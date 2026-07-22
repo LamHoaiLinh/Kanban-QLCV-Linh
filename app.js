@@ -2,7 +2,7 @@
   'use strict';
 
   const STORAGE_KEY = 'linh_personal_kanban_v1';
-  const VERSION = 3;
+  const VERSION = 4;
   const DEFAULT_BACKGROUND_ID = 'bg6';
   const DEFAULT_COLUMN_TITLES = ['Đã hoàn thành','Việc cần làm/chưa sắp xếp','Việc hôm nay','Việc ngày mai','Mục tiêu/ý tưởng'];
   const BACKGROUNDS = [
@@ -68,7 +68,7 @@
       'cardDialog','cardForm','cardDialogTitle','cardTitleInput','cardDescriptionInput','checklistEditor','checklistEmpty','addChecklistBtn',
       'labelOptions','cardColumnSelect','deleteCardBtn','duplicateCardBtn','columnDialog','columnForm','columnDialogTitle','columnNameInput',
       'deleteColumnBtn','duplicateColumnBtn','backgroundDialog','backgroundOptions','guideDialog','confirmDialog','confirmTitle','confirmMessage','globalTooltip','toast',
-      'clockCurrentTime','clockDayPeriod','clockWeekday','clockDate','timerDisplay','clockStatus','timerMinutesInput','timerSecondsInput','timerStartPauseBtn','timerResetBtn','timerStopAlarmBtn','deskClockWidget'
+      'clockCurrentTime','clockDayPeriod','clockWeekday','clockDate','timerDisplay','clockStatus','timerMinutesInput','timerSecondsInput','timerStartPauseBtn','timerResetBtn','timerStopAlarmBtn','deskClockWidget','deskClockControls','clockToggleBtn'
     ].forEach(id => refs[id] = document.getElementById(id));
   }
 
@@ -121,6 +121,7 @@
     refs.exportBtn.addEventListener('click', exportData);
     refs.importBtn.addEventListener('click', () => refs.importFile.click());
     refs.importFile.addEventListener('change', importData);
+    refs.clockToggleBtn.addEventListener('click', toggleClockExpanded);
     refs.timerStartPauseBtn.addEventListener('click', toggleCountdown);
     refs.timerResetBtn.addEventListener('click', resetCountdown);
     refs.timerStopAlarmBtn.addEventListener('click', stopAlarm);
@@ -792,7 +793,7 @@
   }
 
   function createDefaultClockSettings() {
-    return {durationSec:1500,remainingSec:1500,endAt:null,running:false,alarmActive:false};
+    return {durationSec:1500,remainingSec:1500,endAt:null,running:false,alarmActive:false,expanded:false};
   }
 
   function normalizeClockSettings(input) {
@@ -811,7 +812,7 @@
         }
       }
     }
-    return {durationSec,remainingSec: running && !endAt ? durationSec : remainingSec,endAt,running:Boolean(endAt),alarmActive:Boolean(input?.alarmActive)};
+    return {durationSec,remainingSec: running && !endAt ? durationSec : remainingSec,endAt,running:Boolean(endAt),alarmActive:Boolean(input?.alarmActive),expanded:Boolean(input?.expanded)};
   }
 
   function initClockWidget() {
@@ -819,6 +820,15 @@
     if (!clockTickTimer) clockTickTimer = setInterval(updateClockWidget, 1000);
     updateClockWidget();
   }
+
+
+  function toggleClockExpanded() {
+    const clock = state.settings.clock || (state.settings.clock = createDefaultClockSettings());
+    clock.expanded = !clock.expanded;
+    saveNow();
+    updateClockWidget();
+  }
+
 
   function updateClockWidget() {
     const now = new Date();
@@ -846,6 +856,13 @@
     refs.timerStartPauseBtn.textContent = clock.running ? 'Tạm dừng' : (clock.remainingSec > 0 && clock.remainingSec !== clock.durationSec ? 'Tiếp tục' : 'Bắt đầu');
     refs.clockStatus.textContent = clock.alarmActive ? 'Đã hết giờ' : clock.running ? 'Đang tập trung' : clock.remainingSec !== clock.durationSec && clock.remainingSec > 0 ? 'Đang tạm dừng' : 'Sẵn sàng';
     refs.timerStopAlarmBtn.hidden = !clock.alarmActive;
+    refs.deskClockControls.hidden = !clock.expanded;
+    refs.clockToggleBtn.setAttribute('aria-expanded', String(clock.expanded));
+    refs.clockToggleBtn.setAttribute('aria-label', clock.expanded ? 'Thu gọn hẹn giờ' : 'Mở hẹn giờ');
+    refs.clockToggleBtn.textContent = clock.expanded ? '▴' : '▾';
+    refs.clockToggleBtn.dataset.tooltip = clock.expanded ? 'Thu gọn phần hẹn giờ' : 'Mở rộng phần hẹn giờ';
+    refs.deskClockWidget.classList.toggle('expanded', clock.expanded);
+    refs.deskClockWidget.classList.toggle('alarm-active', clock.alarmActive);
   }
 
   function syncTimerInputsSoft() {
@@ -926,6 +943,7 @@
     clock.endAt = null;
     clock.running = false;
     clock.alarmActive = true;
+    clock.expanded = true;
     startAlarm();
     saveNow();
     updateClockWidget();

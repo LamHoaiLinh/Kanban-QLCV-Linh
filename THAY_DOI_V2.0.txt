@@ -1,4 +1,4 @@
-Phiên bản 2.1
-- Thêm đồng hồ làm việc tiếng Việt kiểu đồng hồ để bàn, có đếm ngược và chuông báo khi hết giờ.
-- Tự thu nhỏ chữ ở thẻ dự án để hiển thị được đầy đủ hơn.
-- Cập nhật service worker và tài nguyên lên v2.1.
+Phiên bản 2.2
+- Đồng hồ mặc định thu gọn, ưu tiên vùng làm việc.
+- Bấm nút trên đồng hồ để bung phần đặt giờ và nút điều khiển.
+- Canh vị trí đồng hồ lên hàng trên, ngang khu vực nút Hoàn tác.

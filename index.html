@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#79c2a5">
   <meta name="description" content="Kanban cá nhân nhiều dự án, kéo thả kiểu Trello, chạy tĩnh trên GitHub Pages.">
   <title>Kanban Cá Nhân</title>
-  <link rel="manifest" href="manifest.webmanifest?v=2.1">
+  <link rel="manifest" href="manifest.webmanifest?v=2.2">
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=2.1">
+  <link rel="stylesheet" href="styles.css?v=2.2">
 </head>
 <body>
   <div class="app-shell">
@@ -45,34 +45,23 @@
               <button id="editProjectBtn" class="icon-btn subtle" type="button" aria-label="Sửa dự án" data-tooltip="Đổi tên, màu nhận diện hoặc xóa dự án">✎</button>
             </div>
           </div>
-          <div class="header-actions">
-            <button id="undoBtn" class="secondary-btn" type="button" disabled data-tooltip="Hoàn tác thay đổi gần nhất (Ctrl+Z)">↶ Hoàn tác</button>
-            <button id="backgroundBtn" class="icon-btn" type="button" aria-label="Chọn hình nền" data-tooltip="Chọn hình nền cho bảng công việc">▧</button>
-            <button id="themeBtn" class="icon-btn" type="button" aria-label="Đổi giao diện" data-tooltip="Chuyển giữa giao diện sáng và tối">◐</button>
-            <button id="helpBtn" class="icon-btn" type="button" aria-label="Hướng dẫn" data-tooltip="Xem hướng dẫn sử dụng nhanh">?</button>
-          </div>
-        </div>
-        <div class="topbar-sub">
-          <label class="search-box" data-tooltip="Tìm theo tên, mô tả, nhãn hoặc checklist. Nhấn phím / để mở nhanh.">
-            <span>⌕</span>
-            <input id="searchInput" type="search" placeholder="Tìm trong dự án..." autocomplete="off">
-            <kbd>/</kbd>
-          </label>
-          <div id="projectStats" class="project-stats"></div>
           <section id="deskClockWidget" class="desk-clock" aria-label="Đồng hồ làm việc" data-tooltip="Đồng hồ làm việc: xem giờ hiện tại và dùng bộ đếm ngược để đo thời gian tập trung.">
-            <div class="desk-clock-face">
-              <div class="desk-clock-main">
-                <div id="clockDayPeriod" class="clock-day-period">Sáng</div>
-                <div id="clockCurrentTime" class="clock-current-time">08:00</div>
-                <div class="clock-date-line"><span id="clockWeekday">Thứ Hai</span><span id="clockDate">01/01/2026</span></div>
+            <div class="desk-clock-head">
+              <div class="desk-clock-face">
+                <div class="desk-clock-main">
+                  <div id="clockDayPeriod" class="clock-day-period">Sáng</div>
+                  <div id="clockCurrentTime" class="clock-current-time">08:00</div>
+                  <div class="clock-date-line"><span id="clockWeekday">Thứ Hai</span><span id="clockDate">01/01/2026</span></div>
+                </div>
+                <div class="desk-clock-side">
+                  <div class="clock-side-title">Đếm ngược</div>
+                  <div id="timerDisplay" class="timer-display">25:00</div>
+                  <div id="clockStatus" class="clock-status">Sẵn sàng</div>
+                </div>
               </div>
-              <div class="desk-clock-side">
-                <div class="clock-side-title">Đếm ngược</div>
-                <div id="timerDisplay" class="timer-display">25:00</div>
-                <div id="clockStatus" class="clock-status">Sẵn sàng</div>
-              </div>
+              <button id="clockToggleBtn" class="icon-btn clock-toggle-btn" type="button" aria-label="Mở hẹn giờ" aria-expanded="false" aria-controls="deskClockControls" data-tooltip="Mở rộng hoặc thu gọn phần hẹn giờ">▾</button>
             </div>
-            <div class="desk-clock-controls">
+            <div id="deskClockControls" class="desk-clock-controls" hidden>
               <div class="timer-input-group" data-tooltip="Thiết lập thời lượng đếm ngược tùy chỉnh">
                 <label><span>Phút</span><input id="timerMinutesInput" type="number" min="0" max="999" step="1" value="25"></label>
                 <label><span>Giây</span><input id="timerSecondsInput" type="number" min="0" max="59" step="1" value="0"></label>
@@ -89,6 +78,20 @@
               </div>
             </div>
           </section>
+          <div class="header-actions">
+            <button id="undoBtn" class="secondary-btn" type="button" disabled data-tooltip="Hoàn tác thay đổi gần nhất (Ctrl+Z)">↶ Hoàn tác</button>
+            <button id="backgroundBtn" class="icon-btn" type="button" aria-label="Chọn hình nền" data-tooltip="Chọn hình nền cho bảng công việc">▧</button>
+            <button id="themeBtn" class="icon-btn" type="button" aria-label="Đổi giao diện" data-tooltip="Chuyển giữa giao diện sáng và tối">◐</button>
+            <button id="helpBtn" class="icon-btn" type="button" aria-label="Hướng dẫn" data-tooltip="Xem hướng dẫn sử dụng nhanh">?</button>
+          </div>
+        </div>
+        <div class="topbar-sub">
+          <label class="search-box" data-tooltip="Tìm theo tên, mô tả, nhãn hoặc checklist. Nhấn phím / để mở nhanh.">
+            <span>⌕</span>
+            <input id="searchInput" type="search" placeholder="Tìm trong dự án..." autocomplete="off">
+            <kbd>/</kbd>
+          </label>
+          <div id="projectStats" class="project-stats"></div>
           <div id="saveStatus" class="save-status">Đã lưu</div>
         </div>
       </header>
@@ -201,7 +204,7 @@
 
   <div id="globalTooltip" class="global-tooltip" role="tooltip" hidden></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="dragdrop.js?v=2.1"></script>
-  <script src="app.js?v=2.1"></script>
+  <script src="dragdrop.js?v=2.2"></script>
+  <script src="app.js?v=2.2"></script>
 </body>
 </html>

@@ -42,3 +42,9 @@
 ## Cập nhật v2.1
 - Thêm đồng hồ làm việc tiếng Việt ở khu vực đầu trang, có bộ đếm ngược tùy chỉnh và chuông báo khi hết giờ.
 - Tên dự án ở thanh bên tự giảm cỡ chữ để đọc được đầy đủ hơn.
+
+
+## Cập nhật v2.2
+- Đồng hồ mặc định thu gọn để ưu tiên không gian bảng công việc.
+- Chỉ khi bấm nút mở rộng trên đồng hồ thì phần đặt giờ và nút hẹn giờ mới hiện ra.
+- Đồng hồ được đưa lên hàng trên và canh ngang với khu vực nút Hoàn tác.
