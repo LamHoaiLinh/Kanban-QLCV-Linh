@@ -37,3 +37,8 @@
 - Đây là static site, không có máy chủ và không có tài khoản.
 - Dữ liệu chỉ lưu trong trình duyệt đang sử dụng.
 - Khi đổi máy hoặc đổi trình duyệt, dùng **Xuất bản sao JSON** và **Nhập dữ liệu**.
+
+
+## Cập nhật v2.1
+- Thêm đồng hồ làm việc tiếng Việt ở khu vực đầu trang, có bộ đếm ngược tùy chỉnh và chuông báo khi hết giờ.
+- Tên dự án ở thanh bên tự giảm cỡ chữ để đọc được đầy đủ hơn.

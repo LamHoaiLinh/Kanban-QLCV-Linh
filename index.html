@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#79c2a5">
   <meta name="description" content="Kanban cá nhân nhiều dự án, kéo thả kiểu Trello, chạy tĩnh trên GitHub Pages.">
   <title>Kanban Cá Nhân</title>
-  <link rel="manifest" href="manifest.webmanifest?v=2.0">
+  <link rel="manifest" href="manifest.webmanifest?v=2.1">
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=2.0">
+  <link rel="stylesheet" href="styles.css?v=2.1">
 </head>
 <body>
   <div class="app-shell">
@@ -59,6 +59,36 @@
             <kbd>/</kbd>
           </label>
           <div id="projectStats" class="project-stats"></div>
+          <section id="deskClockWidget" class="desk-clock" aria-label="Đồng hồ làm việc" data-tooltip="Đồng hồ làm việc: xem giờ hiện tại và dùng bộ đếm ngược để đo thời gian tập trung.">
+            <div class="desk-clock-face">
+              <div class="desk-clock-main">
+                <div id="clockDayPeriod" class="clock-day-period">Sáng</div>
+                <div id="clockCurrentTime" class="clock-current-time">08:00</div>
+                <div class="clock-date-line"><span id="clockWeekday">Thứ Hai</span><span id="clockDate">01/01/2026</span></div>
+              </div>
+              <div class="desk-clock-side">
+                <div class="clock-side-title">Đếm ngược</div>
+                <div id="timerDisplay" class="timer-display">25:00</div>
+                <div id="clockStatus" class="clock-status">Sẵn sàng</div>
+              </div>
+            </div>
+            <div class="desk-clock-controls">
+              <div class="timer-input-group" data-tooltip="Thiết lập thời lượng đếm ngược tùy chỉnh">
+                <label><span>Phút</span><input id="timerMinutesInput" type="number" min="0" max="999" step="1" value="25"></label>
+                <label><span>Giây</span><input id="timerSecondsInput" type="number" min="0" max="59" step="1" value="0"></label>
+              </div>
+              <div class="timer-button-row">
+                <button id="timerStartPauseBtn" class="primary-btn compact-btn" type="button" data-tooltip="Bắt đầu hoặc tạm dừng bộ đếm ngược">Bắt đầu</button>
+                <button id="timerResetBtn" class="secondary-btn compact-btn" type="button" data-tooltip="Đặt lại bộ đếm ngược theo thời lượng đã nhập">Đặt lại</button>
+                <button id="timerStopAlarmBtn" class="danger-btn compact-btn" type="button" hidden data-tooltip="Tắt chuông báo khi hết giờ">Tắt chuông</button>
+              </div>
+              <div class="timer-presets" aria-label="Thời gian mẫu">
+                <button class="ghost-btn timer-preset" type="button" data-minutes="25" data-tooltip="Đặt nhanh 25 phút">25p</button>
+                <button class="ghost-btn timer-preset" type="button" data-minutes="50" data-tooltip="Đặt nhanh 50 phút">50p</button>
+                <button class="ghost-btn timer-preset" type="button" data-minutes="90" data-tooltip="Đặt nhanh 90 phút">90p</button>
+              </div>
+            </div>
+          </section>
           <div id="saveStatus" class="save-status">Đã lưu</div>
         </div>
       </header>
@@ -171,7 +201,7 @@
 
   <div id="globalTooltip" class="global-tooltip" role="tooltip" hidden></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="dragdrop.js?v=2.0"></script>
-  <script src="app.js?v=2.0"></script>
+  <script src="dragdrop.js?v=2.1"></script>
+  <script src="app.js?v=2.1"></script>
 </body>
 </html>

@@ -70,3 +70,61 @@ body.has-background .task-card{background:color-mix(in srgb,var(--panel) 93%,tra
   .header-actions .icon-btn{width:34px;height:34px}
   .global-tooltip{display:none!important}
 }
+
+
+/* ===== Nâng cấp v2.1: đồng hồ làm việc + tự thu nhỏ tên dự án ===== */
+.project-select{min-height:44px}
+.project-label{display:block;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:650;line-height:1.1;transform-origin:left center}
+.project-label.two-line{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;line-height:1.05}
+.project-card-count{align-self:center}
+
+.topbar-sub{align-items:flex-start}
+.desk-clock{margin-left:auto;display:grid;gap:10px;min-width:360px;max-width:450px;padding:12px 14px;border:1px solid var(--border);border-radius:18px;background:color-mix(in srgb,var(--panel) 92%,transparent);box-shadow:var(--shadow-soft);backdrop-filter:blur(12px)}
+.desk-clock-face{display:grid;grid-template-columns:minmax(0,1fr) 128px;gap:12px;align-items:center}
+.desk-clock-main{padding:10px 12px;border-radius:16px;background:linear-gradient(180deg,#fdfdfd,#eff2ef);border:1px solid rgba(0,0,0,.06);box-shadow:inset 0 1px 0 rgba(255,255,255,.8)}
+:root[data-theme="dark"] .desk-clock-main{background:linear-gradient(180deg,#1a1f1c,#121614);border-color:rgba(255,255,255,.06)}
+.clock-day-period{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.clock-current-time,.timer-display{font-family:"SFMono-Regular","Roboto Mono","Courier New",monospace;font-variant-numeric:tabular-nums;letter-spacing:-.05em;color:#111}
+:root[data-theme="dark"] .clock-current-time,:root[data-theme="dark"] .timer-display{color:#f3f7f5}
+.clock-current-time{font-size:clamp(28px,2.5vw,42px);font-weight:800;line-height:1}
+.clock-date-line{display:flex;justify-content:space-between;gap:10px;margin-top:8px;color:var(--muted);font-size:12px;font-weight:700}
+.desk-clock-side{display:grid;gap:5px;align-content:start;padding:8px 10px;border-radius:14px;background:var(--panel-soft);border:1px solid var(--border)}
+.clock-side-title{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.timer-display{font-size:29px;font-weight:800;line-height:1.05}
+.clock-status{font-size:12px;font-weight:700;color:var(--green-dark)}
+.desk-clock-controls{display:grid;gap:9px}
+.timer-input-group{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.timer-input-group label{display:grid;gap:4px}
+.timer-input-group span{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.timer-input-group input{width:100%;border:1px solid var(--border);border-radius:11px;background:var(--panel-soft);color:var(--text);padding:8px 10px;font-weight:700}
+.timer-button-row{display:flex;flex-wrap:wrap;gap:8px}
+.compact-btn{padding:8px 11px;font-size:12px}
+.timer-presets{display:flex;gap:8px;flex-wrap:wrap}
+.timer-presets .ghost-btn{padding:7px 10px;border:1px solid var(--border);border-radius:999px;background:var(--panel);font-size:12px}
+.timer-presets .ghost-btn:hover{background:var(--green-soft);color:var(--green-dark)}
+body.has-background .desk-clock{background:color-mix(in srgb,var(--panel) 82%,transparent)}
+
+@media(min-width:901px){
+  .project-select{padding-top:9px;padding-bottom:9px}
+  .project-label{font-size:15px}
+}
+
+@media(max-width:1200px){
+  .desk-clock{min-width:330px;max-width:400px}
+  .clock-current-time{font-size:34px}
+}
+
+@media(max-width:900px){
+  .desk-clock{order:3;min-width:100%;max-width:none;margin-left:0}
+  .save-status{order:4;margin-left:0}
+  .topbar-sub{align-items:stretch}
+}
+
+@media(max-width:560px){
+  .desk-clock{padding:10px 10px 12px;border-radius:16px}
+  .desk-clock-face{grid-template-columns:1fr}
+  .desk-clock-side{grid-template-columns:1fr auto;align-items:end}
+  .clock-current-time{font-size:30px}
+  .timer-display{font-size:24px}
+  .timer-button-row button{flex:1}
+}

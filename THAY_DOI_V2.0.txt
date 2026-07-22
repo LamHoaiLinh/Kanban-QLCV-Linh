@@ -1,8 +1,4 @@
-KANBAN CÁ NHÂN v2.0
-- Thêm 9 hình nền, mặc định Beautiful Background6.
-- Thêm tooltip và cửa sổ hướng dẫn nhanh.
-- Hiển thị 5 cột trên màn hình desktop phổ biến từ 1366 px trở lên.
-- Cột mặc định mới: Đã hoàn thành; Việc cần làm/chưa sắp xếp; Việc hôm nay; Việc ngày mai; Mục tiêu/ý tưởng.
-- Kéo thả để sắp xếp dự án ở thanh bên trái.
-- Tự chuyển cấu trúc 4 cột mặc định của v1.0 sang 5 cột mới mà không xóa công việc.
-- Đổi câu hướng dẫn từ “Anh” thành “Bạn”.
+Phiên bản 2.1
+- Thêm đồng hồ làm việc tiếng Việt kiểu đồng hồ để bàn, có đếm ngược và chuông báo khi hết giờ.
+- Tự thu nhỏ chữ ở thẻ dự án để hiển thị được đầy đủ hơn.
+- Cập nhật service worker và tài nguyên lên v2.1.

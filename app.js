@@ -2,7 +2,7 @@
   'use strict';
 
   const STORAGE_KEY = 'linh_personal_kanban_v1';
-  const VERSION = 2;
+  const VERSION = 3;
   const DEFAULT_BACKGROUND_ID = 'bg6';
   const DEFAULT_COLUMN_TITLES = ['Đã hoàn thành','Việc cần làm/chưa sắp xếp','Việc hôm nay','Việc ngày mai','Mục tiêu/ý tưởng'];
   const BACKGROUNDS = [
@@ -40,6 +40,9 @@
   let confirmResolver = null;
   let toastTimer = null;
   let saveTimer = null;
+  let clockTickTimer = null;
+  let alarmTimer = null;
+  let audioContext = null;
 
   document.addEventListener('DOMContentLoaded', init);
 
@@ -52,6 +55,7 @@
     applyTheme();
     applyBackground();
     renderAll();
+    initClockWidget();
     saveNow();
     registerServiceWorker();
   }
@@ -63,7 +67,8 @@
       'emptyState','board','projectDialog','projectForm','projectDialogTitle','projectNameInput','projectColorOptions','deleteProjectBtn',
       'cardDialog','cardForm','cardDialogTitle','cardTitleInput','cardDescriptionInput','checklistEditor','checklistEmpty','addChecklistBtn',
       'labelOptions','cardColumnSelect','deleteCardBtn','duplicateCardBtn','columnDialog','columnForm','columnDialogTitle','columnNameInput',
-      'deleteColumnBtn','duplicateColumnBtn','backgroundDialog','backgroundOptions','guideDialog','confirmDialog','confirmTitle','confirmMessage','globalTooltip','toast'
+      'deleteColumnBtn','duplicateColumnBtn','backgroundDialog','backgroundOptions','guideDialog','confirmDialog','confirmTitle','confirmMessage','globalTooltip','toast',
+      'clockCurrentTime','clockDayPeriod','clockWeekday','clockDate','timerDisplay','clockStatus','timerMinutesInput','timerSecondsInput','timerStartPauseBtn','timerResetBtn','timerStopAlarmBtn','deskClockWidget'
     ].forEach(id => refs[id] = document.getElementById(id));
   }
 
@@ -116,6 +121,14 @@
     refs.exportBtn.addEventListener('click', exportData);
     refs.importBtn.addEventListener('click', () => refs.importFile.click());
     refs.importFile.addEventListener('change', importData);
+    refs.timerStartPauseBtn.addEventListener('click', toggleCountdown);
+    refs.timerResetBtn.addEventListener('click', resetCountdown);
+    refs.timerStopAlarmBtn.addEventListener('click', stopAlarm);
+    refs.timerMinutesInput.addEventListener('change', handleTimerInputChange);
+    refs.timerSecondsInput.addEventListener('change', handleTimerInputChange);
+    refs.timerMinutesInput.addEventListener('input', syncTimerInputsSoft);
+    refs.timerSecondsInput.addEventListener('input', syncTimerInputsSoft);
+    document.querySelectorAll('.timer-preset').forEach(button => button.addEventListener('click', () => applyTimerPreset(Number(button.dataset.minutes || 0))));
     refs.openSidebarBtn.addEventListener('click', openSidebar);
     refs.closeSidebarBtn.addEventListener('click', closeSidebar);
     refs.sidebarBackdrop.addEventListener('click', closeSidebar);
@@ -149,6 +162,7 @@
     });
     initTooltips();
     window.addEventListener('beforeunload', saveNow);
+    window.addEventListener('resize', fitProjectLabels);
   }
 
   function createDefaultState() {
@@ -165,7 +179,7 @@
     return {
       version:VERSION,
       activeProjectId:projectId,
-      settings:{theme:'light',background:DEFAULT_BACKGROUND_ID,lastExportAt:null},
+      settings:{theme:'light',background:DEFAULT_BACKGROUND_ID,lastExportAt:null,clock:createDefaultClockSettings()},
       projects:[{id:projectId,name:'Công việc của tôi',color:PROJECT_COLORS[0],createdAt:nowIso(),updatedAt:nowIso(),columns}]
     };
   }
@@ -195,7 +209,7 @@
     const normalized = {
       version:VERSION,
       activeProjectId:input.activeProjectId || input.projects[0]?.id || null,
-      settings:{theme:input.settings?.theme === 'dark' ? 'dark' : 'light',background,lastExportAt:input.settings?.lastExportAt || null},
+      settings:{theme:input.settings?.theme === 'dark' ? 'dark' : 'light',background,lastExportAt:input.settings?.lastExportAt || null,clock:normalizeClockSettings(input.settings?.clock)},
       projects:input.projects.map(project => ({
         id:String(project.id || uid('project')),
         name:String(project.name || 'Dự án chưa đặt tên').slice(0,80),
@@ -294,6 +308,7 @@
         onEnd:syncProjectOrderFromDom
       });
     }
+    requestAnimationFrame(fitProjectLabels);
   }
 
   function syncProjectOrderFromDom() {
@@ -730,6 +745,7 @@
       ensureActiveProject();
       applyTheme();
       applyBackground();
+      initClockWidget();
       saveNow();
       renderAll();
       showToast('Đã nhập dữ liệu thành công.');
@@ -773,6 +789,215 @@
       document.documentElement.style.removeProperty('--board-bg-image');
       document.body.classList.remove('has-background');
     }
+  }
+
+  function createDefaultClockSettings() {
+    return {durationSec:1500,remainingSec:1500,endAt:null,running:false,alarmActive:false};
+  }
+
+  function normalizeClockSettings(input) {
+    const defaults = createDefaultClockSettings();
+    const durationSec = Number.isFinite(Number(input?.durationSec)) ? Math.max(1,Math.min(359999,Math.round(Number(input.durationSec)))) : defaults.durationSec;
+    let remainingSec = Number.isFinite(Number(input?.remainingSec)) ? Math.max(0,Math.min(359999,Math.round(Number(input.remainingSec)))) : durationSec;
+    const running = Boolean(input?.running && input?.endAt);
+    let endAt = null;
+    if (running) {
+      const parsed = new Date(input.endAt).getTime();
+      if (Number.isFinite(parsed)) {
+        const rest = Math.ceil((parsed - Date.now()) / 1000);
+        if (rest > 0) {
+          remainingSec = rest;
+          endAt = new Date(Date.now() + rest * 1000).toISOString();
+        }
+      }
+    }
+    return {durationSec,remainingSec: running && !endAt ? durationSec : remainingSec,endAt,running:Boolean(endAt),alarmActive:Boolean(input?.alarmActive)};
+  }
+
+  function initClockWidget() {
+    if (!state.settings.clock) state.settings.clock = createDefaultClockSettings();
+    if (!clockTickTimer) clockTickTimer = setInterval(updateClockWidget, 1000);
+    updateClockWidget();
+  }
+
+  function updateClockWidget() {
+    const now = new Date();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    const seconds = now.getSeconds();
+    const period = hours < 12 ? 'Sáng' : hours < 18 ? 'Chiều' : 'Tối';
+    const weekdayNames = ['Chủ nhật','Thứ Hai','Thứ Ba','Thứ Tư','Thứ Năm','Thứ Sáu','Thứ Bảy'];
+    refs.clockDayPeriod.textContent = period;
+    refs.clockCurrentTime.textContent = `${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
+    refs.clockWeekday.textContent = weekdayNames[now.getDay()];
+    refs.clockDate.textContent = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()}`;
+
+    const clock = state.settings.clock || (state.settings.clock = createDefaultClockSettings());
+    if (clock.running && clock.endAt) {
+      const remain = Math.max(0, Math.ceil((new Date(clock.endAt).getTime() - Date.now()) / 1000));
+      clock.remainingSec = remain;
+      if (remain <= 0) finishCountdown();
+    }
+    refs.timerDisplay.textContent = formatCountdown(clock.remainingSec);
+    if (!clock.running) {
+      refs.timerMinutesInput.value = Math.floor(clock.durationSec / 60);
+      refs.timerSecondsInput.value = clock.durationSec % 60;
+    }
+    refs.timerStartPauseBtn.textContent = clock.running ? 'Tạm dừng' : (clock.remainingSec > 0 && clock.remainingSec !== clock.durationSec ? 'Tiếp tục' : 'Bắt đầu');
+    refs.clockStatus.textContent = clock.alarmActive ? 'Đã hết giờ' : clock.running ? 'Đang tập trung' : clock.remainingSec !== clock.durationSec && clock.remainingSec > 0 ? 'Đang tạm dừng' : 'Sẵn sàng';
+    refs.timerStopAlarmBtn.hidden = !clock.alarmActive;
+  }
+
+  function syncTimerInputsSoft() {
+    refs.timerMinutesInput.value = sanitizeInteger(refs.timerMinutesInput.value,0,999);
+    refs.timerSecondsInput.value = sanitizeInteger(refs.timerSecondsInput.value,0,59);
+  }
+
+  function handleTimerInputChange() {
+    syncTimerInputsSoft();
+    const durationSec = getTimerInputSeconds();
+    const clock = state.settings.clock || (state.settings.clock = createDefaultClockSettings());
+    clock.durationSec = durationSec;
+    if (!clock.running) clock.remainingSec = durationSec;
+    saveNow();
+    updateClockWidget();
+  }
+
+  function getTimerInputSeconds() {
+    const minutes = sanitizeInteger(refs.timerMinutesInput.value,0,999);
+    const seconds = sanitizeInteger(refs.timerSecondsInput.value,0,59);
+    refs.timerMinutesInput.value = minutes;
+    refs.timerSecondsInput.value = seconds;
+    return Math.max(1, minutes * 60 + seconds);
+  }
+
+  function applyTimerPreset(minutes) {
+    const safeMinutes = Math.max(0, Math.min(999, Math.round(minutes || 0)));
+    refs.timerMinutesInput.value = safeMinutes;
+    refs.timerSecondsInput.value = 0;
+    stopAlarm();
+    const clock = state.settings.clock || (state.settings.clock = createDefaultClockSettings());
+    clock.durationSec = Math.max(1, safeMinutes * 60);
+    clock.remainingSec = clock.durationSec;
+    clock.endAt = null;
+    clock.running = false;
+    saveNow();
+    updateClockWidget();
+    showToast(`Đã đặt nhanh ${safeMinutes} phút.`);
+  }
+
+  function toggleCountdown() {
+    const clock = state.settings.clock || (state.settings.clock = createDefaultClockSettings());
+    stopAlarm();
+    if (clock.running) {
+      clock.remainingSec = Math.max(0, Math.ceil((new Date(clock.endAt).getTime() - Date.now()) / 1000));
+      clock.endAt = null;
+      clock.running = false;
+      saveNow();
+      updateClockWidget();
+      return;
+    }
+    if (clock.remainingSec <= 0 || clock.remainingSec === clock.durationSec) {
+      clock.durationSec = getTimerInputSeconds();
+      clock.remainingSec = clock.durationSec;
+    }
+    clock.endAt = new Date(Date.now() + clock.remainingSec * 1000).toISOString();
+    clock.running = true;
+    saveNow();
+    updateClockWidget();
+  }
+
+  function resetCountdown() {
+    stopAlarm();
+    const clock = state.settings.clock || (state.settings.clock = createDefaultClockSettings());
+    clock.durationSec = getTimerInputSeconds();
+    clock.remainingSec = clock.durationSec;
+    clock.endAt = null;
+    clock.running = false;
+    saveNow();
+    updateClockWidget();
+    showToast('Đã đặt lại bộ đếm ngược.');
+  }
+
+  function finishCountdown() {
+    const clock = state.settings.clock || (state.settings.clock = createDefaultClockSettings());
+    if (clock.alarmActive) return;
+    clock.remainingSec = 0;
+    clock.endAt = null;
+    clock.running = false;
+    clock.alarmActive = true;
+    startAlarm();
+    saveNow();
+    updateClockWidget();
+    showToast('Đã hết giờ làm việc.');
+  }
+
+  function startAlarm() {
+    stopAlarm(false);
+    playBeep();
+    alarmTimer = setInterval(playBeep, 1300);
+  }
+
+  function stopAlarm(update=true) {
+    if (alarmTimer) clearInterval(alarmTimer);
+    alarmTimer = null;
+    const clock = state?.settings?.clock;
+    if (clock) clock.alarmActive = false;
+    if (update) {
+      saveNow();
+      updateClockWidget();
+    }
+  }
+
+  function playBeep() {
+    try {
+      if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioContext.state === 'suspended') audioContext.resume();
+      const now = audioContext.currentTime;
+      const osc = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, now);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.18, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+      osc.connect(gain);
+      gain.connect(audioContext.destination);
+      osc.start(now);
+      osc.stop(now + 0.36);
+    } catch (error) {
+      console.warn('Audio alarm:', error);
+    }
+  }
+
+  function formatCountdown(totalSeconds) {
+    const safe = Math.max(0, Math.round(totalSeconds || 0));
+    const hours = Math.floor(safe / 3600);
+    const minutes = Math.floor((safe % 3600) / 60);
+    const seconds = safe % 60;
+    return hours > 0 ? `${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}` : `${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}`;
+  }
+
+  function sanitizeInteger(value,min,max) {
+    const num = Number.parseInt(String(value),10);
+    const safe = Number.isFinite(num) ? num : min;
+    return Math.max(min,Math.min(max,safe));
+  }
+
+  function fitProjectLabels() {
+    refs.projectList.querySelectorAll('.project-label').forEach(label => {
+      label.classList.remove('two-line');
+      let size = 15;
+      label.style.fontSize = `${size}px`;
+      while (label.scrollWidth > label.clientWidth + 1 && size > 10) {
+        size -= 0.5;
+        label.style.fontSize = `${size}px`;
+      }
+      if (label.scrollWidth > label.clientWidth + 1) {
+        label.classList.add('two-line');
+        label.style.fontSize = '10px';
+      }
+    });
   }
 
   function getActiveProject() {
