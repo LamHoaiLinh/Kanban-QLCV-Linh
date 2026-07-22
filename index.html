@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#79c2a5">
+  <meta name="description" content="Kanban cá nhân nhiều dự án, kéo thả kiểu Trello, chạy tĩnh trên GitHub Pages.">
+  <title>Kanban Cá Nhân</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside id="sidebar" class="sidebar" aria-label="Danh sách dự án">
+      <div class="brand-row">
+        <div class="brand-mark">✓</div>
+        <div class="brand-copy">
+          <div class="brand-name">Kanban cá nhân</div>
+          <div class="brand-subtitle">Gọn việc, rõ đầu mục</div>
+        </div>
+        <button id="closeSidebarBtn" class="icon-btn mobile-only" type="button" aria-label="Đóng">×</button>
+      </div>
+      <div class="sidebar-title"><span>Dự án</span><span id="projectCount" class="count-badge">0</span></div>
+      <nav id="projectList" class="project-list"></nav>
+      <button id="addProjectBtn" class="primary-btn full-width" type="button">＋ Thêm dự án</button>
+      <div class="sidebar-spacer"></div>
+      <div class="sidebar-tools">
+        <button id="exportBtn" class="secondary-btn full-width" type="button">Xuất bản sao JSON</button>
+        <button id="importBtn" class="ghost-btn full-width" type="button">Nhập dữ liệu</button>
+        <input id="importFile" type="file" accept="application/json,.json" hidden>
+        <div class="storage-note">Dữ liệu tự lưu trong trình duyệt này.</div>
+      </div>
+    </aside>
+    <div id="sidebarBackdrop" class="sidebar-backdrop" hidden></div>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div class="topbar-main">
+          <button id="openSidebarBtn" class="icon-btn mobile-only" type="button" aria-label="Mở danh sách dự án">☰</button>
+          <div class="title-wrap">
+            <div class="eyebrow">DỰ ÁN ĐANG MỞ</div>
+            <div class="title-row">
+              <h1 id="activeProjectName">Dự án</h1>
+              <button id="editProjectBtn" class="icon-btn subtle" type="button" aria-label="Sửa dự án" title="Sửa dự án">✎</button>
+            </div>
+          </div>
+          <div class="header-actions">
+            <button id="undoBtn" class="secondary-btn" type="button" disabled>↶ Hoàn tác</button>
+            <button id="themeBtn" class="icon-btn" type="button" aria-label="Đổi giao diện" title="Đổi giao diện">◐</button>
+          </div>
+        </div>
+        <div class="topbar-sub">
+          <label class="search-box">
+            <span>⌕</span>
+            <input id="searchInput" type="search" placeholder="Tìm trong dự án..." autocomplete="off">
+            <kbd>/</kbd>
+          </label>
+          <div id="projectStats" class="project-stats"></div>
+          <div id="saveStatus" class="save-status">Đã lưu</div>
+        </div>
+      </header>
+
+      <section class="board-area">
+        <div id="emptyState" class="empty-state" hidden>
+          <div class="empty-icon">▦</div>
+          <h2>Chưa có dự án</h2>
+          <p>Tạo dự án đầu tiên để bắt đầu quản lý công việc.</p>
+          <button id="emptyAddProjectBtn" class="primary-btn" type="button">Tạo dự án</button>
+        </div>
+        <div id="board" class="board" aria-label="Bảng công việc"></div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="projectDialog" class="modal">
+    <form id="projectForm" class="modal-card compact-modal">
+      <div class="modal-header">
+        <div><div class="eyebrow">THÔNG TIN DỰ ÁN</div><h2 id="projectDialogTitle">Tạo dự án</h2></div>
+        <button class="icon-btn" data-close="projectDialog" type="button">×</button>
+      </div>
+      <label class="field"><span>Tên dự án</span><input id="projectNameInput" maxlength="80" required placeholder="Ví dụ: Công việc công ty"></label>
+      <fieldset class="field color-fieldset"><legend>Màu nhận diện</legend><div id="projectColorOptions" class="color-options"></div></fieldset>
+      <div class="modal-actions split-actions">
+        <button id="deleteProjectBtn" class="danger-btn" type="button" hidden>Xóa dự án</button>
+        <div class="right-actions"><button class="secondary-btn" data-close="projectDialog" type="button">Hủy</button><button class="primary-btn" type="submit">Lưu</button></div>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="cardDialog" class="modal">
+    <form id="cardForm" class="modal-card">
+      <div class="modal-header">
+        <div><div class="eyebrow">CHI TIẾT CÔNG VIỆC</div><h2 id="cardDialogTitle">Thêm công việc</h2></div>
+        <button class="icon-btn" data-close="cardDialog" type="button">×</button>
+      </div>
+      <div class="card-form-grid">
+        <div class="card-form-main">
+          <label class="field"><span>Tên công việc</span><input id="cardTitleInput" maxlength="160" required placeholder="Việc cần làm"></label>
+          <label class="field"><span>Mô tả</span><textarea id="cardDescriptionInput" rows="6" maxlength="4000" placeholder="Ghi chú, nội dung hoặc cách xử lý..."></textarea></label>
+          <div class="field">
+            <div class="field-heading"><span>Danh sách kiểm tra</span><button id="addChecklistBtn" class="small-btn" type="button">＋ Thêm dòng</button></div>
+            <div id="checklistEditor" class="checklist-editor"></div>
+            <div id="checklistEmpty" class="inline-empty">Chưa có mục kiểm tra.</div>
+          </div>
+        </div>
+        <aside class="card-form-side">
+          <div class="field"><span>Nhãn phân loại</span><div id="labelOptions" class="label-options"></div></div>
+          <label class="field"><span>Chuyển sang cột</span><select id="cardColumnSelect"></select></label>
+          <div class="editor-tip">Kéo biểu tượng ⠿ để đổi vị trí thẻ hoặc cột.</div>
+        </aside>
+      </div>
+      <div class="modal-actions split-actions">
+        <div class="left-actions"><button id="deleteCardBtn" class="danger-btn" type="button" hidden>Xóa</button><button id="duplicateCardBtn" class="secondary-btn" type="button" hidden>Nhân bản</button></div>
+        <div class="right-actions"><button class="secondary-btn" data-close="cardDialog" type="button">Hủy</button><button class="primary-btn" type="submit">Lưu công việc</button></div>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="columnDialog" class="modal">
+    <form id="columnForm" class="modal-card compact-modal">
+      <div class="modal-header">
+        <div><div class="eyebrow">THÔNG TIN CỘT</div><h2 id="columnDialogTitle">Thêm cột</h2></div>
+        <button class="icon-btn" data-close="columnDialog" type="button">×</button>
+      </div>
+      <label class="field"><span>Tên cột</span><input id="columnNameInput" maxlength="80" required placeholder="Ví dụ: Đang xử lý"></label>
+      <div class="modal-actions split-actions">
+        <div class="left-actions"><button id="deleteColumnBtn" class="danger-btn" type="button" hidden>Xóa cột</button><button id="duplicateColumnBtn" class="secondary-btn" type="button" hidden>Nhân bản</button></div>
+        <div class="right-actions"><button class="secondary-btn" data-close="columnDialog" type="button">Hủy</button><button class="primary-btn" type="submit">Lưu</button></div>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="confirmDialog" class="modal">
+    <form method="dialog" class="modal-card confirm-card">
+      <div class="confirm-icon">!</div><h2 id="confirmTitle">Xác nhận</h2><p id="confirmMessage"></p>
+      <div class="modal-actions centered-actions"><button class="secondary-btn" value="cancel">Hủy</button><button class="danger-btn" value="ok">Xác nhận</button></div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="dragdrop.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

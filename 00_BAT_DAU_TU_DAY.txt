@@ -1,0 +1,5 @@
+KANBAN CÁ NHÂN – BẮT ĐẦU
+1. Muốn chạy thử trên Windows: nhấp đúp BAT_CHAY_THU.bat.
+2. Muốn đưa lên GitHub Pages: đọc README_HUONG_DAN.md.
+3. Phải giải nén trước khi upload. Không upload nguyên file ZIP rồi mong GitHub tự giải nén.
+4. Sau khi dùng, nhớ bấm “Xuất bản sao JSON” định kỳ vì dữ liệu nằm trong trình duyệt.
