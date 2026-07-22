@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#79c2a5">
   <meta name="description" content="Kanban cá nhân nhiều dự án, kéo thả kiểu Trello, chạy tĩnh trên GitHub Pages.">
   <title>Kanban Cá Nhân</title>
-  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="manifest" href="manifest.webmanifest?v=2.0">
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=2.0">
 </head>
 <body>
   <div class="app-shell">
@@ -23,11 +23,11 @@
       </div>
       <div class="sidebar-title"><span>Dự án</span><span id="projectCount" class="count-badge">0</span></div>
       <nav id="projectList" class="project-list"></nav>
-      <button id="addProjectBtn" class="primary-btn full-width" type="button">＋ Thêm dự án</button>
+      <button id="addProjectBtn" class="primary-btn full-width" type="button" data-tooltip="Tạo một dự án mới với 5 cột mặc định">＋ Thêm dự án</button>
       <div class="sidebar-spacer"></div>
       <div class="sidebar-tools">
-        <button id="exportBtn" class="secondary-btn full-width" type="button">Xuất bản sao JSON</button>
-        <button id="importBtn" class="ghost-btn full-width" type="button">Nhập dữ liệu</button>
+        <button id="exportBtn" class="secondary-btn full-width" type="button" data-tooltip="Tải toàn bộ dự án và công việc về máy dưới dạng JSON">Xuất bản sao JSON</button>
+        <button id="importBtn" class="ghost-btn full-width" type="button" data-tooltip="Khôi phục dữ liệu từ tệp JSON đã xuất trước đó">Nhập dữ liệu</button>
         <input id="importFile" type="file" accept="application/json,.json" hidden>
         <div class="storage-note">Dữ liệu tự lưu trong trình duyệt này.</div>
       </div>
@@ -42,16 +42,18 @@
             <div class="eyebrow">DỰ ÁN ĐANG MỞ</div>
             <div class="title-row">
               <h1 id="activeProjectName">Dự án</h1>
-              <button id="editProjectBtn" class="icon-btn subtle" type="button" aria-label="Sửa dự án" title="Sửa dự án">✎</button>
+              <button id="editProjectBtn" class="icon-btn subtle" type="button" aria-label="Sửa dự án" data-tooltip="Đổi tên, màu nhận diện hoặc xóa dự án">✎</button>
             </div>
           </div>
           <div class="header-actions">
-            <button id="undoBtn" class="secondary-btn" type="button" disabled>↶ Hoàn tác</button>
-            <button id="themeBtn" class="icon-btn" type="button" aria-label="Đổi giao diện" title="Đổi giao diện">◐</button>
+            <button id="undoBtn" class="secondary-btn" type="button" disabled data-tooltip="Hoàn tác thay đổi gần nhất (Ctrl+Z)">↶ Hoàn tác</button>
+            <button id="backgroundBtn" class="icon-btn" type="button" aria-label="Chọn hình nền" data-tooltip="Chọn hình nền cho bảng công việc">▧</button>
+            <button id="themeBtn" class="icon-btn" type="button" aria-label="Đổi giao diện" data-tooltip="Chuyển giữa giao diện sáng và tối">◐</button>
+            <button id="helpBtn" class="icon-btn" type="button" aria-label="Hướng dẫn" data-tooltip="Xem hướng dẫn sử dụng nhanh">?</button>
           </div>
         </div>
         <div class="topbar-sub">
-          <label class="search-box">
+          <label class="search-box" data-tooltip="Tìm theo tên, mô tả, nhãn hoặc checklist. Nhấn phím / để mở nhanh.">
             <span>⌕</span>
             <input id="searchInput" type="search" placeholder="Tìm trong dự án..." autocomplete="off">
             <kbd>/</kbd>
@@ -131,6 +133,35 @@
     </form>
   </dialog>
 
+  <dialog id="backgroundDialog" class="modal">
+    <form method="dialog" class="modal-card background-modal">
+      <div class="modal-header">
+        <div><div class="eyebrow">TÙY CHỈNH GIAO DIỆN</div><h2>Chọn hình nền</h2></div>
+        <button class="icon-btn" data-close="backgroundDialog" type="button" aria-label="Đóng">×</button>
+      </div>
+      <p class="dialog-note">Hình nền được lưu riêng trên trình duyệt này. Mặc định là “Beautiful Background6”.</p>
+      <div id="backgroundOptions" class="background-options" aria-label="Danh sách hình nền"></div>
+      <div class="modal-actions right-actions"><button class="primary-btn" value="close">Xong</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="guideDialog" class="modal">
+    <form method="dialog" class="modal-card compact-modal guide-modal">
+      <div class="modal-header">
+        <div><div class="eyebrow">HƯỚNG DẪN NHANH</div><h2>Cách sử dụng</h2></div>
+        <button class="icon-btn" data-close="guideDialog" type="button" aria-label="Đóng">×</button>
+      </div>
+      <div class="guide-list">
+        <div><strong>1. Sắp xếp dự án:</strong> kéo biểu tượng ⠿ ở bên trái tên dự án lên hoặc xuống.</div>
+        <div><strong>2. Sắp xếp cột:</strong> kéo biểu tượng ⠿ ở đầu cột sang trái hoặc phải.</div>
+        <div><strong>3. Di chuyển công việc:</strong> kéo biểu tượng ⠿ trên thẻ sang cột khác hoặc đổi thứ tự trong cùng cột.</div>
+        <div><strong>4. Đổi hình nền:</strong> bấm nút ▧ trên thanh công cụ rồi chọn ảnh.</div>
+        <div><strong>5. Sao lưu:</strong> dùng “Xuất bản sao JSON” trước khi đổi máy hoặc xóa dữ liệu trình duyệt.</div>
+      </div>
+      <div class="modal-actions right-actions"><button class="primary-btn" value="close">Đã hiểu</button></div>
+    </form>
+  </dialog>
+
   <dialog id="confirmDialog" class="modal">
     <form method="dialog" class="modal-card confirm-card">
       <div class="confirm-icon">!</div><h2 id="confirmTitle">Xác nhận</h2><p id="confirmMessage"></p>
@@ -138,8 +169,9 @@
     </form>
   </dialog>
 
+  <div id="globalTooltip" class="global-tooltip" role="tooltip" hidden></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="dragdrop.js"></script>
-  <script src="app.js"></script>
+  <script src="dragdrop.js?v=2.0"></script>
+  <script src="app.js?v=2.0"></script>
 </body>
 </html>

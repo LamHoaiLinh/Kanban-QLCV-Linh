@@ -2,7 +2,21 @@
   'use strict';
 
   const STORAGE_KEY = 'linh_personal_kanban_v1';
-  const VERSION = 1;
+  const VERSION = 2;
+  const DEFAULT_BACKGROUND_ID = 'bg6';
+  const DEFAULT_COLUMN_TITLES = ['Đã hoàn thành','Việc cần làm/chưa sắp xếp','Việc hôm nay','Việc ngày mai','Mục tiêu/ý tưởng'];
+  const BACKGROUNDS = [
+    {id:'none',name:'Không dùng hình nền',file:null},
+    {id:'bg6',name:'Beautiful Background6',file:'assets/backgrounds/Beautiful Background6.png'},
+    {id:'bg7',name:'Beautiful Background7',file:'assets/backgrounds/Beautiful Background7.png'},
+    {id:'bg8',name:'Beautiful Background8',file:'assets/backgrounds/Beautiful Background8.png'},
+    {id:'bg13',name:'Beautiful Background13',file:'assets/backgrounds/Beautiful Background13.png'},
+    {id:'bg15',name:'Beautiful Background15',file:'assets/backgrounds/Beautiful Background15.png'},
+    {id:'bg28',name:'Beautiful Background28',file:'assets/backgrounds/Beautiful Background28.png'},
+    {id:'bg33',name:'Beautiful Background33',file:'assets/backgrounds/Beautiful Background33.png'},
+    {id:'bg40',name:'Beautiful Background40',file:'assets/backgrounds/Beautiful Background40.png'},
+    {id:'bg49',name:'Beautiful Background49',file:'assets/backgrounds/Beautiful Background49.png'}
+  ];
   const PROJECT_COLORS = ['#62b493','#f0a66f','#7ba9d8','#a68ad8','#d77e97','#d1a942','#6aa9a4','#9baf6b'];
   const LABELS = [
     {id:'urgent',name:'Ưu tiên',color:'#e76f6f'},
@@ -22,6 +36,7 @@
   let cardEdit = null;
   let columnEditId = null;
   let dragManager = null;
+  let projectDragManager = null;
   let confirmResolver = null;
   let toastTimer = null;
   let saveTimer = null;
@@ -35,18 +50,20 @@
     state = loadState();
     ensureActiveProject();
     applyTheme();
+    applyBackground();
     renderAll();
+    saveNow();
     registerServiceWorker();
   }
 
   function cacheRefs() {
     [
       'sidebar','sidebarBackdrop','openSidebarBtn','closeSidebarBtn','projectCount','projectList','addProjectBtn','emptyAddProjectBtn',
-      'exportBtn','importBtn','importFile','activeProjectName','editProjectBtn','undoBtn','themeBtn','searchInput','projectStats','saveStatus',
+      'exportBtn','importBtn','importFile','activeProjectName','editProjectBtn','undoBtn','backgroundBtn','themeBtn','helpBtn','searchInput','projectStats','saveStatus',
       'emptyState','board','projectDialog','projectForm','projectDialogTitle','projectNameInput','projectColorOptions','deleteProjectBtn',
       'cardDialog','cardForm','cardDialogTitle','cardTitleInput','cardDescriptionInput','checklistEditor','checklistEmpty','addChecklistBtn',
       'labelOptions','cardColumnSelect','deleteCardBtn','duplicateCardBtn','columnDialog','columnForm','columnDialogTitle','columnNameInput',
-      'deleteColumnBtn','duplicateColumnBtn','confirmDialog','confirmTitle','confirmMessage','toast'
+      'deleteColumnBtn','duplicateColumnBtn','backgroundDialog','backgroundOptions','guideDialog','confirmDialog','confirmTitle','confirmMessage','globalTooltip','toast'
     ].forEach(id => refs[id] = document.getElementById(id));
   }
 
@@ -60,6 +77,14 @@
       <label class="label-check">
         <input type="checkbox" name="cardLabel" value="${label.id}">
         <span class="label-chip" style="--label-color:${label.color}">${escapeHtml(label.name)}</span>
+      </label>`).join('');
+    refs.backgroundOptions.innerHTML = BACKGROUNDS.map(background => `
+      <label class="background-option" data-tooltip="Chọn ${escapeAttr(background.name)}">
+        <input type="radio" name="boardBackground" value="${background.id}">
+        <span class="background-preview${background.file ? '' : ' no-background'}">
+          ${background.file ? `<img src="${escapeAttr(background.file)}" alt="">` : '<span>Không nền</span>'}
+        </span>
+        <span class="background-name">${escapeHtml(background.name)}</span>
       </label>`).join('');
   }
 
@@ -84,7 +109,10 @@
       renderBoard();
     });
     refs.undoBtn.addEventListener('click', undo);
+    refs.backgroundBtn.addEventListener('click', openBackgroundDialog);
     refs.themeBtn.addEventListener('click', toggleTheme);
+    refs.helpBtn.addEventListener('click', () => refs.guideDialog.showModal());
+    refs.backgroundOptions.addEventListener('change', changeBackground);
     refs.exportBtn.addEventListener('click', exportData);
     refs.importBtn.addEventListener('click', () => refs.importFile.click());
     refs.importFile.addEventListener('change', importData);
@@ -110,24 +138,26 @@
         refs.searchInput.focus();
       }
       if (event.key.toLowerCase() === 'n' && !typing) {
-        const firstColumn = getActiveProject()?.columns[0];
-        if (firstColumn) openCardDialog(firstColumn.id);
+        const columns = getActiveProject()?.columns || [];
+        const defaultColumn = columns.find(column => /việc cần làm|chưa sắp xếp/i.test(column.title)) || columns[1] || columns[0];
+        if (defaultColumn) openCardDialog(defaultColumn.id);
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z' && !typing) {
         event.preventDefault();
         undo();
       }
     });
+    initTooltips();
     window.addEventListener('beforeunload', saveNow);
   }
 
   function createDefaultState() {
     const projectId = uid('project');
-    const columns = [createColumn('Ý tưởng'),createColumn('Cần làm'),createColumn('Đang làm'),createColumn('Hoàn thành')];
+    const columns = createDefaultColumns();
     columns[1].cards.push({
       id:uid('card'),
       title:'Bấm vào thẻ để xem và chỉnh sửa',
-      description:'Anh có thể thêm mô tả, nhãn màu và danh sách kiểm tra. Kéo biểu tượng ⠿ để chuyển thẻ giữa các cột.',
+      description:'Bạn có thể thêm mô tả, nhãn màu và danh sách kiểm tra. Kéo biểu tượng ⠿ để chuyển thẻ giữa các cột.',
       labels:['quick'],
       checklist:[{id:uid('check'),text:'Tạo dự án riêng cho từng nhóm công việc',done:false}],
       createdAt:nowIso(),updatedAt:nowIso()
@@ -135,9 +165,13 @@
     return {
       version:VERSION,
       activeProjectId:projectId,
-      settings:{theme:'light',lastExportAt:null},
+      settings:{theme:'light',background:DEFAULT_BACKGROUND_ID,lastExportAt:null},
       projects:[{id:projectId,name:'Công việc của tôi',color:PROJECT_COLORS[0],createdAt:nowIso(),updatedAt:nowIso(),columns}]
     };
+  }
+
+  function createDefaultColumns() {
+    return DEFAULT_COLUMN_TITLES.map(createColumn);
   }
 
   function createColumn(title) {
@@ -157,10 +191,11 @@
 
   function normalizeState(input) {
     if (!input || !Array.isArray(input.projects)) throw new Error('Sai cấu trúc dữ liệu');
+    const background = BACKGROUNDS.some(item => item.id === input.settings?.background) ? input.settings.background : DEFAULT_BACKGROUND_ID;
     const normalized = {
       version:VERSION,
       activeProjectId:input.activeProjectId || input.projects[0]?.id || null,
-      settings:{theme:input.settings?.theme === 'dark' ? 'dark' : 'light',lastExportAt:input.settings?.lastExportAt || null},
+      settings:{theme:input.settings?.theme === 'dark' ? 'dark' : 'light',background,lastExportAt:input.settings?.lastExportAt || null},
       projects:input.projects.map(project => ({
         id:String(project.id || uid('project')),
         name:String(project.name || 'Dự án chưa đặt tên').slice(0,80),
@@ -172,7 +207,7 @@
           cards:Array.isArray(column.cards) ? column.cards.map(card => ({
             id:String(card.id || uid('card')),
             title:String(card.title || 'Công việc').slice(0,160),
-            description:String(card.description || '').slice(0,4000),
+            description:migrateInstructionText(String(card.description || '')).slice(0,4000),
             labels:Array.isArray(card.labels) ? card.labels.filter(id => LABELS.some(label => label.id === id)) : [],
             checklist:Array.isArray(card.checklist) ? card.checklist.map(item => ({id:String(item.id || uid('check')),text:String(item.text || '').slice(0,300),done:Boolean(item.done)})).filter(item => item.text.trim()) : [],
             createdAt:card.createdAt || nowIso(),updatedAt:card.updatedAt || nowIso()
@@ -181,9 +216,31 @@
       }))
     };
     normalized.projects.forEach(project => {
-      if (!project.columns.length) project.columns = [createColumn('Cần làm')];
+      if (!project.columns.length) project.columns = createDefaultColumns();
+      project.columns = migrateLegacyColumns(project.columns);
     });
     return normalized;
+  }
+
+  function migrateInstructionText(text) {
+    return text.replace('Anh có thể thêm mô tả, nhãn màu và danh sách kiểm tra.', 'Bạn có thể thêm mô tả, nhãn màu và danh sách kiểm tra.');
+  }
+
+  function migrateLegacyColumns(columns) {
+    if (columns.length !== 4) return columns;
+    const normalizedTitles = columns.map(column => column.title.trim().toLocaleLowerCase('vi'));
+    const oldTitles = ['ý tưởng','cần làm','đang làm','hoàn thành'];
+    if (!oldTitles.every(title => normalizedTitles.includes(title))) return columns;
+    const byTitle = new Map(columns.map(column => [column.title.trim().toLocaleLowerCase('vi'),column]));
+    const completed = byTitle.get('hoàn thành');
+    const unsorted = byTitle.get('cần làm');
+    const today = byTitle.get('đang làm');
+    const ideas = byTitle.get('ý tưởng');
+    completed.title = DEFAULT_COLUMN_TITLES[0];
+    unsorted.title = DEFAULT_COLUMN_TITLES[1];
+    today.title = DEFAULT_COLUMN_TITLES[2];
+    ideas.title = DEFAULT_COLUMN_TITLES[4];
+    return [completed,unsorted,today,createColumn(DEFAULT_COLUMN_TITLES[3]),ideas];
   }
 
   function ensureActiveProject() {
@@ -203,19 +260,23 @@
   }
 
   function renderProjects() {
+    projectDragManager?.destroy();
+    projectDragManager = null;
     refs.projectCount.textContent = state.projects.length;
     refs.projectList.innerHTML = '';
     state.projects.forEach(project => {
       const count = project.columns.reduce((sum,column) => sum + column.cards.length,0);
       const item = document.createElement('div');
       item.className = `project-item${project.id === state.activeProjectId ? ' active' : ''}`;
+      item.dataset.projectId = project.id;
       item.innerHTML = `
-        <button class="project-select" type="button">
+        <span class="project-grip" data-tooltip="Kéo lên hoặc xuống để sắp xếp dự án">⠿</span>
+        <button class="project-select" type="button" data-tooltip="Mở dự án ${escapeAttr(project.name)}">
           <span class="project-dot" style="background:${project.color}"></span>
           <span class="project-label">${escapeHtml(project.name)}</span>
           <span class="project-card-count">${count}</span>
         </button>
-        <button class="icon-btn subtle project-more" type="button" title="Sửa dự án">⋯</button>`;
+        <button class="icon-btn subtle project-more" type="button" data-tooltip="Sửa dự án">⋯</button>`;
       item.querySelector('.project-select').addEventListener('click', () => {
         state.activeProjectId = project.id;
         ui.search = '';
@@ -227,6 +288,21 @@
       item.querySelector('.project-more').addEventListener('click', () => openProjectDialog(project.id));
       refs.projectList.appendChild(item);
     });
+    if (state.projects.length > 1) {
+      projectDragManager = new ProjectListDragDrop(refs.projectList,{
+        onStart:() => captureUndo('Đổi vị trí dự án'),
+        onEnd:syncProjectOrderFromDom
+      });
+    }
+  }
+
+  function syncProjectOrderFromDom() {
+    const projectMap = new Map(state.projects.map(project => [project.id,project]));
+    state.projects = [...refs.projectList.querySelectorAll('.project-item')]
+      .map(item => projectMap.get(item.dataset.projectId))
+      .filter(Boolean);
+    saveNow();
+    renderAll();
   }
 
   function renderHeader() {
@@ -263,10 +339,10 @@
       const visible = column.cards.filter(matchesSearch).length;
       columnEl.innerHTML = `
         <div class="column-header">
-          <span class="column-grip" title="Kéo để đổi vị trí cột">⠿</span>
+          <span class="column-grip" data-tooltip="Kéo sang trái hoặc phải để đổi vị trí cột">⠿</span>
           <div class="column-title" title="${escapeAttr(column.title)}">${escapeHtml(column.title)}</div>
           <span class="column-count">${ui.search ? visible : column.cards.length}</span>
-          <button class="icon-btn subtle column-menu" type="button" title="Sửa cột">⋯</button>
+          <button class="icon-btn subtle column-menu" type="button" data-tooltip="Đổi tên, nhân bản hoặc xóa cột">⋯</button>
         </div>
         <div class="card-list" data-column-id="${column.id}"></div>
         <button class="add-card-btn" type="button">＋ Thêm công việc</button>`;
@@ -288,6 +364,7 @@
     addColumn.className = 'add-column-tile';
     addColumn.type = 'button';
     addColumn.innerHTML = '＋ Thêm cột';
+    addColumn.dataset.tooltip = 'Tạo thêm một cột mới ở cuối bảng';
     addColumn.addEventListener('click', () => openColumnDialog());
     refs.board.appendChild(addColumn);
 
@@ -317,7 +394,7 @@
         ${card.description ? `<div class="card-description">${escapeHtml(card.description)}</div>` : ''}
         ${total ? `<div class="card-meta"><span class="check-progress${done === total ? ' complete' : ''}">☑ ${done}/${total}</span></div>` : ''}
       </div>
-      <span class="card-grip" title="Kéo công việc">⠿</span>`;
+      <span class="card-grip" data-tooltip="Kéo để đổi vị trí hoặc chuyển sang cột khác">⠿</span>`;
     el.addEventListener('click', event => {
       if (event.target.closest('.card-grip')) return;
       openCardDialog(columnId,card.id);
@@ -377,7 +454,7 @@
         touchProject(project);
       }
     } else {
-      const project = {id:uid('project'),name,color,createdAt:nowIso(),updatedAt:nowIso(),columns:[createColumn('Ý tưởng'),createColumn('Cần làm'),createColumn('Đang làm'),createColumn('Hoàn thành')]};
+      const project = {id:uid('project'),name,color,createdAt:nowIso(),updatedAt:nowIso(),columns:createDefaultColumns()};
       state.projects.push(project);
       state.activeProjectId = project.id;
     }
@@ -652,6 +729,7 @@
       state = imported;
       ensureActiveProject();
       applyTheme();
+      applyBackground();
       saveNow();
       renderAll();
       showToast('Đã nhập dữ liệu thành công.');
@@ -669,6 +747,32 @@
 
   function applyTheme() {
     document.documentElement.dataset.theme = state?.settings?.theme === 'dark' ? 'dark' : 'light';
+  }
+
+  function openBackgroundDialog() {
+    const selected = refs.backgroundOptions.querySelector(`input[value="${state.settings.background}"]`);
+    if (selected) selected.checked = true;
+    refs.backgroundDialog.showModal();
+  }
+
+  function changeBackground(event) {
+    const id = event.target?.value;
+    if (!BACKGROUNDS.some(background => background.id === id)) return;
+    state.settings.background = id;
+    applyBackground();
+    saveNow();
+    showToast('Đã đổi hình nền.');
+  }
+
+  function applyBackground() {
+    const selected = BACKGROUNDS.find(background => background.id === state?.settings?.background) || BACKGROUNDS.find(background => background.id === DEFAULT_BACKGROUND_ID);
+    if (selected?.file) {
+      document.documentElement.style.setProperty('--board-bg-image',`url("${selected.file}")`);
+      document.body.classList.add('has-background');
+    } else {
+      document.documentElement.style.removeProperty('--board-bg-image');
+      document.body.classList.remove('has-background');
+    }
   }
 
   function getActiveProject() {
@@ -697,6 +801,47 @@
   function closeSidebar() {
     refs.sidebar.classList.remove('open');
     refs.sidebarBackdrop.hidden = true;
+  }
+
+  function initTooltips() {
+    document.addEventListener('mouseover', event => {
+      const target = event.target.closest('[data-tooltip]');
+      if (target) showTooltip(target);
+    });
+    document.addEventListener('mouseout', event => {
+      const target = event.target.closest('[data-tooltip]');
+      if (target && !target.contains(event.relatedTarget)) hideTooltip();
+    });
+    document.addEventListener('focusin', event => {
+      const target = event.target.closest('[data-tooltip]');
+      if (target) showTooltip(target);
+    });
+    document.addEventListener('focusout', event => {
+      if (event.target.closest('[data-tooltip]')) hideTooltip();
+    });
+    window.addEventListener('scroll', hideTooltip, true);
+    window.addEventListener('resize', hideTooltip);
+  }
+
+  function showTooltip(target) {
+    const text = target.dataset.tooltip;
+    if (!text || !refs.globalTooltip) return;
+    refs.globalTooltip.textContent = text;
+    refs.globalTooltip.hidden = false;
+    refs.globalTooltip.style.left = '0px';
+    refs.globalTooltip.style.top = '0px';
+    const targetRect = target.getBoundingClientRect();
+    const tipRect = refs.globalTooltip.getBoundingClientRect();
+    let left = targetRect.left + targetRect.width / 2 - tipRect.width / 2;
+    left = Math.max(8,Math.min(left,window.innerWidth - tipRect.width - 8));
+    let top = targetRect.bottom + 9;
+    if (top + tipRect.height > window.innerHeight - 8) top = targetRect.top - tipRect.height - 9;
+    refs.globalTooltip.style.left = `${left}px`;
+    refs.globalTooltip.style.top = `${Math.max(8,top)}px`;
+  }
+
+  function hideTooltip() {
+    if (refs.globalTooltip) refs.globalTooltip.hidden = true;
   }
 
   function askConfirm(title,message) {

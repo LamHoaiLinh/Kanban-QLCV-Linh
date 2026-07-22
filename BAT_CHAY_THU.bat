@@ -12,7 +12,7 @@ if errorlevel 1 (
   where py >nul 2>nul
   if errorlevel 1 (
     echo Khong tim thay Python tren may.
-    echo Anh co the upload thang bo ma len GitHub Pages.
+    echo Ban co the upload thang bo ma len GitHub Pages.
     pause
     exit /b 1
   )
