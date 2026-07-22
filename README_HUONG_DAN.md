@@ -48,3 +48,11 @@
 - Đồng hồ mặc định thu gọn để ưu tiên không gian bảng công việc.
 - Chỉ khi bấm nút mở rộng trên đồng hồ thì phần đặt giờ và nút hẹn giờ mới hiện ra.
 - Đồng hồ được đưa lên hàng trên và canh ngang với khu vực nút Hoàn tác.
+
+
+## Cập nhật v2.3
+- Thêm nút Cài đặt trên thanh công cụ.
+- Trong Cài đặt có chức năng xóa toàn bộ dữ liệu ứng dụng.
+- Trước khi xóa, ứng dụng đề nghị người dùng xuất backup JSON.
+- Chỉ cho phép xóa khi người dùng gõ chính xác `OK`.
+- Chức năng xóa chỉ xóa dữ liệu của Kanban này, không xóa dữ liệu của các website khác cùng tên miền.

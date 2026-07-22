@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#79c2a5">
   <meta name="description" content="Kanban cá nhân nhiều dự án, kéo thả kiểu Trello, chạy tĩnh trên GitHub Pages.">
   <title>Kanban Cá Nhân</title>
-  <link rel="manifest" href="manifest.webmanifest?v=2.2">
+  <link rel="manifest" href="manifest.webmanifest?v=2.3">
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=2.2">
+  <link rel="stylesheet" href="styles.css?v=2.3">
 </head>
 <body>
   <div class="app-shell">
@@ -82,6 +82,7 @@
             <button id="undoBtn" class="secondary-btn" type="button" disabled data-tooltip="Hoàn tác thay đổi gần nhất (Ctrl+Z)">↶ Hoàn tác</button>
             <button id="backgroundBtn" class="icon-btn" type="button" aria-label="Chọn hình nền" data-tooltip="Chọn hình nền cho bảng công việc">▧</button>
             <button id="themeBtn" class="icon-btn" type="button" aria-label="Đổi giao diện" data-tooltip="Chuyển giữa giao diện sáng và tối">◐</button>
+            <button id="settingsBtn" class="icon-btn" type="button" aria-label="Cài đặt" data-tooltip="Mở cài đặt ứng dụng">⚙</button>
             <button id="helpBtn" class="icon-btn" type="button" aria-label="Hướng dẫn" data-tooltip="Xem hướng dẫn sử dụng nhanh">?</button>
           </div>
         </div>
@@ -190,8 +191,65 @@
         <div><strong>3. Di chuyển công việc:</strong> kéo biểu tượng ⠿ trên thẻ sang cột khác hoặc đổi thứ tự trong cùng cột.</div>
         <div><strong>4. Đổi hình nền:</strong> bấm nút ▧ trên thanh công cụ rồi chọn ảnh.</div>
         <div><strong>5. Sao lưu:</strong> dùng “Xuất bản sao JSON” trước khi đổi máy hoặc xóa dữ liệu trình duyệt.</div>
+        <div><strong>6. Xóa dữ liệu:</strong> mở Cài đặt ⚙, chọn “Xóa toàn bộ dữ liệu”, cân nhắc xuất backup rồi gõ chính xác OK.</div>
       </div>
       <div class="modal-actions right-actions"><button class="primary-btn" value="close">Đã hiểu</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="settingsDialog" class="modal">
+    <form method="dialog" class="modal-card compact-modal settings-modal">
+      <div class="modal-header">
+        <div><div class="eyebrow">CÀI ĐẶT ỨNG DỤNG</div><h2>Cài đặt</h2></div>
+        <button class="icon-btn" data-close="settingsDialog" type="button" aria-label="Đóng">×</button>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-copy">
+          <strong>Dữ liệu và sao lưu</strong>
+          <span>Dữ liệu đang được lưu trên trình duyệt này.</span>
+        </div>
+        <button id="settingsExportBtn" class="secondary-btn" type="button">Xuất bản sao JSON</button>
+      </div>
+      <div class="settings-danger-zone">
+        <div class="settings-section-copy">
+          <strong>Xóa toàn bộ dữ liệu</strong>
+          <span>Xóa tất cả dự án, công việc, cài đặt giao diện và dữ liệu đồng hồ của ứng dụng trên trình duyệt này.</span>
+        </div>
+        <button id="openResetDataBtn" class="danger-btn" type="button">Xóa toàn bộ dữ liệu</button>
+      </div>
+      <div class="modal-actions right-actions"><button class="primary-btn" value="close">Xong</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="resetDataDialog" class="modal">
+    <form id="resetDataForm" class="modal-card compact-modal reset-data-modal">
+      <div class="modal-header">
+        <div><div class="eyebrow">VÙNG NGUY HIỂM</div><h2>Xóa toàn bộ dữ liệu?</h2></div>
+        <button class="icon-btn" data-close="resetDataDialog" type="button" aria-label="Đóng">×</button>
+      </div>
+      <div class="reset-warning">
+        <div class="confirm-icon">!</div>
+        <div>
+          <strong>Thao tác này không thể hoàn tác.</strong>
+          <p>Toàn bộ dự án, công việc, tùy chỉnh hình nền, giao diện và bộ đếm giờ sẽ bị xóa. Ứng dụng sẽ trở về trạng thái ban đầu.</p>
+        </div>
+      </div>
+      <div class="backup-reminder">
+        <div>
+          <strong>Bạn có muốn xuất backup trước không?</strong>
+          <span>Nên tải bản sao JSON trước khi tiếp tục.</span>
+        </div>
+        <button id="resetBackupBtn" class="secondary-btn" type="button">Xuất backup ngay</button>
+      </div>
+      <label class="field reset-confirm-field">
+        <span>Gõ chính xác <strong>OK</strong> để xác nhận</span>
+        <input id="resetConfirmInput" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="Nhập OK">
+      </label>
+      <div id="resetBackupStatus" class="reset-backup-status" aria-live="polite"></div>
+      <div class="modal-actions split-actions">
+        <button class="secondary-btn" data-close="resetDataDialog" type="button">Hủy</button>
+        <button id="resetDeleteBtn" class="danger-btn" type="submit" disabled>Xóa vĩnh viễn</button>
+      </div>
     </form>
   </dialog>
 
@@ -204,7 +262,7 @@
 
   <div id="globalTooltip" class="global-tooltip" role="tooltip" hidden></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="dragdrop.js?v=2.2"></script>
-  <script src="app.js?v=2.2"></script>
+  <script src="dragdrop.js?v=2.3"></script>
+  <script src="app.js?v=2.3"></script>
 </body>
 </html>

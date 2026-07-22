@@ -174,3 +174,30 @@ body.has-background .desk-clock{background:color-mix(in srgb,var(--panel) 82%,tr
   .clock-toggle-btn{position:absolute;top:10px;right:10px}
   .desk-clock-head{position:relative;grid-template-columns:1fr}
 }
+
+
+/* ===== Nâng cấp v2.3: cài đặt và xóa toàn bộ dữ liệu ===== */
+.settings-modal{width:min(560px,calc(100vw - 28px))}
+.settings-section,.settings-danger-zone,.backup-reminder{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:18px;padding:16px;border:1px solid var(--border);border-radius:16px;background:var(--panel-soft)}
+.settings-section-copy{display:grid;gap:5px;min-width:0}
+.settings-section-copy strong,.backup-reminder strong{font-size:14px}
+.settings-section-copy span,.backup-reminder span{color:var(--muted);font-size:12px;line-height:1.5}
+.settings-danger-zone{align-items:flex-start;border-color:color-mix(in srgb,var(--danger) 34%,var(--border));background:color-mix(in srgb,var(--danger-soft) 48%,var(--panel))}
+.settings-danger-zone .danger-btn{flex:0 0 auto}
+.reset-data-modal{width:min(590px,calc(100vw - 28px))}
+.reset-warning{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start;margin-top:18px;padding:16px;border-radius:16px;background:var(--danger-soft);border:1px solid color-mix(in srgb,var(--danger) 28%,var(--border))}
+.reset-warning .confirm-icon{width:46px;height:46px;margin:0;border-radius:14px;font-size:22px}
+.reset-warning p{margin:6px 0 0;color:var(--muted);font-size:13px;line-height:1.55}
+.backup-reminder{background:var(--panel-soft)}
+.backup-reminder>div{display:grid;gap:4px}
+.reset-confirm-field span strong{color:var(--danger);font-size:inherit}
+.reset-confirm-field input{font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+.reset-confirm-field input.confirmed{border-color:var(--green);box-shadow:0 0 0 3px color-mix(in srgb,var(--green) 18%,transparent)}
+.reset-backup-status{min-height:18px;margin-top:8px;color:var(--muted);font-size:12px}
+.reset-backup-status.success{color:var(--green-dark);font-weight:700}
+#resetDeleteBtn:disabled{opacity:.45;cursor:not-allowed;filter:saturate(.5)}
+@media(max-width:560px){
+  .settings-section,.settings-danger-zone,.backup-reminder{align-items:stretch;flex-direction:column}
+  .settings-section button,.settings-danger-zone button,.backup-reminder button{width:100%}
+  .reset-warning{grid-template-columns:1fr}
+}

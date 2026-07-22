@@ -2,7 +2,7 @@
   'use strict';
 
   const STORAGE_KEY = 'linh_personal_kanban_v1';
-  const VERSION = 4;
+  const VERSION = 5;
   const DEFAULT_BACKGROUND_ID = 'bg6';
   const DEFAULT_COLUMN_TITLES = ['Đã hoàn thành','Việc cần làm/chưa sắp xếp','Việc hôm nay','Việc ngày mai','Mục tiêu/ý tưởng'];
   const BACKGROUNDS = [
@@ -67,7 +67,7 @@
       'emptyState','board','projectDialog','projectForm','projectDialogTitle','projectNameInput','projectColorOptions','deleteProjectBtn',
       'cardDialog','cardForm','cardDialogTitle','cardTitleInput','cardDescriptionInput','checklistEditor','checklistEmpty','addChecklistBtn',
       'labelOptions','cardColumnSelect','deleteCardBtn','duplicateCardBtn','columnDialog','columnForm','columnDialogTitle','columnNameInput',
-      'deleteColumnBtn','duplicateColumnBtn','backgroundDialog','backgroundOptions','guideDialog','confirmDialog','confirmTitle','confirmMessage','globalTooltip','toast',
+      'deleteColumnBtn','duplicateColumnBtn','backgroundDialog','backgroundOptions','guideDialog','settingsBtn','settingsDialog','settingsExportBtn','openResetDataBtn','resetDataDialog','resetDataForm','resetBackupBtn','resetConfirmInput','resetDeleteBtn','resetBackupStatus','confirmDialog','confirmTitle','confirmMessage','globalTooltip','toast',
       'clockCurrentTime','clockDayPeriod','clockWeekday','clockDate','timerDisplay','clockStatus','timerMinutesInput','timerSecondsInput','timerStartPauseBtn','timerResetBtn','timerStopAlarmBtn','deskClockWidget','deskClockControls','clockToggleBtn'
     ].forEach(id => refs[id] = document.getElementById(id));
   }
@@ -116,6 +116,12 @@
     refs.undoBtn.addEventListener('click', undo);
     refs.backgroundBtn.addEventListener('click', openBackgroundDialog);
     refs.themeBtn.addEventListener('click', toggleTheme);
+    refs.settingsBtn.addEventListener('click', () => refs.settingsDialog.showModal());
+    refs.settingsExportBtn.addEventListener('click', exportData);
+    refs.openResetDataBtn.addEventListener('click', openResetDataDialog);
+    refs.resetBackupBtn.addEventListener('click', exportBackupBeforeReset);
+    refs.resetConfirmInput.addEventListener('input', updateResetDeleteButton);
+    refs.resetDataForm.addEventListener('submit', deleteAllAppData);
     refs.helpBtn.addEventListener('click', () => refs.guideDialog.showModal());
     refs.backgroundOptions.addEventListener('change', changeBackground);
     refs.exportBtn.addEventListener('click', exportData);
@@ -753,6 +759,91 @@
     } catch (error) {
       console.error(error);
       showToast('Tệp JSON không hợp lệ hoặc sai cấu trúc.');
+    }
+  }
+
+  function openResetDataDialog() {
+    refs.settingsDialog.close();
+    refs.resetConfirmInput.value = '';
+    refs.resetBackupStatus.textContent = 'Chưa xuất backup trong lần xác nhận này.';
+    refs.resetBackupStatus.className = 'reset-backup-status';
+    updateResetDeleteButton();
+    refs.resetDataDialog.showModal();
+    requestAnimationFrame(() => refs.resetConfirmInput.focus());
+  }
+
+  function exportBackupBeforeReset() {
+    exportData();
+    refs.resetBackupStatus.textContent = 'Đã tạo file backup JSON. Hãy kiểm tra thư mục tải xuống trước khi xóa.';
+    refs.resetBackupStatus.className = 'reset-backup-status success';
+  }
+
+  function updateResetDeleteButton() {
+    const confirmed = refs.resetConfirmInput.value.trim() === 'OK';
+    refs.resetDeleteBtn.disabled = !confirmed;
+    refs.resetConfirmInput.classList.toggle('confirmed', confirmed);
+  }
+
+  async function deleteAllAppData(event) {
+    event.preventDefault();
+    if (refs.resetConfirmInput.value.trim() !== 'OK') {
+      refs.resetConfirmInput.focus();
+      showToast('Bạn cần gõ chính xác OK để xác nhận.');
+      return;
+    }
+
+    refs.resetDeleteBtn.disabled = true;
+    refs.resetDeleteBtn.textContent = 'Đang xóa…';
+    stopAlarm(false);
+    clearTimeout(saveTimer);
+    undoSnapshot = null;
+    undoLabel = '';
+    ui.search = '';
+
+    removeAppStorage(localStorage);
+    removeAppStorage(sessionStorage);
+    await removeAppCaches();
+
+    state = createDefaultState();
+    refs.searchInput.value = '';
+    applyTheme();
+    applyBackground();
+    renderAll();
+    initClockWidget();
+    saveNow();
+
+    refs.resetDataDialog.close();
+    refs.resetDeleteBtn.textContent = 'Xóa vĩnh viễn';
+    refs.resetConfirmInput.value = '';
+    updateResetDeleteButton();
+    showToast('Đã xóa toàn bộ dữ liệu và khôi phục ứng dụng về trạng thái ban đầu.');
+  }
+
+  function removeAppStorage(storage) {
+    try {
+      const keys = [];
+      for (let index = 0; index < storage.length; index += 1) {
+        const key = storage.key(index);
+        if (key && isAppStorageKey(key)) keys.push(key);
+      }
+      keys.forEach(key => storage.removeItem(key));
+    } catch (error) {
+      console.warn('Không thể xóa storage của ứng dụng:', error);
+    }
+  }
+
+  function isAppStorageKey(key) {
+    return key === STORAGE_KEY || key.startsWith('linh_personal_kanban') || key.startsWith('linh-kanban-static');
+  }
+
+  async function removeAppCaches() {
+    if (!('caches' in window)) return;
+    try {
+      const names = await caches.keys();
+      const appCaches = names.filter(name => name.startsWith('linh-kanban-static'));
+      await Promise.all(appCaches.map(name => caches.delete(name)));
+    } catch (error) {
+      console.warn('Không thể xóa cache của ứng dụng:', error);
     }
   }
 
