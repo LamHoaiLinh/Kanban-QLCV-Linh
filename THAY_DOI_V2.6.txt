@@ -1,0 +1,5 @@
+Phiên bản 2.6
+- Thêm ghi chú nhanh theo từng dự án trong vùng dưới tên dự án.
+- Hỗ trợ nhiều ghi chú và định dạng văn bản cơ bản.
+- Dán nội dung dưới dạng văn bản thuần túy, loại bỏ ảnh và mã nhúng.
+- Ghi chú được lưu trong Local Storage và đi cùng file backup JSON.

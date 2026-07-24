@@ -77,3 +77,11 @@
 - Kéo thả thư mục vào trình phát và dùng Ctrl + Space để phát/tạm dừng.
 - Thông tin thư mục gần đây lưu trong localStorage; quyền thư mục lưu bằng IndexedDB để có thể mở lại khi trình duyệt còn cấp quyền.
 - Chỉ bài đang phát được tạo nguồn audio, không load toàn bộ thư viện vào RAM.
+
+
+## Cập nhật v2.6 – Ghi chú nhanh
+- Thêm các đầu mục ghi chú ngay dưới tên dự án.
+- Mỗi dự án có bộ ghi chú riêng; bấm dấu ＋ để tạo thêm.
+- Hỗ trợ chữ đậm, nghiêng, gạch chân, tiêu đề, danh sách dấu chấm và danh sách đánh số.
+- Khi dán, ứng dụng chỉ nhận văn bản thuần túy; không lưu hình ảnh, tệp hoặc mã nhúng.
+- Ghi chú được lưu chung trong dữ liệu Kanban nên có trong file backup JSON.

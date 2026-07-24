@@ -2,7 +2,7 @@
   'use strict';
 
   const STORAGE_KEY = 'linh_personal_kanban_v1';
-  const VERSION = 7;
+  const VERSION = 8;
   const DEFAULT_BACKGROUND_ID = 'bg6';
   const DEFAULT_COLUMN_TITLES = ['Đã hoàn thành','Việc cần làm/chưa sắp xếp','Việc hôm nay','Việc ngày mai','Mục tiêu/ý tưởng'];
   const BACKGROUNDS = [
@@ -45,6 +45,8 @@
   let audioContext = null;
   let lastObservedLocalDate = null;
   let deletedViewTab = 'archive';
+  let noteEditId = null;
+  let noteEditProjectId = null;
 
   document.addEventListener('DOMContentLoaded', init);
 
@@ -68,7 +70,7 @@
   function cacheRefs() {
     [
       'sidebar','sidebarBackdrop','openSidebarBtn','closeSidebarBtn','projectCount','projectList','addProjectBtn','emptyAddProjectBtn',
-      'exportBtn','importBtn','importFile','activeProjectName','editProjectBtn','undoBtn','backgroundBtn','themeBtn','helpBtn','searchInput','projectStats','saveStatus',
+      'exportBtn','importBtn','importFile','activeProjectName','editProjectBtn','projectNotesBar','projectNoteTabs','addProjectNoteBtn','noteDialog','noteForm','noteDialogTitle','noteTitleInput','noteEditorContent','noteUpdatedInfo','deleteNoteBtn','undoBtn','backgroundBtn','themeBtn','helpBtn','searchInput','projectStats','saveStatus',
       'emptyState','board','projectDialog','projectForm','projectDialogTitle','projectNameInput','projectColorOptions','deleteProjectBtn',
       'cardDialog','cardForm','cardDialogTitle','cardTitleInput','cardDescriptionInput','checklistEditor','checklistEmpty','addChecklistBtn',
       'labelOptions','cardColumnSelect','deleteCardBtn','duplicateCardBtn','columnDialog','columnForm','columnDialogTitle','columnNameInput',
@@ -107,6 +109,12 @@
     });
     refs.projectForm.addEventListener('submit', saveProject);
     refs.deleteProjectBtn.addEventListener('click', deleteProject);
+    refs.addProjectNoteBtn.addEventListener('click', () => openNoteDialog());
+    refs.noteForm.addEventListener('submit', saveNote);
+    refs.deleteNoteBtn.addEventListener('click', deleteNote);
+    refs.noteEditorContent.addEventListener('paste', pastePlainTextIntoNote);
+    refs.noteEditorContent.addEventListener('drop', preventNoteFileDrop);
+    document.querySelectorAll('[data-note-command]').forEach(button => button.addEventListener('mousedown', runNoteCommand));
     refs.cardForm.addEventListener('submit', saveCard);
     refs.addChecklistBtn.addEventListener('click', () => addChecklistRow());
     refs.deleteCardBtn.addEventListener('click', deleteCard);
@@ -168,7 +176,7 @@
 
     document.addEventListener('keydown', event => {
       const tag = document.activeElement?.tagName;
-      const typing = ['INPUT','TEXTAREA','SELECT'].includes(tag);
+      const typing = ['INPUT','TEXTAREA','SELECT'].includes(tag) || Boolean(document.activeElement?.isContentEditable);
       if (event.key === '/' && !typing) {
         event.preventDefault();
         refs.searchInput.focus();
@@ -225,6 +233,22 @@
     };
   }
 
+  function createDefaultNotes() {
+    const now = nowIso();
+    return [{id:uid('note'),title:'Note 1',content:'',createdAt:now,updatedAt:now}];
+  }
+
+  function normalizeNotes(input) {
+    if (!Array.isArray(input)) return createDefaultNotes();
+    return input.map((note,index) => ({
+      id:String(note?.id || uid('note')),
+      title:String(note?.title || `Note ${index + 1}`).slice(0,80),
+      content:sanitizeNoteHtml(String(note?.content || '')).slice(0,50000),
+      createdAt:note?.createdAt || nowIso(),
+      updatedAt:note?.updatedAt || note?.createdAt || nowIso()
+    }));
+  }
+
   function createDefaultState() {
     const projectId = uid('project');
     const columns = createDefaultColumns();
@@ -241,7 +265,7 @@
       activeProjectId:projectId,
       settings:{theme:'light',background:DEFAULT_BACKGROUND_ID,lastExportAt:null,clock:createDefaultClockSettings(),dailyMove:createDefaultDailyMoveSettings()},
       deleted:{archive:[],trash:[]},
-      projects:[{id:projectId,name:'Công việc của tôi',color:PROJECT_COLORS[0],createdAt:nowIso(),updatedAt:nowIso(),columns}]
+      projects:[{id:projectId,name:'Công việc của tôi',color:PROJECT_COLORS[0],createdAt:nowIso(),updatedAt:nowIso(),notes:createDefaultNotes(),columns}]
     };
   }
 
@@ -277,6 +301,7 @@
         name:String(project.name || 'Dự án chưa đặt tên').slice(0,80),
         color:PROJECT_COLORS.includes(project.color) ? project.color : PROJECT_COLORS[0],
         createdAt:project.createdAt || nowIso(),updatedAt:project.updatedAt || nowIso(),
+        notes:normalizeNotes(project.notes),
         columns:Array.isArray(project.columns) ? project.columns.map(column => ({
           id:String(column.id || uid('column')),
           title:String(column.title || 'Cột').slice(0,80),
@@ -391,6 +416,7 @@
     refs.activeProjectName.textContent = project?.name || 'Chưa có dự án';
     refs.editProjectBtn.disabled = !project;
     refs.searchInput.disabled = !project;
+    renderProjectNotes(project);
     if (!project) {
       refs.projectStats.innerHTML = '';
       return;
@@ -508,6 +534,156 @@
     renderAll();
   }
 
+  // ===== Ghi chú nhanh theo từng dự án =====
+  function renderProjectNotes(project) {
+    refs.projectNotesBar.hidden = !project;
+    refs.projectNoteTabs.innerHTML = '';
+    refs.addProjectNoteBtn.disabled = !project;
+    if (!project) return;
+    const notes = Array.isArray(project.notes) ? project.notes : (project.notes = createDefaultNotes());
+    notes.forEach(note => {
+      const button = document.createElement('button');
+      button.className = 'project-note-tab';
+      button.type = 'button';
+      button.textContent = note.title;
+      button.title = note.title;
+      button.dataset.tooltip = `Mở ghi chú: ${note.title}`;
+      button.addEventListener('click', () => openNoteDialog(note.id));
+      refs.projectNoteTabs.appendChild(button);
+    });
+  }
+
+  function openNoteDialog(noteId = null) {
+    const project = getActiveProject();
+    if (!project) return;
+    noteEditProjectId = project.id;
+    noteEditId = noteId;
+    const note = noteId ? project.notes?.find(item => item.id === noteId) : null;
+    const nextNumber = (project.notes?.length || 0) + 1;
+    refs.noteDialogTitle.textContent = note ? 'Chỉnh sửa ghi chú' : 'Tạo ghi chú';
+    refs.noteTitleInput.value = note?.title || `Note ${nextNumber}`;
+    refs.noteEditorContent.innerHTML = sanitizeNoteHtml(note?.content || '');
+    refs.deleteNoteBtn.hidden = !note;
+    refs.noteUpdatedInfo.textContent = note ? `Sửa lần cuối: ${formatDateTime(note.updatedAt)}` : '';
+    refs.noteDialog.showModal();
+    requestAnimationFrame(() => {
+      if (note) refs.noteEditorContent.focus();
+      else { refs.noteTitleInput.focus(); refs.noteTitleInput.select(); }
+    });
+  }
+
+  function runNoteCommand(event) {
+    event.preventDefault();
+    const button = event.currentTarget;
+    const command = button.dataset.noteCommand;
+    const value = button.dataset.noteValue || null;
+    refs.noteEditorContent.focus();
+    try {
+      document.execCommand(command,false,value);
+    } catch (error) {
+      console.warn('Định dạng ghi chú:',error);
+    }
+  }
+
+  function pastePlainTextIntoNote(event) {
+    event.preventDefault();
+    const text = event.clipboardData?.getData('text/plain') || '';
+    insertPlainTextAtSelection(text.slice(0,50000));
+  }
+
+  function preventNoteFileDrop(event) {
+    event.preventDefault();
+    showToast('Ghi chú không nhận kéo thả hình ảnh hoặc tệp; hãy dán văn bản vào trình soạn thảo.');
+  }
+
+  function insertPlainTextAtSelection(text) {
+    const selection = window.getSelection();
+    if (!selection?.rangeCount) return;
+    selection.deleteFromDocument();
+    const range = selection.getRangeAt(0);
+    const node = document.createTextNode(text);
+    range.insertNode(node);
+    range.setStartAfter(node);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
+  function saveNote(event) {
+    event.preventDefault();
+    const project = state.projects.find(item => item.id === noteEditProjectId);
+    if (!project) return refs.noteDialog.close();
+    const title = refs.noteTitleInput.value.trim();
+    if (!title) return refs.noteTitleInput.focus();
+    const textLength = refs.noteEditorContent.textContent.length;
+    if (textLength > 30000) {
+      showToast('Ghi chú quá dài. Vui lòng rút gọn dưới 30.000 ký tự.');
+      return;
+    }
+    const content = sanitizeNoteHtml(refs.noteEditorContent.innerHTML);
+    captureUndo(noteEditId ? 'Sửa ghi chú' : 'Thêm ghi chú');
+    if (noteEditId) {
+      const note = project.notes.find(item => item.id === noteEditId);
+      if (note) {
+        note.title = title.slice(0,80);
+        note.content = content;
+        note.updatedAt = nowIso();
+      }
+    } else {
+      project.notes.push({id:uid('note'),title:title.slice(0,80),content,createdAt:nowIso(),updatedAt:nowIso()});
+    }
+    touchProject(project);
+    saveNow();
+    refs.noteDialog.close();
+    renderHeader();
+    showToast('Đã lưu ghi chú.');
+  }
+
+  async function deleteNote() {
+    const project = state.projects.find(item => item.id === noteEditProjectId);
+    const note = project?.notes?.find(item => item.id === noteEditId);
+    if (!project || !note) return;
+    const ok = await askConfirm('Xóa ghi chú?',`Ghi chú “${note.title}” sẽ bị xóa khỏi dự án.`);
+    if (!ok) return;
+    captureUndo('Xóa ghi chú');
+    project.notes = project.notes.filter(item => item.id !== note.id);
+    touchProject(project);
+    saveNow();
+    refs.noteDialog.close();
+    renderHeader();
+    showToast('Đã xóa ghi chú.');
+  }
+
+  // Chỉ giữ các thẻ định dạng cơ bản, loại bỏ ảnh, tệp nhúng và thuộc tính HTML.
+  function sanitizeNoteHtml(value) {
+    const template = document.createElement('template');
+    template.innerHTML = String(value || '');
+    const allowed = new Set(['P','BR','STRONG','B','EM','I','U','H2','H3','UL','OL','LI','DIV']);
+    const blocked = new Set(['SCRIPT','STYLE','IMG','SVG','IFRAME','OBJECT','EMBED','VIDEO','AUDIO','CANVAS','LINK','META']);
+    const cleanNode = node => {
+      [...node.childNodes].forEach(child => {
+        if (child.nodeType === Node.COMMENT_NODE) {
+          child.remove();
+          return;
+        }
+        if (child.nodeType !== Node.ELEMENT_NODE) return;
+        const tag = child.tagName;
+        if (blocked.has(tag)) {
+          child.remove();
+          return;
+        }
+        cleanNode(child);
+        if (!allowed.has(tag)) {
+          child.replaceWith(...child.childNodes);
+          return;
+        }
+        [...child.attributes].forEach(attribute => child.removeAttribute(attribute.name));
+      });
+    };
+    cleanNode(template.content);
+    return template.innerHTML;
+  }
+
   function openProjectDialog(id = null) {
     projectEditId = id;
     const project = id ? state.projects.find(item => item.id === id) : null;
@@ -535,7 +711,7 @@
         touchProject(project);
       }
     } else {
-      const project = {id:uid('project'),name,color,createdAt:nowIso(),updatedAt:nowIso(),columns:createDefaultColumns()};
+      const project = {id:uid('project'),name,color,createdAt:nowIso(),updatedAt:nowIso(),notes:createDefaultNotes(),columns:createDefaultColumns()};
       state.projects.push(project);
       state.activeProjectId = project.id;
     }
