@@ -85,3 +85,9 @@
 - Hỗ trợ chữ đậm, nghiêng, gạch chân, tiêu đề, danh sách dấu chấm và danh sách đánh số.
 - Khi dán, ứng dụng chỉ nhận văn bản thuần túy; không lưu hình ảnh, tệp hoặc mã nhúng.
 - Ghi chú được lưu chung trong dữ liệu Kanban nên có trong file backup JSON.
+
+
+## Cập nhật v2.7
+- Sắp xếp lại các nút trong hộp Sửa cột theo hai nhóm: thao tác phụ và thao tác lưu/xóa.
+- Trình phát nhạc mặc định bật chế độ lặp toàn bộ playlist.
+- Thanh âm lượng có tooltip “Âm lượng” khi rê chuột.

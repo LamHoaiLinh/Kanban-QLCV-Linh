@@ -10,6 +10,7 @@
    */
 
   const MUSIC_STORAGE_KEY = 'linh_kanban_music_settings_v1';
+  const MUSIC_SETTINGS_VERSION = 2; // v2: mặc định phát lặp toàn bộ playlist
   const MUSIC_DB_NAME = 'linh_kanban_music_db';
   const MUSIC_DB_VERSION = 1;
   const MUSIC_HANDLE_STORE = 'directoryHandles';
@@ -36,6 +37,7 @@
     cacheRefs();
     bindEvents();
     applySavedPlayerSettings();
+    saveMusicSettings(); // Lưu ngay cấu hình Repeat All mặc định hoặc dữ liệu vừa nâng cấp.
     renderEmptyPlayer();
     renderRecentFolders();
     restoreMostRecentFolder();
@@ -831,9 +833,10 @@
   // ===== Lưu cài đặt nhạc trong localStorage =====
   function loadMusicSettings() {
     const defaults = {
+      settingsVersion: MUSIC_SETTINGS_VERSION,
       volume: 0.72,
       shuffle: false,
-      repeat: 'off',
+      repeat: 'all',
       sortMode: 'file-asc',
       lastDirectoryId: null,
       lastFolderName: '',
@@ -842,12 +845,19 @@
     };
     try {
       const raw = JSON.parse(localStorage.getItem(MUSIC_STORAGE_KEY) || 'null');
+      // Nâng dữ liệu cũ lên v2: lần đầu cập nhật sẽ bật Repeat All mặc định.
+      // Sau lần này, lựa chọn người dùng tiếp tục được lưu bình thường.
+      const isLegacySettings = Number(raw?.settingsVersion || 0) < MUSIC_SETTINGS_VERSION;
+      const repeatMode = isLegacySettings
+        ? 'all'
+        : (['off','all','one'].includes(raw?.repeat) ? raw.repeat : defaults.repeat);
       return {
         ...defaults,
         ...(raw || {}),
+        settingsVersion: MUSIC_SETTINGS_VERSION,
         volume: clamp(Number(raw?.volume ?? defaults.volume), 0, 1),
         shuffle: Boolean(raw?.shuffle),
-        repeat: ['off','all','one'].includes(raw?.repeat) ? raw.repeat : 'off',
+        repeat: repeatMode,
         sortMode: raw?.sortMode === 'title-asc' ? 'title-asc' : 'file-asc',
         recentFolders: Array.isArray(raw?.recentFolders) ? raw.recentFolders.filter(item => item?.id && item?.name).slice(0, MAX_RECENT_FOLDERS) : []
       };

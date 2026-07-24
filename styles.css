@@ -393,3 +393,68 @@ body.has-background .project-note-tab,body.has-background .project-note-add{back
   .note-editor-content{min-height:240px;max-height:46vh;padding:12px}
   .note-editor-foot{display:grid}
 }
+
+
+/* ===== Nâng cấp v2.7: bố cục nút sửa cột gọn và rõ ràng ===== */
+.column-dialog-footer{
+  display:grid;
+  gap:12px;
+  margin-top:18px;
+  padding-top:16px;
+  border-top:1px solid var(--border);
+}
+.column-extra-actions{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:9px;
+}
+.column-extra-actions:has(button:not([hidden])){
+  padding:10px;
+  border:1px solid var(--border);
+  border-radius:14px;
+  background:var(--panel-soft);
+}
+.column-action-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  min-height:40px;
+  padding:8px 11px;
+  font-size:13px;
+  white-space:nowrap;
+}
+.column-action-btn span,.column-delete-btn span{
+  font-size:15px;
+  line-height:1;
+}
+.column-primary-actions{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.column-delete-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  min-height:40px;
+  padding:8px 12px;
+}
+.column-save-actions{
+  margin-left:auto;
+}
+.column-save-actions button{
+  min-width:76px;
+  min-height:40px;
+}
+.column-dialog-footer button[hidden]{display:none!important}
+
+@media(max-width:560px){
+  .column-extra-actions{grid-template-columns:1fr}
+  .column-primary-actions{align-items:stretch;flex-direction:column-reverse}
+  .column-delete-btn{width:100%}
+  .column-save-actions{width:100%;margin-left:0}
+  .column-save-actions button{flex:1}
+}

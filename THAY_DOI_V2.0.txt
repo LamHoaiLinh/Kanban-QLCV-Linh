@@ -1,6 +1,5 @@
-Phiên bản 2.3
-- Thêm mục Cài đặt.
-- Thêm chức năng xóa toàn bộ dữ liệu ứng dụng.
-- Nhắc xuất backup JSON trước khi xóa.
-- Bắt buộc gõ chính xác OK mới bật nút xóa.
-- Xóa dự án, công việc, giao diện, đồng hồ và cache riêng của ứng dụng; không ảnh hưởng dữ liệu website khác.
+Phiên bản 2.7
+- Trình bày lại nút trong hộp sửa cột gọn gàng và cân đối.
+- Mặc định bật lặp toàn bộ danh sách nhạc.
+- Thêm tooltip Âm lượng cho thanh volume.
+- Giữ nguyên toàn bộ chức năng Kanban, ghi chú, đồng hồ, chuyển ngày và trình phát nhạc hiện có.

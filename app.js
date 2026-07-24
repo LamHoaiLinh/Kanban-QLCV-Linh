@@ -856,7 +856,7 @@
     refs.deleteColumnBtn.hidden = !column;
     refs.clearColumnContentBtn.hidden = !column;
     refs.clearColumnContentBtn.disabled = !column?.cards?.length;
-    refs.clearColumnContentBtn.textContent = column?.cards?.length ? `Xóa toàn bộ nội dung (${column.cards.length})` : 'Xóa toàn bộ nội dung';
+    refs.clearColumnContentBtn.innerHTML = column?.cards?.length ? `<span aria-hidden="true">⌫</span> Xóa nội dung (${column.cards.length})` : '<span aria-hidden="true">⌫</span> Xóa nội dung';
     refs.duplicateColumnBtn.hidden = !column;
     refs.columnDialog.showModal();
     requestAnimationFrame(() => refs.columnNameInput.focus());
