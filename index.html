@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#79c2a5">
   <meta name="description" content="Kanban cá nhân nhiều dự án, kéo thả kiểu Trello, chạy tĩnh trên GitHub Pages.">
   <title>Kanban Cá Nhân</title>
-  <link rel="manifest" href="manifest.webmanifest?v=2.7">
+  <link rel="manifest" href="manifest.webmanifest?v=2.8">
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=2.7">
+  <link rel="stylesheet" href="styles.css?v=2.8">
 </head>
 <body>
   <div class="app-shell">
@@ -256,21 +256,28 @@
     <form id="noteForm" class="modal-card note-modal">
       <div class="modal-header">
         <div><div class="eyebrow">GHI CHÚ DỰ ÁN</div><h2 id="noteDialogTitle">Ghi chú</h2></div>
-        <button class="icon-btn" data-close="noteDialog" type="button" aria-label="Đóng">×</button>
+        <button class="icon-btn" data-close="noteDialog" type="button" aria-label="Đóng" data-tooltip="Đóng cửa sổ ghi chú" title="Đóng cửa sổ ghi chú">×</button>
       </div>
-      <label class="field note-title-field"><span>Tên ghi chú</span><input id="noteTitleInput" maxlength="80" required placeholder="Ví dụ: Nội dung họp"></label>
+      <div class="field note-title-field">
+        <label for="noteTitleInput">Tên ghi chú</label>
+        <div class="note-title-combo">
+          <input id="noteTitleInput" maxlength="80" required placeholder="Ví dụ: Nội dung họp" autocomplete="off" data-tooltip="Nhập để đổi tên ghi chú" title="Nhập để đổi tên ghi chú">
+          <button id="notePickerBtn" class="note-title-picker-btn" type="button" aria-label="Mở danh sách ghi chú" aria-expanded="false" aria-controls="notePickerMenu" data-tooltip="Mở danh sách ghi chú để chuyển nhanh" title="Mở danh sách ghi chú để chuyển nhanh">▾</button>
+          <div id="notePickerMenu" class="note-picker-menu" role="listbox" aria-label="Danh sách ghi chú của dự án" hidden></div>
+        </div>
+      </div>
       <div class="note-toolbar" role="toolbar" aria-label="Định dạng ghi chú">
-        <button type="button" data-note-command="formatBlock" data-note-value="p" data-tooltip="Đoạn văn bình thường">¶</button>
-        <button type="button" data-note-command="formatBlock" data-note-value="h2" data-tooltip="Tiêu đề lớn">H1</button>
-        <button type="button" data-note-command="formatBlock" data-note-value="h3" data-tooltip="Tiêu đề nhỏ">H2</button>
+        <button type="button" data-note-command="formatBlock" data-note-value="p" data-tooltip="Đoạn văn bình thường" title="Đoạn văn bình thường">¶</button>
+        <button type="button" data-note-command="formatBlock" data-note-value="h2" data-tooltip="Tiêu đề lớn" title="Tiêu đề lớn">H1</button>
+        <button type="button" data-note-command="formatBlock" data-note-value="h3" data-tooltip="Tiêu đề nhỏ" title="Tiêu đề nhỏ">H2</button>
         <span class="note-toolbar-divider"></span>
-        <button type="button" data-note-command="bold" data-tooltip="Chữ đậm"><strong>B</strong></button>
-        <button type="button" data-note-command="italic" data-tooltip="Chữ nghiêng"><em>I</em></button>
-        <button type="button" data-note-command="underline" data-tooltip="Gạch chân"><u>U</u></button>
+        <button type="button" data-note-command="bold" data-tooltip="Chữ đậm" title="Chữ đậm"><strong>B</strong></button>
+        <button type="button" data-note-command="italic" data-tooltip="Chữ nghiêng" title="Chữ nghiêng"><em>I</em></button>
+        <button type="button" data-note-command="underline" data-tooltip="Gạch chân" title="Gạch chân"><u>U</u></button>
         <span class="note-toolbar-divider"></span>
-        <button type="button" data-note-command="insertUnorderedList" data-tooltip="Danh sách dấu chấm">• List</button>
-        <button type="button" data-note-command="insertOrderedList" data-tooltip="Danh sách đánh số">1. List</button>
-        <button type="button" data-note-command="removeFormat" data-tooltip="Xóa định dạng đoạn đang chọn">Tx</button>
+        <button type="button" data-note-command="insertUnorderedList" data-tooltip="Tạo danh sách dấu chấm" title="Tạo danh sách dấu chấm">• List</button>
+        <button type="button" data-note-command="insertOrderedList" data-tooltip="Tạo danh sách đánh số" title="Tạo danh sách đánh số">1. List</button>
+        <button type="button" data-note-command="removeFormat" data-tooltip="Xóa định dạng phần đang chọn" title="Xóa định dạng phần đang chọn">Tx</button>
       </div>
       <div id="noteEditorContent" class="note-editor-content" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Nhập hoặc dán nội dung ghi chú tại đây..."></div>
       <div class="note-editor-foot">
@@ -278,8 +285,8 @@
         <span id="noteUpdatedInfo"></span>
       </div>
       <div class="modal-actions split-actions">
-        <button id="deleteNoteBtn" class="danger-btn" type="button" hidden>Xóa ghi chú</button>
-        <div class="right-actions"><button class="secondary-btn" data-close="noteDialog" type="button">Hủy</button><button class="primary-btn" type="submit">Lưu ghi chú</button></div>
+        <button id="deleteNoteBtn" class="danger-btn" type="button" hidden data-tooltip="Xóa ghi chú hiện tại" title="Xóa ghi chú hiện tại">Xóa ghi chú</button>
+        <div class="right-actions"><button class="secondary-btn" data-close="noteDialog" type="button" data-tooltip="Đóng mà không lưu thay đổi" title="Đóng mà không lưu thay đổi">Hủy</button><button class="primary-btn" type="submit" data-tooltip="Lưu tên và nội dung ghi chú" title="Lưu tên và nội dung ghi chú">Lưu ghi chú</button></div>
       </div>
     </form>
   </dialog>
@@ -416,8 +423,8 @@
 
   <div id="globalTooltip" class="global-tooltip" role="tooltip" hidden></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="dragdrop.js?v=2.7"></script>
-  <script src="app.js?v=2.7"></script>
-  <script src="music-player.js?v=2.7"></script>
+  <script src="dragdrop.js?v=2.8"></script>
+  <script src="app.js?v=2.8"></script>
+  <script src="music-player.js?v=2.8"></script>
 </body>
 </html>

@@ -91,3 +91,10 @@
 - Sắp xếp lại các nút trong hộp Sửa cột theo hai nhóm: thao tác phụ và thao tác lưu/xóa.
 - Trình phát nhạc mặc định bật chế độ lặp toàn bộ playlist.
 - Thanh âm lượng có tooltip “Âm lượng” khi rê chuột.
+
+
+## Cập nhật v2.8
+- Thêm tooltip rõ ràng cho toàn bộ nút định dạng, đóng, hủy, lưu và xóa trong cửa sổ ghi chú.
+- Sửa cơ chế tooltip để hiển thị được phía trên cửa sổ modal.
+- Ô tên ghi chú vẫn cho phép nhập đổi tên, đồng thời có nút xổ danh sách để chuyển nhanh giữa các ghi chú của dự án.
+- Khi chuyển ghi chú mà có nội dung chưa lưu, ứng dụng sẽ hỏi xác nhận để tránh mất dữ liệu ngoài ý muốn.

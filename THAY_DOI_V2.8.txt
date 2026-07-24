@@ -1,0 +1,5 @@
+Phiên bản 2.8
+- Tooltip đầy đủ cho các nút chức năng trong hộp ghi chú.
+- Tooltip hiển thị đúng trên modal.
+- Ô tên ghi chú có nút xổ danh sách ghi chú để chuyển nhanh.
+- Cảnh báo khi chuyển ghi chú trong lúc còn thay đổi chưa lưu.

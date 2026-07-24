@@ -1,4 +1,4 @@
-Phiên bản 2.7
+Phiên bản 2.8
 - Trình bày lại nút trong hộp sửa cột gọn gàng và cân đối.
 - Mặc định bật lặp toàn bộ danh sách nhạc.
 - Thêm tooltip Âm lượng cho thanh volume.

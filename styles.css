@@ -37,7 +37,7 @@ body.has-background .task-card{background:color-mix(in srgb,var(--panel) 93%,tra
 .guide-list{display:grid;gap:12px;padding-top:18px;color:var(--muted);font-size:13px;line-height:1.55}
 .guide-list strong{color:var(--text)}
 
-.global-tooltip{position:fixed;z-index:200;max-width:280px;padding:8px 10px;border-radius:9px;background:#17382c;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.24);font-size:11px;line-height:1.4;pointer-events:none;text-align:center}
+.global-tooltip{position:fixed;z-index:10000;max-width:280px;padding:8px 10px;border-radius:9px;background:#17382c;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.24);font-size:11px;line-height:1.4;pointer-events:none;text-align:center}
 .global-tooltip[hidden]{display:none}
 
 @media(min-width:901px){
@@ -457,4 +457,27 @@ body.has-background .project-note-tab,body.has-background .project-note-add{back
   .column-delete-btn{width:100%}
   .column-save-actions{width:100%;margin-left:0}
   .column-save-actions button{flex:1}
+}
+
+
+/* ===== Nâng cấp v2.8: tooltip trong modal và chọn nhanh ghi chú ===== */
+.note-title-field>label{font-size:12px;font-weight:800;color:var(--muted)}
+.note-title-combo{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 46px;margin-top:7px}
+.note-title-combo input{min-width:0;border-radius:12px 0 0 12px!important;border-right:0!important;margin:0}
+.note-title-picker-btn{display:grid;place-items:center;width:46px;border:1px solid var(--border);border-radius:0 12px 12px 0;background:var(--panel);color:var(--green-dark);font-size:18px;font-weight:900;cursor:pointer}
+.note-title-picker-btn:hover,.note-title-picker-btn[aria-expanded="true"]{background:var(--green-soft);border-color:color-mix(in srgb,var(--green) 52%,var(--border))}
+.note-picker-menu{position:absolute;z-index:60;top:calc(100% + 7px);left:0;right:0;max-height:270px;overflow:auto;padding:7px;border:1px solid var(--border);border-radius:13px;background:var(--panel);box-shadow:var(--shadow);scrollbar-width:thin}
+.note-picker-menu[hidden]{display:none}
+.note-picker-item{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;width:100%;padding:10px 11px;border:0;border-radius:10px;background:transparent;color:var(--text);text-align:left;cursor:pointer}
+.note-picker-item:hover{background:var(--panel-soft)}
+.note-picker-item.current{background:var(--green-soft);color:var(--green-dark)}
+.note-picker-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:800}
+.note-picker-date{color:var(--muted);font-size:10px;white-space:nowrap}
+.note-picker-empty{padding:14px;color:var(--muted);font-size:12px;text-align:center}
+.note-toolbar button{position:relative}
+.note-toolbar button:focus-visible{z-index:1}
+
+@media(max-width:560px){
+  .note-picker-item{grid-template-columns:1fr}
+  .note-picker-date{display:none}
 }

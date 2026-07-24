@@ -2,7 +2,7 @@
   'use strict';
 
   const STORAGE_KEY = 'linh_personal_kanban_v1';
-  const VERSION = 8;
+  const VERSION = 9;
   const DEFAULT_BACKGROUND_ID = 'bg6';
   const DEFAULT_COLUMN_TITLES = ['Đã hoàn thành','Việc cần làm/chưa sắp xếp','Việc hôm nay','Việc ngày mai','Mục tiêu/ý tưởng'];
   const BACKGROUNDS = [
@@ -47,6 +47,7 @@
   let deletedViewTab = 'archive';
   let noteEditId = null;
   let noteEditProjectId = null;
+  let noteInitialSnapshot = null;
 
   document.addEventListener('DOMContentLoaded', init);
 
@@ -70,7 +71,7 @@
   function cacheRefs() {
     [
       'sidebar','sidebarBackdrop','openSidebarBtn','closeSidebarBtn','projectCount','projectList','addProjectBtn','emptyAddProjectBtn',
-      'exportBtn','importBtn','importFile','activeProjectName','editProjectBtn','projectNotesBar','projectNoteTabs','addProjectNoteBtn','noteDialog','noteForm','noteDialogTitle','noteTitleInput','noteEditorContent','noteUpdatedInfo','deleteNoteBtn','undoBtn','backgroundBtn','themeBtn','helpBtn','searchInput','projectStats','saveStatus',
+      'exportBtn','importBtn','importFile','activeProjectName','editProjectBtn','projectNotesBar','projectNoteTabs','addProjectNoteBtn','noteDialog','noteForm','noteDialogTitle','noteTitleInput','notePickerBtn','notePickerMenu','noteEditorContent','noteUpdatedInfo','deleteNoteBtn','undoBtn','backgroundBtn','themeBtn','helpBtn','searchInput','projectStats','saveStatus',
       'emptyState','board','projectDialog','projectForm','projectDialogTitle','projectNameInput','projectColorOptions','deleteProjectBtn',
       'cardDialog','cardForm','cardDialogTitle','cardTitleInput','cardDescriptionInput','checklistEditor','checklistEmpty','addChecklistBtn',
       'labelOptions','cardColumnSelect','deleteCardBtn','duplicateCardBtn','columnDialog','columnForm','columnDialogTitle','columnNameInput',
@@ -112,6 +113,9 @@
     refs.addProjectNoteBtn.addEventListener('click', () => openNoteDialog());
     refs.noteForm.addEventListener('submit', saveNote);
     refs.deleteNoteBtn.addEventListener('click', deleteNote);
+    refs.notePickerBtn.addEventListener('click', toggleNotePickerMenu);
+    refs.notePickerMenu.addEventListener('click', handleNotePickerMenuClick);
+    refs.noteDialog.addEventListener('close', closeNotePickerMenu);
     refs.noteEditorContent.addEventListener('paste', pastePlainTextIntoNote);
     refs.noteEditorContent.addEventListener('drop', preventNoteFileDrop);
     document.querySelectorAll('[data-note-command]').forEach(button => button.addEventListener('mousedown', runNoteCommand));
@@ -166,6 +170,9 @@
 
     document.querySelectorAll('[data-close]').forEach(button => {
       button.addEventListener('click', () => document.getElementById(button.dataset.close).close());
+    });
+    document.addEventListener('click', event => {
+      if (!event.target.closest('.note-title-combo')) closeNotePickerMenu();
     });
 
     refs.confirmDialog.addEventListener('close', () => {
@@ -565,11 +572,73 @@
     refs.noteEditorContent.innerHTML = sanitizeNoteHtml(note?.content || '');
     refs.deleteNoteBtn.hidden = !note;
     refs.noteUpdatedInfo.textContent = note ? `Sửa lần cuối: ${formatDateTime(note.updatedAt)}` : '';
-    refs.noteDialog.showModal();
+    renderNotePickerMenu();
+    closeNotePickerMenu();
+    noteInitialSnapshot = getCurrentNoteDraftSnapshot();
+    if (!refs.noteDialog.open) refs.noteDialog.showModal();
     requestAnimationFrame(() => {
       if (note) refs.noteEditorContent.focus();
       else { refs.noteTitleInput.focus(); refs.noteTitleInput.select(); }
     });
+  }
+
+  function toggleNotePickerMenu(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const willOpen = refs.notePickerMenu.hidden;
+    if (willOpen) renderNotePickerMenu();
+    refs.notePickerMenu.hidden = !willOpen;
+    refs.notePickerBtn.setAttribute('aria-expanded',String(willOpen));
+    refs.notePickerBtn.textContent = willOpen ? '▴' : '▾';
+  }
+
+  function closeNotePickerMenu() {
+    if (!refs.notePickerMenu) return;
+    refs.notePickerMenu.hidden = true;
+    refs.notePickerBtn?.setAttribute('aria-expanded','false');
+    if (refs.notePickerBtn) refs.notePickerBtn.textContent = '▾';
+  }
+
+  function renderNotePickerMenu() {
+    const project = state.projects.find(item => item.id === noteEditProjectId) || getActiveProject();
+    const notes = project?.notes || [];
+    if (!notes.length) {
+      refs.notePickerMenu.innerHTML = '<div class="note-picker-empty">Dự án chưa có ghi chú nào.</div>';
+      return;
+    }
+    refs.notePickerMenu.innerHTML = notes.map(note => `
+      <button class="note-picker-item${note.id === noteEditId ? ' current' : ''}" type="button" role="option" aria-selected="${note.id === noteEditId}" data-note-pick-id="${escapeAttr(note.id)}" title="Mở ghi chú ${escapeAttr(note.title)}">
+        <span class="note-picker-title">${escapeHtml(note.title)}</span>
+        <span class="note-picker-date">${escapeHtml(formatDateTime(note.updatedAt))}</span>
+      </button>`).join('');
+  }
+
+  async function handleNotePickerMenuClick(event) {
+    const button = event.target.closest('[data-note-pick-id]');
+    if (!button) return;
+    event.preventDefault();
+    const targetId = button.dataset.notePickId;
+    if (!targetId || targetId === noteEditId) {
+      closeNotePickerMenu();
+      return;
+    }
+    if (hasUnsavedNoteChanges()) {
+      closeNotePickerMenu();
+      const ok = await askConfirm('Chuyển sang ghi chú khác?', 'Những thay đổi chưa lưu trong ghi chú hiện tại sẽ bị bỏ qua.');
+      if (!ok) return;
+    }
+    openNoteDialog(targetId);
+  }
+
+  function getCurrentNoteDraftSnapshot() {
+    return JSON.stringify({
+      title:refs.noteTitleInput.value.trim(),
+      content:sanitizeNoteHtml(refs.noteEditorContent.innerHTML)
+    });
+  }
+
+  function hasUnsavedNoteChanges() {
+    return noteInitialSnapshot !== null && getCurrentNoteDraftSnapshot() !== noteInitialSnapshot;
   }
 
   function runNoteCommand(event) {
@@ -634,6 +703,7 @@
     }
     touchProject(project);
     saveNow();
+    noteInitialSnapshot = null;
     refs.noteDialog.close();
     renderHeader();
     showToast('Đã lưu ghi chú.');
@@ -649,6 +719,7 @@
     project.notes = project.notes.filter(item => item.id !== note.id);
     touchProject(project);
     saveNow();
+    noteInitialSnapshot = null;
     refs.noteDialog.close();
     renderHeader();
     showToast('Đã xóa ghi chú.');
@@ -1702,6 +1773,11 @@
   function showTooltip(target) {
     const text = target.dataset.tooltip;
     if (!text || !refs.globalTooltip) return;
+    // Dialog modal nằm trong lớp top-layer của trình duyệt. Đưa tooltip vào chính dialog
+    // để tooltip không bị che phía sau lớp nền mờ của modal.
+    const openDialog = target.closest('dialog[open]');
+    const tooltipHost = openDialog || document.body;
+    if (refs.globalTooltip.parentElement !== tooltipHost) tooltipHost.appendChild(refs.globalTooltip);
     refs.globalTooltip.textContent = text;
     refs.globalTooltip.hidden = false;
     refs.globalTooltip.style.left = '0px';
@@ -1717,7 +1793,9 @@
   }
 
   function hideTooltip() {
-    if (refs.globalTooltip) refs.globalTooltip.hidden = true;
+    if (!refs.globalTooltip) return;
+    refs.globalTooltip.hidden = true;
+    if (refs.globalTooltip.parentElement !== document.body) document.body.appendChild(refs.globalTooltip);
   }
 
   function askConfirm(title,message) {
