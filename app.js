@@ -2,7 +2,7 @@
   'use strict';
 
   const STORAGE_KEY = 'linh_personal_kanban_v1';
-  const VERSION = 5;
+  const VERSION = 7;
   const DEFAULT_BACKGROUND_ID = 'bg6';
   const DEFAULT_COLUMN_TITLES = ['Đã hoàn thành','Việc cần làm/chưa sắp xếp','Việc hôm nay','Việc ngày mai','Mục tiêu/ý tưởng'];
   const BACKGROUNDS = [
@@ -43,6 +43,8 @@
   let clockTickTimer = null;
   let alarmTimer = null;
   let audioContext = null;
+  let lastObservedLocalDate = null;
+  let deletedViewTab = 'archive';
 
   document.addEventListener('DOMContentLoaded', init);
 
@@ -52,11 +54,14 @@
     bindEvents();
     state = loadState();
     ensureActiveProject();
+    const dailyMoveResult = runDailyMovesIfNeeded();
+    lastObservedLocalDate = localDateStamp();
     applyTheme();
     applyBackground();
     renderAll();
     initClockWidget();
     saveNow();
+    if (dailyMoveResult.moved > 0) setTimeout(() => showToast(`Đã tự động chuyển ${dailyMoveResult.moved} công việc sang ngày mới.`), 180);
     registerServiceWorker();
   }
 
@@ -67,7 +72,7 @@
       'emptyState','board','projectDialog','projectForm','projectDialogTitle','projectNameInput','projectColorOptions','deleteProjectBtn',
       'cardDialog','cardForm','cardDialogTitle','cardTitleInput','cardDescriptionInput','checklistEditor','checklistEmpty','addChecklistBtn',
       'labelOptions','cardColumnSelect','deleteCardBtn','duplicateCardBtn','columnDialog','columnForm','columnDialogTitle','columnNameInput',
-      'deleteColumnBtn','duplicateColumnBtn','backgroundDialog','backgroundOptions','guideDialog','settingsBtn','settingsDialog','settingsExportBtn','openResetDataBtn','resetDataDialog','resetDataForm','resetBackupBtn','resetConfirmInput','resetDeleteBtn','resetBackupStatus','confirmDialog','confirmTitle','confirmMessage','globalTooltip','toast',
+      'deleteColumnBtn','clearColumnContentBtn','duplicateColumnBtn','backgroundDialog','backgroundOptions','guideDialog','settingsBtn','settingsDialog','settingsExportBtn','dailyMoveEnabled','dailyMoveProjectName','dailyMoveRules','addDailyMoveRuleBtn','dailyMoveStatus','openDeletedContentBtn','deletedContentCount','deletedContentDialog','deletedArchiveTabBtn','deletedTrashTabBtn','deletedArchivePanel','deletedTrashPanel','deletedArchiveCount','deletedTrashCount','deletedArchiveList','deletedTrashList','emptyTrashBtn','openResetDataBtn','resetDataDialog','resetDataForm','resetBackupBtn','resetConfirmInput','resetDeleteBtn','resetBackupStatus','confirmDialog','confirmTitle','confirmMessage','globalTooltip','toast',
       'clockCurrentTime','clockDayPeriod','clockWeekday','clockDate','timerDisplay','clockStatus','timerMinutesInput','timerSecondsInput','timerStartPauseBtn','timerResetBtn','timerStopAlarmBtn','deskClockWidget','deskClockControls','clockToggleBtn'
     ].forEach(id => refs[id] = document.getElementById(id));
   }
@@ -108,6 +113,7 @@
     refs.duplicateCardBtn.addEventListener('click', duplicateCard);
     refs.columnForm.addEventListener('submit', saveColumn);
     refs.deleteColumnBtn.addEventListener('click', deleteColumn);
+    refs.clearColumnContentBtn.addEventListener('click', clearColumnContent);
     refs.duplicateColumnBtn.addEventListener('click', duplicateColumn);
     refs.searchInput.addEventListener('input', event => {
       ui.search = event.target.value.trim().toLocaleLowerCase('vi');
@@ -116,8 +122,18 @@
     refs.undoBtn.addEventListener('click', undo);
     refs.backgroundBtn.addEventListener('click', openBackgroundDialog);
     refs.themeBtn.addEventListener('click', toggleTheme);
-    refs.settingsBtn.addEventListener('click', () => refs.settingsDialog.showModal());
+    refs.settingsBtn.addEventListener('click', openSettingsDialog);
     refs.settingsExportBtn.addEventListener('click', exportData);
+    refs.dailyMoveEnabled.addEventListener('change', toggleDailyMoveEnabled);
+    refs.addDailyMoveRuleBtn.addEventListener('click', addDailyMoveRule);
+    refs.dailyMoveRules.addEventListener('change', updateDailyMoveRule);
+    refs.dailyMoveRules.addEventListener('click', handleDailyMoveRuleClick);
+    refs.openDeletedContentBtn.addEventListener('click', openDeletedContentDialog);
+    refs.deletedArchiveTabBtn.addEventListener('click', () => switchDeletedTab('archive'));
+    refs.deletedTrashTabBtn.addEventListener('click', () => switchDeletedTab('trash'));
+    refs.deletedArchiveList.addEventListener('click', handleDeletedListClick);
+    refs.deletedTrashList.addEventListener('click', handleDeletedListClick);
+    refs.emptyTrashBtn.addEventListener('click', emptyTrash);
     refs.openResetDataBtn.addEventListener('click', openResetDataDialog);
     refs.resetBackupBtn.addEventListener('click', exportBackupBeforeReset);
     refs.resetConfirmInput.addEventListener('input', updateResetDeleteButton);
@@ -170,6 +186,43 @@
     initTooltips();
     window.addEventListener('beforeunload', saveNow);
     window.addEventListener('resize', fitProjectLabels);
+    window.addEventListener('focus', checkDailyMoveAfterResume);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) checkDailyMoveAfterResume(); });
+  }
+
+  function createDefaultDailyMoveSettings() {
+    return {enabled:false,lastRunDate:localDateStamp(),rules:[]};
+  }
+
+  function normalizeDailyMoveSettings(input) {
+    return {
+      enabled:Boolean(input?.enabled),
+      lastRunDate:isDateStamp(input?.lastRunDate) ? input.lastRunDate : localDateStamp(),
+      rules:Array.isArray(input?.rules) ? input.rules.map(rule => ({
+        id:String(rule?.id || uid('rule')),
+        projectId:String(rule?.projectId || ''),
+        fromColumnId:String(rule?.fromColumnId || ''),
+        toColumnId:String(rule?.toColumnId || '')
+      })).filter(rule => rule.projectId && rule.fromColumnId && rule.toColumnId) : []
+    };
+  }
+
+  function normalizeDeletedStorage(input) {
+    const normalizeItem = (item,stage) => ({
+      id:String(item?.id || uid('deleted')),
+      title:String(item?.title || 'Công việc đã xóa').slice(0,160),
+      text:String(item?.text || '').slice(0,12000),
+      project:String(item?.project || 'Dự án').slice(0,120),
+      column:String(item?.column || 'Cột').slice(0,120),
+      createdAt:item?.createdAt || nowIso(),
+      updatedAt:item?.updatedAt || item?.createdAt || nowIso(),
+      deletedAt:item?.deletedAt || nowIso(),
+      ...(stage === 'trash' ? {trashedAt:item?.trashedAt || nowIso()} : {})
+    });
+    return {
+      archive:Array.isArray(input?.archive) ? input.archive.map(item => normalizeItem(item,'archive')) : [],
+      trash:Array.isArray(input?.trash) ? input.trash.map(item => normalizeItem(item,'trash')) : []
+    };
   }
 
   function createDefaultState() {
@@ -186,7 +239,8 @@
     return {
       version:VERSION,
       activeProjectId:projectId,
-      settings:{theme:'light',background:DEFAULT_BACKGROUND_ID,lastExportAt:null,clock:createDefaultClockSettings()},
+      settings:{theme:'light',background:DEFAULT_BACKGROUND_ID,lastExportAt:null,clock:createDefaultClockSettings(),dailyMove:createDefaultDailyMoveSettings()},
+      deleted:{archive:[],trash:[]},
       projects:[{id:projectId,name:'Công việc của tôi',color:PROJECT_COLORS[0],createdAt:nowIso(),updatedAt:nowIso(),columns}]
     };
   }
@@ -216,7 +270,8 @@
     const normalized = {
       version:VERSION,
       activeProjectId:input.activeProjectId || input.projects[0]?.id || null,
-      settings:{theme:input.settings?.theme === 'dark' ? 'dark' : 'light',background,lastExportAt:input.settings?.lastExportAt || null,clock:normalizeClockSettings(input.settings?.clock)},
+      settings:{theme:input.settings?.theme === 'dark' ? 'dark' : 'light',background,lastExportAt:input.settings?.lastExportAt || null,clock:normalizeClockSettings(input.settings?.clock),dailyMove:normalizeDailyMoveSettings(input.settings?.dailyMove)},
+      deleted:normalizeDeletedStorage(input.deleted),
       projects:input.projects.map(project => ({
         id:String(project.id || uid('project')),
         name:String(project.name || 'Dự án chưa đặt tên').slice(0,80),
@@ -239,6 +294,10 @@
     normalized.projects.forEach(project => {
       if (!project.columns.length) project.columns = createDefaultColumns();
       project.columns = migrateLegacyColumns(project.columns);
+    });
+    normalized.settings.dailyMove.rules = normalized.settings.dailyMove.rules.filter(rule => {
+      const project = normalized.projects.find(item => item.id === rule.projectId);
+      return Boolean(project && project.columns.some(column => column.id === rule.fromColumnId) && project.columns.some(column => column.id === rule.toColumnId) && rule.fromColumnId !== rule.toColumnId);
     });
     return normalized;
   }
@@ -492,12 +551,14 @@
     const ok = await askConfirm('Xóa dự án?',`Toàn bộ cột và công việc trong “${project.name}” sẽ bị xóa.`);
     if (!ok) return;
     captureUndo('Xóa dự án');
+    project.columns.forEach(column => archiveCards(column.cards, project, column, 'Xóa dự án'));
     state.projects = state.projects.filter(item => item.id !== project.id);
+    state.settings.dailyMove.rules = state.settings.dailyMove.rules.filter(rule => rule.projectId !== project.id);
     ensureActiveProject();
     saveNow();
     refs.projectDialog.close();
     renderAll();
-    showToast('Đã xóa dự án.');
+    showToast('Đã xóa dự án; nội dung công việc được lưu gọn trong Nội dung đã xóa.');
   }
 
   function openCardDialog(columnId,cardId = null) {
@@ -584,12 +645,13 @@
     const ok = await askConfirm('Xóa công việc?',`“${found.card.title}” sẽ bị xóa khỏi bảng.`);
     if (!ok) return;
     captureUndo('Xóa công việc');
+    archiveCards([found.card], getActiveProject(), found.column, 'Xóa công việc');
     found.column.cards = found.column.cards.filter(card => card.id !== found.card.id);
     touchProject(getActiveProject());
     saveNow();
     refs.cardDialog.close();
     renderAll();
-    showToast('Đã xóa công việc.');
+    showToast('Đã xóa công việc và lưu vào Nội dung đã xóa.');
   }
 
   function duplicateCard() {
@@ -616,6 +678,9 @@
     refs.columnDialogTitle.textContent = column ? 'Sửa cột' : 'Thêm cột';
     refs.columnNameInput.value = column?.title || '';
     refs.deleteColumnBtn.hidden = !column;
+    refs.clearColumnContentBtn.hidden = !column;
+    refs.clearColumnContentBtn.disabled = !column?.cards?.length;
+    refs.clearColumnContentBtn.textContent = column?.cards?.length ? `Xóa toàn bộ nội dung (${column.cards.length})` : 'Xóa toàn bộ nội dung';
     refs.duplicateColumnBtn.hidden = !column;
     refs.columnDialog.showModal();
     requestAnimationFrame(() => refs.columnNameInput.focus());
@@ -651,12 +716,35 @@
     const ok = await askConfirm('Xóa cột?',`Cột “${column.title}” và ${column.cards.length} công việc bên trong sẽ bị xóa.`);
     if (!ok) return;
     captureUndo('Xóa cột');
+    archiveCards(column.cards, project, column, 'Xóa cột');
     project.columns = project.columns.filter(item => item.id !== column.id);
+    state.settings.dailyMove.rules = state.settings.dailyMove.rules.filter(rule => rule.fromColumnId !== column.id && rule.toColumnId !== column.id);
     touchProject(project);
     saveNow();
     refs.columnDialog.close();
     renderAll();
-    showToast('Đã xóa cột.');
+    showToast('Đã xóa cột; nội dung bên trong được lưu gọn trong Nội dung đã xóa.');
+  }
+
+  async function clearColumnContent() {
+    const project = getActiveProject();
+    const column = project?.columns.find(item => item.id === columnEditId);
+    if (!column) return;
+    if (!column.cards.length) {
+      showToast('Cột này không có nội dung để xóa.');
+      return;
+    }
+    const ok = await askConfirm('Xóa toàn bộ nội dung?',`${column.cards.length} công việc trong “${column.title}” sẽ được xóa khỏi cột và lưu gọn dưới dạng văn bản trong mục Nội dung đã xóa.`);
+    if (!ok) return;
+    captureUndo('Xóa toàn bộ nội dung cột');
+    const count = column.cards.length;
+    archiveCards(column.cards, project, column, 'Xóa toàn bộ nội dung cột');
+    column.cards = [];
+    touchProject(project);
+    saveNow();
+    refs.columnDialog.close();
+    renderAll();
+    showToast(`Đã xóa ${count} công việc và lưu vào Nội dung đã xóa.`);
   }
 
   function duplicateColumn() {
@@ -762,6 +850,279 @@
     }
   }
 
+  function openSettingsDialog() {
+    renderSettings();
+    refs.settingsDialog.showModal();
+  }
+
+  function renderSettings() {
+    const dailyMove = state.settings.dailyMove || (state.settings.dailyMove = createDefaultDailyMoveSettings());
+    const project = getActiveProject();
+    refs.dailyMoveEnabled.checked = dailyMove.enabled;
+    refs.dailyMoveProjectName.textContent = project?.name || 'Chưa có dự án';
+    refs.addDailyMoveRuleBtn.disabled = !project || project.columns.length < 2;
+    renderDailyMoveRules();
+    const archiveCount = state.deleted?.archive?.length || 0;
+    const trashCount = state.deleted?.trash?.length || 0;
+    refs.deletedContentCount.textContent = archiveCount + trashCount;
+    const lastRun = dailyMove.lastRunDate ? formatDateOnly(dailyMove.lastRunDate) : 'chưa có';
+    refs.dailyMoveStatus.textContent = dailyMove.enabled
+      ? `Đang bật · Mốc ngày đã ghi nhớ: ${lastRun}. Nếu ứng dụng đang đóng, quy tắc sẽ chạy ngay lần mở đầu tiên sau ngày mới.`
+      : 'Đang tắt. Khi bật, ngày hiện tại sẽ được ghi nhớ và quy tắc bắt đầu chạy từ lần sang ngày tiếp theo.';
+  }
+
+  function renderDailyMoveRules() {
+    const project = getActiveProject();
+    const dailyMove = state.settings.dailyMove || (state.settings.dailyMove = createDefaultDailyMoveSettings());
+    refs.dailyMoveRules.innerHTML = '';
+    if (!project) {
+      refs.dailyMoveRules.innerHTML = '<div class="settings-empty">Chưa có dự án để thiết lập.</div>';
+      return;
+    }
+    const rules = dailyMove.rules.filter(rule => rule.projectId === project.id);
+    if (!rules.length) {
+      refs.dailyMoveRules.innerHTML = '<div class="settings-empty">Chưa có thao tác chuyển. Bấm dấu ＋ để thêm.</div>';
+      return;
+    }
+    const options = project.columns.map(column => `<option value="${escapeAttr(column.id)}">${escapeHtml(column.title)}</option>`).join('');
+    rules.forEach((rule,index) => {
+      const row = document.createElement('div');
+      row.className = 'daily-rule-row';
+      row.dataset.ruleId = rule.id;
+      row.innerHTML = `
+        <span class="daily-rule-index">${index + 1}</span>
+        <label><span>Từ</span><select class="daily-rule-from" aria-label="Cột nguồn">${options}</select></label>
+        <span class="daily-rule-arrow">→</span>
+        <label><span>Sang</span><select class="daily-rule-to" aria-label="Cột đích">${options}</select></label>
+        <button class="icon-btn subtle remove-daily-rule" type="button" aria-label="Xóa thao tác" data-tooltip="Xóa thao tác chuyển này">×</button>`;
+      row.querySelector('.daily-rule-from').value = rule.fromColumnId;
+      row.querySelector('.daily-rule-to').value = rule.toColumnId;
+      refs.dailyMoveRules.appendChild(row);
+    });
+  }
+
+  function toggleDailyMoveEnabled() {
+    const dailyMove = state.settings.dailyMove || (state.settings.dailyMove = createDefaultDailyMoveSettings());
+    dailyMove.enabled = refs.dailyMoveEnabled.checked;
+    dailyMove.lastRunDate = localDateStamp();
+    saveNow();
+    renderSettings();
+    showToast(dailyMove.enabled ? 'Đã bật tự động chuyển khi sang ngày mới.' : 'Đã tắt tự động chuyển khi sang ngày mới.');
+  }
+
+  function addDailyMoveRule() {
+    const project = getActiveProject();
+    if (!project || project.columns.length < 2) {
+      showToast('Cần ít nhất hai cột để tạo thao tác chuyển.');
+      return;
+    }
+    const from = project.columns.find(column => /việc ngày mai/i.test(column.title)) || project.columns[0];
+    const to = project.columns.find(column => /việc hôm nay/i.test(column.title)) || project.columns.find(column => column.id !== from.id);
+    if (!from || !to) return;
+    const dailyMove = state.settings.dailyMove || (state.settings.dailyMove = createDefaultDailyMoveSettings());
+    dailyMove.rules.push({id:uid('rule'),projectId:project.id,fromColumnId:from.id,toColumnId:to.id});
+    dailyMove.lastRunDate = localDateStamp();
+    saveNow();
+    renderSettings();
+  }
+
+  function updateDailyMoveRule(event) {
+    const row = event.target.closest('.daily-rule-row');
+    if (!row || !event.target.matches('select')) return;
+    const rule = state.settings.dailyMove.rules.find(item => item.id === row.dataset.ruleId);
+    if (!rule) return;
+    const fromId = row.querySelector('.daily-rule-from').value;
+    const toId = row.querySelector('.daily-rule-to').value;
+    if (fromId === toId) {
+      showToast('Cột nguồn và cột đích phải khác nhau.');
+      renderDailyMoveRules();
+      return;
+    }
+    rule.fromColumnId = fromId;
+    rule.toColumnId = toId;
+    state.settings.dailyMove.lastRunDate = localDateStamp();
+    saveNow();
+  }
+
+  function handleDailyMoveRuleClick(event) {
+    const button = event.target.closest('.remove-daily-rule');
+    if (!button) return;
+    const row = button.closest('.daily-rule-row');
+    state.settings.dailyMove.rules = state.settings.dailyMove.rules.filter(rule => rule.id !== row.dataset.ruleId);
+    state.settings.dailyMove.lastRunDate = localDateStamp();
+    saveNow();
+    renderSettings();
+  }
+
+  function runDailyMovesIfNeeded() {
+    const result = {moved:0,rules:0};
+    const dailyMove = state?.settings?.dailyMove;
+    if (!dailyMove) return result;
+    const today = localDateStamp();
+    if (!dailyMove.lastRunDate) {
+      dailyMove.lastRunDate = today;
+      return result;
+    }
+    if (!dailyMove.enabled || dailyMove.lastRunDate === today) return result;
+
+    const movedCardIds = new Set();
+    const snapshots = [];
+    dailyMove.rules.forEach(rule => {
+      const project = state.projects.find(item => item.id === rule.projectId);
+      const source = project?.columns.find(column => column.id === rule.fromColumnId);
+      const target = project?.columns.find(column => column.id === rule.toColumnId);
+      if (!project || !source || !target || source.id === target.id) return;
+      const cards = source.cards.filter(card => !movedCardIds.has(card.id));
+      cards.forEach(card => movedCardIds.add(card.id));
+      snapshots.push({project,source,target,cards});
+    });
+
+    snapshots.forEach(move => {
+      if (!move.cards.length) return;
+      const ids = new Set(move.cards.map(card => card.id));
+      move.source.cards = move.source.cards.filter(card => !ids.has(card.id));
+      move.target.cards.push(...move.cards);
+      touchProject(move.project);
+      result.moved += move.cards.length;
+      result.rules += 1;
+    });
+    dailyMove.lastRunDate = today;
+    return result;
+  }
+
+  function checkDailyMoveAfterResume() {
+    if (!state) return;
+    const today = localDateStamp();
+    if (lastObservedLocalDate === today && state.settings.dailyMove?.lastRunDate === today) return;
+    lastObservedLocalDate = today;
+    const result = runDailyMovesIfNeeded();
+    saveNow();
+    if (result.moved > 0) {
+      renderAll();
+      showToast(`Đã tự động chuyển ${result.moved} công việc sang ngày mới.`);
+    }
+  }
+
+  function archiveCards(cards,project,column,reason = '') {
+    if (!Array.isArray(cards) || !cards.length || !project || !column) return 0;
+    if (!state.deleted) state.deleted = {archive:[],trash:[]};
+    const deletedAt = nowIso();
+    const items = cards.map(card => ({
+      id:uid('deleted'),
+      title:String(card.title || 'Công việc').slice(0,160),
+      text:cardToPlainText(card,reason),
+      project:String(project.name || 'Dự án').slice(0,120),
+      column:String(column.title || 'Cột').slice(0,120),
+      createdAt:card.createdAt || deletedAt,
+      updatedAt:card.updatedAt || card.createdAt || deletedAt,
+      deletedAt
+    }));
+    state.deleted.archive.unshift(...items);
+    return items.length;
+  }
+
+  function cardToPlainText(card,reason = '') {
+    const lines = [];
+    const description = String(card.description || '').trim();
+    if (description) lines.push(description);
+    const labels = Array.isArray(card.labels) ? card.labels.map(id => LABELS.find(label => label.id === id)?.name).filter(Boolean) : [];
+    if (labels.length) lines.push(`Nhãn: ${labels.join(', ')}`);
+    const checklist = Array.isArray(card.checklist) ? card.checklist : [];
+    if (checklist.length) lines.push(`Danh sách kiểm tra:\n${checklist.map(item => `${item.done ? '[x]' : '[ ]'} ${String(item.text || '').trim()}`).join('\n')}`);
+    if (reason) lines.push(`Nguồn xóa: ${reason}`);
+    return lines.join('\n\n').slice(0,12000);
+  }
+
+  function openDeletedContentDialog() {
+    refs.settingsDialog.close();
+    deletedViewTab = 'archive';
+    renderDeletedContent();
+    refs.deletedContentDialog.showModal();
+  }
+
+  function switchDeletedTab(tab) {
+    deletedViewTab = tab === 'trash' ? 'trash' : 'archive';
+    renderDeletedContent();
+  }
+
+  function renderDeletedContent() {
+    if (!state.deleted) state.deleted = {archive:[],trash:[]};
+    const archive = state.deleted.archive;
+    const trash = state.deleted.trash;
+    refs.deletedArchiveCount.textContent = archive.length;
+    refs.deletedTrashCount.textContent = trash.length;
+    refs.deletedArchiveTabBtn.classList.toggle('active',deletedViewTab === 'archive');
+    refs.deletedTrashTabBtn.classList.toggle('active',deletedViewTab === 'trash');
+    refs.deletedArchivePanel.hidden = deletedViewTab !== 'archive';
+    refs.deletedTrashPanel.hidden = deletedViewTab !== 'trash';
+    refs.emptyTrashBtn.disabled = trash.length === 0;
+    refs.deletedArchiveList.innerHTML = renderDeletedItems(archive,'archive');
+    refs.deletedTrashList.innerHTML = renderDeletedItems(trash,'trash');
+  }
+
+  function renderDeletedItems(items,stage) {
+    if (!items.length) return `<div class="deleted-empty">${stage === 'archive' ? 'Chưa có nội dung đã xóa.' : 'Thùng rác đang trống.'}</div>`;
+    return items.map(item => `
+      <article class="deleted-item" data-deleted-id="${escapeAttr(item.id)}" data-stage="${stage}">
+        <div class="deleted-item-head">
+          <button class="deleted-expand-btn" type="button" aria-expanded="false">
+            <span class="deleted-item-title">${escapeHtml(item.title)}</span>
+            <span class="deleted-item-location">${escapeHtml(item.project)} › ${escapeHtml(item.column)}</span>
+            <span class="deleted-item-dates">Tạo ${formatDateTime(item.createdAt)} · Sửa ${formatDateTime(item.updatedAt)} · Xóa ${formatDateTime(item.deletedAt)}</span>
+          </button>
+          <button class="${stage === 'archive' ? 'danger-btn' : 'ghost-btn'} compact-btn deleted-action-btn" type="button" data-action="${stage === 'archive' ? 'trash' : 'purge'}">${stage === 'archive' ? 'Xóa' : 'Xóa vĩnh viễn'}</button>
+        </div>
+        <div class="deleted-item-body" hidden><pre>${escapeHtml(item.text || '(Không có mô tả bổ sung)')}</pre>${stage === 'trash' ? `<div class="deleted-trash-date">Vào thùng rác: ${formatDateTime(item.trashedAt)}</div>` : ''}</div>
+      </article>`).join('');
+  }
+
+  function handleDeletedListClick(event) {
+    const itemEl = event.target.closest('.deleted-item');
+    if (!itemEl) return;
+    const expand = event.target.closest('.deleted-expand-btn');
+    if (expand) {
+      const body = itemEl.querySelector('.deleted-item-body');
+      body.hidden = !body.hidden;
+      expand.setAttribute('aria-expanded',String(!body.hidden));
+      return;
+    }
+    const action = event.target.closest('.deleted-action-btn')?.dataset.action;
+    if (action === 'trash') moveDeletedItemToTrash(itemEl.dataset.deletedId);
+    if (action === 'purge') purgeDeletedItem(itemEl.dataset.deletedId);
+  }
+
+  function moveDeletedItemToTrash(id) {
+    const index = state.deleted.archive.findIndex(item => item.id === id);
+    if (index < 0) return;
+    captureUndo('Chuyển nội dung vào thùng rác');
+    const [item] = state.deleted.archive.splice(index,1);
+    state.deleted.trash.unshift({...item,trashedAt:nowIso()});
+    saveNow();
+    renderDeletedContent();
+    showToast('Đã chuyển nội dung vào thùng rác.');
+  }
+
+  async function purgeDeletedItem(id) {
+    const item = state.deleted.trash.find(entry => entry.id === id);
+    if (!item) return;
+    const ok = await askConfirm('Xóa vĩnh viễn?',`“${item.title}” sẽ bị xóa hoàn toàn và không thể khôi phục.`);
+    if (!ok) return;
+    state.deleted.trash = state.deleted.trash.filter(entry => entry.id !== id);
+    saveNow();
+    renderDeletedContent();
+    showToast('Đã xóa vĩnh viễn nội dung.');
+  }
+
+  async function emptyTrash() {
+    if (!state.deleted.trash.length) return;
+    const ok = await askConfirm('Xóa vĩnh viễn toàn bộ thùng rác?',`${state.deleted.trash.length} mục sẽ bị xóa hoàn toàn để giải phóng dung lượng.`);
+    if (!ok) return;
+    state.deleted.trash = [];
+    saveNow();
+    renderDeletedContent();
+    showToast('Đã dọn sạch thùng rác.');
+  }
+
   function openResetDataDialog() {
     refs.settingsDialog.close();
     refs.resetConfirmInput.value = '';
@@ -800,6 +1161,7 @@
     undoLabel = '';
     ui.search = '';
 
+    await window.KanbanMusicPlayer?.clearAllData?.();
     removeAppStorage(localStorage);
     removeAppStorage(sessionStorage);
     await removeAppCaches();
@@ -833,7 +1195,7 @@
   }
 
   function isAppStorageKey(key) {
-    return key === STORAGE_KEY || key.startsWith('linh_personal_kanban') || key.startsWith('linh-kanban-static');
+    return key === STORAGE_KEY || key.startsWith('linh_personal_kanban') || key.startsWith('linh-kanban-static') || key.startsWith('linh_kanban_music');
   }
 
   async function removeAppCaches() {
@@ -874,6 +1236,7 @@
 
   function applyBackground() {
     const selected = BACKGROUNDS.find(background => background.id === state?.settings?.background) || BACKGROUNDS.find(background => background.id === DEFAULT_BACKGROUND_ID);
+    document.body.dataset.backgroundId = selected?.id || 'none';
     if (selected?.file) {
       document.documentElement.style.setProperty('--board-bg-image',`url("${selected.file}")`);
       document.body.classList.add('has-background');
@@ -923,6 +1286,9 @@
 
   function updateClockWidget() {
     const now = new Date();
+    const observedDate = localDateStamp(now);
+    if (lastObservedLocalDate && observedDate !== lastObservedLocalDate) checkDailyMoveAfterResume();
+    lastObservedLocalDate = observedDate;
     const hours = now.getHours();
     const minutes = now.getMinutes();
     const seconds = now.getSeconds();
@@ -1203,9 +1569,20 @@
   }
 
   function nowIso() { return new Date().toISOString(); }
-  function dateStamp() {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  function localDateStamp(date = new Date()) {
+    return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+  }
+  function isDateStamp(value) { return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')); }
+  function dateStamp() { return localDateStamp(); }
+  function formatDateOnly(value) {
+    if (!isDateStamp(value)) return 'chưa có';
+    const [year,month,day] = value.split('-');
+    return `${day}/${month}/${year}`;
+  }
+  function formatDateTime(value) {
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return '—';
+    return `${String(date.getDate()).padStart(2,'0')}/${String(date.getMonth()+1).padStart(2,'0')}/${date.getFullYear()} ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
   }
   function escapeHtml(value) {
     return String(value).replace(/[&<>'"]/g,char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'})[char]);

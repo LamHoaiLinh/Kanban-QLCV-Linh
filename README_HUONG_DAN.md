@@ -1,4 +1,4 @@
-# KANBAN CÁ NHÂN STATIC v2.0
+# KANBAN CÁ NHÂN STATIC v2.4
 
 ## 1. Điểm mới
 - Có 9 hình nền tùy chọn; mặc định là **Beautiful Background6**.
@@ -56,3 +56,24 @@
 - Trước khi xóa, ứng dụng đề nghị người dùng xuất backup JSON.
 - Chỉ cho phép xóa khi người dùng gõ chính xác `OK`.
 - Chức năng xóa chỉ xóa dữ liệu của Kanban này, không xóa dữ liệu của các website khác cùng tên miền.
+
+
+## Cập nhật v2.4
+- Thêm quy tắc tự động chuyển toàn bộ công việc từ cột nguồn sang cuối cột đích khi sang ngày mới.
+- Có thể thêm nhiều thao tác chuyển bằng dấu `＋`; quy tắc được lưu trong Local Storage.
+- Khi trang đang mở, quy tắc chạy ngay lúc qua 00:00. Nếu trang đang đóng, quy tắc chạy ở lần mở đầu tiên của ngày mới.
+- Bổ sung nút **Xóa toàn bộ nội dung** trong hộp chỉnh sửa cột.
+- Công việc bị xóa được lưu gọn dưới dạng văn bản thuần túy, kèm ngày tạo, ngày sửa cuối và ngày xóa.
+- Mục **Nội dung đã xóa** có hai tầng: Đã xóa → Thùng rác → Xóa vĩnh viễn.
+
+
+## Cập nhật v2.5 – Trình phát nhạc local
+- Thêm trình phát nhạc gọn trong sidebar, không thay đổi logic Kanban cũ.
+- Chọn thư mục bằng File System Access API trên Chrome/Edge hoặc dùng cơ chế chọn thư mục dự phòng.
+- Hỗ trợ MP3, WAV, OGG, FLAC, M4A theo codec mà trình duyệt đang hỗ trợ.
+- Có Play/Pause, bài trước/sau, Shuffle, Repeat All/One, tiến trình, thời gian và âm lượng.
+- Hiển thị 3 dòng: bài trước, bài đang phát và bài tiếp theo; nghệ sĩ chỉ hiện khi đọc được metadata.
+- Danh sách đầy đủ mở trong popup, có sắp xếp theo tên file hoặc tên bài hát, highlight và click để phát.
+- Kéo thả thư mục vào trình phát và dùng Ctrl + Space để phát/tạm dừng.
+- Thông tin thư mục gần đây lưu trong localStorage; quyền thư mục lưu bằng IndexedDB để có thể mở lại khi trình duyệt còn cấp quyền.
+- Chỉ bài đang phát được tạo nguồn audio, không load toàn bộ thư viện vào RAM.

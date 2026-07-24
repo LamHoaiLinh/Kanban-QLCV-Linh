@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#79c2a5">
   <meta name="description" content="Kanban cá nhân nhiều dự án, kéo thả kiểu Trello, chạy tĩnh trên GitHub Pages.">
   <title>Kanban Cá Nhân</title>
-  <link rel="manifest" href="manifest.webmanifest?v=2.3">
+  <link rel="manifest" href="manifest.webmanifest?v=2.5">
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=2.3">
+  <link rel="stylesheet" href="styles.css?v=2.5">
 </head>
 <body>
   <div class="app-shell">
@@ -24,6 +24,42 @@
       <div class="sidebar-title"><span>Dự án</span><span id="projectCount" class="count-badge">0</span></div>
       <nav id="projectList" class="project-list"></nav>
       <button id="addProjectBtn" class="primary-btn full-width" type="button" data-tooltip="Tạo một dự án mới với 5 cột mặc định">＋ Thêm dự án</button>
+      <section id="musicPlayer" class="music-player" aria-label="Trình phát nhạc local">
+        <div class="music-player-header">
+          <div class="music-player-heading">
+            <span class="music-equalizer" aria-hidden="true"><i></i><i></i><i></i></span>
+            <div><strong>Nhạc làm việc</strong><span id="musicFolderLabel">Chưa chọn thư mục</span></div>
+          </div>
+          <button id="musicPlaylistBtn" class="music-icon-btn" type="button" aria-label="Mở danh sách bài hát" data-tooltip="Mở danh sách bài hát đầy đủ" disabled>☷</button>
+        </div>
+        <button id="musicBrowseBtn" class="music-browse-btn" type="button" data-tooltip="Chọn toàn bộ thư mục nhạc trên máy tính">Browse thư mục nhạc</button>
+        <input id="musicFolderInput" type="file" accept="audio/*,.mp3,.wav,.ogg,.flac,.m4a" webkitdirectory directory multiple hidden>
+        <button id="musicRecentBtn" class="music-recent-btn" type="button" hidden><span>Mở lại:</span><strong id="musicRecentName"></strong></button>
+        <div id="musicDropHint" class="music-drop-hint">Hoặc kéo thả thư mục nhạc vào đây</div>
+        <div class="music-three-lines" aria-label="Bài trước, bài đang phát và bài tiếp theo">
+          <div id="musicPrevLine" class="music-track-line previous"></div>
+          <div id="musicCurrentLine" class="music-track-line current"></div>
+          <div id="musicNextLine" class="music-track-line next"></div>
+        </div>
+        <div class="music-progress-row">
+          <span id="musicCurrentTime">0:00</span>
+          <input id="musicProgress" class="music-range music-progress" type="range" min="0" max="1000" value="0" step="1" aria-label="Tiến trình bài hát" disabled>
+          <span id="musicDuration">0:00</span>
+        </div>
+        <div class="music-controls">
+          <button id="musicShuffleBtn" class="music-control-btn mode-btn" type="button" aria-label="Phát ngẫu nhiên" data-tooltip="Bật phát ngẫu nhiên" disabled>⇄</button>
+          <button id="musicPrevBtn" class="music-control-btn" type="button" aria-label="Bài trước" data-tooltip="Phát bài trước" disabled>❚◀</button>
+          <button id="musicPlayPauseBtn" class="music-control-btn play-btn" type="button" aria-label="Phát nhạc" data-tooltip="Phát nhạc (Ctrl + Space)" disabled>▶</button>
+          <button id="musicNextBtn" class="music-control-btn" type="button" aria-label="Bài tiếp theo" data-tooltip="Phát bài tiếp theo" disabled>▶❚</button>
+          <button id="musicRepeatBtn" class="music-control-btn mode-btn" type="button" aria-label="Tắt lặp" data-tooltip="Chế độ lặp" disabled>↻</button>
+        </div>
+        <div class="music-volume-row">
+          <span aria-hidden="true">♩</span>
+          <input id="musicVolume" class="music-range" type="range" min="0" max="1" value="0.72" step="0.01" aria-label="Âm lượng">
+          <span aria-hidden="true">♫</span>
+        </div>
+        <div id="musicStatus" class="music-status" aria-live="polite">Chưa có bài hát</div>
+      </section>
       <div class="sidebar-spacer"></div>
       <div class="sidebar-tools">
         <button id="exportBtn" class="secondary-btn full-width" type="button" data-tooltip="Tải toàn bộ dự án và công việc về máy dưới dạng JSON">Xuất bản sao JSON</button>
@@ -161,7 +197,7 @@
       </div>
       <label class="field"><span>Tên cột</span><input id="columnNameInput" maxlength="80" required placeholder="Ví dụ: Đang xử lý"></label>
       <div class="modal-actions split-actions">
-        <div class="left-actions"><button id="deleteColumnBtn" class="danger-btn" type="button" hidden>Xóa cột</button><button id="duplicateColumnBtn" class="secondary-btn" type="button" hidden>Nhân bản</button></div>
+        <div class="left-actions column-dialog-actions"><button id="deleteColumnBtn" class="danger-btn" type="button" hidden>Xóa cột</button><button id="clearColumnContentBtn" class="secondary-btn archive-action-btn" type="button" hidden>Xóa toàn bộ nội dung</button><button id="duplicateColumnBtn" class="secondary-btn" type="button" hidden>Nhân bản</button></div>
         <div class="right-actions"><button class="secondary-btn" data-close="columnDialog" type="button">Hủy</button><button class="primary-btn" type="submit">Lưu</button></div>
       </div>
     </form>
@@ -191,33 +227,103 @@
         <div><strong>3. Di chuyển công việc:</strong> kéo biểu tượng ⠿ trên thẻ sang cột khác hoặc đổi thứ tự trong cùng cột.</div>
         <div><strong>4. Đổi hình nền:</strong> bấm nút ▧ trên thanh công cụ rồi chọn ảnh.</div>
         <div><strong>5. Sao lưu:</strong> dùng “Xuất bản sao JSON” trước khi đổi máy hoặc xóa dữ liệu trình duyệt.</div>
-        <div><strong>6. Xóa dữ liệu:</strong> mở Cài đặt ⚙, chọn “Xóa toàn bộ dữ liệu”, cân nhắc xuất backup rồi gõ chính xác OK.</div>
+        <div><strong>6. Tự chuyển sang ngày mới:</strong> mở Cài đặt ⚙, bật tính năng rồi chọn cột nguồn và cột đích.</div>
+        <div><strong>7. Nội dung đã xóa:</strong> các công việc bị xóa được lưu gọn dưới dạng văn bản và có thể xem trong Cài đặt.</div>
+        <div><strong>8. Xóa dữ liệu:</strong> mở Cài đặt ⚙, chọn “Xóa toàn bộ dữ liệu”, cân nhắc xuất backup rồi gõ chính xác OK.</div>
+        <div><strong>9. Nhạc làm việc:</strong> bấm “Browse thư mục nhạc” hoặc kéo thả thư mục vào trình phát bên trái. Ctrl + Space để phát hoặc tạm dừng.</div>
       </div>
       <div class="modal-actions right-actions"><button class="primary-btn" value="close">Đã hiểu</button></div>
     </form>
   </dialog>
 
   <dialog id="settingsDialog" class="modal">
-    <form method="dialog" class="modal-card compact-modal settings-modal">
+    <form method="dialog" class="modal-card settings-modal">
       <div class="modal-header">
         <div><div class="eyebrow">CÀI ĐẶT ỨNG DỤNG</div><h2>Cài đặt</h2></div>
         <button class="icon-btn" data-close="settingsDialog" type="button" aria-label="Đóng">×</button>
       </div>
-      <div class="settings-section">
+      <section class="settings-block daily-move-settings">
+        <div class="settings-block-head">
+          <div class="settings-section-copy">
+            <strong>Tự động chuyển công việc khi sang ngày mới</strong>
+            <span>Khi ứng dụng phát hiện ngày mới, toàn bộ công việc trong cột nguồn sẽ được nối xuống cuối cột đích.</span>
+          </div>
+          <label class="toggle-switch" data-tooltip="Bật hoặc tắt toàn bộ quy tắc chuyển ngày mới">
+            <input id="dailyMoveEnabled" type="checkbox">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="daily-project-note">Đang thiết lập cho dự án: <strong id="dailyMoveProjectName">—</strong></div>
+        <div id="dailyMoveRules" class="daily-move-rules"></div>
+        <button id="addDailyMoveRuleBtn" class="secondary-btn add-rule-btn" type="button">＋ Thêm thao tác chuyển</button>
+        <div id="dailyMoveStatus" class="settings-status-line"></div>
+      </section>
+      <section class="settings-section deleted-settings-section">
+        <div class="settings-section-copy">
+          <strong>Nội dung đã xóa</strong>
+          <span>Công việc đã xóa được rút gọn thành văn bản thuần túy để tiết kiệm dung lượng.</span>
+        </div>
+        <button id="openDeletedContentBtn" class="secondary-btn" type="button">Xem nội dung đã xóa <span id="deletedContentCount" class="button-count">0</span></button>
+      </section>
+      <section class="settings-section">
         <div class="settings-section-copy">
           <strong>Dữ liệu và sao lưu</strong>
           <span>Dữ liệu đang được lưu trên trình duyệt này.</span>
         </div>
         <button id="settingsExportBtn" class="secondary-btn" type="button">Xuất bản sao JSON</button>
-      </div>
-      <div class="settings-danger-zone">
+      </section>
+      <section class="settings-danger-zone">
         <div class="settings-section-copy">
           <strong>Xóa toàn bộ dữ liệu</strong>
-          <span>Xóa tất cả dự án, công việc, cài đặt giao diện và dữ liệu đồng hồ của ứng dụng trên trình duyệt này.</span>
+          <span>Xóa tất cả dự án, công việc, nội dung đã xóa, cài đặt giao diện, đồng hồ và dữ liệu trình phát nhạc của ứng dụng trên trình duyệt này.</span>
         </div>
         <button id="openResetDataBtn" class="danger-btn" type="button">Xóa toàn bộ dữ liệu</button>
-      </div>
+      </section>
       <div class="modal-actions right-actions"><button class="primary-btn" value="close">Xong</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="deletedContentDialog" class="modal">
+    <form method="dialog" class="modal-card deleted-content-modal">
+      <div class="modal-header">
+        <div><div class="eyebrow">LƯU TRỮ GỌN</div><h2>Nội dung đã xóa</h2></div>
+        <button class="icon-btn" data-close="deletedContentDialog" type="button" aria-label="Đóng">×</button>
+      </div>
+      <div class="deleted-tabs" role="tablist">
+        <button id="deletedArchiveTabBtn" class="deleted-tab active" type="button" data-deleted-tab="archive">Đã xóa <span id="deletedArchiveCount">0</span></button>
+        <button id="deletedTrashTabBtn" class="deleted-tab" type="button" data-deleted-tab="trash">Thùng rác <span id="deletedTrashCount">0</span></button>
+      </div>
+      <section id="deletedArchivePanel" class="deleted-panel">
+        <div class="deleted-panel-note">Bấm <strong>Xóa</strong> để chuyển một mục vào thùng rác. Nội dung vẫn chưa bị xóa vĩnh viễn.</div>
+        <div id="deletedArchiveList" class="deleted-list"></div>
+      </section>
+      <section id="deletedTrashPanel" class="deleted-panel" hidden>
+        <div class="trash-toolbar">
+          <span>Các mục tại đây chỉ còn dữ liệu văn bản tối thiểu.</span>
+          <button id="emptyTrashBtn" class="danger-btn compact-btn" type="button">Xóa vĩnh viễn toàn bộ</button>
+        </div>
+        <div id="deletedTrashList" class="deleted-list"></div>
+      </section>
+      <div class="modal-actions right-actions"><button class="primary-btn" value="close">Đóng</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="musicPlaylistDialog" class="modal">
+    <form method="dialog" class="modal-card music-playlist-modal">
+      <div class="modal-header">
+        <div><div class="eyebrow">NHẠC LOCAL</div><h2>Danh sách bài hát</h2><div id="musicPlaylistFolder" class="music-playlist-folder">Chưa chọn thư mục</div></div>
+        <button class="icon-btn" data-close="musicPlaylistDialog" type="button" aria-label="Đóng">×</button>
+      </div>
+      <div class="music-playlist-toolbar">
+        <label><span>Sắp xếp</span><select id="musicSortSelect"><option value="file-asc">Tên file A–Z</option><option value="title-asc">Tên bài hát A–Z</option></select></label>
+        <label><span>Thư mục gần đây</span><select id="musicRecentSelect"><option value="">Chưa có thư mục gần đây</option></select></label>
+        <button id="musicOpenRecentBtn" class="secondary-btn compact-btn" type="button" disabled>Mở thư mục</button>
+        <button id="musicPlaylistBrowseBtn" class="secondary-btn compact-btn" type="button">Browse thư mục khác</button>
+      </div>
+      <div class="music-playlist-summary"><span id="musicPlaylistCount">0 bài</span><span>Click vào một bài để phát</span></div>
+      <div id="musicPlaylistEmpty" class="music-playlist-empty">Chưa có bài hát. Hãy chọn hoặc kéo thả một thư mục nhạc.</div>
+      <div id="musicPlaylistList" class="music-playlist-list"></div>
+      <div class="modal-actions right-actions"><button class="primary-btn" value="close">Đóng</button></div>
     </form>
   </dialog>
 
@@ -231,7 +337,7 @@
         <div class="confirm-icon">!</div>
         <div>
           <strong>Thao tác này không thể hoàn tác.</strong>
-          <p>Toàn bộ dự án, công việc, tùy chỉnh hình nền, giao diện và bộ đếm giờ sẽ bị xóa. Ứng dụng sẽ trở về trạng thái ban đầu.</p>
+          <p>Toàn bộ dự án, công việc, tùy chỉnh hình nền, giao diện, bộ đếm giờ, cài đặt nhạc và quyền thư mục nhạc gần đây sẽ bị xóa. Ứng dụng sẽ trở về trạng thái ban đầu.</p>
         </div>
       </div>
       <div class="backup-reminder">
@@ -262,7 +368,8 @@
 
   <div id="globalTooltip" class="global-tooltip" role="tooltip" hidden></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="dragdrop.js?v=2.3"></script>
-  <script src="app.js?v=2.3"></script>
+  <script src="dragdrop.js?v=2.5"></script>
+  <script src="app.js?v=2.5"></script>
+  <script src="music-player.js?v=2.5"></script>
 </body>
 </html>
