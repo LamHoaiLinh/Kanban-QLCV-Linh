@@ -519,3 +519,50 @@ body.has-background .kanban-column.custom-column-color{background:color-mix(in s
 @media(max-width:700px){
   .quick-setting-row{grid-template-columns:1fr}
 }
+
+
+/* ===== Nâng cấp v3.1: bố trí công cụ văn phòng thành hàng dưới ===== */
+.header-actions{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:8px;
+  min-width:max-content;
+}
+.header-system-actions{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:8px;
+}
+.header-actions .office-launcher{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:7px;
+  min-height:38px;
+}
+
+@media(max-width:1050px){
+  .header-system-actions{gap:5px}
+  .header-actions .office-launcher{gap:5px}
+}
+
+@media(max-width:900px){
+  .header-actions{
+    align-items:flex-end;
+    margin-left:auto;
+  }
+  .header-system-actions{flex-wrap:nowrap}
+}
+
+@media(max-width:560px){
+  .header-actions{
+    width:100%;
+    align-items:stretch;
+  }
+  .header-system-actions,
+  .header-actions .office-launcher{
+    justify-content:flex-end;
+  }
+}

@@ -169,3 +169,10 @@
 ### File kiểm thử
 Thư mục `test-files` có PDF, ảnh và workbook mẫu không chứa dữ liệu nhạy cảm để thử nhanh các công cụ.
 
+
+
+## Cập nhật v3.1
+- Bốn nút công cụ văn phòng được đặt thành hàng riêng dưới nhóm Hoàn tác/Cài đặt để giao diện gọn hơn.
+- Chế độ gộp Excel mặc định là **Gộp theo vị trí cột**.
+- Tooltip giải thích: gộp theo vị trí nối A với A, B với B; gộp theo tên tiêu đề đối chiếu cột dựa trên tên tiêu đề.
+- Không đổi khóa dữ liệu Kanban hiện tại.

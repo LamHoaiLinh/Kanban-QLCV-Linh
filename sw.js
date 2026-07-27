@@ -1,8 +1,8 @@
-const CACHE_NAME='linh-kanban-static-v30';
+const CACHE_NAME='linh-kanban-static-v31';
 const ASSETS=[
-  './','./index.html','./styles.css?v=3.0','./dragdrop.js?v=3.0','./app.js?v=3.0','./music-player.js?v=3.0',
-  './office-tools/office-tools.css?v=3.0','./office-tools/office-tools.js?v=3.0','./office-tools/vendor/jszip.min.js',
-  './manifest.webmanifest?v=3.0','./assets/icon.svg',
+  './','./index.html','./styles.css?v=3.1','./dragdrop.js?v=3.1','./app.js?v=3.1','./music-player.js?v=3.1',
+  './office-tools/office-tools.css?v=3.1','./office-tools/office-tools.js?v=3.1','./office-tools/vendor/jszip.min.js',
+  './manifest.webmanifest?v=3.1','./assets/icon.svg',
   './assets/backgrounds/Beautiful Background6.png','./assets/backgrounds/Beautiful Background7.png',
   './assets/backgrounds/Beautiful Background8.png','./assets/backgrounds/Beautiful Background13.png',
   './assets/backgrounds/Beautiful Background15.png','./assets/backgrounds/Beautiful Background28.png',

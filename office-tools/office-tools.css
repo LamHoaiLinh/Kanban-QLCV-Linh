@@ -40,3 +40,15 @@
 .office-page-card.drop-target{outline:3px dashed var(--green);outline-offset:2px}
 .office-file-row.dragging{opacity:.45}
 .office-file-row.drop-target{outline:2px dashed var(--green);outline-offset:2px}
+
+
+/* v3.1 - giải thích ngắn ngay dưới lựa chọn gộp Excel */
+.office-field-help{
+  display:block;
+  min-height:32px;
+  color:var(--muted);
+  font-size:11px;
+  line-height:1.45;
+  text-transform:none;
+  letter-spacing:0;
+}

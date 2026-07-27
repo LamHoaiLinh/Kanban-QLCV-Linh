@@ -6,10 +6,10 @@
   <meta name="theme-color" content="#79c2a5">
   <meta name="description" content="Kanban cá nhân nhiều dự án, kéo thả kiểu Trello, chạy tĩnh trên GitHub Pages.">
   <title>Kanban Cá Nhân</title>
-  <link rel="manifest" href="manifest.webmanifest?v=3.0">
+  <link rel="manifest" href="manifest.webmanifest?v=3.1">
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=3.0">
-  <link rel="stylesheet" href="office-tools/office-tools.css?v=3.0">
+  <link rel="stylesheet" href="styles.css?v=3.1">
+  <link rel="stylesheet" href="office-tools/office-tools.css?v=3.1">
 </head>
 <body>
   <div class="app-shell">
@@ -122,17 +122,19 @@
             </div>
           </section>
           <div class="header-actions">
+            <div class="header-system-actions">
+              <button id="undoBtn" class="secondary-btn" type="button" disabled data-tooltip="Hoàn tác thay đổi gần nhất (Ctrl+Z)">↶ Hoàn tác</button>
+              <button id="backgroundBtn" class="icon-btn" type="button" aria-label="Chọn hình nền" data-tooltip="Chọn hình nền cho bảng công việc">▧</button>
+              <button id="themeBtn" class="icon-btn" type="button" aria-label="Đổi giao diện" data-tooltip="Chuyển giữa giao diện sáng và tối">◐</button>
+              <button id="settingsBtn" class="icon-btn" type="button" aria-label="Cài đặt" data-tooltip="Mở cài đặt ứng dụng">⚙</button>
+              <button id="helpBtn" class="icon-btn" type="button" aria-label="Hướng dẫn" data-tooltip="Xem hướng dẫn sử dụng nhanh">?</button>
+            </div>
             <div class="office-launcher" aria-label="Công cụ văn phòng">
               <button class="icon-btn office-launch-btn" type="button" data-office-tool="pdf" aria-label="Công cụ PDF" data-tooltip="Công cụ PDF"><span class="office-btn-mark">PDF</span></button>
               <button class="icon-btn office-launch-btn" type="button" data-office-tool="image" aria-label="Công cụ hình ảnh" data-tooltip="Công cụ hình ảnh"><span class="office-btn-mark">IMG</span></button>
               <button class="icon-btn office-launch-btn" type="button" data-office-tool="rename" aria-label="Đổi tên hàng loạt" data-tooltip="Đổi tên hàng loạt"><span class="office-btn-mark">REN</span></button>
               <button class="icon-btn office-launch-btn" type="button" data-office-tool="excel" aria-label="Công cụ Excel" data-tooltip="Công cụ Excel"><span class="office-btn-mark">XLS</span></button>
             </div>
-            <button id="undoBtn" class="secondary-btn" type="button" disabled data-tooltip="Hoàn tác thay đổi gần nhất (Ctrl+Z)">↶ Hoàn tác</button>
-            <button id="backgroundBtn" class="icon-btn" type="button" aria-label="Chọn hình nền" data-tooltip="Chọn hình nền cho bảng công việc">▧</button>
-            <button id="themeBtn" class="icon-btn" type="button" aria-label="Đổi giao diện" data-tooltip="Chuyển giữa giao diện sáng và tối">◐</button>
-            <button id="settingsBtn" class="icon-btn" type="button" aria-label="Cài đặt" data-tooltip="Mở cài đặt ứng dụng">⚙</button>
-            <button id="helpBtn" class="icon-btn" type="button" aria-label="Hướng dẫn" data-tooltip="Xem hướng dẫn sử dụng nhanh">?</button>
           </div>
         </div>
         <div class="topbar-sub">
@@ -476,9 +478,9 @@
 
   <div id="globalTooltip" class="global-tooltip" role="tooltip" hidden></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="dragdrop.js?v=3.0"></script>
-  <script src="app.js?v=3.0"></script>
-  <script src="music-player.js?v=3.0"></script>
-  <script type="module" src="office-tools/office-tools.js?v=3.0"></script>
+  <script src="dragdrop.js?v=3.1"></script>
+  <script src="app.js?v=3.1"></script>
+  <script src="music-player.js?v=3.1"></script>
+  <script type="module" src="office-tools/office-tools.js?v=3.1"></script>
 </body>
 </html>
