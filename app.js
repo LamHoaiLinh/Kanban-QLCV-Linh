@@ -2,7 +2,7 @@
   'use strict';
 
   const STORAGE_KEY = 'linh_personal_kanban_v1';
-  const VERSION = 10;
+  const VERSION = 11;
   const DEFAULT_BACKGROUND_ID = 'bg6';
   const DEFAULT_COLUMN_TITLES = ['Đã hoàn thành','Việc cần làm/chưa sắp xếp','Việc hôm nay','Việc ngày mai','Mục tiêu/ý tưởng'];
   const BACKGROUNDS = [
@@ -231,6 +231,13 @@
       if (event.key === 'Escape' && !openDialog && selectedCardIds.size) {
         event.preventDefault();
         clearCardSelection();
+        return;
+      }
+      // Xóa nhanh các công việc đang chọn. Chỉ hoạt động khi không nhập liệu và không có modal mở.
+      // Nội dung được chuyển vào khu “Nội dung đã xóa”, nên vẫn còn bản văn bản lưu trữ và có thể Hoàn tác ngay.
+      if (event.key === 'Delete' && !typing && !openDialog && selectedCardIds.size) {
+        event.preventDefault();
+        deleteSelectedCardsToArchive();
         return;
       }
       if (event.key === '/' && !typing) {
@@ -573,7 +580,7 @@
     el.dataset.columnId = columnId;
     el.tabIndex = 0;
     el.setAttribute('aria-selected',String(selectedCardIds.has(card.id)));
-    el.dataset.tooltip = 'Nhấp để chọn; Ctrl/Shift để chọn nhiều; nhấp đúp hoặc Enter để chỉnh sửa';
+    el.dataset.tooltip = 'Nhấp để chọn; Ctrl/Shift để chọn nhiều; Delete để xóa vào lưu trữ; nhấp đúp hoặc Enter để chỉnh sửa';
     const labels = card.labels.map(id => LABELS.find(label => label.id === id)).filter(Boolean);
     const total = card.checklist.length;
     const done = card.checklist.filter(item => item.done).length;
@@ -671,6 +678,34 @@
     updateCardSelectionDom();
     refs.board.querySelector(`.task-card[data-card-id="${cssEscape(selectionAnchorCardId)}"]`)?.focus({preventScroll:true});
     showToast(`Đã chọn ${column.cards.length} công việc trong cột “${column.title}”.`);
+  }
+
+
+  function deleteSelectedCardsToArchive() {
+    const project = getActiveProject();
+    if (!project || !selectedCardIds.size) return;
+    const selected = new Set(selectedCardIds);
+    const batches = [];
+    project.columns.forEach(column => {
+      const cards = column.cards.filter(card => selected.has(card.id));
+      if (cards.length) batches.push({column,cards});
+    });
+    const total = batches.reduce((sum,batch) => sum + batch.cards.length,0);
+    if (!total) {
+      clearCardSelection();
+      return;
+    }
+    captureUndo(total > 1 ? 'Xóa nhiều công việc' : 'Xóa công việc');
+    batches.forEach(({column,cards}) => {
+      archiveCards(cards,project,column,total > 1 ? 'Xóa nhanh nhiều công việc bằng phím Delete' : 'Xóa nhanh bằng phím Delete');
+      const ids = new Set(cards.map(card => card.id));
+      column.cards = column.cards.filter(card => !ids.has(card.id));
+    });
+    clearCardSelection(false);
+    touchProject(project);
+    saveNow();
+    renderAll();
+    showToast(`Đã xóa ${total} công việc và chuyển vào Nội dung đã xóa. Có thể bấm Hoàn tác.`);
   }
 
   function clearCardSelection(updateDom = true) {
@@ -1724,7 +1759,7 @@
   }
 
   function isAppStorageKey(key) {
-    return key === STORAGE_KEY || key.startsWith('linh_personal_kanban') || key.startsWith('linh-kanban-static') || key.startsWith('linh_kanban_music');
+    return key === STORAGE_KEY || key.startsWith('linh_personal_kanban') || key.startsWith('linh-kanban-static') || key.startsWith('linh_kanban_music') || key.startsWith('linh_kanban_office');
   }
 
   async function removeAppCaches() {

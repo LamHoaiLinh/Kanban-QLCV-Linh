@@ -106,3 +106,66 @@
 - Ctrl + click chọn rời rạc, Shift + click chọn liên tục, Ctrl + A chọn toàn bộ thẻ trong cột đang chọn. Kéo một thẻ đã chọn để di chuyển cả nhóm.
 - Có thể chọn màu nền riêng cho từng cột; mặc định vẫn giữ giao diện cũ.
 - Nhấp một lần để chọn thẻ; nhấp đúp hoặc nhấn Enter để mở chỉnh sửa.
+
+
+## Cập nhật v3.0 – Bộ công cụ văn phòng
+
+### Xóa nhanh thẻ bằng Delete
+1. Chọn một hoặc nhiều thẻ bằng click, Ctrl+click, Shift+click hoặc Ctrl+A trong cột.
+2. Nhấn phím Delete.
+3. Thẻ được chuyển vào Cài đặt → Nội dung đã xóa, không bị xóa vĩnh viễn ngay.
+4. Có thể bấm Hoàn tác để khôi phục thao tác vừa thực hiện.
+5. Phím Delete bị vô hiệu khi đang nhập văn bản hoặc có hộp thoại mở để tránh xóa nhầm.
+
+### Bốn công cụ trên thanh trên cùng
+- **PDF:** gộp và chuẩn hóa kích thước trang; thumbnail sắp xếp trang; chọn nhiều trang; xoay riêng từng trang; nhân bản, xóa, trích xuất; tách PDF; PDF sang PNG; ảnh sang PDF.
+- **IMG:** chuyển JPG/PNG/WebP; resize; xoay/lật; nén ảnh; ghép dọc/ngang/lưới; đóng dấu chữ.
+- **REN:** preview đổi tên file/thư mục; quy tắc tiền tố/hậu tố/tìm thay thế/regex/đánh số/kiểu chữ/xóa dấu; tạo ZIP an toàn; manifest JSON; đổi tên file tại chỗ khi có quyền.
+- **XLS:** đọc workbook; xuất JSON phân biệt value/formula; quản lý và làm sạch sheet; gộp sheet theo vị trí hoặc tiêu đề; gộp nhiều workbook; tách sheet.
+
+### Giữ nguyên dữ liệu Kanban
+- Phiên bản này tiếp tục dùng đúng khóa `linh_personal_kanban_v1`.
+- Không gọi `localStorage.clear()` và không thay đổi đường dẫn lưu dữ liệu cũ.
+- Upload đè mã nguồn và nhấn Ctrl+F5 chỉ làm mới tệp giao diện/cache; không xóa Local Storage.
+- Dữ liệu công cụ văn phòng dùng khóa riêng `linh_kanban_office_settings_v1`.
+- Vẫn nên bấm **Xuất bản sao JSON** trước khi cập nhật để có bản dự phòng ngoài trình duyệt.
+
+### Cách sử dụng PDF
+- Gộp PDF: thêm nhiều file, kéo thả hoặc dùng nút lên/xuống, chọn chế độ chuẩn hóa trang rồi xuất.
+- Chỉnh trang: mở một PDF, chọn trang bằng Ctrl/Shift/Ctrl+A, kéo thả đổi thứ tự, xoay hoặc xóa từng trang rồi xuất lại.
+- Tách PDF: chọn tách từng trang, theo khoảng như `1-3,5,8-10`, trang chẵn hoặc lẻ.
+- PDF sang PNG: chọn DPI; ứng dụng render tuần tự để hạn chế RAM.
+- Ảnh sang PDF: sắp xếp ảnh và chọn kích thước trang đầu ra.
+
+### Cách sử dụng IMG
+- Chọn nhiều ảnh, sắp xếp và chọn thao tác cần chạy.
+- Đổi định dạng/resize/xoay/lật xử lý theo lô.
+- Nén ảnh hiển thị dung lượng nguồn và kết quả.
+- Ghép ảnh hỗ trợ dọc, ngang hoặc dạng lưới, lề và khoảng cách.
+- Đóng dấu chữ áp dụng cho toàn bộ ảnh đã chọn.
+
+### Cách sử dụng Batch Rename
+- Browse thư mục hoặc dùng bộ chọn thư mục dự phòng.
+- Thiết lập quy tắc và kiểm tra bảng preview trước khi chạy.
+- **ZIP an toàn** là chế độ mặc định: tạo bản sao tên mới, không đụng file nguồn.
+- Đổi tên tại chỗ chỉ áp dụng cho file và yêu cầu quyền ghi cùng xác nhận `DOI TEN`.
+- Có thể tải manifest JSON để đối chiếu tên cũ/tên mới.
+
+### Cách sử dụng Excel
+- Đọc XLSX/XLS/XLSM/CSV và chọn sheet để xem preview.
+- Xuất JSON dạng thưa để chỉ lưu các ô có nội dung, hoặc bật xuất toàn bộ vùng dùng.
+- Ô công thức được phân biệt bằng `kind: "formula"`, có `formula` và `cachedValue` nếu file lưu sẵn kết quả.
+- Có thể đổi tên/sắp xếp/nhân bản/xóa sheet trong bản xuất, gộp sheet, gộp workbook và tách sheet thành ZIP.
+
+### Lưu ý thư viện và giới hạn
+- JSZip được đóng gói trong source.
+- Công cụ PDF và Excel tải lười pdf-lib, PDF.js và SheetJS đã ghim phiên bản ở lần đầu dùng; lần đầu cần Internet. Các file được chọn vẫn chỉ xử lý trong bộ nhớ của trình duyệt, không upload.
+- PDF không OCR, không sửa trực tiếp chữ đã có và có thể làm chữ ký số mất hiệu lực sau khi xuất lại.
+- IMG chưa có công cụ crop đồ họa trong bản này.
+- Rename không đổi tên thư mục tại chỗ; ZIP an toàn vẫn có thể tạo cấu trúc thư mục với tên mới.
+- Excel không chạy VBA/macro và không tự tính lại toàn bộ công thức.
+- Chrome/Edge trên máy tính hỗ trợ tốt nhất việc chọn thư mục và ghi file trực tiếp; trình duyệt khác dùng download/ZIP dự phòng.
+
+### File kiểm thử
+Thư mục `test-files` có PDF, ảnh và workbook mẫu không chứa dữ liệu nhạy cảm để thử nhanh các công cụ.
+
