@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#79c2a5">
   <meta name="description" content="Kanban cá nhân nhiều dự án, kéo thả kiểu Trello, chạy tĩnh trên GitHub Pages.">
   <title>Kanban Cá Nhân</title>
-  <link rel="manifest" href="manifest.webmanifest?v=2.8">
+  <link rel="manifest" href="manifest.webmanifest?v=2.9">
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=2.8">
+  <link rel="stylesheet" href="styles.css?v=2.9">
 </head>
 <body>
   <div class="app-shell">
@@ -151,6 +151,32 @@
     </main>
   </div>
 
+  <dialog id="quickCaptureDialog" class="modal">
+    <form id="quickCaptureForm" class="modal-card compact-modal quick-capture-modal">
+      <div class="modal-header">
+        <div><div class="eyebrow">NHẬP NHANH CÔNG VIỆC</div><h2>Ghi nhanh</h2></div>
+        <button class="icon-btn" data-close="quickCaptureDialog" type="button" aria-label="Đóng" data-tooltip="Đóng hộp nhập nhanh">×</button>
+      </div>
+      <div class="quick-capture-note">
+        <strong>Nhập tên công việc rồi nhấn Enter để lưu.</strong>
+        <span id="quickCaptureDestinationHint">Công việc sẽ được đưa vào cột mặc định của dự án đang mở.</span>
+      </div>
+      <label class="field">
+        <span>Tên công việc</span>
+        <input id="quickCaptureTitleInput" maxlength="160" required autocomplete="off" placeholder="Ví dụ: Gửi báo cáo cho Ban Giám đốc" data-tooltip="Nhập tên công việc; nhấn Enter để lưu ngay">
+      </label>
+      <label class="field">
+        <span>Đưa vào cột</span>
+        <select id="quickCaptureColumnSelect" data-tooltip="Có thể chọn cột khác cho riêng lần nhập này"></select>
+      </label>
+      <div class="quick-capture-shortcut">Phím tắt mở hộp này: <kbd>Ctrl</kbd> + <kbd>Enter</kbd> khi đang ở trang Kanban.</div>
+      <div class="modal-actions right-actions">
+        <button class="secondary-btn" data-close="quickCaptureDialog" type="button">Hủy</button>
+        <button class="primary-btn" type="submit">Thêm công việc</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="projectDialog" class="modal">
     <form id="projectForm" class="modal-card compact-modal">
       <div class="modal-header">
@@ -202,6 +228,11 @@
         <button class="icon-btn" data-close="columnDialog" type="button">×</button>
       </div>
       <label class="field"><span>Tên cột</span><input id="columnNameInput" maxlength="80" required placeholder="Ví dụ: Đang xử lý"></label>
+      <fieldset class="field color-fieldset column-color-fieldset">
+        <legend>Màu nền cột <small>(tùy chọn)</small></legend>
+        <div id="columnColorOptions" class="column-color-options" aria-label="Chọn màu nền cột"></div>
+        <div class="field-help">Mặc định giữ nguyên màu nền hiện tại. Chỉ chọn màu khi muốn phân biệt cột rõ hơn.</div>
+      </fieldset>
       <div class="column-dialog-footer">
         <div class="column-extra-actions" aria-label="Thao tác với cột">
           <button id="duplicateColumnBtn" class="secondary-btn column-action-btn" type="button" hidden><span aria-hidden="true">⧉</span> Nhân bản</button>
@@ -247,6 +278,8 @@
         <div><strong>8. Xóa dữ liệu:</strong> mở Cài đặt ⚙, chọn “Xóa toàn bộ dữ liệu”, cân nhắc xuất backup rồi gõ chính xác OK.</div>
         <div><strong>9. Nhạc làm việc:</strong> bấm “Browse thư mục nhạc” hoặc kéo thả thư mục vào trình phát bên trái. Ctrl + Space để phát hoặc tạm dừng.</div>
         <div><strong>10. Ghi chú nhanh:</strong> bấm dấu ＋ dưới tên dự án để tạo ghi chú; bấm tên ghi chú để mở và chỉnh sửa.</div>
+        <div><strong>11. Nhập nhanh công việc:</strong> nhấn Ctrl + Enter khi trang Kanban đang được focus, nhập tên rồi nhấn Enter để lưu.</div>
+        <div><strong>12. Chọn nhiều công việc:</strong> Ctrl + click để chọn rời rạc, Shift + click để chọn liên tục, Ctrl + A để chọn toàn bộ thẻ trong cột đang chọn; kéo một thẻ đã chọn để di chuyển cả nhóm.</div>
       </div>
       <div class="modal-actions right-actions"><button class="primary-btn" value="close">Đã hiểu</button></div>
     </form>
@@ -297,6 +330,19 @@
         <div><div class="eyebrow">CÀI ĐẶT ỨNG DỤNG</div><h2>Cài đặt</h2></div>
         <button class="icon-btn" data-close="settingsDialog" type="button" aria-label="Đóng">×</button>
       </div>
+      <section class="settings-block quick-capture-settings">
+        <div class="settings-block-head">
+          <div class="settings-section-copy">
+            <strong>Ghi nhanh bằng Ctrl + Enter</strong>
+            <span>Mở hộp nhập nhanh và đưa công việc vào cột mặc định của dự án đang mở.</span>
+          </div>
+        </div>
+        <div class="quick-setting-row">
+          <div>Đang thiết lập cho dự án: <strong id="quickCaptureProjectName">—</strong></div>
+          <label><span>Cột nhận công việc mặc định</span><select id="quickCaptureDefaultColumnSelect" data-tooltip="Chọn cột nhận công việc khi dùng Ctrl + Enter"></select></label>
+        </div>
+        <div id="quickCaptureStatus" class="settings-status-line"></div>
+      </section>
       <section class="settings-block daily-move-settings">
         <div class="settings-block-head">
           <div class="settings-section-copy">
@@ -423,8 +469,8 @@
 
   <div id="globalTooltip" class="global-tooltip" role="tooltip" hidden></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="dragdrop.js?v=2.8"></script>
-  <script src="app.js?v=2.8"></script>
-  <script src="music-player.js?v=2.8"></script>
+  <script src="dragdrop.js?v=2.9"></script>
+  <script src="app.js?v=2.9"></script>
+  <script src="music-player.js?v=2.9"></script>
 </body>
 </html>

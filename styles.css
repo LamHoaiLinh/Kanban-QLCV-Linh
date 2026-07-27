@@ -481,3 +481,41 @@ body.has-background .project-note-tab,body.has-background .project-note-add{back
   .note-picker-item{grid-template-columns:1fr}
   .note-picker-date{display:none}
 }
+
+
+/* ===== Nâng cấp v2.9: ghi nhanh, chọn nhiều thẻ và màu nền cột ===== */
+.quick-capture-modal{width:min(560px,calc(100vw - 28px))}
+.quick-capture-note{display:grid;gap:5px;margin-top:18px;padding:13px 14px;border:1px solid color-mix(in srgb,var(--green) 35%,var(--border));border-radius:14px;background:var(--green-soft)}
+.quick-capture-note strong{font-size:13px}
+.quick-capture-note span,.quick-capture-shortcut,.field-help{color:var(--muted);font-size:11px;line-height:1.5}
+.quick-capture-shortcut{margin-top:14px}
+.quick-capture-shortcut kbd{display:inline-block;padding:2px 7px;border:1px solid var(--border);border-bottom-width:2px;border-radius:6px;background:var(--panel-soft);color:var(--text);font-size:11px;font-weight:800}
+.quick-setting-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(250px,1fr);align-items:end;gap:14px;margin-top:14px}
+.quick-setting-row>div{color:var(--muted);font-size:12px}
+.quick-setting-row label{display:grid;gap:6px}
+.quick-setting-row label span{color:var(--muted);font-size:11px;font-weight:800}
+.quick-setting-row select{width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:11px;background:var(--panel);color:var(--text)}
+
+.column-color-fieldset legend small{font-weight:500;color:var(--muted)}
+.column-color-options{display:flex;flex-wrap:wrap;gap:9px;margin-top:9px}
+.column-color-radio{position:relative}
+.column-color-radio input{position:absolute;opacity:0;pointer-events:none}
+.column-color-swatch{display:grid;place-items:center;width:42px;height:34px;border:3px solid transparent;border-radius:11px;background:var(--swatch,var(--panel-soft));box-shadow:inset 0 0 0 1px rgba(0,0,0,.08);cursor:pointer;font-size:8px;font-weight:800;color:var(--muted);transition:.15s ease}
+.column-color-swatch.default-swatch{width:68px;background:linear-gradient(135deg,var(--panel-soft),var(--green-soft))}
+.column-color-radio input:checked+.column-color-swatch{border-color:var(--text);transform:scale(1.06);box-shadow:0 0 0 2px color-mix(in srgb,var(--green) 20%,transparent)}
+
+.kanban-column.custom-column-color{background:color-mix(in srgb,var(--column-custom-bg) 84%,var(--panel) 16%);border-color:color-mix(in srgb,var(--column-custom-bg) 58%,var(--border) 42%)}
+body.has-background .kanban-column.custom-column-color{background:color-mix(in srgb,var(--column-custom-bg) 78%,transparent);backdrop-filter:blur(9px)}
+:root[data-theme="dark"] .kanban-column.custom-column-color{background:color-mix(in srgb,var(--column-custom-bg) 32%,var(--panel-soft) 68%)}
+:root[data-theme="dark"] body.has-background .kanban-column.custom-column-color{background:color-mix(in srgb,var(--column-custom-bg) 28%,rgba(29,48,40,.84) 72%)}
+
+.task-card{outline:0}
+.task-card.selected-card{border-color:var(--green)!important;box-shadow:0 0 0 2px color-mix(in srgb,var(--green) 24%,transparent),var(--shadow-soft)!important;transform:translateY(-1px)}
+.card-selected-mark{display:none;position:absolute;top:-7px;left:-7px;width:21px;height:21px;border-radius:50%;place-items:center;background:var(--green);color:#fff;font-size:12px;font-weight:900;box-shadow:0 4px 12px rgba(30,80,60,.25);z-index:2}
+.task-card.selected-card .card-selected-mark{display:grid}
+.task-card.dragging{opacity:.46}
+.task-card.selected-card.dragging{box-shadow:0 0 0 2px var(--green)!important}
+
+@media(max-width:700px){
+  .quick-setting-row{grid-template-columns:1fr}
+}

@@ -7,7 +7,10 @@
       this.onStart = options.onStart || (() => {});
       this.onEnd = options.onEnd || (() => {});
       this.canDrag = options.canDrag || (() => true);
+      this.onCardDragPrepare = options.onCardDragPrepare || (() => {});
+      this.getCardDragElements = options.getCardDragElements || (card => [card]);
       this.dragEl = null;
+      this.dragEls = [];
       this.dragType = null;
       this.pointerId = null;
       this.mouseGrip = null;
@@ -52,12 +55,15 @@
         event.preventDefault();
         return;
       }
+      if (card) this.onCardDragPrepare(card);
       this.dragEl = source;
       this.dragType = card ? 'card' : 'column';
       if (!this.dragEl) return;
+      this.dragEls = card ? this.getCardDragElements(card).filter(Boolean) : [source];
+      if (!this.dragEls.length) this.dragEls = [source];
       event.dataTransfer.effectAllowed = 'move';
       event.dataTransfer.setData('text/plain', this.dragEl.dataset.cardId || this.dragEl.dataset.columnId || 'kanban');
-      requestAnimationFrame(() => this.dragEl?.classList.add('dragging'));
+      requestAnimationFrame(() => this.dragEls.forEach(el => el.classList.add('dragging')));
       document.body.classList.add('drag-active');
       this.onStart(this.dragType);
     }
@@ -84,13 +90,16 @@
       if (!grip || !this.canDrag()) return;
       const card = grip.closest('.task-card');
       const column = grip.closest('.kanban-column');
+      if (card) this.onCardDragPrepare(card);
       this.dragEl = card || column;
       this.dragType = card ? 'card' : 'column';
       if (!this.dragEl) return;
+      this.dragEls = card ? this.getCardDragElements(card).filter(Boolean) : [this.dragEl];
+      if (!this.dragEls.length) this.dragEls = [this.dragEl];
       event.preventDefault();
       this.pointerId = event.pointerId;
       grip.setPointerCapture?.(event.pointerId);
-      this.dragEl.classList.add('dragging');
+      this.dragEls.forEach(el => el.classList.add('dragging'));
       document.body.classList.add('drag-active');
       document.addEventListener('pointermove', this.boundPointerMove, { passive: false });
       document.addEventListener('pointerup', this.boundPointerUp);
@@ -127,8 +136,10 @@
       });
       const placeholder = list.querySelector('.empty-column');
       if (placeholder) placeholder.remove();
-      if (after) list.insertBefore(this.dragEl, after);
-      else list.appendChild(this.dragEl);
+      const fragment = document.createDocumentFragment();
+      this.dragEls.forEach(el => fragment.appendChild(el));
+      if (after) list.insertBefore(fragment, after);
+      else list.appendChild(fragment);
     }
 
     moveColumn(x) {
@@ -152,12 +163,14 @@
     }
 
     cleanup() {
+      this.dragEls.forEach(el => el.classList.remove('dragging'));
       this.dragEl?.classList.remove('dragging');
       document.body.classList.remove('drag-active');
       document.removeEventListener('pointermove', this.boundPointerMove);
       document.removeEventListener('pointerup', this.boundPointerUp);
       document.removeEventListener('pointercancel', this.boundPointerUp);
       this.dragEl = null;
+      this.dragEls = [];
       this.dragType = null;
       this.pointerId = null;
       this.mouseGrip = null;

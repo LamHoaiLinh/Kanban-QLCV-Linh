@@ -98,3 +98,11 @@
 - Sửa cơ chế tooltip để hiển thị được phía trên cửa sổ modal.
 - Ô tên ghi chú vẫn cho phép nhập đổi tên, đồng thời có nút xổ danh sách để chuyển nhanh giữa các ghi chú của dự án.
 - Khi chuyển ghi chú mà có nội dung chưa lưu, ứng dụng sẽ hỏi xác nhận để tránh mất dữ liệu ngoài ý muốn.
+
+
+## Cập nhật v2.9
+- Nhấn Ctrl + Enter khi trang Kanban đang được focus để mở hộp ghi nhanh công việc.
+- Nhập tên và nhấn Enter để lưu; mặc định vào cột Việc cần làm/chưa sắp xếp, có thể đổi trong Cài đặt.
+- Ctrl + click chọn rời rạc, Shift + click chọn liên tục, Ctrl + A chọn toàn bộ thẻ trong cột đang chọn. Kéo một thẻ đã chọn để di chuyển cả nhóm.
+- Có thể chọn màu nền riêng cho từng cột; mặc định vẫn giữ giao diện cũ.
+- Nhấp một lần để chọn thẻ; nhấp đúp hoặc nhấn Enter để mở chỉnh sửa.
