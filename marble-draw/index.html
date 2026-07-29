@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#173a30">
   <title>Marble Draw – Đường đua may mắn</title>
-  <link rel="stylesheet" href="styles.css?v=1.1.0">
+  <link rel="stylesheet" href="styles.css?v=1.2.0">
   <script type="importmap">
   {
     "imports": {
@@ -30,22 +30,7 @@
         <button id="closeDrawBtn" class="md-close-btn" type="button">Quay về Kanban</button>
       </div>
     </header>
-    <div class="md-shell">
-      <aside class="md-sidebar">
-        <div class="md-event-head"><span>Sự kiện</span><button id="newEventBtn" class="md-mini-btn" type="button">＋ Mới</button></div>
-        <div id="eventList" class="md-event-list"></div>
-        <nav class="md-nav" aria-label="Các bước bốc thăm">
-          <button data-view="overview" class="active"><b>1</b><span>Tổng quan</span></button>
-          <button data-view="participants"><b>2</b><span>Người tham dự</span></button>
-          <button data-view="shuffle"><b>3</b><span>Xáo & gán mã</span></button>
-          <button data-view="race"><b>4</b><span>Đường đua</span></button>
-          <button data-view="results"><b>5</b><span>Kết quả</span></button>
-          <button data-view="verify"><b>6</b><span>Xác minh</span></button>
-        </nav>
-        <div class="md-privacy">🔒 Danh sách và kết quả chỉ lưu trên trình duyệt này.</div>
-      </aside>
-      <main id="mainView" class="md-main" tabindex="-1"></main>
-    </div>
+    <div class="md-shell no-sidebar"><main id="mainView" class="md-main solo" tabindex="-1"></main></div>
   </div>
   <div id="raceStage" class="race-stage" hidden>
     <canvas id="raceCanvas"></canvas>
@@ -75,6 +60,6 @@
   </dialog>
   <dialog id="confirmDialog" class="md-dialog"><form method="dialog" class="md-dialog-card compact"><h2 id="confirmTitle">Xác nhận</h2><p id="confirmText"></p><div class="md-dialog-actions"><button value="cancel" class="md-secondary-btn">Hủy</button><button value="ok" class="md-danger-btn">Xác nhận</button></div></form></dialog>
   <div id="toast" class="md-toast" role="status"></div>
-  <script type="module" src="js/app.js?v=1.1.0"></script>
+  <script type="module" src="js/app.js?v=1.2.0"></script>
 </body>
 </html>

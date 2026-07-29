@@ -101,9 +101,9 @@ export class MarbleRaceEngine{
     }
 
     // Khu xuất phát.
-    const bowlZ=-9.2;
+    const bowlZ=-9.0;
     this.addFixedBox({x:0,y:this.surfaceYAt(bowlZ)+.05,z:bowlZ,w:LANE_W,h:.9,d:3.2,rx:SLOPE_ANGLE,material:trackMat});
-    this.addFixedBox({x:0,y:this.surfaceYAt(-11)+1.15,z:-11.3,w:LANE_W+.1,h:.35,d:.45,material:wallMat});
+    this.addFixedBox({x:0,y:this.surfaceYAt(-10.7)+1.35,z:-10.7,w:LANE_W+.2,h:1.1,d:.45,material:wallMat});
 
     // Cọc vật lý để tạo độ ngẫu nhiên công khai.
     for(let row=0;row<7;row++){
@@ -176,9 +176,9 @@ export class MarbleRaceEngine{
     this.scene.add(group);this.trackObjects.push(group);this.rotors.push({body,group,angle:0,speed:1.2});
   }
   createMarble(digit,slot,rng){
-    const x=-4.25+slot*.95;
-    const z=-9.55+(rng()-.5)*.08;
-    const y=this.surfaceYAt(z)+1.35+(rng()-.5)*.03;
+    const x=-3.85+slot*.86;
+    const z=-8.55+(rng()-.5)*.05;
+    const y=this.surfaceYAt(z)+1.25+(rng()-.5)*.015;
     const body=this.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(x,y,z).setCanSleep(false).setCcdEnabled(true).setLinearDamping(.01).setAngularDamping(.01));
     const desc=RAPIER.ColliderDesc.ball(MARBLE_RADIUS).setDensity(1.15).setRestitution(.18).setFriction(.22).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
     const collider=this.world.createCollider(desc,body);
