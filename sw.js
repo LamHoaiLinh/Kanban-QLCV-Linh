@@ -1,9 +1,9 @@
-const CACHE_NAME='linh-kanban-static-v35';
+const CACHE_NAME='linh-kanban-static-v36';
 const ASSETS=[
-  './','./index.html','./styles.css?v=3.2','./dragdrop.js?v=3.2','./app.js?v=3.5','./music-player.js?v=3.2',
+  './','./index.html','./styles.css?v=3.2','./dragdrop.js?v=3.2','./app.js?v=3.6','./music-player.js?v=3.2',
   './office-tools/office-tools.css?v=3.2','./office-tools/office-tools.js?v=3.2','./office-tools/vendor/jszip.min.js',
-  './marble-draw-launcher.js?v=3.5','./marble-draw/index.html?v=1.2.1','./marble-draw/styles.css?v=1.2.1',
-  './marble-draw/js/app.js?v=1.2.1','./marble-draw/js/storage.js','./marble-draw/js/crypto-utils.js','./marble-draw/js/participants.js','./marble-draw/js/shuffle-engine.js','./marble-draw/js/race-engine.js',
+  './marble-draw-launcher.js?v=3.6','./marble-draw/index.html?v=1.3.0','./marble-draw/styles.css?v=1.3.0',
+  './marble-draw/js/app.js?v=1.3.0','./marble-draw/js/storage.js','./marble-draw/js/crypto-utils.js','./marble-draw/js/participants.js','./marble-draw/js/shuffle-engine.js','./marble-draw/js/race-engine.js',
   './manifest.webmanifest?v=3.2','./assets/icon.svg',
   './assets/backgrounds/Beautiful Background6.png','./assets/backgrounds/Beautiful Background7.png',
   './assets/backgrounds/Beautiful Background8.png','./assets/backgrounds/Beautiful Background13.png',

@@ -18,3 +18,12 @@
 - Thêm benchmark nhanh kiểm tra phân bổ chữ số vào vị trí xuất phát.
 - Giữ nguyên khóa Local Storage và toàn bộ logic Kanban v3.1.
 - Cập nhật Service Worker lên `linh-kanban-static-v32`.
+
+## v3.6
+- Đổi Marble Draw sang một màn hình Home duy nhất.
+- Nút Xáo danh sách thay đổi thật thứ tự người tham dự trong bảng.
+- Bỏ cột Chức danh khỏi giao diện và Excel mẫu.
+- Cho chọn 2–10 viên bi mỗi lượt; 3 viên sẽ dùng số 1, 2, 3.
+- Số trên viên bi bám theo mặt nhìn thấy và không quay vòng quanh viên bi.
+- Thay máng bằng một mặt liền, giảm số chướng ngại để hạn chế kẹt bi.
+- Bấm Bắt đầu đua sẽ tự chuẩn bị danh sách và tự chạy các lượt.

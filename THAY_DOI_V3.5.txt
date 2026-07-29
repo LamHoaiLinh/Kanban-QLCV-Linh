@@ -1,0 +1,6 @@
+Kanban Ca Nhan v3.5 - Cache Hotfix
+- Sua launcher Marble Draw tu v1.0.0 sang v1.2.1.
+- Tang Service Worker cache tu v32 len v35.
+- HTML va Marble Draw dung network-first de tranh giao dien cu.
+- Dang ky Service Worker voi updateViaCache none va goi update ngay.
+- Giu nguyen khoa du lieu Kanban va Marble Draw.

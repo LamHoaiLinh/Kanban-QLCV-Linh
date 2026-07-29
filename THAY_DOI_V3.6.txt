@@ -1,0 +1,8 @@
+Kanban Cá Nhân v3.6
+- Marble Draw chỉ còn một màn hình Home.
+- Nút Xáo danh sách thay đổi thật thứ tự trong bảng.
+- Bỏ cột Chức danh.
+- Chọn từ 2 đến 10 viên bi mỗi lượt; dưới 10 bi dùng số từ 1 đến số bi đã chọn.
+- Số trên bi bám vào bề mặt nhìn thấy và không quay vòng quanh bi.
+- Máng đua đổi sang mặt liền, chướng ngại thưa để giảm kẹt bi.
+- Toàn bộ nội dung giao diện dùng cách xưng hô Bạn.

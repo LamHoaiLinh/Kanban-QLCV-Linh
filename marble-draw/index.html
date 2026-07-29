@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#173a30">
   <title>Marble Draw – Đường đua may mắn</title>
-  <link rel="stylesheet" href="styles.css?v=1.2.1">
+  <link rel="stylesheet" href="styles.css?v=1.3.0">
   <script type="importmap">
   {
     "imports": {
@@ -21,7 +21,7 @@
     <header class="md-header">
       <div class="md-brand">
         <div class="md-logo" aria-hidden="true"><span></span><span></span><span></span></div>
-        <div><div class="md-eyebrow">BỐC THĂM VẬT LÝ 3D</div><h1>MARBLE DRAW</h1><p>Đường đua may mắn – xử lý hoàn toàn trên thiết bị</p></div>
+        <div><div class="md-eyebrow">BỐC THĂM VẬT LÝ 3D</div><h1>MARBLE DRAW</h1><p>Đường đua may mắn</p></div>
       </div>
       <div class="md-header-actions">
         <button id="fullscreenBtn" class="md-icon-btn" type="button" data-tip="Mở toàn màn hình trình chiếu" aria-label="Toàn màn hình">⛶</button>
@@ -35,7 +35,7 @@
   <div id="raceStage" class="race-stage" hidden>
     <canvas id="raceCanvas"></canvas>
     <div class="race-topbar">
-      <div><span id="raceModeBadge" class="race-badge">CHẠY THỬ</span><strong id="raceEventName">Sự kiện</strong></div>
+      <div><span id="raceModeBadge" class="race-badge">XEM THỬ</span><strong id="raceEventName">Sự kiện</strong></div>
       <div class="race-top-actions"><button id="raceSoundBtn" class="md-icon-btn" type="button">♪</button><button id="exitRaceBtn" class="md-close-btn" type="button">Thoát đường đua</button></div>
     </div>
     <div class="race-scoreboard">
@@ -46,8 +46,8 @@
     <div id="raceCountdown" class="race-countdown" hidden>3</div>
     <div id="raceWinner" class="race-winner" hidden></div>
     <div id="raceRanking" class="race-ranking"></div>
-    <div id="raceStatus" class="race-status">Đang tải engine vật lý…</div>
-    <div id="raceControls" class="race-controls"><button id="startDigitBtn" class="md-primary-btn" type="button">Bắt đầu lượt</button><button id="resetSequenceBtn" class="md-secondary-btn" type="button" hidden>Quay lại toàn bộ chuỗi</button></div>
+    <div id="raceStatus" class="race-status">Đang chuẩn bị đường đua…</div>
+    <div id="raceControls" class="race-controls" hidden><button id="startDigitBtn" class="md-primary-btn" type="button" hidden>Bắt đầu</button><button id="resetSequenceBtn" class="md-secondary-btn" type="button" hidden>Chạy lại</button></div>
   </div>
   <dialog id="settingsDialog" class="md-dialog">
     <form method="dialog" class="md-dialog-card">
@@ -60,6 +60,6 @@
   </dialog>
   <dialog id="confirmDialog" class="md-dialog"><form method="dialog" class="md-dialog-card compact"><h2 id="confirmTitle">Xác nhận</h2><p id="confirmText"></p><div class="md-dialog-actions"><button value="cancel" class="md-secondary-btn">Hủy</button><button value="ok" class="md-danger-btn">Xác nhận</button></div></form></dialog>
   <div id="toast" class="md-toast" role="status"></div>
-  <script type="module" src="js/app.js?v=1.2.1"></script>
+  <script type="module" src="js/app.js?v=1.3.0"></script>
 </body>
 </html>
