@@ -9,7 +9,7 @@ const TRACK_LENGTH=29.5;
 const TRACK_CENTER_Z=(START_Z+FINISH_Z)/2;
 const TRACK_WIDTH=10.8;
 const TRACK_HALF=TRACK_WIDTH/2;
-const SLOPE_ANGLE=0.19;
+const SLOPE_ANGLE=0.235;
 const FLOOR_THICKNESS=.42;
 const MARBLE_RADIUS=.34;
 
@@ -57,7 +57,7 @@ export class MarbleRaceEngine{
     await this.init();this.stop();this.clearWorld();
     this.digits=valuesFor(this.marbleCount);
     this.world=new RAPIER.World({x:0,y:-12,z:0});this.world.timestep=this.fixed;this.eventQueue=new RAPIER.EventQueue(true);
-    this.finishOrder=[];this.marbleColliderMap.clear();this.buildTrack();
+    this.finishOrder=[];this.firstFinishAt=null;this.marbleColliderMap.clear();this.buildTrack();
     const positions=await seededShuffle(this.digits,`${seed}|start-positions`);const rng=await seededRng(`${seed}|start-jitter`);
     positions.forEach((digit,slot)=>this.createMarble(digit,slot,rng));
     this.updateMeshes();this.renderOnce();return positions;
@@ -70,24 +70,20 @@ export class MarbleRaceEngine{
     const centerY=this.surfaceYAt(TRACK_CENTER_Z)-FLOOR_THICKNESS/2;
 
     // Một mặt máng liền khối để không có khe làm lọt bi.
-    this.addFixedBox({x:0,y:centerY,z:TRACK_CENTER_Z,w:TRACK_WIDTH,h:FLOOR_THICKNESS,d:TRACK_LENGTH,rx:SLOPE_ANGLE,material:floorMat,friction:.3});
-    this.addFixedBox({x:-TRACK_HALF-.26,y:centerY+1.05,z:TRACK_CENTER_Z,w:.52,h:2.2,d:TRACK_LENGTH,rx:SLOPE_ANGLE,material:wallMat,friction:.35});
-    this.addFixedBox({x:TRACK_HALF+.26,y:centerY+1.05,z:TRACK_CENTER_Z,w:.52,h:2.2,d:TRACK_LENGTH,rx:SLOPE_ANGLE,material:wallMat,friction:.35});
+    this.addFixedBox({x:0,y:centerY,z:TRACK_CENTER_Z,w:TRACK_WIDTH,h:FLOOR_THICKNESS,d:TRACK_LENGTH,rx:SLOPE_ANGLE,material:floorMat,friction:.12});
+    this.addFixedBox({x:-TRACK_HALF-.26,y:centerY+1.05,z:TRACK_CENTER_Z,w:.52,h:2.2,d:TRACK_LENGTH,rx:SLOPE_ANGLE,material:wallMat,friction:.18});
+    this.addFixedBox({x:TRACK_HALF+.26,y:centerY+1.05,z:TRACK_CENTER_Z,w:.52,h:2.2,d:TRACK_LENGTH,rx:SLOPE_ANGLE,material:wallMat,friction:.18});
 
     // Tường sau giữ toàn bộ bi trong khu xuất phát.
     this.addFixedBox({x:0,y:this.surfaceYAt(START_Z)+.8,z:START_Z-.25,w:TRACK_WIDTH+.3,h:1.8,d:.5,material:wallMat,friction:.4});
 
-    // Chướng ngại thưa, khe đi rộng hơn đường kính bi để hạn chế kẹt.
+    // Chướng ngại thưa và lệch nhau để bi đổi hướng nhưng không tạo hốc kẹt.
     const pegRows=[
-      {z:-1.5,xs:[-3.2,0,3.2]},
-      {z:4.0,xs:[-2.3,2.3]},
-      {z:9.0,xs:[-3.3,0,3.3]}
+      {z:-1.0,xs:[-3.4,0,3.4]},
+      {z:5.0,xs:[-2.5,2.5]},
+      {z:10.5,xs:[-3.5,0,3.5]}
     ];
-    for(const row of pegRows){for(const x of row.xs)this.addFixedCylinder({x,y:this.surfaceYAt(row.z)+.52,z:row.z,r:.24,half:.55,material:pegMat})}
-
-    // Hai thanh đổi hướng thấp, không tạo hốc kín.
-    this.addFixedBox({x:-1.7,y:this.surfaceYAt(2.0)+.28,z:2.0,w:.3,h:.52,d:2.8,rx:SLOPE_ANGLE,ry:.34,material:accentMat,friction:.25});
-    this.addFixedBox({x:1.7,y:this.surfaceYAt(7.0)+.28,z:7.0,w:.3,h:.52,d:2.8,rx:SLOPE_ANGLE,ry:-.34,material:accentMat,friction:.25});
+    for(const row of pegRows){for(const x of row.xs)this.addFixedCylinder({x,y:this.surfaceYAt(row.z)+.50,z:row.z,r:.20,half:.50,material:pegMat})}
 
     // Cổng xuất phát đặt trước bi.
     const gateZ=-8.0,gateY=this.surfaceYAt(gateZ)+.62;
@@ -112,14 +108,14 @@ export class MarbleRaceEngine{
     const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);mesh.position.set(x,y,z);mesh.quaternion.set(q.x,q.y,q.z,q.w);mesh.receiveShadow=true;mesh.castShadow=this.quality!=='low';this.scene.add(mesh);this.trackObjects.push(mesh);return{body,mesh};
   }
   addFixedCylinder({x,y,z,r,half,material}){
-    const body=this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(x,y,z));this.world.createCollider(RAPIER.ColliderDesc.cylinder(half,r).setFriction(.25),body);
+    const body=this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(x,y,z));this.world.createCollider(RAPIER.ColliderDesc.cylinder(half,r).setFriction(.06),body);
     const mesh=new THREE.Mesh(new THREE.CylinderGeometry(r,r,half*2,18),material);mesh.position.set(x,y,z);mesh.castShadow=true;this.scene.add(mesh);this.trackObjects.push(mesh);
   }
   createMarble(digit,slot,rng){
     const count=this.digits.length;const usableWidth=Math.min(8.4,(count-1)*.88);const startX=-usableWidth/2;const spacing=count>1?usableWidth/(count-1):0;
     const x=startX+slot*spacing;const z=-9.0+(rng()-.5)*.025;const y=this.surfaceYAt(z)+MARBLE_RADIUS+.12+(rng()-.5)*.01;
     const body=this.world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(x,y,z).setCanSleep(false).setCcdEnabled(true).setLinearDamping(.008).setAngularDamping(.008));
-    const collider=this.world.createCollider(RAPIER.ColliderDesc.ball(MARBLE_RADIUS).setDensity(1.1).setRestitution(.1).setFriction(.18).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),body);
+    const collider=this.world.createCollider(RAPIER.ColliderDesc.ball(MARBLE_RADIUS).setDensity(1.1).setRestitution(.14).setFriction(.08).setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),body);
     this.marbleColliderMap.set(collider.handle,digit);
     const colorIndex=this.marbleCount===10?Number(digit):Math.max(0,Number(digit)-1);const ball=new THREE.Mesh(new THREE.SphereGeometry(MARBLE_RADIUS,30,22),new THREE.MeshStandardMaterial({color:COLORS[colorIndex%COLORS.length],roughness:.23,metalness:.06}));ball.castShadow=true;ball.position.set(x,y,z);this.scene.add(ball);
     const label=this.makeSurfaceLabel(String(digit));label.position.set(x,y,z);this.scene.add(label);
@@ -136,7 +132,7 @@ export class MarbleRaceEngine{
     await this.prepare(seed);this.listeners={onCountdown,onUpdate,onFinish,onStatus};
     for(let n=3;n>=1;n--){onCountdown(n);this.playTone(420+n*110,.12);await wait(650)}onCountdown(0);await wait(170);
     this.releaseGate();this.playTone(230,.2);this.running=true;this.startPerf=performance.now();this.lastTime=performance.now();this.accumulator=0;onStatus('Các viên bi đang chạy.');
-    return new Promise((resolve,reject)=>{this.raceResolve=resolve;this.raceReject=reject;this.loop();this.timeoutId=setTimeout(()=>this.timeoutRace(),32000)});
+    return new Promise((resolve,reject)=>{this.raceResolve=resolve;this.raceReject=reject;this.loop();this.timeoutId=setTimeout(()=>this.timeoutRace(),20000)});
   }
   releaseGate(){
     if(this.gateBody){this.world.removeRigidBody(this.gateBody);this.gateBody=null}
@@ -151,18 +147,21 @@ export class MarbleRaceEngine{
     const elapsed=(performance.now()-this.startPerf)/1000;this.world.step(this.eventQueue);
     this.eventQueue.drainCollisionEvents((h1,h2,started)=>{if(!started)return;let marbleHandle=null;if(h1===this.sensorHandle)marbleHandle=h2;else if(h2===this.sensorHandle)marbleHandle=h1;if(marbleHandle!==null&&this.marbleColliderMap.has(marbleHandle))this.recordFinish(this.marbleColliderMap.get(marbleHandle),elapsed)});
     for(const marble of this.marbles){const p=marble.body.translation();if(!marble.finished&&p.z>=FINISH_Z-.1)this.recordFinish(marble.digit,elapsed)}
+    // Chỉ cần xác định viên về đầu. Sau một khoảng ngắn để người xem thấy kết quả,
+    // kết thúc lượt dù các viên còn lại bị chậm hoặc mắc lại.
+    if(this.firstFinishAt&&performance.now()-this.firstFinishAt>=1100)this.completeRace();
   }
   recordFinish(digit,time){
     const marble=this.marbles.find(m=>m.digit===digit);if(!marble||marble.finished)return;marble.finished=true;marble.finishTime=time;this.finishOrder.push({digit,time:Number(time.toFixed(4))});this.playTone(this.finishOrder.length===1?980:650,.09);
     if(this.finishOrder.length===1){this.firstFinishAt=performance.now();this.listeners.onStatus(`Bi ${digit} về đích đầu tiên.`)}
-    if(this.finishOrder.length===this.digits.length||(this.firstFinishAt&&performance.now()-this.firstFinishAt>3600))this.completeRace();
+    if(this.finishOrder.length===this.digits.length)this.completeRace();
   }
   completeRace(){
     if(!this.running)return;this.running=false;cancelAnimationFrame(this.animFrame);clearTimeout(this.timeoutId);this.renderOnce();
     const result={winner:this.finishOrder[0]?.digit,finishOrder:[...this.finishOrder],duration:Number(((performance.now()-this.startPerf)/1000).toFixed(4))};this.listeners.onFinish(result);this.raceResolve?.(result);this.raceResolve=null;
   }
   timeoutRace(){
-    if(!this.running)return;this.running=false;cancelAnimationFrame(this.animFrame);const err=new Error('Lượt đua chưa hoàn thành. Hệ thống sẽ chạy lại.');this.listeners.onStatus(err.message);this.raceReject?.(err);this.raceReject=null;
+    if(!this.running)return;this.running=false;cancelAnimationFrame(this.animFrame);const err=new Error('Không có bi về đích trong thời gian quy định. Hệ thống sẽ tự chạy lại lượt này.');this.listeners.onStatus(err.message);this.raceReject?.(err);this.raceReject=null;
   }
   emitUpdate(){
     const order=[...this.marbles].sort((a,b)=>b.body.translation().z-a.body.translation().z).map(m=>({digit:m.digit,z:m.body.translation().z,finished:m.finished}));this.listeners.onUpdate(order,this.finishOrder);

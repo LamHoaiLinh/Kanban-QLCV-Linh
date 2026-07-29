@@ -33,9 +33,10 @@ async function init(){
 
 function migrateEvent(event){
   event.marbleCount=Math.max(2,Math.min(10,Number(event.marbleCount)||10));
-  event.gameVersion='1.2.0';
-  event.trackVersion='marble-wide-track-v3';
+  event.gameVersion='1.3.1';
+  event.trackVersion='marble-wide-track-v4';
   event.participants=(event.participants||[]).map((p,i)=>normalizeParticipant(p,i));
+  const manual=Number(event.digitCountManual);event.digitCountManual=Number.isInteger(manual)&&manual>=1?Math.min(8,manual):null;
 }
 
 function bindGlobal(){
@@ -59,7 +60,7 @@ function createEvent(name='Sự kiện mới'){
     id:`event_${crypto.randomUUID?.()||Date.now()}`,name,createdAt:now,updatedAt:now,status:'draft',
     participants:[],marbleCount:10,digitCount:1,shuffleCount:0,mapping:[],rounds:[],attempts:[],results:[],
     excludedParticipantIds:[],allowRepeatWinner:false,prizeName:'Giải may mắn',prizeDepartments:[],
-    trackVersion:'marble-wide-track-v3',physicsVersion:'rapier-0.19.3',gameVersion:'1.2.0'
+    trackVersion:'marble-wide-track-v4',physicsVersion:'rapier-0.19.3',gameVersion:'1.3.1',digitCountManual:null
   };
 }
 
@@ -72,8 +73,14 @@ function sampleParticipants(count){
   },i));
 }
 
-function currentDigitCount(){
+function minimumDigitCount(){
   return digitCountFor(Math.max(1,eligibleParticipants(current).length),current.marbleCount||10);
+}
+
+function currentDigitCount(){
+  const minimum=minimumDigitCount();
+  const manual=Number(current.digitCountManual);
+  return Number.isInteger(manual)&&manual>=minimum?Math.min(8,manual):minimum;
 }
 
 function ballRangeText(count){
@@ -87,6 +94,9 @@ function render(){
   const eligible=eligibleParticipants(current).length;
   const count=currentDigitCount();
   const marbleCount=current.marbleCount||10;
+  const minimumRounds=minimumDigitCount();
+  const manualRounds=Number(current.digitCountManual);
+  const hasManualRounds=Number.isInteger(manualRounds)&&manualRounds>=minimumRounds;
   refs.main.innerHTML=`
   <div class="md-grid md-dashboard simple-home">
     <section class="md-card">
@@ -94,18 +104,19 @@ function render(){
         <div><div class="md-eyebrow">MARBLE DRAW</div><h2>Bốc thăm đường đua</h2></div>
         <div class="view-actions"><button id="newEventBtn" class="md-secondary-btn">＋ Sự kiện mới</button><button id="deleteEventBtn" class="md-danger-btn">Xóa sự kiện</button></div>
       </div>
-      <div class="md-form-grid four-cols">
+      <div class="md-form-grid five-cols">
         <label class="md-field"><span>Sự kiện</span><select id="eventSelect">${events.map(e=>`<option value="${escAttr(e.id)}" ${e.id===current.id?'selected':''}>${esc(e.name)}</option>`).join('')}</select></label>
         <label class="md-field"><span>Tên sự kiện</span><input id="eventName" value="${escAttr(current.name)}"></label>
         <label class="md-field"><span>Tên giải</span><input id="prizeName" value="${escAttr(current.prizeName||'Giải may mắn')}"></label>
         <label class="md-field"><span>Số bi mỗi lượt</span><select id="marbleCount">${Array.from({length:9},(_,i)=>i+2).map(n=>`<option value="${n}" ${n===marbleCount?'selected':''}>${n} bi (${ballRangeText(n)})</option>`).join('')}</select></label>
+        <label class="md-field"><span>Số lượt quay</span><select id="digitCountManual"><option value="auto" ${!hasManualRounds?'selected':''}>Tự động (${minimumRounds} lượt)</option>${Array.from({length:Math.max(0,8-minimumRounds+1)},(_,i)=>minimumRounds+i).map(n=>`<option value="${n}" ${hasManualRounds&&manualRounds===n?'selected':''}>${n} lượt</option>`).join('')}</select></label>
       </div>
       <div class="md-toolbar compact-toolbar">
         <label class="md-field grow"><span>Phòng ban được tham gia</span><input id="prizeDepartments" value="${escAttr((current.prizeDepartments||[]).join(', '))}" placeholder="Để trống nếu tất cả đều được tham gia"></label>
         <label class="check-label"><input id="allowRepeat" type="checkbox" ${current.allowRepeatWinner?'checked':''}> Cho phép trúng nhiều lần</label>
         <button id="saveOverviewBtn" class="md-primary-btn">Lưu</button>
       </div>
-      <div class="md-toolbar"><span class="status-pill">${eligible} người hợp lệ</span><span class="status-pill">${marbleCount} bi/lượt</span><span class="status-pill">${count} lượt để ra mã</span><span class="status-pill">Đã xáo ${current.shuffleCount||0} lần</span></div>
+      <div class="md-toolbar"><span class="status-pill">${eligible} người hợp lệ</span><span class="status-pill">${marbleCount} bi/lượt</span><span class="status-pill">${count} lượt quay</span><span class="status-pill">Đã xáo ${current.shuffleCount||0} lần</span></div><div class="round-note">Với ${eligible} người và ${marbleCount} bi, cần ít nhất ${minimumRounds} lượt quay.</div>
     </section>
 
     <section class="md-card">
@@ -139,6 +150,7 @@ function bindMain(){
   $('#deleteEventBtn').onclick=removeCurrentEvent;
   $('#saveOverviewBtn').onclick=()=>saveOverview(true);
   $('#marbleCount').onchange=()=>saveOverview(false);
+  $('#digitCountManual').onchange=()=>saveOverview(false);
 
   $('#participantDrop').onclick=()=>$('#participantFile').click();
   $('#participantFile').onchange=e=>importParticipantFile(e.target.files?.[0]);
@@ -172,10 +184,13 @@ async function saveOverview(showMessage=true){
   const oldCount=current.marbleCount||10;
   current.name=$('#eventName')?.value.trim()||current.name||'Sự kiện';
   current.prizeName=$('#prizeName')?.value.trim()||'Giải may mắn';
-  current.prizeDepartments=($('#prizeDepartments')?.value||'').split(',').map(x=>x.trim()).filter(Boolean);
+  current.prizeDepartments=($('#prizeDepartments')?.value||'').split(/[;,]/).map(x=>x.trim()).filter(Boolean);
   current.allowRepeatWinner=!!$('#allowRepeat')?.checked;
   current.marbleCount=Math.max(2,Math.min(10,Number($('#marbleCount')?.value)||10));
   if(oldCount!==current.marbleCount)invalidateDrawSetup(false);
+  const minimum=digitCountFor(Math.max(1,eligibleParticipants(current).length),current.marbleCount);
+  const roundValue=$('#digitCountManual')?.value||'auto';
+  current.digitCountManual=roundValue==='auto'?null:Math.max(minimum,Math.min(8,Number(roundValue)||minimum));
   current.digitCount=currentDigitCount();
   await saveEvent(current);events=await listEvents();current=events.find(e=>e.id===current.id)||current;
   render();if(showMessage)showToast('Đã lưu.');
@@ -281,7 +296,7 @@ async function openRace(mode){
 }
 
 function setupDigitSlots(){
-  const count=currentDigitCount(),labels=digitLabels(count);
+  const count=current.digitCount||currentDigitCount(),labels=digitLabels(count);
   refs.digitSlots.innerHTML=Array.from({length:count},(_,i)=>`<div class="digit-slot ${i===0?'active':''}" title="${labels[i]}">?</div>`).join('');
   refs.raceRoundLabel.textContent=labels[0]||'Lượt đầu';
 }
@@ -294,7 +309,7 @@ async function runNextDigit(){
   slots.forEach((s,i)=>s.classList.toggle('active',i===index));refs.raceRoundLabel.textContent=labels[index];
   try{
     await raceEngine.run({seed,onCountdown:n=>{refs.raceCountdown.hidden=n===0;refs.raceCountdown.textContent=n||''},onUpdate:order=>{refs.raceRanking.innerHTML=order.slice(0,5).map((r,i)=>`<div class="rank-row"><span>${i+1}. Bi ${r.digit}</span><span>${r.finished?'Đích':r.z.toFixed(1)}</span></div>`).join('')},onStatus:t=>refs.raceStatus.textContent=t,onFinish:r=>showDigitWinner(r,index,seed)});
-  }catch(e){refs.raceStatus.textContent=e.message;autoRoundTimer=setTimeout(runNextDigit,1600)}
+  }catch(e){raceAttempt++;refs.raceStatus.textContent=e.message;autoRoundTimer=setTimeout(runNextDigit,1400)}
 }
 
 async function showDigitWinner(result,index,seed){

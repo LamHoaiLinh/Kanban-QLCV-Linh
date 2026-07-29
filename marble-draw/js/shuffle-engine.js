@@ -6,7 +6,7 @@ export async function lockParticipantList(event){
   if(!eligible.length)throw new Error('Không có người tham dự hợp lệ.');
   const canonical=eligible.map(p=>({participantId:p.participantId,name:p.name,department:p.department,eligible:true}));
   event.participantListHash=await sha256(canonical);
-  event.trackHash=await sha256({trackVersion:event.trackVersion||'marble-wide-track-v3',modules:['wide-slope','wide-gates','sparse-obstacles','finish-sensor']});
+  event.trackHash=await sha256({trackVersion:event.trackVersion||'marble-wide-track-v4',modules:['wide-slope','wide-gates','sparse-obstacles','finish-sensor']});
   event.physicsConfigHash=await sha256({engine:event.physicsVersion||'rapier-0.19.3',gravity:[0,-12,0],fixedTimeStep:1/180,marbleRadius:.34});
   event.baseSeed=randomSeed();
   event.baseSeedCommitment=await sha256(`${event.baseSeed}|${event.contributorSeed||''}`);

@@ -43,3 +43,10 @@
 .race-winner{pointer-events:none}
 @media(max-width:1100px){.md-form-grid.four-cols{grid-template-columns:repeat(2,minmax(0,1fr))}.input-grid{grid-template-columns:1fr}.input-grid>.dropzone,.input-grid>.paste-box{grid-column:span 1}}
 @media(max-width:700px){.md-form-grid.four-cols{grid-template-columns:1fr}.view-head.compact{display:block}.view-actions{margin-top:10px}.start-actions{grid-template-columns:1fr}.participant-table-wrap{max-height:380px}}
+
+/* v1.3.1 - lựa chọn số lượt và tiến lượt ngay sau khi có bi thắng */
+.md-form-grid.five-cols{grid-template-columns:repeat(5,minmax(0,1fr))}
+.round-note{margin-top:4px;color:var(--muted);font-size:12px}
+@media(max-width:1350px){.md-form-grid.five-cols{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:900px){.md-form-grid.five-cols{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.md-form-grid.five-cols{grid-template-columns:1fr}}

@@ -1,0 +1,8 @@
+Kanban Ca Nhan v3.7 - Marble Draw
+- Sua loi luot dua dung mai khi mot vien bi bi ket: sau khi co vien ve dich dau tien, luot se cong bo ket qua va tu chuyen sang luot tiep theo.
+- Neu khong co bi ve dich trong thoi gian quy dinh, he thong tu tao seed moi va chay lai luot.
+- Them tuy chon So luot quay tren giao dien.
+- Hien ro so luot toi thieu theo so nguoi va so bi.
+- Giam ma sat, tang do doc va bo cac thanh chan de han che bi ket.
+- Tang Service Worker cache len v37 va Marble Draw len 1.3.1.
+- Khong thay doi khoa du lieu Kanban hien tai.
