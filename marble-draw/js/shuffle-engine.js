@@ -6,8 +6,8 @@ export async function lockParticipantList(event){
   if(!eligible.length)throw new Error('Không có người tham dự hợp lệ để khóa danh sách.');
   const canonical=eligible.map(p=>({participantId:p.participantId,name:p.name,department:p.department,title:p.title,eligible:true}));
   event.participantListHash=await sha256(canonical);
-  event.trackHash=await sha256({trackVersion:event.trackVersion||'marblie-track-v1',modules:['starter','six-slopes','pegboard','dividers','rotor','finish-sensor']});
-  event.physicsConfigHash=await sha256({engine:event.physicsVersion||'rapier-0.19.3',gravity:[0,-9.81,0],fixedTimeStep:1/120,marbleRadius:.38,friction:.12,restitution:.12,density:1});
+  event.trackHash=await sha256({trackVersion:event.trackVersion||'marble-simple-track-v2',modules:['overlap-slopes','side-walls','pegboard','dividers','rotor','finish-sensor']});
+  event.physicsConfigHash=await sha256({engine:event.physicsVersion||'rapier-0.19.3',gravity:[0,-12,0],fixedTimeStep:1/180,marbleRadius:.34,friction:.22,restitution:.18,density:1.15});
   event.baseSeed=randomSeed();
   event.baseSeedCommitment=await sha256(`${event.baseSeed}|${event.contributorSeed||''}`);
   event.shuffleCount=0;event.mapping=[];event.mappingHash='';event.status='list_locked';
