@@ -176,3 +176,41 @@ Thư mục `test-files` có PDF, ảnh và workbook mẫu không chứa dữ li�
 - Chế độ gộp Excel mặc định là **Gộp theo vị trí cột**.
 - Tooltip giải thích: gộp theo vị trí nối A với A, B với B; gộp theo tên tiêu đề đối chiếu cột dựa trên tên tiêu đề.
 - Không đổi khóa dữ liệu Kanban hiện tại.
+
+# MARBLE DRAW – ĐƯỜNG ĐUA MAY MẮN (v3.2)
+
+## Mở công cụ
+Trên thanh công cụ của Kanban, bấm nút **DRAW**. Công cụ được mở trong một workspace toàn màn hình riêng. Three.js và Rapier chỉ được tải khi người dùng thực sự mở hoặc xem đường đua, nên việc mở Kanban bình thường không phải tải engine 3D.
+
+## Quy trình sử dụng
+1. Tạo sự kiện.
+2. Nhập danh sách bằng Excel mẫu hoặc dán trực tiếp từ Excel.
+3. Kiểm tra và khóa danh sách.
+4. Bấm **Xáo chính thức** số lần mong muốn. Mỗi lần bấm chỉ tăng bộ đếm và chạy hiệu ứng; mapping trung gian không được công bố.
+5. Bấm **Khóa kết quả xáo** để tạo mapping mã số chính thức.
+6. Mở đường đua và chọn **Chạy chính thức**.
+7. Các chữ số được quay từ hàng cao nhất xuống hàng thấp nhất.
+8. Nếu kết quả là mã trống hoặc thuộc người đã trúng nhưng không được trúng lại, phải quay lại toàn bộ chuỗi.
+9. Xuất Excel, in/lưu PDF và `verification.json` sau sự kiện.
+
+## Nhập người tham dự
+- File mẫu: `marble-draw/samples/Danh_sach_nguoi_tham_du_mau.xlsx`.
+- Sheet mặc định: `DANH_SACH_THAM_DU`.
+- Trường bắt buộc: Mã người tham dự và Họ và tên.
+- Mã người tham dự không được trùng.
+- Có thể dán các cột Mã, Họ tên, Phòng ban, Chức danh, Đủ điều kiện và Ghi chú bằng Ctrl+V.
+
+## Dữ liệu và quyền riêng tư
+- Sự kiện Marble Draw được lưu trong IndexedDB `linh_marble_draw_db`.
+- Cài đặt riêng được lưu tại `linh_marble_draw_settings_v1`.
+- Không dùng chung khóa dữ liệu `linh_personal_kanban_v1` của Kanban.
+- Ctrl+F5 không chủ động xóa dữ liệu Kanban hoặc Marble Draw.
+- Nút xóa trong Marble Draw chỉ xóa database và cài đặt của Marble Draw.
+
+## Lưu ý lần mở đầu tiên
+Engine Three.js, Rapier và SheetJS được ghim phiên bản và tải khi cần. Lần đầu mở đường đua hoặc nhập Excel cần kết nối mạng. Service Worker sẽ lưu cache các tài nguyên đã tải thành công để hỗ trợ những lần dùng sau.
+
+## Giới hạn kỹ thuật
+- Kết quả cuộc đua được tạo bởi mô phỏng Rapier và cảm biến đích trong trình duyệt.
+- Chạy lại cùng seed được thiết kế để phục vụ xác minh trong cùng cấu hình phần mềm; kết quả dấu phẩy động có thể cần kiểm tra thực tế trên máy trình chiếu trước sự kiện.
+- Bản v3.2 có benchmark nhanh về phân bổ chữ số vào vị trí xuất phát. Benchmark vật lý Rapier quy mô 10.000 lượt nên được chạy như một quy trình kiểm thử riêng trước sự kiện lớn.

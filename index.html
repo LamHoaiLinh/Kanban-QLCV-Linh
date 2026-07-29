@@ -6,10 +6,10 @@
   <meta name="theme-color" content="#79c2a5">
   <meta name="description" content="Kanban cá nhân nhiều dự án, kéo thả kiểu Trello, chạy tĩnh trên GitHub Pages.">
   <title>Kanban Cá Nhân</title>
-  <link rel="manifest" href="manifest.webmanifest?v=3.1">
+  <link rel="manifest" href="manifest.webmanifest?v=3.2">
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=3.1">
-  <link rel="stylesheet" href="office-tools/office-tools.css?v=3.1">
+  <link rel="stylesheet" href="styles.css?v=3.2">
+  <link rel="stylesheet" href="office-tools/office-tools.css?v=3.2">
 </head>
 <body>
   <div class="app-shell">
@@ -134,6 +134,7 @@
               <button class="icon-btn office-launch-btn" type="button" data-office-tool="image" aria-label="Công cụ hình ảnh" data-tooltip="Công cụ hình ảnh"><span class="office-btn-mark">IMG</span></button>
               <button class="icon-btn office-launch-btn" type="button" data-office-tool="rename" aria-label="Đổi tên hàng loạt" data-tooltip="Đổi tên hàng loạt"><span class="office-btn-mark">REN</span></button>
               <button class="icon-btn office-launch-btn" type="button" data-office-tool="excel" aria-label="Công cụ Excel" data-tooltip="Công cụ Excel"><span class="office-btn-mark">XLS</span></button>
+              <button class="icon-btn marble-launch-btn" type="button" aria-label="Mở đường đua bốc thăm 3D" data-tooltip="Mở đường đua bốc thăm 3D"><span class="office-btn-mark">DRAW</span></button>
             </div>
           </div>
         </div>
@@ -478,9 +479,10 @@
 
   <div id="globalTooltip" class="global-tooltip" role="tooltip" hidden></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="dragdrop.js?v=3.1"></script>
-  <script src="app.js?v=3.1"></script>
-  <script src="music-player.js?v=3.1"></script>
-  <script type="module" src="office-tools/office-tools.js?v=3.1"></script>
+  <script src="dragdrop.js?v=3.2"></script>
+  <script src="app.js?v=3.2"></script>
+  <script src="music-player.js?v=3.2"></script>
+  <script type="module" src="office-tools/office-tools.js?v=3.2"></script>
+  <script type="module" src="marble-draw-launcher.js?v=3.2"></script>
 </body>
 </html>

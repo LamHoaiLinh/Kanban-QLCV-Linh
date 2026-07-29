@@ -1,8 +1,10 @@
-const CACHE_NAME='linh-kanban-static-v31';
+const CACHE_NAME='linh-kanban-static-v32';
 const ASSETS=[
-  './','./index.html','./styles.css?v=3.1','./dragdrop.js?v=3.1','./app.js?v=3.1','./music-player.js?v=3.1',
-  './office-tools/office-tools.css?v=3.1','./office-tools/office-tools.js?v=3.1','./office-tools/vendor/jszip.min.js',
-  './manifest.webmanifest?v=3.1','./assets/icon.svg',
+  './','./index.html','./styles.css?v=3.2','./dragdrop.js?v=3.2','./app.js?v=3.2','./music-player.js?v=3.2',
+  './office-tools/office-tools.css?v=3.2','./office-tools/office-tools.js?v=3.2','./office-tools/vendor/jszip.min.js',
+  './marble-draw-launcher.js?v=3.2','./marble-draw/index.html?v=1.0.0','./marble-draw/styles.css?v=1.0.0',
+  './marble-draw/js/app.js?v=1.0.0','./marble-draw/js/storage.js','./marble-draw/js/crypto-utils.js','./marble-draw/js/participants.js','./marble-draw/js/shuffle-engine.js','./marble-draw/js/race-engine.js',
+  './manifest.webmanifest?v=3.2','./assets/icon.svg',
   './assets/backgrounds/Beautiful Background6.png','./assets/backgrounds/Beautiful Background7.png',
   './assets/backgrounds/Beautiful Background8.png','./assets/backgrounds/Beautiful Background13.png',
   './assets/backgrounds/Beautiful Background15.png','./assets/backgrounds/Beautiful Background28.png',

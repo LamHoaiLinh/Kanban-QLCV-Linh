@@ -21,3 +21,19 @@
 - Được tải lười theo phiên bản cố định khi mở công cụ Excel.
 
 Các tệp người dùng chọn không được gửi đến các địa chỉ thư viện. Trình duyệt chỉ tải mã JavaScript của thư viện; nội dung file được xử lý trong bộ nhớ trên thiết bị.
+
+## Marblie
+- Tác giả: Younghoo Nam.
+- Mục đích: nguồn asset và tham khảo kiến trúc đường đua Three.js/Rapier.
+- Giấy phép: MIT.
+- Toàn văn: `marble-draw/LICENSE_MARBLIE.txt`.
+
+## Three.js 0.185.1
+- Mục đích: render đồ họa 3D và tải GLB.
+- Giấy phép: MIT.
+- Được tải lười theo phiên bản cố định khi mở đường đua.
+
+## Rapier 3D Compat 0.19.3
+- Mục đích: rigid body, collider, fixed timestep và cảm biến đích.
+- Giấy phép: Apache License 2.0.
+- Được tải lười theo phiên bản cố định khi mở đường đua.
