@@ -1,8 +1,0 @@
-KANBAN CA NHAN v4.0 - DICE ARENA
-- Thay hoàn toàn game Marble Draw bằng Dice Arena.
-- Nút DRAW đổi thành DICE.
-- Chọn từ 1 đến 10 xúc xắc.
-- Hai chế độ: Thả đồng thời và Thả từng viên.
-- Sử dụng model xúc xắc, cốc lắc và vật liệu từ asset Dice Animation 2.
-- Dice Arena lưu cài đặt và lịch sử ở khóa riêng, không sửa dữ liệu Kanban.
-- Service Worker nâng lên cache v40-dice.

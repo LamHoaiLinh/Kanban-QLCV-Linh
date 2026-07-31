@@ -1,6 +1,0 @@
-v5.1
-- Chỉnh lại khung bàn Dice Arena cho cân đối hơn.
-- Giảm hở mép xúc xắc bằng cách làm mặt xúc xắc chồng mép nhẹ.
-- Dịch logo bàn cân hơn trong vùng nỉ.
-- Tăng độ rộng nút TAROT để tránh tràn chữ.
-- Bump cache/service worker để cập nhật giao diện mới.

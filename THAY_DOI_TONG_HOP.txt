@@ -1,0 +1,269 @@
+NHẬT KÝ THAY ĐỔI TỔNG HỢP – KANBAN CÁ NHÂN
+Tệp này thay thế toàn bộ các tệp THAY_DOI_Vx.x.txt trước đây.
+
+========================================================================
+THAY_DOI_V2.0
+========================================================================
+Phiên bản 2.8
+- Trình bày lại nút trong hộp sửa cột gọn gàng và cân đối.
+- Mặc định bật lặp toàn bộ danh sách nhạc.
+- Thêm tooltip Âm lượng cho thanh volume.
+- Giữ nguyên toàn bộ chức năng Kanban, ghi chú, đồng hồ, chuyển ngày và trình phát nhạc hiện có.
+
+========================================================================
+THAY_DOI_V2.3
+========================================================================
+KANBAN CÁ NHÂN v2.3
+
+1. Thêm nút Cài đặt ⚙ trên thanh công cụ.
+2. Thêm chức năng Xóa toàn bộ dữ liệu.
+3. Trước khi xóa có nút Xuất backup ngay.
+4. Nút Xóa vĩnh viễn chỉ được bật khi người dùng gõ chính xác OK.
+5. Sau khi xóa, ứng dụng trở về trạng thái ban đầu.
+6. Chỉ xóa dữ liệu và cache của Kanban này; không xóa dữ liệu website khác cùng tên miền.
+
+========================================================================
+THAY_DOI_V2.4
+========================================================================
+Phiên bản 2.4
+- Tự động chuyển công việc giữa các cột khi sang ngày mới; hỗ trợ nhiều quy tắc và nhiều dự án.
+- Quy tắc lưu trong Local Storage và chạy lúc qua ngày hoặc lần mở đầu tiên sau ngày mới.
+- Thêm Xóa toàn bộ nội dung cho từng cột.
+- Lưu nội dung đã xóa dưới dạng văn bản thuần túy, có ngày tạo, sửa cuối và ngày xóa.
+- Thêm thùng rác cấp hai và chức năng xóa vĩnh viễn để giải phóng dung lượng.
+
+========================================================================
+THAY_DOI_V2.5
+========================================================================
+PHIÊN BẢN 2.5
+
+1. Giữ nguyên toàn bộ chức năng Kanban v2.4.
+2. Thêm trình phát nhạc local trong sidebar.
+3. Chọn, kéo thả và mở lại thư mục nhạc gần đây.
+4. Hỗ trợ MP3, WAV, OGG, FLAC, M4A.
+5. Thêm playlist popup, metadata, sắp xếp, highlight và click để phát.
+6. Thêm Play/Pause, Next/Prev, Shuffle, Repeat, tiến trình, volume và phím Ctrl + Space.
+7. Tối ưu: chỉ nạp tệp đang phát, metadata đọc nền theo hàng đợi nhỏ.
+
+========================================================================
+THAY_DOI_V2.6
+========================================================================
+Phiên bản 2.6
+- Thêm ghi chú nhanh theo từng dự án trong vùng dưới tên dự án.
+- Hỗ trợ nhiều ghi chú và định dạng văn bản cơ bản.
+- Dán nội dung dưới dạng văn bản thuần túy, loại bỏ ảnh và mã nhúng.
+- Ghi chú được lưu trong Local Storage và đi cùng file backup JSON.
+
+========================================================================
+THAY_DOI_V2.8
+========================================================================
+Phiên bản 2.8
+- Tooltip đầy đủ cho các nút chức năng trong hộp ghi chú.
+- Tooltip hiển thị đúng trên modal.
+- Ô tên ghi chú có nút xổ danh sách ghi chú để chuyển nhanh.
+- Cảnh báo khi chuyển ghi chú trong lúc còn thay đổi chưa lưu.
+
+========================================================================
+THAY_DOI_V2.9
+========================================================================
+Phiên bản 2.9
+- Ghi nhanh công việc bằng Ctrl + Enter.
+- Cấu hình cột nhận công việc mặc định theo từng dự án.
+- Chọn nhiều thẻ bằng Ctrl/Shift/Ctrl+A và kéo cả nhóm.
+- Tùy chọn màu nền riêng cho cột, mặc định không đổi.
+
+========================================================================
+THAY_DOI_V3.0
+========================================================================
+KANBAN CÁ NHÂN v3.0
+
+1. XÓA NHANH NHIỀU CÔNG VIỆC
+- Chọn thẻ bằng click, Ctrl+click, Shift+click hoặc Ctrl+A trong cột.
+- Nhấn Delete để xóa toàn bộ thẻ đang chọn.
+- Nội dung được chuyển vào khu Nội dung đã xóa dưới dạng văn bản lưu trữ.
+- Có thể bấm Hoàn tác ngay sau khi xóa.
+- Delete không hoạt động khi đang nhập trong input, textarea, select, trình soạn thảo hoặc khi modal đang mở.
+
+2. BỘ CÔNG CỤ VĂN PHÒNG
+- Bốn nút PDF, IMG, REN và XLS trên thanh công cụ.
+- PDF:
+  + Gộp nhiều PDF và kéo thả sắp xếp file.
+  + Chuẩn hóa kích thước: giữ nguyên, theo trang đầu, theo trang rộng nhất, A4 dọc/A4 ngang.
+  + Sắp xếp trang bằng thumbnail; chọn nhiều trang bằng Ctrl/Shift/Ctrl+A.
+  + Xoay riêng từng trang, nhân bản, xóa, chuyển lên đầu/cuối, trích xuất và xuất lại PDF.
+  + Tách từng trang, theo khoảng, trang chẵn hoặc trang lẻ.
+  + PDF sang PNG theo DPI; ảnh sang PDF.
+- IMG:
+  + Đổi định dạng JPG/PNG/WebP.
+  + Resize, xoay/lật, nén ảnh hàng loạt.
+  + Ghép ảnh dọc/ngang/lưới, chuẩn hóa chiều rộng/chiều cao.
+  + Đóng dấu văn bản.
+- REN:
+  + Chọn thư mục, preview tên mới, kiểm tra trùng tên.
+  + Tiền tố, hậu tố, tìm/thay thế, regex, đánh số, đổi hoa/thường, xóa dấu, thay khoảng trắng và mẫu tên.
+  + Xuất ZIP an toàn và manifest JSON.
+  + Đổi tên file tại chỗ khi trình duyệt cấp quyền và người dùng gõ DOI TEN.
+- XLS:
+  + Đọc XLSX/XLS/XLSM/CSV và xem cấu trúc workbook.
+  + Xuất JSON phân biệt ô value và formula, kèm cachedValue, formattedValue, hyperlink, note/comment và merged range khi đọc được.
+  + Đổi tên, sắp xếp, nhân bản, xóa sheet trong bản kết quả.
+  + Làm sạch dữ liệu cơ bản, gộp sheet theo vị trí hoặc tiêu đề.
+  + Gộp nhiều workbook; tách sheet thành XLSX/CSV ZIP.
+
+3. AN TOÀN DỮ LIỆU
+- Giữ nguyên khóa Local Storage linh_personal_kanban_v1.
+- Không xóa hoặc reset dữ liệu khi cập nhật hay Ctrl+F5.
+- Dữ liệu công cụ văn phòng dùng khóa cài đặt riêng linh_kanban_office_settings_v1.
+- Nội dung file chỉ được xử lý trong trình duyệt và không lưu vào dữ liệu Kanban.
+- Chức năng xóa toàn bộ dữ liệu của Kanban cũng dọn khóa cài đặt công cụ văn phòng, nhưng không xóa file gốc trên máy.
+
+4. CACHE
+- Nâng Service Worker lên linh-kanban-static-v30.
+- Cache thêm module giao diện công cụ văn phòng và JSZip cục bộ.
+
+5. GIỚI HẠN CỦA BẢN STATIC
+- PDF không OCR và không sửa trực tiếp chữ đã có trong PDF.
+- IMG chưa có khung crop đồ họa.
+- REN không đổi tên thư mục tại chỗ; chế độ ZIP an toàn có thể tạo lại cấu trúc thư mục với tên mới.
+- XLS không chạy VBA/macro và không tự tính lại toàn bộ công thức; cachedValue là kết quả đã lưu gần nhất trong file.
+- pdf-lib, PDF.js và SheetJS được tải lười từ nguồn đã ghim phiên bản ở lần đầu dùng PDF/Excel; vì vậy lần đầu cần Internet. File người dùng vẫn được xử lý cục bộ, không upload.
+
+========================================================================
+THAY_DOI_V3.1
+========================================================================
+PHIÊN BẢN 3.1
+
+- Chuyển bốn nút PDF, IMG, REN và XLS xuống hàng dưới nhóm nút hệ thống để tận dụng vùng trống bên phải đồng hồ.
+- Không thay đổi khóa Local Storage và không can thiệp dữ liệu Kanban hiện có.
+- Đặt mặc định gộp Excel là “Gộp theo vị trí cột”.
+- Thêm tooltip và mô tả trực tiếp giải thích hai chế độ gộp sheet.
+- Cập nhật cache Service Worker lên v3.1.
+
+========================================================================
+THAY_DOI_V3.2
+========================================================================
+Phiên bản 3.2
+- Thêm DRAW – Marble Draw 3D.
+- Import Excel/CSV và nhập trực tiếp người tham dự.
+- Khóa danh sách, xáo chính thức, gán mã và xác minh SHA-256.
+- Quay từ hàng cao nhất xuống hàng thấp nhất bằng 10 viên bi số 0–9.
+- Dữ liệu lưu trong IndexedDB riêng, không đổi dữ liệu Kanban.
+
+========================================================================
+THAY_DOI_V3.3
+========================================================================
+Kanban Ca Nhan v3.3 - Marble Draw
+- Don gian hoa Marble Draw ve 1 giao dien chinh.
+- Bo sidebar/tab trong Marble Draw, gom nhap danh sach + xao + bat dau dua tren cung mot man.
+- Sua lai duong dua vat ly bang mang truot overlap de giam loi bi xuyen mang.
+- Hien mapping chinh thuc ro rang ngay tren giao dien sau khi khoa ket qua xao.
+
+========================================================================
+THAY_DOI_V3.5
+========================================================================
+Kanban Ca Nhan v3.5 - Cache Hotfix
+- Sua launcher Marble Draw tu v1.0.0 sang v1.2.1.
+- Tang Service Worker cache tu v32 len v35.
+- HTML va Marble Draw dung network-first de tranh giao dien cu.
+- Dang ky Service Worker voi updateViaCache none va goi update ngay.
+- Giu nguyen khoa du lieu Kanban va Marble Draw.
+
+========================================================================
+THAY_DOI_V3.6
+========================================================================
+Kanban Cá Nhân v3.6
+- Marble Draw chỉ còn một màn hình Home.
+- Nút Xáo danh sách thay đổi thật thứ tự trong bảng.
+- Bỏ cột Chức danh.
+- Chọn từ 2 đến 10 viên bi mỗi lượt; dưới 10 bi dùng số từ 1 đến số bi đã chọn.
+- Số trên bi bám vào bề mặt nhìn thấy và không quay vòng quanh bi.
+- Máng đua đổi sang mặt liền, chướng ngại thưa để giảm kẹt bi.
+- Toàn bộ nội dung giao diện dùng cách xưng hô Bạn.
+
+========================================================================
+THAY_DOI_V3.7
+========================================================================
+Kanban Ca Nhan v3.7 - Marble Draw
+- Sua loi luot dua dung mai khi mot vien bi bi ket: sau khi co vien ve dich dau tien, luot se cong bo ket qua va tu chuyen sang luot tiep theo.
+- Neu khong co bi ve dich trong thoi gian quy dinh, he thong tu tao seed moi va chay lai luot.
+- Them tuy chon So luot quay tren giao dien.
+- Hien ro so luot toi thieu theo so nguoi va so bi.
+- Giam ma sat, tang do doc va bo cac thanh chan de han che bi ket.
+- Tang Service Worker cache len v37 va Marble Draw len 1.3.1.
+- Khong thay doi khoa du lieu Kanban hien tai.
+
+========================================================================
+THAY_DOI_V4.0
+========================================================================
+KANBAN CA NHAN v4.0 - DICE ARENA
+- Thay hoàn toàn game Marble Draw bằng Dice Arena.
+- Nút DRAW đổi thành DICE.
+- Chọn từ 1 đến 10 xúc xắc.
+- Hai chế độ: Thả đồng thời và Thả từng viên.
+- Sử dụng model xúc xắc, cốc lắc và vật liệu từ asset Dice Animation 2.
+- Dice Arena lưu cài đặt và lịch sử ở khóa riêng, không sửa dữ liệu Kanban.
+- Service Worker nâng lên cache v40-dice.
+
+========================================================================
+THAY_DOI_V4.1
+========================================================================
+KANBAN CA NHAN v4.1 - DICE ARENA HOTFIX
+
+- Sua loi GLTFLoader: URL object gay loi lastIndexOf is not a function.
+- Chuyen URL asset sang chuoi .href truoc khi nap model GLB.
+- Nang version Dice Arena va Service Worker de xoa cache v4.0.
+- Khong thay doi app.js, music-player.js, dragdrop.js, khoa Local Storage hoac du lieu Kanban.
+
+========================================================================
+THAY_DOI_V5.0
+========================================================================
+KANBAN CÁ NHÂN v5.0 – DICE + TAROT
+
+1. Dice Arena được viết lại hoàn toàn bằng HTML/CSS/JavaScript thuần.
+- Không còn Three.js, Rapier, GLTFLoader hoặc file GLB.
+- Không còn lỗi t.lastIndexOf is not a function.
+- Chọn 1–10 xúc xắc.
+- Thả đồng thời hoặc thả từng viên.
+- Dùng crypto.getRandomValues để sinh kết quả.
+
+2. Thêm nút TAROT trên thanh công cụ Kanban.
+- Bộ bài 78 lá.
+- Chủ đề: tổng quan, tình cảm, công việc, tài chính, gia đình, tinh thần, quyết định.
+- Rút 1, 3, 5 hoặc 7 lá.
+- Tự chọn lá hoặc máy tự rút.
+- Diễn giải tự động bằng tiếng Việt ngay trên trình duyệt.
+- Lịch sử Tarot lưu bằng khóa riêng.
+
+3. Dữ liệu Kanban không thay đổi.
+- Không sửa app.js, music-player.js, dragdrop.js và office-tools.js.
+- Dice và Tarot dùng localStorage riêng.
+
+========================================================================
+THAY_DOI_V5.1
+========================================================================
+v5.1
+- Chỉnh lại khung bàn Dice Arena cho cân đối hơn.
+- Giảm hở mép xúc xắc bằng cách làm mặt xúc xắc chồng mép nhẹ.
+- Dịch logo bàn cân hơn trong vùng nỉ.
+- Tăng độ rộng nút TAROT để tránh tràn chữ.
+- Bump cache/service worker để cập nhật giao diện mới.
+
+========================================================================
+THAY_DOI_V5.2
+========================================================================
+v5.2
+- Thay khung bàn bốn thanh rời bằng một khung gỗ liền khối để không hở góc.
+- Dựng lại sáu mặt xúc xắc theo cùng một kích thước và cho các mặt chồng mép nhẹ.
+- Thêm góc nghiêng nhẹ cho từng khối để cảm giác 3D rõ hơn.
+- Không thay đổi dữ liệu hoặc logic Kanban.
+
+========================================================================
+THAY_DOI_V5.3
+========================================================================
+- Dice Arena: thêm lựa chọn xúc xắc D6 (1–6) hoặc D10 (0–9).
+- Dice Arena: lịch sử ghi rõ loại xúc xắc D6/D10.
+- Tarot Việt: thêm khung KẾT LUẬN CUỐI CÙNG ở đầu bài đọc.
+- Kết luận Tarot bám trực tiếp vào câu hỏi, chủ đề, xu hướng lá xuôi/ngược và lá kết thúc.
+- Tarot Việt: phần diễn giải dài được đặt dưới mục có thể mở/thu gọn.
+- Gom toàn bộ nhật ký thay đổi thành duy nhất tệp THAY_DOI_TONG_HOP.txt.
+- Không thay đổi khóa dữ liệu hoặc chức năng cốt lõi của Kanban.

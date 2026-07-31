@@ -1,5 +1,0 @@
-Phiên bản 2.8
-- Trình bày lại nút trong hộp sửa cột gọn gàng và cân đối.
-- Mặc định bật lặp toàn bộ danh sách nhạc.
-- Thêm tooltip Âm lượng cho thanh volume.
-- Giữ nguyên toàn bộ chức năng Kanban, ghi chú, đồng hồ, chuyển ngày và trình phát nhạc hiện có.

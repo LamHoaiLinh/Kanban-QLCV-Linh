@@ -1,6 +1,0 @@
-KANBAN CA NHAN v4.1 - DICE ARENA HOTFIX
-
-- Sua loi GLTFLoader: URL object gay loi lastIndexOf is not a function.
-- Chuyen URL asset sang chuoi .href truoc khi nap model GLB.
-- Nang version Dice Arena va Service Worker de xoa cache v4.0.
-- Khong thay doi app.js, music-player.js, dragdrop.js, khoa Local Storage hoac du lieu Kanban.

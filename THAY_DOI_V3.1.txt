@@ -1,7 +1,0 @@
-PHIÊN BẢN 3.1
-
-- Chuyển bốn nút PDF, IMG, REN và XLS xuống hàng dưới nhóm nút hệ thống để tận dụng vùng trống bên phải đồng hồ.
-- Không thay đổi khóa Local Storage và không can thiệp dữ liệu Kanban hiện có.
-- Đặt mặc định gộp Excel là “Gộp theo vị trí cột”.
-- Thêm tooltip và mô tả trực tiếp giải thích hai chế độ gộp sheet.
-- Cập nhật cache Service Worker lên v3.1.

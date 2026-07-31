@@ -1,6 +1,0 @@
-Phiên bản 3.2
-- Thêm DRAW – Marble Draw 3D.
-- Import Excel/CSV và nhập trực tiếp người tham dự.
-- Khóa danh sách, xáo chính thức, gán mã và xác minh SHA-256.
-- Quay từ hàng cao nhất xuống hàng thấp nhất bằng 10 viên bi số 0–9.
-- Dữ liệu lưu trong IndexedDB riêng, không đổi dữ liệu Kanban.

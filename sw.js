@@ -1,9 +1,9 @@
-const CACHE_NAME='linh-kanban-static-v52-dice-geometry';
+const CACHE_NAME='linh-kanban-static-v53-d10-tarot-conclusion';
 const ASSETS=[
   './','./index.html','./styles.css?v=4.0','./dragdrop.js?v=3.2','./app.js?v=3.7','./music-player.js?v=3.2',
   './office-tools/office-tools.css?v=3.2','./office-tools/office-tools.js?v=3.2','./office-tools/vendor/jszip.min.js',
-  './dice-launcher.js?v=5.2','./dice-game/index.html?v=5.2.0','./dice-game/styles.css?v=5.2.0','./dice-game/js/app.js?v=5.2.0',
-  './tarot-launcher.js?v=5.2','./tarot-game/index.html?v=5.1.0','./tarot-game/styles.css?v=5.1.0','./tarot-game/js/app.js?v=5.1.0','./tarot-game/js/tarot-data.js',
+  './dice-launcher.js?v=5.3','./dice-game/index.html?v=5.3.0','./dice-game/styles.css?v=5.3.0','./dice-game/js/app.js?v=5.3.0',
+  './tarot-launcher.js?v=5.3','./tarot-game/index.html?v=5.3.0','./tarot-game/styles.css?v=5.3.0','./tarot-game/js/app.js?v=5.3.0','./tarot-game/js/tarot-data.js',
   './tarot-game/LICENSE_SOURCE.txt','./manifest.webmanifest?v=3.2','./assets/icon.svg',
   './assets/backgrounds/Beautiful Background6.png','./assets/backgrounds/Beautiful Background7.png',
   './assets/backgrounds/Beautiful Background8.png','./assets/backgrounds/Beautiful Background13.png',

@@ -1,6 +1,0 @@
-Phiên bản 2.4
-- Tự động chuyển công việc giữa các cột khi sang ngày mới; hỗ trợ nhiều quy tắc và nhiều dự án.
-- Quy tắc lưu trong Local Storage và chạy lúc qua ngày hoặc lần mở đầu tiên sau ngày mới.
-- Thêm Xóa toàn bộ nội dung cho từng cột.
-- Lưu nội dung đã xóa dưới dạng văn bản thuần túy, có ngày tạo, sửa cuối và ngày xóa.
-- Thêm thùng rác cấp hai và chức năng xóa vĩnh viễn để giải phóng dung lượng.

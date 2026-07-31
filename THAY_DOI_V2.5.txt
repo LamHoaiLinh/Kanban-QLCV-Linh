@@ -1,9 +1,0 @@
-PHIÊN BẢN 2.5
-
-1. Giữ nguyên toàn bộ chức năng Kanban v2.4.
-2. Thêm trình phát nhạc local trong sidebar.
-3. Chọn, kéo thả và mở lại thư mục nhạc gần đây.
-4. Hỗ trợ MP3, WAV, OGG, FLAC, M4A.
-5. Thêm playlist popup, metadata, sắp xếp, highlight và click để phát.
-6. Thêm Play/Pause, Next/Prev, Shuffle, Repeat, tiến trình, volume và phím Ctrl + Space.
-7. Tối ưu: chỉ nạp tệp đang phát, metadata đọc nền theo hàng đợi nhỏ.

@@ -1,5 +1,0 @@
-v5.2
-- Thay khung bàn bốn thanh rời bằng một khung gỗ liền khối để không hở góc.
-- Dựng lại sáu mặt xúc xắc theo cùng một kích thước và cho các mặt chồng mép nhẹ.
-- Thêm góc nghiêng nhẹ cho từng khối để cảm giác 3D rõ hơn.
-- Không thay đổi dữ liệu hoặc logic Kanban.

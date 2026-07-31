@@ -1,8 +1,0 @@
-KANBAN CÁ NHÂN v2.3
-
-1. Thêm nút Cài đặt ⚙ trên thanh công cụ.
-2. Thêm chức năng Xóa toàn bộ dữ liệu.
-3. Trước khi xóa có nút Xuất backup ngay.
-4. Nút Xóa vĩnh viễn chỉ được bật khi người dùng gõ chính xác OK.
-5. Sau khi xóa, ứng dụng trở về trạng thái ban đầu.
-6. Chỉ xóa dữ liệu và cache của Kanban này; không xóa dữ liệu website khác cùng tên miền.

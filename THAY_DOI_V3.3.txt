@@ -1,5 +1,0 @@
-Kanban Ca Nhan v3.3 - Marble Draw
-- Don gian hoa Marble Draw ve 1 giao dien chinh.
-- Bo sidebar/tab trong Marble Draw, gom nhap danh sach + xao + bat dau dua tren cung mot man.
-- Sua lai duong dua vat ly bang mang truot overlap de giam loi bi xuyen mang.
-- Hien mapping chinh thuc ro rang ngay tren giao dien sau khi khoa ket qua xao.

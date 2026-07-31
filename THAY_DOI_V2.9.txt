@@ -1,5 +1,0 @@
-Phiên bản 2.9
-- Ghi nhanh công việc bằng Ctrl + Enter.
-- Cấu hình cột nhận công việc mặc định theo từng dự án.
-- Chọn nhiều thẻ bằng Ctrl/Shift/Ctrl+A và kéo cả nhóm.
-- Tùy chọn màu nền riêng cho cột, mặc định không đổi.
