@@ -196,3 +196,9 @@ Trên thanh công cụ Kanban, bấm nút **DICE**. Game mở toàn màn hình t
 
 ## Asset 3D
 Model xúc xắc và cốc lắc lấy từ asset **Dice Animation 2** của KageG, giấy phép CC BY 4.0. Thông tin ghi nhận nằm tại `dice-game/assets/LICENSE_ASSET.txt`.
+
+## Dice Arena và Tarot Việt v5.0
+- Dice Arena được viết bằng HTML/CSS/JavaScript thuần, không cần tải model GLB hoặc thư viện 3D bên ngoài.
+- Tarot Việt chạy hoàn toàn trên GitHub Pages, không cần Render hoặc backend.
+- Tarot hỗ trợ 78 lá, rút 1/3/5/7 lá, tự chọn hoặc máy tự rút và diễn giải bằng tiếng Việt.
+- Lịch sử Dice và Tarot lưu bằng khóa riêng, không làm thay đổi dữ liệu Kanban.

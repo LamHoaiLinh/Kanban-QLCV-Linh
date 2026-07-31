@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#2b1838">
+  <title>Tarot Việt</title>
+  <link rel="stylesheet" href="styles.css?v=5.0.0">
+</head>
+<body>
+  <main class="tarot-app">
+    <div class="stars"></div>
+    <header class="topbar">
+      <div class="brand"><div class="brand-card">✦</div><div><span>TRẢI BÀI THAM KHẢO</span><h1>TAROT VIỆT</h1><p>Rút bài và diễn giải bằng tiếng Việt</p></div></div>
+      <div class="actions"><button id="fullscreenBtn" class="icon-btn" type="button" title="Toàn màn hình">⛶</button><button id="closeBtn" class="back-btn" type="button">Quay về Kanban</button></div>
+    </header>
+    <section class="layout">
+      <aside class="setup-panel panel">
+        <span class="eyebrow">CÂU HỎI</span><h2>Bạn muốn xem điều gì?</h2>
+        <label><span>Chủ đề</span><select id="topicSelect"><option value="general">Tổng quan</option><option value="love">Tình cảm</option><option value="work">Công việc</option><option value="finance">Tài chính</option><option value="family">Gia đình</option><option value="mind">Tinh thần</option><option value="decision">Quyết định</option></select></label>
+        <label><span>Câu hỏi hoặc điều đang băn khoăn</span><textarea id="questionInput" rows="5" placeholder="Ví dụ: Tôi nên tập trung điều gì trong công việc thời gian tới?"></textarea></label>
+        <label><span>Số lá muốn rút</span><select id="cardCountSelect"><option value="1">1 lá – Thông điệp chính</option><option value="3" selected>3 lá – Nền tảng, hiện tại, hướng đi</option><option value="5">5 lá – Phân tích sâu</option><option value="7">7 lá – Trải bài mở rộng</option></select></label>
+        <div class="method"><span>Cách rút</span><label><input type="radio" name="method" value="manual" checked> Tự chọn lá</label><label><input type="radio" name="method" value="auto"> Máy tự rút</label></div>
+        <button id="startBtn" class="primary-btn" type="button">Bắt đầu trải bài</button>
+        <button id="resetBtn" class="secondary-btn" type="button">Trải bài mới</button>
+        <p class="disclaimer">Kết quả mang tính gợi mở và giải trí, không thay thế tư vấn chuyên môn.</p>
+      </aside>
+      <section class="reading-panel">
+        <div id="introView" class="intro-view panel"><div class="orb">✦</div><h2>Chọn chủ đề, đặt câu hỏi và rút bài</h2><p>Bạn có thể tự chọn lá theo cảm nhận hoặc để máy tự rút. Mỗi lần trải bài dùng bộ bài được xáo mới.</p></div>
+        <div id="deckView" class="deck-view panel" hidden><div class="deck-head"><div><span class="eyebrow">CHỌN LÁ</span><h2 id="pickTitle">Chọn 3 lá theo cảm nhận</h2></div><div id="pickCounter" class="pick-counter">0/3</div></div><div id="deckGrid" class="deck-grid"></div><button id="revealBtn" class="primary-btn reveal-btn" type="button" disabled>Xem kết quả</button></div>
+        <div id="resultView" class="result-view" hidden><div class="result-summary panel"><span class="eyebrow">THÔNG ĐIỆP TỔNG HỢP</span><h2 id="readingTitle">Trải bài của bạn</h2><p id="summaryText"></p><div id="actionText" class="action-text"></div><div class="summary-actions"><button id="copyBtn" class="secondary-btn" type="button">Sao chép nội dung</button><button id="downloadBtn" class="secondary-btn" type="button">Lưu TXT</button></div></div><div id="cardsResult" class="cards-result"></div></div>
+      </section>
+      <aside class="history-panel panel"><div class="history-head"><div><span class="eyebrow">LỊCH SỬ</span><h2>Trải bài gần đây</h2></div><button id="clearHistoryBtn" type="button">Xóa</button></div><div id="historyList" class="history-list"><span>Chưa có trải bài.</span></div></aside>
+    </section>
+    <div id="toast" class="toast" role="status"></div>
+  </main>
+  <script type="module" src="js/app.js?v=5.0.0"></script>
+</body>
+</html>

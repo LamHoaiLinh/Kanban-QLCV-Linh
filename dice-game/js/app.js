@@ -1,63 +1,31 @@
-import {DiceEngine} from './dice-engine.js';
-
-const $=selector=>document.querySelector(selector);
-const refs={
-  canvas:$('#diceCanvas'),countInput:$('#diceCountInput'),countOutput:$('#diceCountOutput'),countMinus:$('#countMinusBtn'),countPlus:$('#countPlusBtn'),prepare:$('#prepareRollBtn'),clear:$('#clearTableBtn'),modeDialog:$('#modeDialog'),modeCount:$('#modeDiceCount'),together:$('#rollTogetherBtn'),sequence:$('#rollOneByOneBtn'),resultMode:$('#resultMode'),resultTotal:$('#resultTotal'),resultDice:$('#resultDice'),status:$('#rollStatus'),history:$('#historyList'),clearHistory:$('#clearHistoryBtn'),sound:$('#soundBtn'),fullscreen:$('#fullscreenBtn'),close:$('#closeDiceBtn'),loading:$('#loadingOverlay'),toast:$('#toast')
-};
-const SETTINGS_KEY='linh_dice_game_settings_v1';
-const HISTORY_KEY='linh_dice_game_history_v1';
-let settings=loadJson(SETTINGS_KEY,{count:3,sound:true,volume:.65});
-let history=loadJson(HISTORY_KEY,[]);
-let engine=null,rolling=false,toastTimer=null;
-
-init().catch(error=>{
-  console.error(error);refs.loading.innerHTML=`<strong>Không tải được bàn xúc xắc.</strong><span>${escapeHtml(error.message||String(error))}</span>`;
-});
-
-async function init(){
-  bindEvents();setCount(settings.count);syncSound();renderHistory();
-  engine=new DiceEngine(refs.canvas,{quality:'medium',sound:settings.sound,volume:settings.volume});
-  await engine.init();
-  refs.loading.classList.add('hidden');setTimeout(()=>refs.loading.remove(),450);
-}
-function bindEvents(){
-  refs.countInput.addEventListener('input',event=>setCount(+event.target.value));
-  refs.countMinus.addEventListener('click',()=>setCount(getCount()-1));
-  refs.countPlus.addEventListener('click',()=>setCount(getCount()+1));
-  refs.prepare.addEventListener('click',openModeDialog);
-  refs.together.addEventListener('click',()=>startRoll('together'));
-  refs.sequence.addEventListener('click',()=>startRoll('sequence'));
-  refs.clear.addEventListener('click',()=>{if(rolling)return;engine?.clearDice();resetResult();showToast('Đã dọn bàn.')});
-  refs.clearHistory.addEventListener('click',()=>{history=[];saveJson(HISTORY_KEY,history);renderHistory();showToast('Đã xóa lịch sử.')});
-  refs.sound.addEventListener('click',()=>{settings.sound=!settings.sound;saveSettings();engine?.setSound(settings.sound);syncSound()});
-  refs.fullscreen.addEventListener('click',toggleFullscreen);
-  refs.close.addEventListener('click',closeDiceGame);
-  window.addEventListener('keydown',event=>{if(event.key==='Escape'&&!refs.modeDialog.open)closeDiceGame();if(event.code==='Space'&&event.ctrlKey){event.preventDefault();openModeDialog()}});
-}
-function getCount(){return Math.max(1,Math.min(10,+refs.countInput.value||3))}
-function setCount(value){const count=Math.max(1,Math.min(10,+value||1));refs.countInput.value=String(count);refs.countOutput.textContent=String(count);settings.count=count;saveSettings()}
-function openModeDialog(){if(rolling)return;refs.modeCount.textContent=String(getCount());refs.modeDialog.showModal()}
-async function startRoll(mode){
-  if(rolling||!engine)return;refs.modeDialog.close();rolling=true;setControlsDisabled(true);resetResult();refs.resultMode.textContent=mode==='together'?'Thả đồng thời':'Thả từng viên';
-  const count=getCount();refs.status.textContent=mode==='together'?`Đang thả ${count} xúc xắc cùng lúc…`:`Chuẩn bị thả lần lượt ${count} xúc xắc…`;
-  try{
-    const values=await engine.roll(count,mode,{onStatus:text=>refs.status.textContent=text,onPartial:partial=>renderPartialResults(partial)});
-    showFinalResults(values,mode);addHistory(values,mode);showToast(`Kết quả: ${values.join(' · ')}`);
-  }catch(error){console.error(error);refs.status.textContent='Lượt thả gặp lỗi. Bạn có thể thử lại.';showToast(error.message||'Không thể hoàn tất lượt thả.')}
-  finally{rolling=false;setControlsDisabled(false)}
-}
-function resetResult(){refs.resultMode.textContent='Chưa thả';refs.resultTotal.textContent='—';refs.resultDice.innerHTML='<div class="empty-result">Kết quả sẽ hiện tại đây.</div>';refs.status.textContent='Sẵn sàng.'}
-function renderPartialResults(values){refs.resultDice.innerHTML=values.map((value,index)=>value?`<div class="result-chip new" title="Xúc xắc ${index+1}">${value}</div>`:`<div class="result-chip">?</div>`).join('');const valid=values.filter(Boolean);refs.resultTotal.textContent=valid.length?String(valid.reduce((sum,value)=>sum+value,0)):'—'}
-function showFinalResults(values,mode){refs.resultMode.textContent=mode==='together'?'Thả đồng thời':'Thả từng viên';refs.resultDice.innerHTML=values.map((value,index)=>`<div class="result-chip new" title="Xúc xắc ${index+1}: ${value}">${value}</div>`).join('');refs.resultTotal.textContent=String(values.reduce((sum,value)=>sum+value,0));refs.status.textContent=`Đã hoàn tất ${values.length} xúc xắc.`}
-function addHistory(values,mode){history.unshift({id:Date.now(),createdAt:new Date().toISOString(),mode,values,total:values.reduce((a,b)=>a+b,0)});history=history.slice(0,20);saveJson(HISTORY_KEY,history);renderHistory()}
-function renderHistory(){if(!history.length){refs.history.innerHTML='<span>Chưa có lượt thả.</span>';return}refs.history.innerHTML=history.slice(0,10).map(item=>`<div class="history-row"><span>${item.mode==='together'?'Đồng thời':'Từng viên'} · ${formatTime(item.createdAt)}</span><b>${item.values.join('-')} = ${item.total}</b></div>`).join('')}
-function setControlsDisabled(disabled){refs.prepare.disabled=disabled;refs.countMinus.disabled=disabled;refs.countPlus.disabled=disabled;refs.countInput.disabled=disabled;refs.clear.disabled=disabled}
-function syncSound(){refs.sound.classList.toggle('active',settings.sound);refs.sound.textContent=settings.sound?'♪':'∅';refs.sound.title=settings.sound?'Tắt âm thanh':'Bật âm thanh'}
+const $=s=>document.querySelector(s);
+const refs={stage:$('#diceStage'),count:$('#countRange'),out:$('#countOutput'),minus:$('#minusBtn'),plus:$('#plusBtn'),roll:$('#rollBtn'),clear:$('#clearBtn'),dialog:$('#modeDialog'),dialogCount:$('#dialogCount'),together:$('#togetherBtn'),sequence:$('#sequenceBtn'),mode:$('#modeLabel'),total:$('#totalLabel'),values:$('#valueList'),status:$('#statusText'),history:$('#historyList'),clearHistory:$('#clearHistoryBtn'),sound:$('#soundBtn'),fullscreen:$('#fullscreenBtn'),close:$('#closeDiceBtn'),toast:$('#toast')};
+const SETTINGS_KEY='linh_dice_game_settings_v2';const HISTORY_KEY='linh_dice_game_history_v2';
+let settings=load(SETTINGS_KEY,{count:3,sound:true}),history=load(HISTORY_KEY,[]),rolling=false,audio=null,toastTimer=null;
+const FACE_ROT={1:['-18deg','0deg','0deg'],6:['-18deg','180deg','0deg'],3:['-18deg','-90deg','0deg'],4:['-18deg','90deg','0deg'],2:['-105deg','0deg','0deg'],5:['75deg','0deg','0deg']};
+init();
+function init(){bind();setCount(settings.count);syncSound();renderHistory();renderEmpty()}
+function bind(){refs.count.oninput=e=>setCount(+e.target.value);refs.minus.onclick=()=>setCount(getCount()-1);refs.plus.onclick=()=>setCount(getCount()+1);refs.roll.onclick=()=>{if(rolling)return;refs.dialogCount.textContent=getCount();refs.dialog.showModal()};refs.together.onclick=()=>startRoll('together');refs.sequence.onclick=()=>startRoll('sequence');refs.clear.onclick=()=>{if(rolling)return;refs.stage.innerHTML='';renderEmpty();showToast('Đã dọn bàn.')};refs.clearHistory.onclick=()=>{history=[];save(HISTORY_KEY,history);renderHistory()};refs.sound.onclick=()=>{settings.sound=!settings.sound;save(SETTINGS_KEY,settings);syncSound()};refs.fullscreen.onclick=toggleFullscreen;refs.close.onclick=closeGame}
+function getCount(){return Math.max(1,Math.min(10,+refs.count.value||3))}
+function setCount(v){v=Math.max(1,Math.min(10,+v||1));refs.count.value=v;refs.out.textContent=v;settings.count=v;save(SETTINGS_KEY,settings)}
+async function startRoll(mode){if(rolling)return;refs.dialog.close();rolling=true;toggleControls(true);refs.stage.innerHTML='';refs.mode.textContent=mode==='together'?'Thả đồng thời':'Thả từng viên';refs.total.textContent='—';refs.values.innerHTML='';const count=getCount();const results=[];refs.status.textContent=mode==='together'?`Đang thả ${count} xúc xắc…`:`Đang thả lần lượt ${count} xúc xắc…`;playTone(145,.22,.07);try{if(mode==='together'){const jobs=[];for(let i=0;i<count;i++){const die=createDie(i,count);jobs.push(rollDie(die,i*45))}const values=await Promise.all(jobs);values.forEach((v,i)=>results[i]=v);renderValues(results)}else{for(let i=0;i<count;i++){refs.status.textContent=`Đang thả xúc xắc ${i+1}/${count}…`;const die=createDie(i,count);results[i]=await rollDie(die,0);renderValues(results);await wait(320)}}refs.total.textContent=results.reduce((a,b)=>a+b,0);refs.status.textContent='Đã có kết quả.';addHistory(results,mode);playResult();showToast(`Kết quả: ${results.join(' · ')}`)}finally{rolling=false;toggleControls(false)}}
+function createDie(index,total){const wrap=document.createElement('div');wrap.className='die-wrap';const pos=positionFor(index,total);wrap.style.left=pos.x+'%';wrap.style.top=pos.y+'%';const die=document.createElement('div');die.className='die';for(const [cls,value] of [['front',1],['back',6],['right',3],['left',4],['top',2],['bottom',5]]){const face=document.createElement('div');face.className=`face ${cls}`;face.innerHTML=pips(value);die.appendChild(face)}wrap.appendChild(die);refs.stage.appendChild(wrap);return die}
+function positionFor(index,total){const cols=Math.min(5,total),rows=Math.ceil(total/cols),col=index%cols,row=Math.floor(index/cols);return{x:18+(cols===1?32:col*(64/(cols-1))),y:30+(rows===1?20:row*32)}}
+function pips(n){const map={1:['p1'],2:['p2a','p2b'],3:['p3a','p3b','p3c'],4:['p4a','p4b','p4c','p4d'],5:['p5a','p5b','p5c','p5d','p5e'],6:['p6a','p6b','p6c','p6d','p6e','p6f']};return map[n].map(c=>`<i class="pip ${c}"></i>`).join('')}
+async function rollDie(die,delay=0){await wait(delay);const value=randomInt(1,6),rot=FACE_ROT[value];die.style.setProperty('--rx',rot[0]);die.style.setProperty('--ry',rot[1]);die.style.setProperty('--rz',rot[2]);die.classList.remove('rolling');void die.offsetWidth;die.classList.add('rolling');playTone(220+randomInt(0,80),.08,.025);await wait(1350);playTone(360+value*32,.08,.03);return value}
+function renderValues(values){refs.values.innerHTML=values.map((v,i)=>`<div class="value-chip" title="Xúc xắc ${i+1}">${v}</div>`).join('');refs.total.textContent=values.length?values.reduce((a,b)=>a+b,0):'—'}
+function renderEmpty(){refs.mode.textContent='Chưa thả';refs.total.textContent='—';refs.values.innerHTML='<span>Chưa có kết quả.</span>';refs.status.textContent='Sẵn sàng.'}
+function addHistory(values,mode){history.unshift({time:new Date().toISOString(),mode,values,total:values.reduce((a,b)=>a+b,0)});history=history.slice(0,20);save(HISTORY_KEY,history);renderHistory()}
+function renderHistory(){refs.history.innerHTML=history.length?history.slice(0,10).map(x=>`<div class="history-row"><span>${x.mode==='together'?'Đồng thời':'Từng viên'} · ${formatTime(x.time)}</span><strong>${x.values.join(' – ')} = ${x.total}</strong></div>`).join(''):'<span>Chưa có lượt thả.</span>'}
+function toggleControls(disabled){[refs.count,refs.minus,refs.plus,refs.roll,refs.clear].forEach(el=>el.disabled=disabled)}
+function randomInt(min,max){const a=new Uint32Array(1);crypto.getRandomValues(a);return min+(a[0]%(max-min+1))}
+function playTone(freq,duration,gain){if(!settings.sound)return;try{audio=audio||new(window.AudioContext||window.webkitAudioContext)();const t=audio.currentTime,o=audio.createOscillator(),g=audio.createGain();o.frequency.value=freq;o.type='sine';g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(gain,t+.008);g.gain.exponentialRampToValueAtTime(.0001,t+duration);o.connect(g);g.connect(audio.destination);o.start(t);o.stop(t+duration+.02)}catch{}}
+function playResult(){[520,660,820].forEach((f,i)=>setTimeout(()=>playTone(f,.14,.05),i*100))}
+function syncSound(){refs.sound.textContent=settings.sound?'♪':'∅';refs.sound.classList.toggle('active',settings.sound)}
 async function toggleFullscreen(){if(!document.fullscreenElement)await document.documentElement.requestFullscreen?.();else await document.exitFullscreen?.()}
-function closeDiceGame(){engine?.destroy();if(parent!==window)parent.postMessage({type:'dice-game-close'},'*');else location.href='../index.html'}
-function saveSettings(){saveJson(SETTINGS_KEY,settings)}
-function loadJson(key,fallback){try{const parsed=JSON.parse(localStorage.getItem(key)||'null');if(Array.isArray(fallback))return Array.isArray(parsed)?parsed:fallback;return parsed&&typeof parsed==='object'?{...fallback,...parsed}:fallback}catch{return fallback}}
-function saveJson(key,value){localStorage.setItem(key,JSON.stringify(value))}
-function formatTime(value){const date=new Date(value);return Number.isFinite(date.getTime())?date.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}):''}
-function showToast(message){clearTimeout(toastTimer);refs.toast.textContent=message;refs.toast.classList.add('show');toastTimer=setTimeout(()=>refs.toast.classList.remove('show'),2400)}
-function escapeHtml(value){return String(value??'').replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'})[char])}
+function closeGame(){if(parent!==window)parent.postMessage({type:'dice-game-close'},'*');else location.href='../index.html'}
+function showToast(s){clearTimeout(toastTimer);refs.toast.textContent=s;refs.toast.classList.add('show');toastTimer=setTimeout(()=>refs.toast.classList.remove('show'),2300)}
+function load(k,f){try{const v=JSON.parse(localStorage.getItem(k));return v&&typeof v==='object'?v:f}catch{return f}}
+function save(k,v){localStorage.setItem(k,JSON.stringify(v))}
+function formatTime(v){return new Date(v).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'})}
+function wait(ms){return new Promise(r=>setTimeout(r,ms))}
