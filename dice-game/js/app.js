@@ -64,7 +64,7 @@ async function preloadD10(){
 }
 async function ensureD10Engine(){
   if(d10Engine)return d10Engine;
-  if(!d10EnginePromise)d10EnginePromise=import('./d10-engine.js?v=5.4.0').then(async({D10AssetEngine})=>{
+  if(!d10EnginePromise)d10EnginePromise=import('./d10-engine.js?v=5.6.0').then(async({D10AssetEngine})=>{
     const engine=new D10AssetEngine(refs.stage,{onSettle:value=>playTone(410+value*24,.09,.032)});
     await engine.init();d10Engine=engine;return engine;
   }).finally(()=>{d10EnginePromise=null});

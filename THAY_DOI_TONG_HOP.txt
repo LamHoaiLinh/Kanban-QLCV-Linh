@@ -284,3 +284,10 @@ THAY_DOI_V5.3
 - Thêm huy hiệu số lớn nổi ngay trên từng viên để đọc kết quả nhanh.
 - Thêm phím tắt: Space để lắc, phím 1 chọn thả đồng thời, phím 2 chọn thả từng viên.
 - Không thay đổi dữ liệu và chức năng Kanban khác.
+
+
+=== v5.6 ===
+- Chỉ cập nhật chuyển động D10: bỏ animation trong GLB.
+- Tự mô phỏng trọng lực, vận tốc ngang, xoay ba trục, va bàn, nảy, ma sát và giảm tốc.
+- Sau khi gần dừng, viên xúc xắc ổn định về đúng mặt kết quả.
+- Giữ nguyên model D10, số nổi, phím tắt và toàn bộ chức năng Kanban khác.

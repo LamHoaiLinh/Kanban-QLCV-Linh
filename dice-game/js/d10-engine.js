@@ -87,7 +87,7 @@ export class D10AssetEngine{
     // Parse ArrayBuffer với base path dạng chuỗi để tránh lỗi lastIndexOf của GLTFLoader.
     const gltf=await loader.parseAsync(buffer,new URL('../assets/',import.meta.url).href);
     this.template=gltf.scene;
-    this.clip=gltf.animations?.find(a=>a.name==='D10_SHAKE_ROLL_LOOP')||gltf.animations?.[0]||null;
+    this.clip=null; // Không dùng animation trong GLB; chuyển động được mô phỏng bằng code.
     this.template.traverse(node=>{if(node.isMesh){node.castShadow=true;node.receiveShadow=true}});
     this.resizeObserver=new ResizeObserver(()=>this.resize());this.resizeObserver.observe(this.stage);
     this.resize();this.setVisible(false);this.ready=true;this.loop();
@@ -150,29 +150,131 @@ export class D10AssetEngine{
   }
   async animateOne(item,delay){
     await wait(delay);
-    const value=randomInt(0,9);item.value=value;
-    const targetQ=resultQuaternion(value),startQ=randomQuaternion(),spinQ=randomQuaternion();
-    item.group.quaternion.copy(startQ);
-    item.group.position.y=item.restY+5.2;
-    item.group.position.x=item.targetPosition.x+(Math.random()-.5)*.5;
-    item.group.position.z=item.targetPosition.z+(Math.random()-.5)*.4;
-    if(item.action){item.action.reset();item.action.setLoop(THREE.LoopRepeat,2);item.action.timeScale=2.2;item.action.play()}
-    const duration=1750,start=performance.now();
+    const value=randomInt(0,9);
+    item.value=value;
+
+    const targetQ=resultQuaternion(value);
+    const floorY=item.restY;
+    const startX=item.targetPosition.x+(Math.random()-.5)*1.0;
+    const startZ=item.targetPosition.z+(Math.random()-.5)*.9;
+
+    item.group.position.set(startX,floorY+5.4+Math.random()*.9,startZ);
+    item.group.quaternion.copy(randomQuaternion());
+
+    // Vận tốc tuyến tính và vận tốc góc mô phỏng một vật thể cứng.
+    const velocity=new THREE.Vector3(
+      (Math.random()-.5)*3.2,
+      -1.0-Math.random()*1.4,
+      (Math.random()-.5)*2.6
+    );
+    const angularVelocity=new THREE.Vector3(
+      (Math.random()-.5)*17,
+      (Math.random()-.5)*19,
+      (Math.random()-.5)*17
+    );
+
+    const gravity=-19.5;
+    const restitution=.38+Math.random()*.08;
+    const floorFriction=.76;
+    const angularDamping=.72;
+    const start=performance.now();
+    let last=start;
+    let impacts=0;
+    let stableFrames=0;
+    let settling=false;
+    let settleStart=0;
+    const settleFromQ=new THREE.Quaternion();
+    const settleFromPos=new THREE.Vector3();
+
     await new Promise(resolve=>{
       const tick=now=>{
-        const t=Math.min(1,(now-start)/duration),drop=easeOutCubic(t),settle=Math.max(0,(t-.63)/.37);
-        const bounce=Math.abs(Math.sin(t*Math.PI*3.2))*Math.pow(1-t,1.7)*.85;
-        item.group.position.y=THREE.MathUtils.lerp(item.restY+5.2,item.restY,drop)+bounce;
-        item.group.position.x=THREE.MathUtils.lerp(item.group.position.x,item.targetPosition.x,.08);
-        item.group.position.z=THREE.MathUtils.lerp(item.group.position.z,item.targetPosition.z,.08);
-        if(t<.63)item.group.quaternion.slerp(spinQ,.055);else item.group.quaternion.slerp(targetQ,easeInOutCubic(settle)*.22+.05);
-        if(t<1)requestAnimationFrame(tick);else resolve();
-      };requestAnimationFrame(tick);
+        let dt=Math.min(.032,Math.max(.001,(now-last)/1000));
+        last=now;
+        const elapsed=(now-start)/1000;
+
+        if(!settling){
+          // Rơi theo trọng lực.
+          velocity.y+=gravity*dt;
+          item.group.position.addScaledVector(velocity,dt);
+
+          // Xoay theo vận tốc góc thực, không nội suy kiểu "lá rơi".
+          const speed=angularVelocity.length();
+          if(speed>.0001){
+            const axis=angularVelocity.clone().multiplyScalar(1/speed);
+            const dq=new THREE.Quaternion().setFromAxisAngle(axis,speed*dt);
+            item.group.quaternion.premultiply(dq).normalize();
+          }
+
+          // Va chạm với mặt bàn.
+          if(item.group.position.y<=floorY){
+            item.group.position.y=floorY;
+
+            if(Math.abs(velocity.y)>.75){
+              impacts++;
+              velocity.y=Math.abs(velocity.y)*restitution;
+              velocity.x*=floorFriction;
+              velocity.z*=floorFriction;
+
+              // Đổi trục quay nhẹ sau mỗi lần va để tạo cảm giác va đập cứng.
+              angularVelocity.x=(angularVelocity.x+(Math.random()-.5)*5)*angularDamping;
+              angularVelocity.y=(angularVelocity.y+(Math.random()-.5)*4)*angularDamping;
+              angularVelocity.z=(angularVelocity.z+(Math.random()-.5)*5)*angularDamping;
+            }else{
+              velocity.y=0;
+              velocity.x*=Math.pow(.32,dt);
+              velocity.z*=Math.pow(.32,dt);
+              angularVelocity.multiplyScalar(Math.pow(.18,dt));
+            }
+          }
+
+          // Giữ viên trong vùng gần vị trí đích, giả lập va nhẹ vào giới hạn bàn.
+          const maxX=item.targetPosition.x+1.15,minX=item.targetPosition.x-1.15;
+          const maxZ=item.targetPosition.z+.95,minZ=item.targetPosition.z-.95;
+          if(item.group.position.x>maxX){item.group.position.x=maxX;velocity.x=-Math.abs(velocity.x)*.48}
+          if(item.group.position.x<minX){item.group.position.x=minX;velocity.x=Math.abs(velocity.x)*.48}
+          if(item.group.position.z>maxZ){item.group.position.z=maxZ;velocity.z=-Math.abs(velocity.z)*.48}
+          if(item.group.position.z<minZ){item.group.position.z=minZ;velocity.z=Math.abs(velocity.z)*.48}
+
+          const horizontalSpeed=Math.hypot(velocity.x,velocity.z);
+          const angularSpeed=angularVelocity.length();
+          if(item.group.position.y<=floorY+.001&&Math.abs(velocity.y)<.12&&horizontalSpeed<.18&&angularSpeed<.7){
+            stableFrames++;
+          }else{
+            stableFrames=0;
+          }
+
+          // Bắt đầu ổn định sau vài lần nảy hoặc sau thời gian tối đa.
+          if((impacts>=2&&stableFrames>=4)||elapsed>1.72){
+            settling=true;
+            settleStart=now;
+            settleFromQ.copy(item.group.quaternion);
+            settleFromPos.copy(item.group.position);
+          }
+        }else{
+          const t=Math.min(1,(now-settleStart)/360);
+          const eased=easeInOutCubic(t);
+          item.group.position.lerpVectors(
+            settleFromPos,
+            new THREE.Vector3(item.targetPosition.x,floorY,item.targetPosition.z),
+            eased
+          );
+          item.group.quaternion.slerpQuaternions(settleFromQ,targetQ,eased).normalize();
+
+          if(t>=1){
+            item.group.position.set(item.targetPosition.x,floorY,item.targetPosition.z);
+            item.group.quaternion.copy(targetQ);
+            resolve();
+            return;
+          }
+        }
+
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
     });
-    if(item.action){item.action.stop();item.mixer.setTime(0)}
-    if(item.animatedRoot&&item.initialRoot){item.animatedRoot.position.copy(item.initialRoot.position);item.animatedRoot.quaternion.copy(item.initialRoot.quaternion);item.animatedRoot.scale.copy(item.initialRoot.scale)}
-    item.group.position.set(item.targetPosition.x,item.restY,item.targetPosition.z);item.group.quaternion.copy(targetQ);
-    this.onSettle(value);return value;
+
+    this.onSettle(value);
+    return value;
   }
   loop(){
     if(!this.running)return;
