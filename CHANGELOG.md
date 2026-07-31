@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## v4.0 – Dice Arena
+- Thay game Marble Draw bằng Dice Arena.
+- Nút `DRAW` đổi thành `DICE`.
+- Cho chọn 1–10 xúc xắc.
+- Thêm hai chế độ thả đồng thời và thả từng viên.
+- Dùng model xúc xắc, cốc lắc và vật liệu từ asset Dice Animation 2.
+- Hiển thị kết quả từng viên, tổng điểm và lịch sử gần đây.
+- Lưu dữ liệu Dice Arena bằng khóa riêng, không thay đổi dữ liệu Kanban.
+- Cập nhật Service Worker lên `linh-kanban-static-v40-dice`.
+
+
 ## v3.2 – Marble Draw
 - Thêm nút `DRAW` trên thanh công cụ Kanban.
 - Thêm workspace toàn màn hình `MARBLE DRAW – ĐƯỜNG ĐUA MAY MẮN`.

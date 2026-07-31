@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#143c32">
+  <title>Dice Arena</title>
+  <link rel="stylesheet" href="styles.css?v=4.0.0">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.min.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/",
+      "@dimforge/rapier3d-compat": "https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.19.3/rapier.mjs"
+    }
+  }
+  </script>
+</head>
+<body>
+  <main class="dice-app">
+    <canvas id="diceCanvas" aria-label="Bàn thả xúc xắc 3D"></canvas>
+    <div class="scene-vignette" aria-hidden="true"></div>
+    <header class="dice-header">
+      <div class="brand">
+        <div class="brand-die" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+        <div><span>CÔNG CỤ GIẢI TRÍ</span><h1>DICE ARENA</h1><p>Thả xúc xắc 3D</p></div>
+      </div>
+      <div class="header-actions">
+        <button id="fullscreenBtn" class="round-btn" type="button" title="Toàn màn hình" aria-label="Toàn màn hình">⛶</button>
+        <button id="soundBtn" class="round-btn active" type="button" title="Bật hoặc tắt âm thanh" aria-label="Âm thanh">♪</button>
+        <button id="closeDiceBtn" class="back-btn" type="button">Quay về Kanban</button>
+      </div>
+    </header>
+
+    <section class="control-card" aria-label="Điều khiển xúc xắc">
+      <div class="control-title"><span>THIẾT LẬP</span><strong>Chọn số lượng xúc xắc</strong></div>
+      <div class="count-control">
+        <button id="countMinusBtn" type="button" aria-label="Giảm số xúc xắc">−</button>
+        <output id="diceCountOutput">3</output>
+        <button id="countPlusBtn" type="button" aria-label="Tăng số xúc xắc">＋</button>
+      </div>
+      <input id="diceCountInput" type="range" min="1" max="10" value="3" step="1" aria-label="Số lượng xúc xắc">
+      <div class="count-caption"><span>1</span><span>Tối đa 10</span></div>
+      <button id="prepareRollBtn" class="main-roll-btn" type="button"><span>◆</span> Thả xúc xắc</button>
+      <button id="clearTableBtn" class="ghost-btn" type="button">Dọn bàn</button>
+    </section>
+
+    <section class="result-card" aria-live="polite">
+      <div class="result-head"><div><span>KẾT QUẢ GẦN NHẤT</span><strong id="resultMode">Chưa thả</strong></div><div id="resultTotal" class="total-badge">—</div></div>
+      <div id="resultDice" class="result-dice"><div class="empty-result">Kết quả sẽ hiện tại đây.</div></div>
+      <div id="rollStatus" class="roll-status">Sẵn sàng.</div>
+    </section>
+
+    <section class="history-card">
+      <div class="history-head"><strong>Lịch sử</strong><button id="clearHistoryBtn" type="button">Xóa</button></div>
+      <div id="historyList" class="history-list"><span>Chưa có lượt thả.</span></div>
+    </section>
+
+    <dialog id="modeDialog" class="mode-dialog">
+      <form method="dialog" class="mode-card">
+        <div class="mode-head"><div><span>CHỌN CÁCH THẢ</span><h2><b id="modeDiceCount">3</b> xúc xắc</h2></div><button class="close-mode" value="cancel" aria-label="Đóng">×</button></div>
+        <div class="mode-grid">
+          <button id="rollTogetherBtn" class="mode-option together" value="cancel" type="button">
+            <span class="mode-icon">◆◆◆</span><strong>Thả đồng thời</strong><small>Tất cả xúc xắc rơi xuống bàn cùng lúc.</small>
+          </button>
+          <button id="rollOneByOneBtn" class="mode-option sequence" value="cancel" type="button">
+            <span class="mode-icon">◆ → ◆ → ◆</span><strong>Thả từng viên</strong><small>Thả và công bố lần lượt từng xúc xắc.</small>
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="loadingOverlay" class="loading-overlay"><div class="loader-die"><i></i><i></i><i></i></div><strong>Đang chuẩn bị bàn xúc xắc…</strong></div>
+    <div class="asset-credit">3D: “Dice Animation 2” – KageG · CC BY 4.0</div><div id="toast" class="toast" role="status"></div>
+  </main>
+  <script type="module" src="js/app.js?v=4.0.0"></script>
+</body>
+</html>

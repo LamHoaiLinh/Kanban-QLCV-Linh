@@ -1,9 +1,9 @@
-const CACHE_NAME='linh-kanban-static-v37';
+const CACHE_NAME='linh-kanban-static-v40-dice';
 const ASSETS=[
-  './','./index.html','./styles.css?v=3.2','./dragdrop.js?v=3.2','./app.js?v=3.7','./music-player.js?v=3.2',
+  './','./index.html','./styles.css?v=4.0','./dragdrop.js?v=3.2','./app.js?v=3.7','./music-player.js?v=3.2',
   './office-tools/office-tools.css?v=3.2','./office-tools/office-tools.js?v=3.2','./office-tools/vendor/jszip.min.js',
-  './marble-draw-launcher.js?v=3.7','./marble-draw/index.html?v=1.3.1','./marble-draw/styles.css?v=1.3.1',
-  './marble-draw/js/app.js?v=1.3.1','./marble-draw/js/storage.js','./marble-draw/js/crypto-utils.js','./marble-draw/js/participants.js','./marble-draw/js/shuffle-engine.js','./marble-draw/js/race-engine.js',
+  './dice-launcher.js?v=4.0','./dice-game/index.html?v=4.0.0','./dice-game/styles.css?v=4.0.0',
+  './dice-game/js/app.js?v=4.0.0','./dice-game/js/dice-engine.js','./dice-game/assets/dice_animation_2.glb','./dice-game/assets/LICENSE_ASSET.txt',
   './manifest.webmanifest?v=3.2','./assets/icon.svg',
   './assets/backgrounds/Beautiful Background6.png','./assets/backgrounds/Beautiful Background7.png',
   './assets/backgrounds/Beautiful Background8.png','./assets/backgrounds/Beautiful Background13.png',
@@ -22,7 +22,7 @@ self.addEventListener('activate',event=>{
 self.addEventListener('fetch',event=>{
   if(event.request.method!=='GET')return;
   const url=new URL(event.request.url);
-  const mustBeFresh=event.request.mode==='navigate'||url.pathname.includes('/marble-draw/')||url.pathname.endsWith('/marble-draw-launcher.js');
+  const mustBeFresh=event.request.mode==='navigate'||url.pathname.includes('/dice-game/')||url.pathname.endsWith('/dice-launcher.js');
   if(mustBeFresh){
     event.respondWith(fetch(event.request).then(response=>{
       if(response&&response.status===200){const copy=response.clone();caches.open(CACHE_NAME).then(cache=>cache.put(event.request,copy));}
