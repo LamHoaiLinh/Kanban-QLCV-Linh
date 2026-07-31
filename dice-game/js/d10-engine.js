@@ -26,6 +26,25 @@ function randomInt(min,max){
   do{crypto.getRandomValues(a)}while(a[0]>=limit);
   return min+(a[0]%range);
 }
+function randomFloat(){
+  const a=new Uint32Array(1);
+  crypto.getRandomValues(a);
+  return a[0]/0x100000000;
+}
+function randomRange(min,max){return min+(max-min)*randomFloat()}
+
+function readTopFace(quaternion){
+  let bestValue=0,bestDot=-Infinity;
+  for(const [rawValue,localNormal] of Object.entries(FACE_NORMAL_BY_VALUE)){
+    const worldNormal=localNormal.clone().normalize().applyQuaternion(quaternion);
+    const dot=worldNormal.dot(WORLD_UP);
+    if(dot>bestDot){
+      bestDot=dot;
+      bestValue=Number(rawValue);
+    }
+  }
+  return bestValue;
+}
 function randomQuaternion(){
   const a=new Uint32Array(3);crypto.getRandomValues(a);
   const u1=a[0]/0x100000000,u2=a[1]/0x100000000,u3=a[2]/0x100000000;
@@ -150,129 +169,118 @@ export class D10AssetEngine{
   }
   async animateOne(item,delay){
     await wait(delay);
-    const value=randomInt(0,9);
-    item.value=value;
 
-    const targetQ=resultQuaternion(value);
     const floorY=item.restY;
-    const startX=item.targetPosition.x+(Math.random()-.5)*1.0;
-    const startZ=item.targetPosition.z+(Math.random()-.5)*.9;
+    const startX=item.targetPosition.x+randomRange(-.42,.42);
+    const startZ=item.targetPosition.z+randomRange(-.36,.36);
 
-    item.group.position.set(startX,floorY+5.4+Math.random()*.9,startZ);
+    item.group.position.set(startX,floorY+randomRange(5.35,6.05),startZ);
     item.group.quaternion.copy(randomQuaternion());
 
-    // Vận tốc tuyến tính và vận tốc góc mô phỏng một vật thể cứng.
+    // Điều kiện ban đầu được sinh bằng Web Crypto.
     const velocity=new THREE.Vector3(
-      (Math.random()-.5)*3.2,
-      -1.0-Math.random()*1.4,
-      (Math.random()-.5)*2.6
+      randomRange(-1.45,1.45),
+      randomRange(-2.35,-1.0),
+      randomRange(-1.15,1.15)
     );
     const angularVelocity=new THREE.Vector3(
-      (Math.random()-.5)*17,
-      (Math.random()-.5)*19,
-      (Math.random()-.5)*17
+      randomRange(-16.5,16.5),
+      randomRange(-18.5,18.5),
+      randomRange(-16.5,16.5)
     );
 
     const gravity=-19.5;
-    const restitution=.38+Math.random()*.08;
-    const floorFriction=.76;
-    const angularDamping=.72;
+    const restitution=randomRange(.37,.45);
+    const floorFriction=.73;
+    const angularImpactDamping=.69;
+    const fixedStep=1/120;
     const start=performance.now();
     let last=start;
+    let accumulator=0;
     let impacts=0;
-    let stableFrames=0;
-    let settling=false;
-    let settleStart=0;
-    const settleFromQ=new THREE.Quaternion();
-    const settleFromPos=new THREE.Vector3();
+    let stableSteps=0;
 
     await new Promise(resolve=>{
-      const tick=now=>{
-        let dt=Math.min(.032,Math.max(.001,(now-last)/1000));
-        last=now;
-        const elapsed=(now-start)/1000;
+      const simulate=dt=>{
+        velocity.y+=gravity*dt;
+        item.group.position.addScaledVector(velocity,dt);
 
-        if(!settling){
-          // Rơi theo trọng lực.
-          velocity.y+=gravity*dt;
-          item.group.position.addScaledVector(velocity,dt);
+        const angularSpeed=angularVelocity.length();
+        if(angularSpeed>.0001){
+          const axis=angularVelocity.clone().multiplyScalar(1/angularSpeed);
+          const dq=new THREE.Quaternion().setFromAxisAngle(axis,angularSpeed*dt);
+          item.group.quaternion.premultiply(dq).normalize();
+        }
 
-          // Xoay theo vận tốc góc thực, không nội suy kiểu "lá rơi".
-          const speed=angularVelocity.length();
-          if(speed>.0001){
-            const axis=angularVelocity.clone().multiplyScalar(1/speed);
-            const dq=new THREE.Quaternion().setFromAxisAngle(axis,speed*dt);
-            item.group.quaternion.premultiply(dq).normalize();
-          }
+        if(item.group.position.y<=floorY){
+          item.group.position.y=floorY;
 
-          // Va chạm với mặt bàn.
-          if(item.group.position.y<=floorY){
-            item.group.position.y=floorY;
+          if(Math.abs(velocity.y)>.62){
+            impacts++;
+            velocity.y=Math.abs(velocity.y)*restitution;
+            velocity.x*=floorFriction;
+            velocity.z*=floorFriction;
 
-            if(Math.abs(velocity.y)>.75){
-              impacts++;
-              velocity.y=Math.abs(velocity.y)*restitution;
-              velocity.x*=floorFriction;
-              velocity.z*=floorFriction;
-
-              // Đổi trục quay nhẹ sau mỗi lần va để tạo cảm giác va đập cứng.
-              angularVelocity.x=(angularVelocity.x+(Math.random()-.5)*5)*angularDamping;
-              angularVelocity.y=(angularVelocity.y+(Math.random()-.5)*4)*angularDamping;
-              angularVelocity.z=(angularVelocity.z+(Math.random()-.5)*5)*angularDamping;
-            }else{
-              velocity.y=0;
-              velocity.x*=Math.pow(.32,dt);
-              velocity.z*=Math.pow(.32,dt);
-              angularVelocity.multiplyScalar(Math.pow(.18,dt));
-            }
-          }
-
-          // Giữ viên trong vùng gần vị trí đích, giả lập va nhẹ vào giới hạn bàn.
-          const maxX=item.targetPosition.x+1.15,minX=item.targetPosition.x-1.15;
-          const maxZ=item.targetPosition.z+.95,minZ=item.targetPosition.z-.95;
-          if(item.group.position.x>maxX){item.group.position.x=maxX;velocity.x=-Math.abs(velocity.x)*.48}
-          if(item.group.position.x<minX){item.group.position.x=minX;velocity.x=Math.abs(velocity.x)*.48}
-          if(item.group.position.z>maxZ){item.group.position.z=maxZ;velocity.z=-Math.abs(velocity.z)*.48}
-          if(item.group.position.z<minZ){item.group.position.z=minZ;velocity.z=Math.abs(velocity.z)*.48}
-
-          const horizontalSpeed=Math.hypot(velocity.x,velocity.z);
-          const angularSpeed=angularVelocity.length();
-          if(item.group.position.y<=floorY+.001&&Math.abs(velocity.y)<.12&&horizontalSpeed<.18&&angularSpeed<.7){
-            stableFrames++;
+            // Mỗi lần va làm đổi nhẹ vận tốc góc, giống một vật thể cứng chạm mặt bàn.
+            angularVelocity.x=(angularVelocity.x+randomRange(-2.3,2.3))*angularImpactDamping;
+            angularVelocity.y=(angularVelocity.y+randomRange(-1.8,1.8))*angularImpactDamping;
+            angularVelocity.z=(angularVelocity.z+randomRange(-2.3,2.3))*angularImpactDamping;
           }else{
-            stableFrames=0;
-          }
-
-          // Bắt đầu ổn định sau vài lần nảy hoặc sau thời gian tối đa.
-          if((impacts>=2&&stableFrames>=4)||elapsed>1.72){
-            settling=true;
-            settleStart=now;
-            settleFromQ.copy(item.group.quaternion);
-            settleFromPos.copy(item.group.position);
-          }
-        }else{
-          const t=Math.min(1,(now-settleStart)/360);
-          const eased=easeInOutCubic(t);
-          item.group.position.lerpVectors(
-            settleFromPos,
-            new THREE.Vector3(item.targetPosition.x,floorY,item.targetPosition.z),
-            eased
-          );
-          item.group.quaternion.slerpQuaternions(settleFromQ,targetQ,eased).normalize();
-
-          if(t>=1){
-            item.group.position.set(item.targetPosition.x,floorY,item.targetPosition.z);
-            item.group.quaternion.copy(targetQ);
-            resolve();
-            return;
+            velocity.y=0;
+            velocity.x*=Math.pow(.055,dt);
+            velocity.z*=Math.pow(.055,dt);
+            angularVelocity.multiplyScalar(Math.pow(.025,dt));
           }
         }
 
+        // Chỉ giới hạn vùng bàn; không kéo viên trở lại vị trí ban đầu.
+        const minX=item.targetPosition.x-.78,maxX=item.targetPosition.x+.78;
+        const minZ=item.targetPosition.z-.66,maxZ=item.targetPosition.z+.66;
+        if(item.group.position.x>maxX){item.group.position.x=maxX;velocity.x=-Math.abs(velocity.x)*.42}
+        if(item.group.position.x<minX){item.group.position.x=minX;velocity.x=Math.abs(velocity.x)*.42}
+        if(item.group.position.z>maxZ){item.group.position.z=maxZ;velocity.z=-Math.abs(velocity.z)*.42}
+        if(item.group.position.z<minZ){item.group.position.z=minZ;velocity.z=Math.abs(velocity.z)*.42}
+
+        const horizontalSpeed=Math.hypot(velocity.x,velocity.z);
+        const remainingSpin=angularVelocity.length();
+        const onTable=item.group.position.y<=floorY+.001;
+
+        if(onTable&&Math.abs(velocity.y)<.08&&horizontalSpeed<.075&&remainingSpin<.24){
+          stableSteps++;
+        }else{
+          stableSteps=0;
+        }
+      };
+
+      const tick=now=>{
+        const frameDelta=Math.min(.05,Math.max(.001,(now-last)/1000));
+        last=now;
+        accumulator+=frameDelta;
+
+        let subSteps=0;
+        while(accumulator>=fixedStep&&subSteps<8){
+          simulate(fixedStep);
+          accumulator-=fixedStep;
+          subSteps++;
+        }
+
+        const elapsed=(now-start)/1000;
+        const naturallyStopped=impacts>=2&&stableSteps>=9;
+
+        if(naturallyStopped||elapsed>2.85){
+          // Giữ nguyên vị trí và góc xoay tại thời điểm dừng.
+          item.group.position.y=Math.max(floorY,item.group.position.y);
+          resolve();
+          return;
+        }
         requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);
     });
 
+    // Kết quả được đọc từ chính mặt đang hướng lên trên sau khi viên đã dừng.
+    const value=readTopFace(item.group.quaternion);
+    item.value=value;
     this.onSettle(value);
     return value;
   }

@@ -291,3 +291,11 @@ THAY_DOI_V5.3
 - Tự mô phỏng trọng lực, vận tốc ngang, xoay ba trục, va bàn, nảy, ma sát và giảm tốc.
 - Sau khi gần dừng, viên xúc xắc ổn định về đúng mặt kết quả.
 - Giữ nguyên model D10, số nổi, phím tắt và toàn bộ chức năng Kanban khác.
+
+
+=== v5.7 ===
+- D10 không còn chọn kết quả trước rồi xoay về mặt đã chọn.
+- Giữ nguyên vị trí và góc xoay thực tế khi viên dừng.
+- Kết quả được đọc từ mặt D10 đang hướng lên trên sau chuyển động.
+- Điều kiện tung và xoay dùng Web Crypto; mô phỏng chạy theo bước thời gian cố định.
+- Không thay đổi dữ liệu hoặc chức năng Kanban khác.
