@@ -1,10 +1,10 @@
 const $=s=>document.querySelector(s);
 const refs={stage:$('#diceStage'),count:$('#countRange'),out:$('#countOutput'),type:$('#dieTypeSelect'),minus:$('#minusBtn'),plus:$('#plusBtn'),roll:$('#rollBtn'),clear:$('#clearBtn'),dialog:$('#modeDialog'),dialogCount:$('#dialogCount'),dialogType:$('#dialogDieType'),together:$('#togetherBtn'),sequence:$('#sequenceBtn'),mode:$('#modeLabel'),total:$('#totalLabel'),values:$('#valueList'),status:$('#statusText'),history:$('#historyList'),clearHistory:$('#clearHistoryBtn'),sound:$('#soundBtn'),fullscreen:$('#fullscreenBtn'),close:$('#closeDiceBtn'),toast:$('#toast')};
-const SETTINGS_KEY='linh_dice_game_settings_v2';const HISTORY_KEY='linh_dice_game_history_v2';
-let settings=load(SETTINGS_KEY,{count:3,sound:true,type:'d6'}),history=load(HISTORY_KEY,[]),rolling=false,audio=null,toastTimer=null,d10Engine=null,d10EnginePromise=null;
+const SETTINGS_KEY='linh_dice_game_settings_v3';const HISTORY_KEY='linh_dice_game_history_v2';
+let settings=load(SETTINGS_KEY,{count:3,sound:true,type:'d6',rollMode:'together'}),history=load(HISTORY_KEY,[]),rolling=false,audio=null,toastTimer=null,d10Engine=null,d10EnginePromise=null;
 const FACE_ROT={1:['-18deg','0deg','0deg'],6:['-18deg','180deg','0deg'],3:['-18deg','-90deg','0deg'],4:['-18deg','90deg','0deg'],2:['-105deg','0deg','0deg'],5:['75deg','0deg','0deg']};
 init();
-function init(){bind();refs.type.value=settings.type==='d10'?'d10':'d6';setCount(settings.count);syncSound();renderHistory();renderEmpty();if(getDieType()==='d10')preloadD10()}
+function init(){bind();refs.type.value=settings.type==='d10'?'d10':'d6';settings.rollMode=settings.rollMode==='sequence'?'sequence':'together';setCount(settings.count);syncSound();renderHistory();renderEmpty();if(getDieType()==='d10')preloadD10()}
 function bind(){
   refs.count.oninput=e=>setCount(+e.target.value);
   refs.type.onchange=async e=>{
@@ -20,6 +20,38 @@ function bind(){
   refs.clearHistory.onclick=()=>{history=[];save(HISTORY_KEY,history);renderHistory()};
   refs.sound.onclick=()=>{settings.sound=!settings.sound;save(SETTINGS_KEY,settings);syncSound()};
   refs.fullscreen.onclick=toggleFullscreen;refs.close.onclick=closeGame;
+  window.addEventListener('keydown',handleShortcuts,{passive:false});
+}
+function handleShortcuts(e){
+  const tag=(document.activeElement?.tagName||'').toUpperCase();
+  const typing=(document.activeElement?.isContentEditable)||['INPUT','TEXTAREA','SELECT'].includes(tag);
+  if(typing && !(e.key==='1'||e.key==='2'))return;
+  if(e.key===' '||e.code==='Space'){
+    if(rolling)return;
+    e.preventDefault();
+    quickRoll();
+    return;
+  }
+  if(e.key==='1'){
+    e.preventDefault();
+    settings.rollMode='together';save(SETTINGS_KEY,settings);
+    if(refs.dialog.open){startRoll('together');return;}
+    showToast('Đã chọn kiểu lắc 1: Thả đồng thời.');
+    refs.status.textContent='Kiểu lắc hiện tại: Thả đồng thời. Nhấn Space để lắc xúc xắc.';
+    return;
+  }
+  if(e.key==='2'){
+    e.preventDefault();
+    settings.rollMode='sequence';save(SETTINGS_KEY,settings);
+    if(refs.dialog.open){startRoll('sequence');return;}
+    showToast('Đã chọn kiểu lắc 2: Thả từng viên.');
+    refs.status.textContent='Kiểu lắc hiện tại: Thả từng viên. Nhấn Space để lắc xúc xắc.';
+  }
+}
+function quickRoll(){
+  refs.dialogCount.textContent=getCount();refs.dialogType.textContent=getDieLabel();
+  const mode=settings.rollMode==='sequence'?'sequence':'together';
+  startRoll(mode);
 }
 function getCount(){return Math.max(1,Math.min(10,+refs.count.value||3))}
 function getDieType(){return refs.type.value==='d10'?'d10':'d6'}
@@ -38,7 +70,7 @@ async function ensureD10Engine(){
   }).finally(()=>{d10EnginePromise=null});
   return d10EnginePromise;
 }
-function clearArena(){refs.stage.querySelectorAll('.die-wrap').forEach(el=>el.remove());d10Engine?.clear();d10Engine?.setVisible(getDieType()==='d10')}
+function clearArena(){refs.stage.querySelectorAll('.die-wrap,.die-result-badge').forEach(el=>el.remove());d10Engine?.clear();d10Engine?.setVisible(getDieType()==='d10')}
 async function startRoll(mode){
   if(rolling)return;refs.dialog.close();rolling=true;toggleControls(true);clearArena();
   const dieType=getDieType();settings.type=dieType;save(SETTINGS_KEY,settings);
@@ -88,8 +120,23 @@ async function rollCssDie(die,delay=0){
   }
   const value=randomInt(1,6),rot=FACE_ROT[value];die.el.style.setProperty('--rx',rot[0]);die.el.style.setProperty('--ry',rot[1]);die.el.style.setProperty('--rz',rot[2]);die.el.classList.remove('rolling');void die.el.offsetWidth;die.el.classList.add('rolling');playTone(220+randomInt(0,80),.08,.025);await wait(1350);playTone(360+value*32,.08,.03);return value;
 }
-function renderValues(values){refs.values.innerHTML=values.map((v,i)=>`<div class="value-chip" title="Xúc xắc ${i+1}">${v}</div>`).join('');refs.total.textContent=values.length?values.reduce((a,b)=>a+b,0):'—'}
-function renderEmpty(){refs.mode.textContent=`Chưa thả · ${getDieLabel()}`;refs.total.textContent='—';refs.values.innerHTML='<span>Chưa có kết quả.</span>';refs.status.textContent='Sẵn sàng.'}
+function renderValues(values){refs.values.innerHTML=values.length?values.map((v,i)=>`<div class="value-chip" title="Xúc xắc ${i+1}">${v}</div>`).join(''):'<span>Chưa có kết quả.</span>';refs.total.textContent=values.length?values.reduce((a,b)=>a+b,0):'—';renderStageBadges(values)}
+function renderStageBadges(values){
+  refs.stage.querySelectorAll('.die-result-badge').forEach(el=>el.remove());
+  if(!values?.length)return;
+  const total=getCount();
+  values.forEach((v,i)=>{
+    if(v===undefined||v===null||v==='')return;
+    const pos=positionFor(i,total);
+    const badge=document.createElement('div');
+    badge.className='die-result-badge';
+    badge.style.left=pos.x+'%';
+    badge.style.top=`${Math.max(16,pos.y-9)}%`;
+    badge.innerHTML=`<small>Viên ${i+1}</small><strong>${v}</strong>`;
+    refs.stage.appendChild(badge);
+  });
+}
+function renderEmpty(){refs.mode.textContent=`Chưa thả · ${getDieLabel()}`;refs.total.textContent='—';refs.values.innerHTML='<span>Chưa có kết quả.</span>';renderStageBadges([]);refs.status.textContent='Sẵn sàng. Phím tắt: Space để lắc, 1 = đồng thời, 2 = từng viên.'}
 function addHistory(values,mode,type){history.unshift({time:new Date().toISOString(),mode,type,values,total:values.reduce((a,b)=>a+b,0)});history=history.slice(0,20);save(HISTORY_KEY,history);renderHistory()}
 function renderHistory(){refs.history.innerHTML=history.length?history.slice(0,10).map(x=>`<div class="history-row"><span>${(x.type||'d6').toUpperCase()} · ${x.mode==='together'?'Đồng thời':'Từng viên'} · ${formatTime(x.time)}</span><strong>${x.values.join(' – ')} = ${x.total}</strong></div>`).join(''):'<span>Chưa có lượt thả.</span>'}
 function toggleControls(disabled){[refs.count,refs.type,refs.minus,refs.plus,refs.roll,refs.clear].forEach(el=>el.disabled=disabled)}

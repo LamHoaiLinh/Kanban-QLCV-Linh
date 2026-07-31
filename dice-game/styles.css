@@ -120,3 +120,7 @@
 .d10-asset-canvas{position:absolute;inset:0;display:block;width:100%;height:100%;z-index:2;pointer-events:none}
 .d10-asset-canvas[hidden]{display:none!important}
 .dice-stage>.die-wrap{z-index:3}
+
+/* v5.5 - tăng độ rõ số và phím tắt */
+.die-result-badge{position:absolute;z-index:6;transform:translate(-50%,-115%);min-width:56px;padding:6px 10px 7px;border-radius:16px;background:rgba(255,251,241,.98);border:2px solid rgba(67,46,20,.58);box-shadow:0 10px 24px rgba(0,0,0,.24);display:grid;place-items:center;gap:1px;pointer-events:none}.die-result-badge small{font-size:10px;font-weight:900;line-height:1;color:#6d593d;letter-spacing:.02em}.die-result-badge strong{font-size:28px;line-height:1;font-weight:1000;color:#142e26;text-shadow:0 1px 0 rgba(255,255,255,.35)}
+@media(max-width:760px){.die-result-badge{min-width:48px;padding:5px 8px 6px;border-radius:14px}.die-result-badge small{font-size:9px}.die-result-badge strong{font-size:24px}}
