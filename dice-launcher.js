@@ -10,7 +10,7 @@ function openDiceGame(){
     overlay=document.createElement('div');overlay.className='marble-draw-overlay';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-label','Dice Arena – Game xúc xắc 3D');
     frame=document.createElement('iframe');frame.className='marble-draw-frame';frame.title='Dice Arena – Game xúc xắc 3D';frame.allow='fullscreen';overlay.appendChild(frame);document.body.appendChild(overlay);
   }
-  frame.src='dice-game/index.html?v=4.0.0';overlay.hidden=false;document.body.classList.add('marble-draw-open');
+  frame.src='dice-game/index.html?v=4.1.0';overlay.hidden=false;document.body.classList.add('marble-draw-open');
 }
 function closeDiceGame(){
   if(!overlay)return;overlay.hidden=true;frame.src='about:blank';document.body.classList.remove('marble-draw-open');

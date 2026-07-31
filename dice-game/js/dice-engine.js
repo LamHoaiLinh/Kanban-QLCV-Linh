@@ -63,7 +63,8 @@ export class DiceEngine{
   }
   async loadAsset(){
     const loader=new GLTFLoader();
-    const gltf=await loader.loadAsync(new URL('../assets/dice_animation_2.glb',import.meta.url));
+    const assetUrl=new URL('../assets/dice_animation_2.glb',import.meta.url).href;
+    const gltf=await loader.loadAsync(assetUrl);
     this.assetScene=gltf.scene;
     const die=gltf.scene.getObjectByName('Die 1');
     const cup=gltf.scene.getObjectByName('Cup');

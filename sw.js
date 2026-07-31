@@ -1,9 +1,9 @@
-const CACHE_NAME='linh-kanban-static-v40-dice';
+const CACHE_NAME='linh-kanban-static-v41-dice-hotfix';
 const ASSETS=[
   './','./index.html','./styles.css?v=4.0','./dragdrop.js?v=3.2','./app.js?v=3.7','./music-player.js?v=3.2',
   './office-tools/office-tools.css?v=3.2','./office-tools/office-tools.js?v=3.2','./office-tools/vendor/jszip.min.js',
-  './dice-launcher.js?v=4.0','./dice-game/index.html?v=4.0.0','./dice-game/styles.css?v=4.0.0',
-  './dice-game/js/app.js?v=4.0.0','./dice-game/js/dice-engine.js','./dice-game/assets/dice_animation_2.glb','./dice-game/assets/LICENSE_ASSET.txt',
+  './dice-launcher.js?v=4.1','./dice-game/index.html?v=4.1.0','./dice-game/styles.css?v=4.1.0',
+  './dice-game/js/app.js?v=4.1.0','./dice-game/js/dice-engine.js','./dice-game/assets/dice_animation_2.glb','./dice-game/assets/LICENSE_ASSET.txt',
   './manifest.webmanifest?v=3.2','./assets/icon.svg',
   './assets/backgrounds/Beautiful Background6.png','./assets/backgrounds/Beautiful Background7.png',
   './assets/backgrounds/Beautiful Background8.png','./assets/backgrounds/Beautiful Background13.png',
