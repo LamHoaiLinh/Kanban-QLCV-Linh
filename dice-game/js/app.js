@@ -1,20 +1,93 @@
 const $=s=>document.querySelector(s);
 const refs={stage:$('#diceStage'),count:$('#countRange'),out:$('#countOutput'),type:$('#dieTypeSelect'),minus:$('#minusBtn'),plus:$('#plusBtn'),roll:$('#rollBtn'),clear:$('#clearBtn'),dialog:$('#modeDialog'),dialogCount:$('#dialogCount'),dialogType:$('#dialogDieType'),together:$('#togetherBtn'),sequence:$('#sequenceBtn'),mode:$('#modeLabel'),total:$('#totalLabel'),values:$('#valueList'),status:$('#statusText'),history:$('#historyList'),clearHistory:$('#clearHistoryBtn'),sound:$('#soundBtn'),fullscreen:$('#fullscreenBtn'),close:$('#closeDiceBtn'),toast:$('#toast')};
 const SETTINGS_KEY='linh_dice_game_settings_v2';const HISTORY_KEY='linh_dice_game_history_v2';
-let settings=load(SETTINGS_KEY,{count:3,sound:true,type:'d6'}),history=load(HISTORY_KEY,[]),rolling=false,audio=null,toastTimer=null;
+let settings=load(SETTINGS_KEY,{count:3,sound:true,type:'d6'}),history=load(HISTORY_KEY,[]),rolling=false,audio=null,toastTimer=null,d10Engine=null,d10EnginePromise=null;
 const FACE_ROT={1:['-18deg','0deg','0deg'],6:['-18deg','180deg','0deg'],3:['-18deg','-90deg','0deg'],4:['-18deg','90deg','0deg'],2:['-105deg','0deg','0deg'],5:['75deg','0deg','0deg']};
 init();
-function init(){bind();refs.type.value=settings.type==='d10'?'d10':'d6';setCount(settings.count);syncSound();renderHistory();renderEmpty()}
-function bind(){refs.count.oninput=e=>setCount(+e.target.value);refs.type.onchange=e=>{settings.type=e.target.value==='d10'?'d10':'d6';save(SETTINGS_KEY,settings);if(!rolling){refs.stage.innerHTML='';renderEmpty()}};refs.minus.onclick=()=>setCount(getCount()-1);refs.plus.onclick=()=>setCount(getCount()+1);refs.roll.onclick=()=>{if(rolling)return;refs.dialogCount.textContent=getCount();refs.dialogType.textContent=getDieLabel();refs.dialog.showModal()};refs.together.onclick=()=>startRoll('together');refs.sequence.onclick=()=>startRoll('sequence');refs.clear.onclick=()=>{if(rolling)return;refs.stage.innerHTML='';renderEmpty();showToast('Đã dọn bàn.')};refs.clearHistory.onclick=()=>{history=[];save(HISTORY_KEY,history);renderHistory()};refs.sound.onclick=()=>{settings.sound=!settings.sound;save(SETTINGS_KEY,settings);syncSound()};refs.fullscreen.onclick=toggleFullscreen;refs.close.onclick=closeGame}
+function init(){bind();refs.type.value=settings.type==='d10'?'d10':'d6';setCount(settings.count);syncSound();renderHistory();renderEmpty();if(getDieType()==='d10')preloadD10()}
+function bind(){
+  refs.count.oninput=e=>setCount(+e.target.value);
+  refs.type.onchange=async e=>{
+    settings.type=e.target.value==='d10'?'d10':'d6';save(SETTINGS_KEY,settings);
+    if(rolling)return;
+    clearArena();renderEmpty();
+    if(settings.type==='d10')await preloadD10();else d10Engine?.setVisible(false);
+  };
+  refs.minus.onclick=()=>setCount(getCount()-1);refs.plus.onclick=()=>setCount(getCount()+1);
+  refs.roll.onclick=()=>{if(rolling)return;refs.dialogCount.textContent=getCount();refs.dialogType.textContent=getDieLabel();refs.dialog.showModal()};
+  refs.together.onclick=()=>startRoll('together');refs.sequence.onclick=()=>startRoll('sequence');
+  refs.clear.onclick=()=>{if(rolling)return;clearArena();renderEmpty();showToast('Đã dọn bàn.')};
+  refs.clearHistory.onclick=()=>{history=[];save(HISTORY_KEY,history);renderHistory()};
+  refs.sound.onclick=()=>{settings.sound=!settings.sound;save(SETTINGS_KEY,settings);syncSound()};
+  refs.fullscreen.onclick=toggleFullscreen;refs.close.onclick=closeGame;
+}
 function getCount(){return Math.max(1,Math.min(10,+refs.count.value||3))}
 function getDieType(){return refs.type.value==='d10'?'d10':'d6'}
 function getDieLabel(){return getDieType()==='d10'?'D10':'D6'}
 function setCount(v){v=Math.max(1,Math.min(10,+v||1));refs.count.value=v;refs.out.textContent=v;settings.count=v;save(SETTINGS_KEY,settings)}
-async function startRoll(mode){if(rolling)return;refs.dialog.close();rolling=true;toggleControls(true);refs.stage.innerHTML='';const dieType=getDieType();settings.type=dieType;save(SETTINGS_KEY,settings);refs.mode.textContent=`${mode==='together'?'Thả đồng thời':'Thả từng viên'} · ${dieType.toUpperCase()}`;refs.total.textContent='—';refs.values.innerHTML='';const count=getCount(),results=[];refs.status.textContent=mode==='together'?`Đang thả ${count} xúc xắc ${dieType.toUpperCase()}…`:`Đang thả lần lượt ${count} xúc xắc ${dieType.toUpperCase()}…`;playTone(145,.22,.07);try{if(mode==='together'){const jobs=[];for(let i=0;i<count;i++){const die=createDie(i,count,dieType);jobs.push(rollDie(die,i*45))}const values=await Promise.all(jobs);values.forEach((v,i)=>results[i]=v);renderValues(results)}else{for(let i=0;i<count;i++){refs.status.textContent=`Đang thả xúc xắc ${i+1}/${count}…`;const die=createDie(i,count,dieType);results[i]=await rollDie(die,0);renderValues(results);await wait(320)}}refs.total.textContent=results.reduce((a,b)=>a+b,0);refs.status.textContent='Đã có kết quả.';addHistory(results,mode,dieType);playResult();showToast(`Kết quả ${dieType.toUpperCase()}: ${results.join(' · ')}`)}finally{rolling=false;toggleControls(false)}}
-function createDie(index,total,type){const wrap=document.createElement('div');wrap.className=`die-wrap ${type==='d10'?'d10-wrap':''}`;const pos=positionFor(index,total);wrap.style.left=pos.x+'%';wrap.style.top=pos.y+'%';if(type==='d10'){const die=document.createElement('div');die.className='d10';die.innerHTML='<div class="d10-facets" aria-hidden="true"></div><strong class="d10-value">?</strong>';wrap.appendChild(die);refs.stage.appendChild(wrap);return{type,el:die,valueEl:die.querySelector('.d10-value')}}const die=document.createElement('div');die.className='die';for(const [cls,value] of [['front',1],['back',6],['right',3],['left',4],['top',2],['bottom',5]]){const face=document.createElement('div');face.className=`face ${cls}`;face.innerHTML=pips(value);die.appendChild(face)}wrap.appendChild(die);refs.stage.appendChild(wrap);return{type,el:die}}
+async function preloadD10(){
+  refs.status.textContent='Đang chuẩn bị asset D10…';
+  try{await ensureD10Engine();d10Engine.setVisible(true);refs.status.textContent='Asset D10 đã sẵn sàng.'}
+  catch(error){console.error(error);refs.status.textContent='Không tải được asset D10; hệ thống sẽ dùng hình D10 dự phòng.'}
+}
+async function ensureD10Engine(){
+  if(d10Engine)return d10Engine;
+  if(!d10EnginePromise)d10EnginePromise=import('./d10-engine.js?v=5.4.0').then(async({D10AssetEngine})=>{
+    const engine=new D10AssetEngine(refs.stage,{onSettle:value=>playTone(410+value*24,.09,.032)});
+    await engine.init();d10Engine=engine;return engine;
+  }).finally(()=>{d10EnginePromise=null});
+  return d10EnginePromise;
+}
+function clearArena(){refs.stage.querySelectorAll('.die-wrap').forEach(el=>el.remove());d10Engine?.clear();d10Engine?.setVisible(getDieType()==='d10')}
+async function startRoll(mode){
+  if(rolling)return;refs.dialog.close();rolling=true;toggleControls(true);clearArena();
+  const dieType=getDieType();settings.type=dieType;save(SETTINGS_KEY,settings);
+  refs.mode.textContent=`${mode==='together'?'Thả đồng thời':'Thả từng viên'} · ${dieType.toUpperCase()}`;refs.total.textContent='—';refs.values.innerHTML='';
+  const count=getCount(),results=[];refs.status.textContent=mode==='together'?`Đang thả ${count} xúc xắc ${dieType.toUpperCase()}…`:`Đang thả lần lượt ${count} xúc xắc ${dieType.toUpperCase()}…`;playTone(145,.22,.07);
+  try{
+    if(dieType==='d10'){
+      let usedAsset=false;
+      try{
+        const engine=await ensureD10Engine();engine.setVisible(true);usedAsset=true;
+        const values=await engine.roll(count,mode,{onStatus:text=>refs.status.textContent=text,onPartial:values=>renderValues(values)});
+        values.forEach((v,i)=>results[i]=v);
+      }catch(error){
+        console.error('D10 asset fallback:',error);d10Engine?.setVisible(false);showToast('Không tải được asset D10; đang dùng D10 dự phòng.');
+        await rollWithCss(count,mode,'d10',results);
+      }
+      if(usedAsset)renderValues(results);
+    }else{
+      d10Engine?.setVisible(false);await rollWithCss(count,mode,'d6',results);
+    }
+    refs.total.textContent=results.reduce((a,b)=>a+b,0);refs.status.textContent='Đã có kết quả.';addHistory(results,mode,dieType);playResult();showToast(`Kết quả ${dieType.toUpperCase()}: ${results.join(' · ')}`);
+  }finally{rolling=false;toggleControls(false)}
+}
+async function rollWithCss(count,mode,dieType,results){
+  if(mode==='together'){
+    const jobs=[];for(let i=0;i<count;i++){const die=createCssDie(i,count,dieType);jobs.push(rollCssDie(die,i*45))}
+    const values=await Promise.all(jobs);values.forEach((v,i)=>results[i]=v);renderValues(results);
+  }else{
+    for(let i=0;i<count;i++){refs.status.textContent=`Đang thả xúc xắc ${i+1}/${count}…`;const die=createCssDie(i,count,dieType);results[i]=await rollCssDie(die,0);renderValues(results);await wait(320)}
+  }
+}
+function createCssDie(index,total,type){
+  const wrap=document.createElement('div');wrap.className=`die-wrap ${type==='d10'?'d10-wrap':''}`;const pos=positionFor(index,total);wrap.style.left=pos.x+'%';wrap.style.top=pos.y+'%';
+  if(type==='d10'){
+    const die=document.createElement('div');die.className='d10';die.innerHTML='<div class="d10-facets" aria-hidden="true"></div><strong class="d10-value">?</strong>';wrap.appendChild(die);refs.stage.appendChild(wrap);return{type,el:die,valueEl:die.querySelector('.d10-value')};
+  }
+  const die=document.createElement('div');die.className='die';
+  for(const [cls,value] of [['front',1],['back',6],['right',3],['left',4],['top',2],['bottom',5]]){const face=document.createElement('div');face.className=`face ${cls}`;face.innerHTML=pips(value);die.appendChild(face)}
+  wrap.appendChild(die);refs.stage.appendChild(wrap);return{type,el:die};
+}
 function positionFor(index,total){const cols=Math.min(5,total),rows=Math.ceil(total/cols),col=index%cols,row=Math.floor(index/cols);return{x:18+(cols===1?32:col*(64/(cols-1))),y:30+(rows===1?20:row*32)}}
 function pips(n){const map={1:['p1'],2:['p2a','p2b'],3:['p3a','p3b','p3c'],4:['p4a','p4b','p4c','p4d'],5:['p5a','p5b','p5c','p5d','p5e'],6:['p6a','p6b','p6c','p6d','p6e','p6f']};return map[n].map(c=>`<i class="pip ${c}"></i>`).join('')}
-async function rollDie(die,delay=0){await wait(delay);if(die.type==='d10'){const value=randomInt(0,9);die.el.style.setProperty('--spin-x',`${randomInt(650,1100)}deg`);die.el.style.setProperty('--spin-y',`${randomInt(700,1250)}deg`);die.el.style.setProperty('--spin-z',`${randomInt(260,680)}deg`);die.valueEl.textContent='';die.el.classList.remove('rolling');void die.el.offsetWidth;die.el.classList.add('rolling');playTone(230+randomInt(0,90),.09,.027);await wait(1400);die.el.classList.remove('rolling');die.el.classList.add('settled');die.valueEl.textContent=String(value);playTone(410+value*24,.09,.032);return value}const value=randomInt(1,6),rot=FACE_ROT[value];die.el.style.setProperty('--rx',rot[0]);die.el.style.setProperty('--ry',rot[1]);die.el.style.setProperty('--rz',rot[2]);die.el.classList.remove('rolling');void die.el.offsetWidth;die.el.classList.add('rolling');playTone(220+randomInt(0,80),.08,.025);await wait(1350);playTone(360+value*32,.08,.03);return value}
+async function rollCssDie(die,delay=0){
+  await wait(delay);
+  if(die.type==='d10'){
+    const value=randomInt(0,9);die.el.style.setProperty('--spin-x',`${randomInt(650,1100)}deg`);die.el.style.setProperty('--spin-y',`${randomInt(700,1250)}deg`);die.el.style.setProperty('--spin-z',`${randomInt(260,680)}deg`);die.valueEl.textContent='';die.el.classList.remove('rolling');void die.el.offsetWidth;die.el.classList.add('rolling');playTone(230+randomInt(0,90),.09,.027);await wait(1400);die.el.classList.remove('rolling');die.el.classList.add('settled');die.valueEl.textContent=String(value);playTone(410+value*24,.09,.032);return value;
+  }
+  const value=randomInt(1,6),rot=FACE_ROT[value];die.el.style.setProperty('--rx',rot[0]);die.el.style.setProperty('--ry',rot[1]);die.el.style.setProperty('--rz',rot[2]);die.el.classList.remove('rolling');void die.el.offsetWidth;die.el.classList.add('rolling');playTone(220+randomInt(0,80),.08,.025);await wait(1350);playTone(360+value*32,.08,.03);return value;
+}
 function renderValues(values){refs.values.innerHTML=values.map((v,i)=>`<div class="value-chip" title="Xúc xắc ${i+1}">${v}</div>`).join('');refs.total.textContent=values.length?values.reduce((a,b)=>a+b,0):'—'}
 function renderEmpty(){refs.mode.textContent=`Chưa thả · ${getDieLabel()}`;refs.total.textContent='—';refs.values.innerHTML='<span>Chưa có kết quả.</span>';refs.status.textContent='Sẵn sàng.'}
 function addHistory(values,mode,type){history.unshift({time:new Date().toISOString(),mode,type,values,total:values.reduce((a,b)=>a+b,0)});history=history.slice(0,20);save(HISTORY_KEY,history);renderHistory()}
@@ -25,7 +98,7 @@ function playTone(freq,duration,gain){if(!settings.sound)return;try{audio=audio|
 function playResult(){[520,660,820].forEach((f,i)=>setTimeout(()=>playTone(f,.14,.05),i*100))}
 function syncSound(){refs.sound.textContent=settings.sound?'♪':'∅';refs.sound.classList.toggle('active',settings.sound)}
 async function toggleFullscreen(){if(!document.fullscreenElement)await document.documentElement.requestFullscreen?.();else await document.exitFullscreen?.()}
-function closeGame(){if(parent!==window)parent.postMessage({type:'dice-game-close'},'*');else location.href='../index.html'}
+function closeGame(){d10Engine?.destroy();if(parent!==window)parent.postMessage({type:'dice-game-close'},'*');else location.href='../index.html'}
 function showToast(s){clearTimeout(toastTimer);refs.toast.textContent=s;refs.toast.classList.add('show');toastTimer=setTimeout(()=>refs.toast.classList.remove('show'),2300)}
 function load(k,f){try{const v=JSON.parse(localStorage.getItem(k));if(Array.isArray(f))return Array.isArray(v)?v:f;return v&&typeof v==='object'?{...f,...v}:f}catch{return f}}
 function save(k,v){localStorage.setItem(k,JSON.stringify(v))}

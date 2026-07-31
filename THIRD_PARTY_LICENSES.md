@@ -26,3 +26,9 @@ Các tệp người dùng chọn không được gửi đến các địa chỉ 
 - Nguồn tham khảo và bộ ảnh: flutter_tarot_card, tác giả Dao Hong Vinh.
 - Giấy phép mã nguồn đi kèm: MIT License.
 - Bản tích hợp web được viết lại bằng JavaScript/CSS, không sử dụng Flutter runtime.
+
+## Three.js 0.185.1
+- Mục đích: hiển thị và phát animation cho asset `D10.glb` trong Dice Arena.
+- Giấy phép: MIT.
+- Được tải theo phiên bản cố định từ jsDelivr khi người dùng chọn D10.
+- Dice Arena vẫn có phương án D10 CSS dự phòng nếu thư viện 3D không tải được.

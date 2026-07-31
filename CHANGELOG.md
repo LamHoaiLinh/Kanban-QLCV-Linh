@@ -38,3 +38,9 @@
 - Số trên viên bi bám theo mặt nhìn thấy và không quay vòng quanh viên bi.
 - Thay máng bằng một mặt liền, giảm số chướng ngại để hạn chế kẹt bi.
 - Bấm Bắt đầu đua sẽ tự chuẩn bị danh sách và tự chạy các lượt.
+
+
+## 5.4 - D10 GLB asset
+- Added user-provided `dice-game/assets/D10.glb`.
+- Added `dice-game/js/d10-engine.js` for Three.js rendering and asset animation.
+- D6 remains CSS-based; D10 uses GLB with CSS fallback.

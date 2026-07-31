@@ -267,3 +267,13 @@ THAY_DOI_V5.3
 - Tarot Việt: phần diễn giải dài được đặt dưới mục có thể mở/thu gọn.
 - Gom toàn bộ nhật ký thay đổi thành duy nhất tệp THAY_DOI_TONG_HOP.txt.
 - Không thay đổi khóa dữ liệu hoặc chức năng cốt lõi của Kanban.
+
+
+=== PHIÊN BẢN 5.4 ===
+- Tích hợp trực tiếp asset D10.glb do người dùng cung cấp vào Dice Arena.
+- D10 dùng model gỗ và số khắc chìm thật từ GLB, không còn dùng hình CSS mô phỏng khi tải asset thành công.
+- Phát animation D10_SHAKE_ROLL_LOOP có sẵn trong asset trong lúc thả.
+- Kết quả 0-9 được đưa đúng mặt tương ứng lên phía trên.
+- Dùng cơ chế fetch ArrayBuffer + GLTFLoader.parseAsync để tránh lỗi lastIndexOf khi tải GLB.
+- Có D10 CSS dự phòng nếu trình duyệt không tải được thư viện 3D.
+- Không thay đổi dữ liệu hoặc chức năng cốt lõi của Kanban.
