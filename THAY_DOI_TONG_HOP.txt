@@ -299,3 +299,11 @@ THAY_DOI_V5.3
 - Kết quả được đọc từ mặt D10 đang hướng lên trên sau chuyển động.
 - Điều kiện tung và xoay dùng Web Crypto; mô phỏng chạy theo bước thời gian cố định.
 - Không thay đổi dữ liệu hoặc chức năng Kanban khác.
+
+
+=== v5.8 ===
+- Sửa lỗi thumbnail xoay PDF và file xuất dùng hai cách tính góc khác nhau.
+- Đọc góc xoay gốc của từng trang và quản lý bằng một góc tuyệt đối duy nhất.
+- File xuất dùng đúng góc đang hiển thị ở thumbnail, không cộng góc xoay hai lần.
+- Thumbnail giữ đúng tỷ lệ dọc/ngang, không bị kéo méo thành khung dọc.
+- Không thay đổi dữ liệu hoặc các chức năng Kanban khác.
