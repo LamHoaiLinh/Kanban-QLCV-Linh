@@ -52,3 +52,62 @@
   text-transform:none;
   letter-spacing:0;
 }
+
+/* v3.4 - A4 → A5 + khả năng sử dụng ở zoom 100% */
+.office-tools-dialog{
+  max-height:calc(100dvh - 20px);
+}
+.office-main{
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable;
+}
+.office-a5-diagram{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:20px;
+  margin:14px 0 4px;
+  padding:16px;
+  border:1px dashed var(--border);
+  border-radius:14px;
+  background:var(--panel-soft);
+}
+.office-a4-sheet{
+  width:118px;
+  height:166px;
+  display:grid;
+  grid-template-rows:1fr 2px 1fr;
+  place-items:center;
+  background:#fff;
+  color:#4e625a;
+  border:1px solid #b9c8c1;
+  border-radius:5px;
+  box-shadow:0 7px 16px rgba(20,55,45,.12);
+  font-size:10px;
+  text-align:center;
+}
+.office-a4-sheet i{
+  width:100%;
+  border-top:2px dashed var(--green);
+}
+.office-a4-sheet span:first-child{color:var(--green-dark)}
+.office-a4-sheet span:last-child{opacity:.55}
+.office-a5-sheet{
+  width:166px;
+  height:118px;
+  display:grid;
+  place-items:center;
+  background:#fff;
+  color:var(--green-dark);
+  border:2px solid var(--green);
+  border-radius:6px;
+  box-shadow:0 7px 16px rgba(20,55,45,.12);
+  font-size:13px;
+  font-weight:900;
+}
+@media(max-height:760px) and (min-width:761px){
+  .office-tools-dialog{height:calc(100dvh - 12px);max-height:none}
+  .office-header{padding:10px 14px}
+  .office-main{padding-top:12px}
+  .office-status-bar{padding:7px 14px}
+}

@@ -15,7 +15,7 @@ const PINNED_LIBS = {
 const A4 = {portrait:[595.28,841.89],landscape:[841.89,595.28]};
 const state = {
   tool:'pdf', sub:{pdf:'merge',image:'convert',rename:'preview',excel:'inspect'},
-  pdfMergeFiles:[], pdfEdit:null, pdfSplit:null, pdfToPng:null, pdfImages:[],
+  pdfMergeFiles:[], pdfEdit:null, pdfSplit:null, pdfToPng:null, pdfImages:[], pdfA5File:null,
   imageFiles:[], renameEntries:[], renameRootHandle:null, excelFiles:[],
   busy:false, abort:false, settings:loadSettings()
 };
@@ -135,22 +135,169 @@ function bindSubtabs(tool){mainHost.querySelectorAll('[data-sub]').forEach(b=>b.
 function showError(error){console.error(error);endBusy(error?.name==='AbortError'?'Đã hủy tác vụ.':`Lỗi: ${error?.message||error}`);}
 
 // ===== PDF =====
+const PDF_SUB_TOOLTIPS={
+  merge:'Gộp nhiều file PDF theo đúng thứ tự danh sách; có thể chuẩn hóa kích thước trang.',
+  edit:'Sắp xếp lại trang, xoay riêng từng trang, nhân bản, trích xuất hoặc xóa trang.',
+  a5:'Lấy nửa trên của mỗi trang A4 dọc và tạo thành trang A5 ngang.',
+  split:'Tách một PDF thành từng trang, trang lẻ/chẵn hoặc các khoảng trang tùy chọn.',
+  png:'Chuyển các trang PDF thành ảnh PNG theo độ phân giải đã chọn.',
+  images:'Gộp nhiều ảnh JPG/PNG/WebP thành một file PDF.'
+};
+const PDF_CONTROL_TOOLTIPS={
+  pdfMergeDrop:'Kéo thả hoặc chọn nhiều file PDF. Thứ tự đang hiển thị chính là thứ tự file sau khi gộp.',
+  pdfMergeAdd:'Thêm PDF vào cuối danh sách hiện tại.',
+  pdfMergeSort:'Sắp xếp danh sách PDF theo tên từ A đến Z.',
+  pdfMergeClear:'Bỏ toàn bộ file khỏi danh sách gộp; không xóa file gốc trên máy.',
+  pdfNormalize:'Chọn cách đưa các trang khác kích thước về cùng một chuẩn khi gộp.',
+  pdfMargin:'Chỉ áp dụng khi chọn chuẩn A4; tạo khoảng trắng quanh nội dung để tránh sát mép.',
+  pdfMergeName:'Tên file PDF mới sẽ lưu về máy.',
+  pdfMergeRun:'Bắt đầu gộp các PDF theo thứ tự và chế độ đã chọn.',
+  pdfEditBrowse:'Chọn một PDF để xem thumbnail, sắp xếp và xoay từng trang.',
+  pdfSelectAll:'Chọn tất cả trang để thao tác cùng lúc.',
+  pdfMoveTop:'Đưa toàn bộ trang đang chọn lên đầu tài liệu.',
+  pdfMoveBottom:'Đưa toàn bộ trang đang chọn xuống cuối tài liệu.',
+  pdfRotateLeft:'Xoay các trang đang chọn 90° sang trái.',
+  pdfRotateRight:'Xoay các trang đang chọn 90° sang phải.',
+  pdfDuplicatePages:'Tạo thêm một bản sao của các trang đang chọn ngay sau trang gốc.',
+  pdfExtractPages:'Tạo một PDF mới chỉ gồm các trang đang chọn.',
+  pdfDeletePages:'Bỏ các trang đang chọn khỏi bản PDF mới; file gốc trên máy không bị xóa.',
+  pdfEditName:'Tên file PDF sau khi sắp xếp/xoay.',
+  pdfEditExport:'Xuất một PDF mới đúng theo thứ tự và chiều đang thấy ở thumbnail.',
+  pdfA5Drop:'Chọn một PDF có các trang A4 dọc; mỗi trang sẽ lấy nửa trên để tạo A5 ngang.',
+  pdfA5Browse:'Chọn file PDF A4 dọc cần chuyển.',
+  pdfA5Part:'Hiện dùng đúng chế độ nửa trên như file Python mẫu.',
+  pdfA5Name:'Tên file PDF A5 ngang sau khi chuyển.',
+  pdfA5Run:'Chuyển mỗi trang A4 dọc thành một trang A5 ngang mà không raster hóa nội dung.',
+  pdfSplitFile:'Chọn PDF cần tách.',
+  pdfSplitMode:'Chọn cách tách: từng trang, trang lẻ, trang chẵn hoặc khoảng trang tự nhập.',
+  pdfSplitRanges:'Nhập các khoảng trang, ví dụ 1-3,5,8-10.',
+  pdfSplitRun:'Bắt đầu tách; nếu tạo nhiều file, kết quả sẽ được đóng thành ZIP.',
+  pdfPngFile:'Chọn PDF cần chuyển thành ảnh PNG.',
+  pdfPngDpi:'DPI càng cao ảnh càng rõ nhưng file lớn và xử lý chậm hơn. 200 DPI phù hợp đa số nhu cầu.',
+  pdfPngPages:'Để trống để xuất tất cả trang; hoặc nhập 1-3,5 để chỉ xuất các trang đó.',
+  pdfPngRun:'Render các trang được chọn thành PNG.',
+  pdfImageDrop:'Chọn hoặc kéo thả nhiều ảnh để tạo một PDF.',
+  pdfImageAdd:'Thêm ảnh vào danh sách hiện tại.',
+  pdfImageClear:'Bỏ toàn bộ ảnh khỏi danh sách; không xóa ảnh gốc.',
+  pdfImageMode:'Chọn kích thước trang PDF: theo ảnh gốc, A4 dọc/ngang hoặc vừa bề ngang A4.',
+  pdfImageMargin:'Khoảng trắng bao quanh ảnh khi đặt vào trang A4.',
+  pdfImageName:'Tên file PDF được tạo từ ảnh.',
+  pdfImageRun:'Tạo PDF theo đúng thứ tự ảnh hiện tại.'
+};
+function applyPdfTooltips(){
+  mainHost.querySelectorAll('[data-sub]').forEach(el=>{
+    const tip=PDF_SUB_TOOLTIPS[el.dataset.sub];
+    if(tip){el.dataset.tooltip=tip;el.title=tip}
+  });
+  Object.entries(PDF_CONTROL_TOOLTIPS).forEach(([id,tip])=>{
+    const el=mainHost.querySelector('#'+id);
+    if(el){el.dataset.tooltip=tip;el.title=tip}
+  });
+  mainHost.querySelectorAll('.office-page-actions button').forEach(el=>{
+    const tip=el.title||'Di chuyển trang trong tài liệu';
+    el.dataset.tooltip=tip;
+  });
+}
 function renderPdfTool(){
-  const tabs=[['merge','Gộp PDF'],['edit','Sắp xếp & xoay trang'],['split','Tách PDF'],['png','PDF → PNG'],['images','Ảnh → PDF']];
+  const tabs=[['merge','Gộp PDF'],['edit','Sắp xếp & xoay trang'],['a5','A4 → A5 ngang'],['split','Tách PDF'],['png','PDF → PNG'],['images','Ảnh → PDF']];
   mainHost.innerHTML=`<section class="office-tool-panel active"><div class="office-tool-head"><div><h3>PDF</h3><p>Gộp, chuẩn hóa bề ngang, sắp xếp, xoay riêng từng trang, tách trang và chuyển đổi PDF.</p></div></div>${subTabs('pdf',tabs)}<div id="pdfSubHost"></div><div class="office-warning">PDF có chữ ký số có thể mất hiệu lực sau khi chỉnh sửa. Phiên bản này không OCR, không chỉnh trực tiếp chữ có sẵn và không mở PDF được bảo vệ bằng mật khẩu.</div><div class="office-library-warning">Các thư viện PDF được tải theo phiên bản cố định khi mở công cụ lần đầu; tệp của bạn vẫn chỉ được xử lý trong trình duyệt.</div></section>`;
   bindSubtabs('pdf'); const h=mainHost.querySelector('#pdfSubHost');
-  if(state.sub.pdf==='merge')renderPdfMerge(h);if(state.sub.pdf==='edit')renderPdfEdit(h);if(state.sub.pdf==='split')renderPdfSplit(h);if(state.sub.pdf==='png')renderPdfPng(h);if(state.sub.pdf==='images')renderPdfImages(h);
+  if(state.sub.pdf==='merge')renderPdfMerge(h);if(state.sub.pdf==='edit')renderPdfEdit(h);if(state.sub.pdf==='a5')renderPdfA4ToA5(h);if(state.sub.pdf==='split')renderPdfSplit(h);if(state.sub.pdf==='png')renderPdfPng(h);if(state.sub.pdf==='images')renderPdfImages(h);
+  applyPdfTooltips();
 }
-function renderPdfMerge(h){h.innerHTML=`<div class="office-card"><h4>Gộp nhiều PDF</h4><p class="office-card-note">Chọn nhiều file, sắp xếp thứ tự rồi chọn cách chuẩn hóa kích thước trang. Chế độ đồng nhất bề ngang giữ đúng tỷ lệ, không làm méo nội dung.</p><div class="office-dropzone" id="pdfMergeDrop"><strong>Browse hoặc kéo thả nhiều file PDF</strong><span>Thứ tự trong danh sách là thứ tự gộp.</span><input type="file" accept="application/pdf,.pdf" multiple hidden></div><div class="office-toolbar"><button class="office-btn" id="pdfMergeAdd">Chọn thêm PDF</button><button class="office-btn" id="pdfMergeSort">Sắp xếp A–Z</button><button class="office-btn danger" id="pdfMergeClear">Xóa danh sách</button></div><div id="pdfMergeList"></div></div><div class="office-card"><div class="office-grid three"><label class="office-field"><span>Chuẩn hóa trang</span><select id="pdfNormalize"><option value="keep">Giữ nguyên từng trang</option><option value="first-width">Đồng nhất bề ngang theo trang đầu</option><option value="widest">Đồng nhất bề ngang theo trang rộng nhất</option><option value="a4p">Chuẩn A4 dọc</option><option value="a4l">Chuẩn A4 ngang</option></select></label><label class="office-field"><span>Lề A4</span><select id="pdfMargin"><option value="0">0 mm</option><option value="5">5 mm</option><option value="10">10 mm</option><option value="15">15 mm</option></select></label><label class="office-field"><span>Tên file đầu ra</span><input id="pdfMergeName" value="PDF_da_gop.pdf"></label></div><div class="office-toolbar"><span class="spacer"></span><button class="office-btn primary" id="pdfMergeRun" ${state.pdfMergeFiles.length?'':'disabled'}>Gộp PDF</button></div></div>`;
+function renderPdfMerge(h){h.innerHTML=`<div class="office-card"><h4>Gộp nhiều PDF</h4><p class="office-card-note">Chọn nhiều file, sắp xếp thứ tự rồi chọn cách chuẩn hóa kích thước trang. Chế độ đồng nhất bề ngang giữ đúng tỷ lệ, không làm méo nội dung.</p><div class="office-dropzone" id="pdfMergeDrop"><strong>Browse hoặc kéo thả nhiều file PDF</strong><span>Thứ tự trong danh sách là thứ tự gộp.</span><input type="file" accept="application/pdf,.pdf" multiple hidden></div><div class="office-toolbar"><button class="office-btn" id="pdfMergeAdd">Chọn thêm PDF</button><button class="office-btn" id="pdfMergeSort">Sắp xếp A–Z</button><button class="office-btn danger" id="pdfMergeClear">Xóa danh sách</button></div><div id="pdfMergeList"></div></div><div class="office-card"><div class="office-grid three"><label class="office-field" id="pdfNormalizeField"><span>Chuẩn hóa trang</span><select id="pdfNormalize"><option value="keep">Giữ nguyên từng trang</option><option value="first-width">Đồng nhất bề ngang theo trang đầu</option><option value="widest">Đồng nhất bề ngang theo trang rộng nhất</option><option value="a4p">Chuẩn A4 dọc</option><option value="a4l">Chuẩn A4 ngang</option></select><small id="pdfNormalizeHelp" class="office-field-help"></small></label><label class="office-field"><span>Lề A4</span><select id="pdfMargin"><option value="0">0 mm</option><option value="5">5 mm</option><option value="10">10 mm</option><option value="15">15 mm</option></select></label><label class="office-field"><span>Tên file đầu ra</span><input id="pdfMergeName" value="PDF_da_gop.pdf"></label></div><div class="office-toolbar"><span class="spacer"></span><button class="office-btn primary" id="pdfMergeRun" ${state.pdfMergeFiles.length?'':'disabled'}>Gộp PDF</button></div></div>`;
   h.querySelector('#pdfNormalize').value=state.settings.pdfNormalize||'keep';
   const add=files=>{state.pdfMergeFiles.push(...files.filter(f=>f.type==='application/pdf'||/\.pdf$/i.test(f.name)).map(file=>({id:uid(),file})));renderPdfTool()};
   bindDropzone(h.querySelector('#pdfMergeDrop'),f=>/\.pdf$/i.test(f.name),add);h.querySelector('#pdfMergeDrop input').onchange=e=>add([...e.target.files]);h.querySelector('#pdfMergeAdd').onclick=async()=>add(await fileInput('.pdf,application/pdf',true));h.querySelector('#pdfMergeSort').onclick=()=>{state.pdfMergeFiles.sort((a,b)=>a.file.name.localeCompare(b.file.name,'vi'));renderPdfTool()};h.querySelector('#pdfMergeClear').onclick=()=>{state.pdfMergeFiles=[];renderPdfTool()};
-  const list=h.querySelector('#pdfMergeList');list.innerHTML=listRows(state.pdfMergeFiles,it=>formatBytes(it.file.size));bindListActions(list,state.pdfMergeFiles,renderPdfTool);h.querySelector('#pdfNormalize').onchange=e=>{state.settings.pdfNormalize=e.target.value;saveSettings()};h.querySelector('#pdfMergeRun').onclick=runPdfMerge;
+  const list=h.querySelector('#pdfMergeList');list.innerHTML=listRows(state.pdfMergeFiles,it=>formatBytes(it.file.size));bindListActions(list,state.pdfMergeFiles,renderPdfTool);
+  const norm=h.querySelector('#pdfNormalize'),normHelp=h.querySelector('#pdfNormalizeHelp');
+  const syncNormHelp=()=>{const map={
+    'keep':'Giữ nguyên đúng kích thước từng trang. File gộp có thể gồm trang rộng/hẹp khác nhau.',
+    'first-width':'Lấy bề ngang của trang đầu làm chuẩn; các trang sau co/giãn đồng tỷ lệ theo bề ngang đó.',
+    'widest':'Lấy trang rộng nhất làm chuẩn; các trang hẹp hơn được phóng đồng tỷ lệ để cùng bề ngang.',
+    'a4p':'Đưa nội dung vào khổ A4 dọc 210 × 297 mm, giữ đúng tỷ lệ và căn giữa.',
+    'a4l':'Đưa nội dung vào khổ A4 ngang 297 × 210 mm, giữ đúng tỷ lệ và căn giữa.'
+  };normHelp.textContent=map[norm.value]||'';norm.dataset.tooltip=map[norm.value]||'';norm.title=map[norm.value]||'';};
+  norm.onchange=e=>{state.settings.pdfNormalize=e.target.value;saveSettings();syncNormHelp()};syncNormHelp();
+  h.querySelector('#pdfMergeRun').onclick=runPdfMerge;
 }
 async function runPdfMerge(){try{startBusy('Đang đọc các file PDF…');const {PDFDocument}=await ensurePdfLib();const mode=mainHost.querySelector('#pdfNormalize').value;const marginMm=Number(mainHost.querySelector('#pdfMargin').value||0);const loaded=[];let total=0;for(let i=0;i<state.pdfMergeFiles.length;i++){assertNotAborted();const bytes=await state.pdfMergeFiles[i].file.arrayBuffer();const doc=await PDFDocument.load(bytes,{ignoreEncryption:false});loaded.push({doc,file:state.pdfMergeFiles[i].file});total+=doc.getPageCount();setStatus(`Đang đọc PDF ${i+1}/${state.pdfMergeFiles.length}`,Math.round((i+1)/state.pdfMergeFiles.length*20));}
   const firstSize=loaded[0].doc.getPages()[0].getSize();let widest=firstSize.width;if(mode==='widest')loaded.forEach(x=>x.doc.getPages().forEach(p=>widest=Math.max(widest,p.getWidth())));const out=await PDFDocument.create();let done=0;
   for(const item of loaded){for(let i=0;i<item.doc.getPageCount();i++){assertNotAborted();const src=item.doc.getPage(i);if(mode==='keep'){const [copied]=await out.copyPages(item.doc,[i]);out.addPage(copied);}else{const embedded=await out.embedPage(src);const sw=src.getWidth(),sh=src.getHeight();let tw,th,scale,x=0,y=0;if(mode==='first-width'||mode==='widest'){tw=mode==='first-width'?firstSize.width:widest;scale=tw/sw;th=sh*scale;}else{[tw,th]=mode==='a4l'?A4.landscape:A4.portrait;const margin=marginMm*72/25.4;scale=Math.min((tw-2*margin)/sw,(th-2*margin)/sh);x=(tw-sw*scale)/2;y=(th-sh*scale)/2;}const page=out.addPage([tw,th]);page.drawPage(embedded,{x,y,width:sw*scale,height:sh*scale});}done++;setStatus(`Đang gộp trang ${done}/${total}`,20+Math.round(done/total*75));await sleep();}}
   const bytes=await out.save({useObjectStreams:true});const name=mainHost.querySelector('#pdfMergeName').value||'PDF_da_gop.pdf';await saveBlob(new Blob([bytes],{type:'application/pdf'}),safeName(name,'.pdf'),'PDF');endBusy(`Đã gộp ${total} trang PDF.`);}catch(e){showError(e)}}
+
+function renderPdfA4ToA5(h){
+  h.innerHTML=`<div class="office-card">
+    <h4>A4 dọc → A5 ngang</h4>
+    <p class="office-card-note">Dành cho mẫu PDF có nội dung nằm ở nửa trên của trang A4 dọc. Mỗi trang A4 tạo thành 1 trang A5 ngang bằng cách lấy đúng nửa trên, không chuyển thành ảnh.</p>
+    <div class="office-dropzone" id="pdfA5Drop">
+      <strong>Browse hoặc kéo thả một file PDF A4 dọc</strong>
+      <span>Lấy nửa trên của từng trang và giữ nguyên chất lượng vector/chữ.</span>
+      <input type="file" accept=".pdf,application/pdf" hidden>
+    </div>
+    <div class="office-toolbar">
+      <button class="office-btn" id="pdfA5Browse">Chọn PDF</button>
+      ${state.pdfA5File?`<strong>${escapeHtml(state.pdfA5File.name)}</strong><span class="office-card-note">${formatBytes(state.pdfA5File.size)}</span>`:''}
+    </div>
+  </div>
+  <div class="office-card">
+    <div class="office-grid">
+      <label class="office-field">
+        <span>Phần trang được giữ</span>
+        <select id="pdfA5Part"><option value="top" selected>Nửa trên trang A4</option></select>
+        <small class="office-field-help">Đúng theo công cụ Python mẫu: phần dưới của trang A4 sẽ bị loại bỏ.</small>
+      </label>
+      <label class="office-field">
+        <span>Tên file đầu ra</span>
+        <input id="pdfA5Name" value="${state.pdfA5File?escapeHtml(baseName(state.pdfA5File.name)+'_A5_ngang.pdf'):'PDF_A5_ngang.pdf'}">
+      </label>
+    </div>
+    <div class="office-a5-diagram" data-tooltip="Trang A4 dọc được cắt theo đường ngang giữa trang; nửa trên trở thành một trang A5 ngang mới.">
+      <div class="office-a4-sheet"><span>NỬA TRÊN<br><b>GIỮ LẠI</b></span><i></i><span>NỬA DƯỚI<br><b>LOẠI BỎ</b></span></div>
+      <b>→</b>
+      <div class="office-a5-sheet">A5 NGANG</div>
+    </div>
+    <div class="office-toolbar">
+      <span class="office-card-note">Yêu cầu: mỗi trang đầu vào phải là trang dọc. Nội dung không bị raster hóa.</span>
+      <span class="spacer"></span>
+      <button class="office-btn primary" id="pdfA5Run" ${state.pdfA5File?'':'disabled'}>Chuyển sang A5 ngang</button>
+    </div>
+  </div>`;
+  const setFile=file=>{if(file&&(/\.pdf$/i.test(file.name)||file.type==='application/pdf')){state.pdfA5File=file;renderPdfTool()}};
+  bindDropzone(h.querySelector('#pdfA5Drop'),f=>/\.pdf$/i.test(f.name),files=>setFile(files[0]));
+  h.querySelector('#pdfA5Drop input').onchange=e=>setFile(e.target.files?.[0]);
+  h.querySelector('#pdfA5Browse').onclick=async()=>{const [file]=await fileInput('.pdf,application/pdf',false);setFile(file)};
+  h.querySelector('#pdfA5Run').onclick=runPdfA4ToA5;
+}
+async function runPdfA4ToA5(){
+  try{
+    const file=state.pdfA5File;
+    if(!file)throw new Error('Hãy chọn một file PDF A4 dọc.');
+    startBusy('Đang chuyển A4 sang A5 ngang…');
+    const {PDFDocument}=await ensurePdfLib();
+    const src=await PDFDocument.load(await file.arrayBuffer(),{ignoreEncryption:false});
+    const out=await PDFDocument.create();
+    const pageCount=src.getPageCount();
+    for(let i=0;i<pageCount;i++){
+      assertNotAborted();
+      const page=src.getPage(i);
+      const sw=page.getWidth(),sh=page.getHeight();
+      if(sw>=sh)throw new Error(`Trang ${i+1} không phải trang dọc (${Math.round(sw)} × ${Math.round(sh)} pt).`);
+      const half=sh/2;
+      // PDF dùng gốc tọa độ ở góc dưới trái: vùng nửa trên nằm từ y=half đến y=sh.
+      const embedded=await out.embedPage(page,{left:0,bottom:half,right:sw,top:sh});
+      const outPage=out.addPage([sw,half]);
+      outPage.drawPage(embedded,{x:0,y:0,width:sw,height:half});
+      setStatus(`Đang chuyển trang ${i+1}/${pageCount}`,Math.round((i+1)/pageCount*95));
+      await sleep();
+    }
+    const bytes=await out.save({useObjectStreams:true});
+    const name=mainHost.querySelector('#pdfA5Name').value||`${baseName(file.name)}_A5_ngang.pdf`;
+    await saveBlob(new Blob([bytes],{type:'application/pdf'}),safeName(name,'.pdf'),'PDF A5 ngang');
+    endBusy(`Đã chuyển ${pageCount} trang sang A5 ngang.`);
+  }catch(e){showError(e)}
+}
+
 function renderPdfEdit(h){h.innerHTML=`<div class="office-card"><h4>Sắp xếp và xoay trang trong một PDF</h4><p class="office-card-note">Kéo thả thumbnail để đổi thứ tự. Hình xem trước giữ đúng tỷ lệ và đúng chiều sẽ xuất ra. Ctrl+click chọn rời rạc, Shift+click chọn liên tục, Ctrl+A chọn tất cả; Delete xóa trang đang chọn.</p><div class="office-toolbar"><button class="office-btn" id="pdfEditBrowse">Browse một PDF</button>${state.pdfEdit?`<strong>${escapeHtml(state.pdfEdit.file.name)}</strong>`:''}<span class="spacer"></span><button class="office-btn" id="pdfSelectAll" ${state.pdfEdit?'':'disabled'}>Chọn tất cả</button><button class="office-btn" id="pdfMoveTop" ${state.pdfEdit?'':'disabled'}>Lên đầu</button><button class="office-btn" id="pdfMoveBottom" ${state.pdfEdit?'':'disabled'}>Xuống cuối</button><button class="office-btn" id="pdfRotateLeft" ${state.pdfEdit?'':'disabled'}>↶ Xoay trái</button><button class="office-btn" id="pdfRotateRight" ${state.pdfEdit?'':'disabled'}>↷ Xoay phải</button><button class="office-btn" id="pdfDuplicatePages" ${state.pdfEdit?'':'disabled'}>Nhân bản</button><button class="office-btn" id="pdfExtractPages" ${state.pdfEdit?'':'disabled'}>Trích xuất</button><button class="office-btn danger" id="pdfDeletePages" ${state.pdfEdit?'':'disabled'}>Xóa trang</button></div><div id="pdfPages" class="office-pages">${state.pdfEdit?'<div class="office-empty">Đang chờ hiển thị thumbnail…</div>':'<div class="office-empty">Chưa chọn PDF.</div>'}</div><div class="office-toolbar"><label class="office-field" style="min-width:260px"><span>Tên file đầu ra</span><input id="pdfEditName" value="${state.pdfEdit?escapeHtml(baseName(state.pdfEdit.file.name)+'_da_sap_xep.pdf'):'PDF_da_sap_xep.pdf'}"></label><span class="spacer"></span><button class="office-btn primary" id="pdfEditExport" ${state.pdfEdit?'':'disabled'}>Xuất PDF mới</button></div></div>`;
   h.querySelector('#pdfEditBrowse').onclick=async()=>{const [file]=await fileInput('.pdf,application/pdf',false);if(file)await loadPdfEditor(file)};if(state.pdfEdit)renderPdfPageCards(h.querySelector('#pdfPages'));
   h.querySelector('#pdfSelectAll').onclick=()=>{state.pdfEdit.pages.forEach(p=>p.selected=true);state.pdfEdit.anchorId=state.pdfEdit.pages[0]?.id||null;renderPdfTool()};h.querySelector('#pdfMoveTop').onclick=()=>moveSelectedPdfPages('top');h.querySelector('#pdfMoveBottom').onclick=()=>moveSelectedPdfPages('bottom');h.querySelector('#pdfRotateLeft').onclick=()=>editSelectedPages(p=>p.rotation=normalizePdfRotation(p.rotation-90));h.querySelector('#pdfRotateRight').onclick=()=>editSelectedPages(p=>p.rotation=normalizePdfRotation(p.rotation+90));h.querySelector('#pdfDuplicatePages').onclick=duplicateSelectedPdfPages;h.querySelector('#pdfExtractPages').onclick=extractSelectedPdfPages;h.querySelector('#pdfDeletePages').onclick=deleteSelectedPdfPages;h.querySelector('#pdfEditExport').onclick=exportEditedPdf;

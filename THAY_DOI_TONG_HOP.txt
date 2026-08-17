@@ -307,3 +307,11 @@ THAY_DOI_V5.3
 - File xuất dùng đúng góc đang hiển thị ở thumbnail, không cộng góc xoay hai lần.
 - Thumbnail giữ đúng tỷ lệ dọc/ngang, không bị kéo méo thành khung dọc.
 - Không thay đổi dữ liệu hoặc các chức năng Kanban khác.
+
+
+=== v5.9 ===
+- Sửa board Kanban ở zoom 100%: vùng bảng cuộn dọc/ngang chung, cột dài không bị cắt phía dưới.
+- Bỏ giới hạn max-height của cột và card-list để luôn cuộn tới công việc cuối.
+- Thêm PDF A4 dọc → A5 ngang: lấy nửa trên mỗi trang, giữ nội dung vector.
+- Thêm tooltip giải thích cho toàn bộ tab và điều khiển chính trong công cụ PDF.
+- Thêm mô tả trực tiếp cho các chế độ Chuẩn hóa trang khi gộp PDF.
