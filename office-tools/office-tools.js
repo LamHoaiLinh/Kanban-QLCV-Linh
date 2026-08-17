@@ -365,7 +365,8 @@ async function runRenameInPlace(){try{if(!state.renameRootHandle)throw new Error
 function renderExcelTool(){const tabs=[['inspect','Đọc & xuất JSON'],['manage','Quản lý sheet'],['combine','Gộp sheet'],['workbooks','Gộp nhiều file'],['split','Tách sheet']];mainHost.innerHTML=`<section class="office-tool-panel active"><div class="office-tool-head"><div><h3>Excel</h3><p>Đọc XLSX, XLS, XLSM và CSV; phân biệt ô giá trị với ô công thức.</p></div></div>${subTabs('excel',tabs)}<div id="excelSubHost"></div><div class="office-warning">Ứng dụng đọc công thức và giá trị cached được lưu trong file. Không tự tính lại toàn bộ công thức như Microsoft Excel; không chạy VBA hoặc macro.</div><div class="office-library-warning">Thư viện SheetJS được tải theo phiên bản cố định khi công cụ Excel được mở lần đầu.</div></section>`;bindSubtabs('excel');const h=mainHost.querySelector('#excelSubHost');if(state.sub.excel==='inspect')renderExcelInspect(h);if(state.sub.excel==='manage')renderExcelManage(h);if(state.sub.excel==='combine')renderExcelCombine(h);if(state.sub.excel==='workbooks')renderExcelWorkbooks(h);if(state.sub.excel==='split')renderExcelSplit(h)}
 function excelBrowseCard(extra=''){return `<div class="office-card"><div class="office-dropzone" id="excelDrop"><strong>Browse hoặc kéo thả file Excel/CSV</strong><span>XLSX, XLS, XLSM và CSV.</span><input type="file" accept=".xlsx,.xls,.xlsm,.csv" multiple hidden></div><div class="office-toolbar"><button class="office-btn" id="excelAdd">Chọn thêm file</button><button class="office-btn danger" id="excelClear">Xóa danh sách</button></div><div id="excelFileList"></div></div>${extra}`}
 function bindExcelLibrary(){const add=async files=>{try{startBusy('Đang đọc workbook…');const XLSX=await ensureXlsx();for(let i=0;i<files.length;i++){const file=files[i];if(!/\.(xlsx|xls|xlsm|csv)$/i.test(file.name))continue;const data=await file.arrayBuffer();const wb=XLSX.read(data,{type:'array',cellFormula:true,cellDates:true,cellNF:true,cellText:true,bookVBA:false});state.excelFiles.push({id:uid(),file,wb});setStatus(`Đang đọc ${i+1}/${files.length}`,Math.round((i+1)/files.length*100));}endBusy(`Đã đọc ${state.excelFiles.length} file.`);renderExcelTool()}catch(e){showError(e)}};const drop=mainHost.querySelector('#excelDrop');bindDropzone(drop,f=>/\.(xlsx|xls|xlsm|csv)$/i.test(f.name),add);drop.querySelector('input').onchange=e=>add([...e.target.files]);mainHost.querySelector('#excelAdd').onclick=async()=>add(await fileInput('.xlsx,.xls,.xlsm,.csv',true));mainHost.querySelector('#excelClear').onclick=()=>{state.excelFiles=[];renderExcelTool()};const l=mainHost.querySelector('#excelFileList');l.innerHTML=listRows(state.excelFiles,it=>`${formatBytes(it.file.size)} · ${it.wb.SheetNames.length} sheet`);bindListActions(l,state.excelFiles,renderExcelTool)}
-function renderExcelInspect(h){h.innerHTML=excelBrowseCard(`<div class="office-card"><h4>Cấu trúc workbook</h4><div id="excelOverview"></div><div class="office-toolbar"><label class="office-check"><input id="excelFormatted" type="checkbox" checked> Xuất formattedValue</label><label class="office-check"><input id="excelHyperlinks" type="checkbox" checked> Hyperlink/comment</label><label class="office-check" title="Chỉ nên bật với workbook nhỏ. Với vùng dùng rất lớn, việc xuất cả ô trống có thể tạo hàng triệu hoặc hàng tỷ ô JSON."><input id="excelEmpty" type="checkbox"> Cả ô trống trong vùng dùng</label><span class="spacer"></span><button class="office-btn" id="excelPreviewJson" ${state.excelFiles.length?'':'disabled'}>Xem trước JSON</button><button class="office-btn primary" id="excelExportJson" ${state.excelFiles.length?'':'disabled'}>Xuất JSON</button></div><div class="office-card-note" style="margin-top:8px">File Excel lớn sẽ được xuất JSON tuần tự theo từng sheet/ô để tránh vượt giới hạn bộ nhớ của trình duyệt.</div><pre id="excelJsonPreview" class="office-json-preview" hidden></pre></div>`);
+function renderExcelInspect(h){h.innerHTML=excelBrowseCard(`<div class="office-card"><h4>Cấu trúc workbook</h4><div id="excelOverview"></div><div class="office-toolbar"><label class="office-check"><input id="excelFormatted" type="checkbox" checked> Xuất formattedValue</label><label class="office-check"><input id="excelHyperlinks" type="checkbox" checked> Hyperlink/comment</label><label class="office-check" title="Chỉ nên bật với workbook nhỏ. Với vùng dùng rất lớn, việc xuất cả ô trống có thể tạo hàng triệu hoặc hàng tỷ ô JSON."><input id="excelEmpty" type="checkbox"> Cả ô trống trong vùng dùng</label><span class="spacer"></span><button class="office-btn" id="excelPreviewJson" ${state.excelFiles.length?'':'disabled'}>Xem trước JSON</button><button class="office-btn primary" id="excelExportJson" ${state.excelFiles.length?'':'disabled'}>Xuất 1 JSON</button></div><div class="office-card-note" style="margin-top:8px">File Excel lớn sẽ được xuất JSON tuần tự theo từng sheet/ô để tránh vượt giới hạn bộ nhớ của trình duyệt.</div><pre id="excelJsonPreview" class="office-json-preview" hidden></pre></div>
+  <div class="office-card excel-chatgpt-split"><div class="office-card-title-row"><div><h4>Chia JSON để gửi ChatGPT</h4><p class="office-card-note">Mỗi phần là một file JSON độc lập, được đánh số theo thứ tự. Khuyến nghị mặc định 5 MB/phần.</p></div><span class="office-recommend-badge">ChatGPT · 5 MB khuyến nghị</span></div><div class="office-grid three"><label class="office-field"><span>Dung lượng mỗi phần</span><select id="excelSplitMb"><option value="5" selected>5 MB — khuyến nghị</option><option value="8">8 MB — ít file hơn</option><option value="10">10 MB</option><option value="20">20 MB</option><option value="50">50 MB</option></select><small>5 MB là mức bảo thủ để giảm nguy cơ chạm giới hạn token của file văn bản.</small></label><label class="office-field"><span>Cách lưu</span><select id="excelSplitSave"><option value="folder" selected>Thư mục gồm nhiều JSON</option></select><small>Chrome/Edge sẽ hỏi chọn thư mục rồi tạo một thư mục con chứa các phần.</small></label><label class="office-field"><span>Ước tính đầu ra</span><div id="excelSplitEstimate" class="office-estimate-box">${state.excelFiles.length?'Đang chờ ước tính…':'Chưa chọn workbook.'}</div><small id="excelSplitAdvice">Nếu JSON lớn hơn khoảng 5 MB, nên dùng chế độ chia nhỏ.</small></label></div><div class="office-chatgpt-note"><strong>Gợi ý:</strong> ChatGPT có giới hạn file và giới hạn token riêng. Với JSON, nên ưu tiên nhiều file nhỏ thay vì một file rất lớn. File <b>manifest.json</b> đi kèm cho biết thứ tự các phần.</div><div class="office-toolbar"><span class="spacer"></span><button class="office-btn primary" id="excelExportSplit" ${state.excelFiles.length?'':'disabled'}>Xuất JSON chia nhỏ</button></div></div>`);
   bindExcelLibrary();renderExcelOverview();
   mainHost.querySelector('#excelPreviewJson').onclick=()=>{
     try{
@@ -376,6 +377,11 @@ function renderExcelInspect(h){h.innerHTML=excelBrowseCard(`<div class="office-c
     }catch(e){showError(e)}
   };
   mainHost.querySelector('#excelExportJson').onclick=()=>exportWorkbookJsonStream(state.excelFiles[0]);
+  mainHost.querySelector('#excelExportSplit').onclick=()=>exportWorkbookJsonSplit(state.excelFiles[0]);
+  const refreshEstimate=()=>updateExcelSplitEstimate(state.excelFiles[0]);
+  mainHost.querySelector('#excelSplitMb').onchange=refreshEstimate;
+  ['#excelFormatted','#excelHyperlinks','#excelEmpty'].forEach(sel=>mainHost.querySelector(sel)?.addEventListener('change',refreshEstimate));
+  setTimeout(refreshEstimate,0);
 }
 function renderExcelOverview(){const host=mainHost.querySelector('#excelOverview');if(!state.excelFiles.length){host.innerHTML='<div class="office-empty">Chưa chọn workbook.</div>';return}const item=state.excelFiles[0];host.innerHTML=`<strong>${escapeHtml(item.file.name)}</strong><div class="office-sheet-list" style="margin-top:9px">${item.wb.SheetNames.map(n=>{const ws=item.wb.Sheets[n],ref=ws['!ref']||'Trống';return `<span class="office-sheet-chip">${escapeHtml(n)} · ${escapeHtml(ref)}</span>`}).join('')}</div>`}
 function excelCellType(cell){return cell.t==='n'?'number':cell.t==='b'?'boolean':cell.t==='d'?'date':cell.t==='e'?'error':'string'}
@@ -440,6 +446,135 @@ function buildWorkbookJsonPreview(item,maxCells=1200){
     sheets
   };
 }
+function estimateWorkbookJsonSize(item,sampleLimit=5000){
+  if(!item)return {bytes:0,cells:0,sampled:0};
+  const {formatted,links,includeEmpty}=excelJsonOptions(),XLSX=globalThis.XLSX,encoder=new TextEncoder();
+  validateExcelEmptyExport(item,includeEmpty);
+  let totalCells=0,sampled=0,sampleBytes=0;
+  for(const name of item.wb.SheetNames){
+    const ws=item.wb.Sheets[name],range=ws['!ref']||'A1:A1';
+    if(includeEmpty){
+      const count=excelRangeCellCount(range);totalCells+=count;
+      if(sampled<sampleLimit){
+        const r=XLSX.utils.decode_range(range);
+        outer:for(let R=r.s.r;R<=r.e.r;R++)for(let C=r.s.c;C<=r.e.c;C++){
+          const addr=XLSX.utils.encode_cell({r:R,c:C});
+          sampleBytes+=encoder.encode(`${JSON.stringify(addr)}:${JSON.stringify(cellJson(ws[addr],formatted,links))},`).length;
+          sampled++;if(sampled>=sampleLimit)break outer;
+        }
+      }
+    }else{
+      for(const addr in ws){
+        if(addr.startsWith('!'))continue;
+        totalCells++;
+        if(sampled<sampleLimit){
+          sampleBytes+=encoder.encode(`${JSON.stringify(addr)}:${JSON.stringify(cellJson(ws[addr],formatted,links))},`).length;
+          sampled++;
+        }
+      }
+    }
+  }
+  const avg=sampled?sampleBytes/sampled:40;
+  const metadata=4096+item.wb.SheetNames.length*512;
+  return {bytes:Math.ceil(metadata+avg*totalCells),cells:totalCells,sampled};
+}
+function updateExcelSplitEstimate(item){
+  const host=mainHost.querySelector('#excelSplitEstimate'),advice=mainHost.querySelector('#excelSplitAdvice');
+  if(!host||!advice)return;
+  if(!item){host.textContent='Chưa chọn workbook.';return}
+  try{
+    const estimate=estimateWorkbookJsonSize(item),mb=Math.max(1,+mainHost.querySelector('#excelSplitMb')?.value||5),parts=Math.max(1,Math.ceil(estimate.bytes/(mb*1024*1024*.90)));
+    host.innerHTML=`<strong>~ ${formatBytes(estimate.bytes)}</strong><span>${estimate.cells.toLocaleString('vi-VN')} ô · khoảng ${parts} file</span>`;
+    if(estimate.bytes<=5*1024*1024)advice.textContent='Ước tính nhỏ: có thể xuất 1 JSON; chia nhỏ vẫn dùng được nếu muốn.';
+    else if(parts<=20)advice.textContent=`Khuyến nghị ${mb===5?'giữ 5 MB':'5 MB'} mỗi phần; dự kiến khoảng ${Math.ceil(estimate.bytes/(5*1024*1024*.90))} file ở mức 5 MB.`;
+    else advice.textContent='Workbook rất lớn: nên giữ 5 MB/phần và upload các part theo từng nhóm nếu ChatGPT không nhận hết một lần.';
+  }catch(e){host.textContent='Không ước tính được.';advice.textContent=e.message}
+}
+async function createSplitJsonDestination(item){
+  if(!('showDirectoryPicker'in window))throw new Error('Tính năng chia nhiều file cần Chrome hoặc Edge hỗ trợ chọn thư mục.');
+  const rootHandle=await showDirectoryPicker({mode:'readwrite'});
+  const folderName=safeName(`${baseName(item.file.name)}_JSON_ChatGPT`);
+  const folder=await rootHandle.getDirectoryHandle(folderName,{create:true});
+  return {
+    folderName,
+    async writeFile(name,text){
+      const handle=await folder.getFileHandle(safeName(name),{create:true});
+      const writable=await handle.createWritable();await writable.write(text);await writable.close();
+    }
+  };
+}
+async function exportWorkbookJsonSplit(item){
+  let destination=null;
+  try{
+    if(!item)throw new Error('Chưa chọn workbook.');
+    const {formatted,links,includeEmpty}=excelJsonOptions(),XLSX=globalThis.XLSX,encoder=new TextEncoder();
+    validateExcelEmptyExport(item,includeEmpty);
+    const targetMb=Math.max(1,+mainHost.querySelector('#excelSplitMb')?.value||5),targetBytes=targetMb*1024*1024;
+    destination=await createSplitJsonDestination(item);
+    startBusy('Đang chia JSON thành nhiều phần…');
+
+    const sourceFile={name:item.file.name,size:item.file.size,exportedAt:new Date().toISOString()};
+    const workbook={sheetOrder:[...item.wb.SheetNames]};
+    const outputs=[];
+    let partNo=1,currentChunks=[],currentApprox=1200,currentSheet=null,currentChunk=null,chunkIndexBySheet=new Map();
+
+    const newChunk=(name,range,merges)=>{
+      const next=(chunkIndexBySheet.get(name)||0)+1;chunkIndexBySheet.set(name,next);
+      const chunk={sheetName:name,sheetRange:range,chunkIndex:next,mergedRanges:next===1?merges:[],cells:{}};
+      currentChunks.push(chunk);currentSheet=name;currentChunk=chunk;currentApprox+=encoder.encode(JSON.stringify({sheetName:name,sheetRange:range,chunkIndex:next,mergedRanges:chunk.mergedRanges,cells:{}})).length+64;
+      return chunk;
+    };
+    const flushPart=async()=>{
+      if(!currentChunks.length)return;
+      const payload={formatVersion:2,sourceFile,workbook,splitExport:{partNumber:partNo,targetSizeMB:targetMb},chunks:currentChunks};
+      const text=JSON.stringify(payload);
+      const filename=`${baseName(item.file.name)}_part_${String(partNo).padStart(3,'0')}.json`;
+      await destination.writeFile(filename,text);
+      outputs.push({file:filename,bytes:encoder.encode(text).length,sheets:[...new Set(currentChunks.map(c=>c.sheetName))]});
+      partNo++;currentChunks=[];currentApprox=1200;currentSheet=null;currentChunk=null;
+    };
+    const appendCell=async(name,range,merges,addr,cell)=>{
+      const record=cellJson(cell,formatted,links),entryBytes=encoder.encode(`${JSON.stringify(addr)}:${JSON.stringify(record)},`).length;
+      if(!currentChunk||currentSheet!==name)newChunk(name,range,merges);
+      if(currentApprox+entryBytes>targetBytes*.90&&Object.keys(currentChunk.cells).length){
+        await flushPart();newChunk(name,range,merges);
+      }
+      currentChunk.cells[addr]=record;currentApprox+=entryBytes;
+    };
+
+    const sheetCount=item.wb.SheetNames.length;
+    for(let si=0;si<sheetCount;si++){
+      assertNotAborted();
+      const name=item.wb.SheetNames[si],ws=item.wb.Sheets[name],range=ws['!ref']||'A1:A1',merges=(ws['!merges']||[]).map(r=>XLSX.utils.encode_range(r));
+      if(includeEmpty){
+        const r=XLSX.utils.decode_range(range),totalRows=r.e.r-r.s.r+1;
+        for(let R=r.s.r;R<=r.e.r;R++){
+          assertNotAborted();
+          for(let C=r.s.c;C<=r.e.c;C++){
+            const addr=XLSX.utils.encode_cell({r:R,c:C});await appendCell(name,range,merges,addr,ws[addr]);
+          }
+          if((R-r.s.r)%50===0){setStatus(`Sheet ${si+1}/${sheetCount}: ${name}`,((si+(R-r.s.r+1)/Math.max(1,totalRows))/sheetCount)*95);await sleep()}
+        }
+      }else{
+        let done=0,total=0;for(const key in ws)if(!key.startsWith('!'))total++;
+        for(const addr in ws){
+          if(addr.startsWith('!'))continue;assertNotAborted();await appendCell(name,range,merges,addr,ws[addr]);done++;
+          if(done%2500===0){setStatus(`Sheet ${si+1}/${sheetCount}: ${name} · ${done}/${total} ô`,((si+done/Math.max(1,total))/sheetCount)*95);await sleep()}
+        }
+      }
+      setStatus(`Đã xử lý sheet ${si+1}/${sheetCount}: ${name}`,((si+1)/sheetCount)*95);await sleep();
+    }
+    await flushPart();
+    const totalBytes=outputs.reduce((n,p)=>n+p.bytes,0);
+    const manifest={formatVersion:1,purpose:'Excel JSON parts for ChatGPT',sourceFile,split:{targetSizeMB:targetMb,totalParts:outputs.length,totalBytes,createdAt:new Date().toISOString()},workbook,parts:outputs,instructions:['Các file part được đánh số theo thứ tự.','Khi gửi cho AI, nên gửi manifest.json cùng các part cần phân tích.','Nếu không thể upload toàn bộ part cùng lúc, hãy upload theo nhóm và nói rõ số part đang gửi.']};
+    await destination.writeFile(`${baseName(item.file.name)}_manifest.json`,JSON.stringify(manifest,null,2));
+    endBusy(`Đã tạo ${outputs.length} file JSON (~${targetMb} MB/phần) + manifest trong thư mục ${destination.folderName}.`);
+  }catch(e){
+    if(e?.name==='AbortError'){endBusy('Đã hủy tác vụ.');return}
+    showError(e);
+  }
+}
+
 async function createJsonOutputSink(filename){
   const safe=safeName(filename,'.json');
   if('showSaveFilePicker'in window){

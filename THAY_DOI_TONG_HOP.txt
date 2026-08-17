@@ -343,3 +343,12 @@ THAY_DOI_V5.3
 - Xem trước JSON chỉ lấy tối đa 1.200 ô để tránh treo trình duyệt.
 - Chặn tùy chọn “Cả ô trống trong vùng dùng” khi vùng dùng quá lớn để tránh tạo hàng triệu/tỷ ô rỗng.
 - Không thay đổi dữ liệu hoặc logic Kanban khác.
+
+
+=== v5.13 ===
+- Excel → JSON: thêm chế độ chia thành nhiều file nhỏ để upload lên ChatGPT.
+- Mặc định 5 MB/phần; có lựa chọn 8/10/20/50 MB.
+- Ước tính dung lượng JSON và số part trước khi xuất.
+- Mỗi part là JSON độc lập, đánh số part_001, part_002...; kèm file manifest.json mô tả thứ tự và dung lượng.
+- Ghi trực tiếp từng part vào thư mục do người dùng chọn bằng File System Access API, không gom toàn bộ JSON lớn vào RAM.
+- Không thay đổi dữ liệu hoặc logic Kanban khác.
