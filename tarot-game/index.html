@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#2b1838">
   <title>Tarot Việt</title>
-  <link rel="stylesheet" href="styles.css?v=5.3.0">
+  <link rel="stylesheet" href="styles.css?v=5.4.0">
 </head>
 <body>
   <main class="tarot-app">
@@ -28,12 +28,12 @@
       <section class="reading-panel">
         <div id="introView" class="intro-view panel"><div class="orb">✦</div><h2>Chọn chủ đề, đặt câu hỏi và rút bài</h2><p>Bạn có thể tự chọn lá theo cảm nhận hoặc để máy tự rút. Mỗi lần trải bài dùng bộ bài được xáo mới.</p></div>
         <div id="deckView" class="deck-view panel" hidden><div class="deck-head"><div><span class="eyebrow">CHỌN LÁ</span><h2 id="pickTitle">Chọn 3 lá theo cảm nhận</h2></div><div id="pickCounter" class="pick-counter">0/3</div></div><div id="deckGrid" class="deck-grid"></div><button id="revealBtn" class="primary-btn reveal-btn" type="button" disabled>Xem kết quả</button></div>
-        <div id="resultView" class="result-view" hidden><div class="result-summary panel"><span class="eyebrow">THÔNG ĐIỆP TỔNG HỢP</span><h2 id="readingTitle">Trải bài của bạn</h2><section class="final-conclusion" aria-labelledby="finalConclusionLabel"><span id="finalConclusionLabel">KẾT LUẬN CUỐI CÙNG</span><p id="conclusionText"></p></section><details class="reading-detail"><summary>Đọc diễn giải tổng hợp</summary><p id="summaryText"></p><div id="actionText" class="action-text"></div></details><div class="summary-actions"><button id="copyBtn" class="secondary-btn" type="button">Sao chép nội dung</button><button id="downloadBtn" class="secondary-btn" type="button">Lưu TXT</button></div></div><div id="cardsResult" class="cards-result"></div></div>
+        <div id="resultView" class="result-view" hidden><div class="result-summary panel"><span class="eyebrow">THÔNG ĐIỆP TỔNG HỢP</span><h2 id="readingTitle">Trải bài của bạn</h2><section class="final-conclusion" aria-labelledby="finalConclusionLabel"><span id="finalConclusionLabel">KẾT LUẬN CUỐI CÙNG</span><p id="conclusionText"></p></section><details class="reading-detail"><summary>Đọc diễn giải tổng hợp</summary><p id="summaryText"></p><div id="actionText" class="action-text"></div></details><div class="summary-actions"><button id="aiPromptBtn" class="primary-btn ai-prompt-btn" type="button" title="Sao chép câu hỏi, các lá đã rút và kết quả hiện tại thành prompt để dán vào ChatGPT/Gemini/AI khác">Copy prompt cho AI</button><button id="copyBtn" class="secondary-btn" type="button">Sao chép nội dung</button><button id="downloadBtn" class="secondary-btn" type="button">Lưu TXT</button></div></div><div id="cardsResult" class="cards-result"></div></div>
       </section>
       <aside class="history-panel panel"><div class="history-head"><div><span class="eyebrow">LỊCH SỬ</span><h2>Trải bài gần đây</h2></div><button id="clearHistoryBtn" type="button">Xóa</button></div><div id="historyList" class="history-list"><span>Chưa có trải bài.</span></div></aside>
     </section>
     <div id="toast" class="toast" role="status"></div>
   </main>
-  <script type="module" src="js/app.js?v=5.3.0"></script>
+  <script type="module" src="js/app.js?v=5.4.0"></script>
 </body>
 </html>

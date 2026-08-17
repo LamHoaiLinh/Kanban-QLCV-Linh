@@ -1,11 +1,11 @@
 import {TAROT_CARDS,SPREADS,TOPICS} from './tarot-data.js';
 const $=s=>document.querySelector(s);
-const refs={topic:$('#topicSelect'),question:$('#questionInput'),count:$('#cardCountSelect'),start:$('#startBtn'),reset:$('#resetBtn'),intro:$('#introView'),deck:$('#deckView'),result:$('#resultView'),deckGrid:$('#deckGrid'),pickTitle:$('#pickTitle'),pickCounter:$('#pickCounter'),reveal:$('#revealBtn'),title:$('#readingTitle'),summary:$('#summaryText'),action:$('#actionText'),conclusion:$('#conclusionText'),cards:$('#cardsResult'),copy:$('#copyBtn'),download:$('#downloadBtn'),history:$('#historyList'),clearHistory:$('#clearHistoryBtn'),fullscreen:$('#fullscreenBtn'),close:$('#closeBtn'),toast:$('#toast')};
+const refs={topic:$('#topicSelect'),question:$('#questionInput'),count:$('#cardCountSelect'),start:$('#startBtn'),reset:$('#resetBtn'),intro:$('#introView'),deck:$('#deckView'),result:$('#resultView'),deckGrid:$('#deckGrid'),pickTitle:$('#pickTitle'),pickCounter:$('#pickCounter'),reveal:$('#revealBtn'),title:$('#readingTitle'),summary:$('#summaryText'),action:$('#actionText'),conclusion:$('#conclusionText'),cards:$('#cardsResult'),aiPrompt:$('#aiPromptBtn'),copy:$('#copyBtn'),download:$('#downloadBtn'),history:$('#historyList'),clearHistory:$('#clearHistoryBtn'),fullscreen:$('#fullscreenBtn'),close:$('#closeBtn'),toast:$('#toast')};
 const HISTORY_KEY='linh_tarot_history_v1';
 let deck=[],selected=[],currentReading=null,history=load(HISTORY_KEY,[]),toastTimer=null;
 init();
 function init(){bind();renderHistory()}
-function bind(){refs.start.onclick=startReading;refs.reset.onclick=resetReading;refs.reveal.onclick=revealSelected;refs.copy.onclick=copyReading;refs.download.onclick=downloadReading;refs.clearHistory.onclick=()=>{history=[];save(HISTORY_KEY,history);renderHistory();showToast('Đã xóa lịch sử.')};refs.fullscreen.onclick=toggleFullscreen;refs.close.onclick=closeTarot}
+function bind(){refs.start.onclick=startReading;refs.reset.onclick=resetReading;refs.reveal.onclick=revealSelected;refs.aiPrompt.onclick=copyAiPrompt;refs.copy.onclick=copyReading;refs.download.onclick=downloadReading;refs.clearHistory.onclick=()=>{history=[];save(HISTORY_KEY,history);renderHistory();showToast('Đã xóa lịch sử.')};refs.fullscreen.onclick=toggleFullscreen;refs.close.onclick=closeTarot}
 function startReading(){const count=+refs.count.value;deck=shuffle(TAROT_CARDS.map(card=>({...card,reversed:randomInt(0,99)<32})));selected=[];const method=document.querySelector('input[name="method"]:checked')?.value||'manual';if(method==='auto'){selected=deck.slice(0,count);createReading(selected);return}show(refs.deck);refs.pickTitle.textContent=`Chọn ${count} lá theo cảm nhận`;refs.pickCounter.textContent=`0/${count}`;refs.reveal.disabled=true;refs.deckGrid.innerHTML=deck.map((card,index)=>`<button class="card-back" type="button" data-index="${index}" aria-label="Lá bài úp số ${index+1}"></button>`).join('');refs.deckGrid.querySelectorAll('.card-back').forEach(btn=>btn.onclick=()=>toggleCard(btn,count))}
 function toggleCard(btn,count){const index=+btn.dataset.index;const found=selected.findIndex(x=>x._deckIndex===index);if(found>=0){selected.splice(found,1);btn.classList.remove('selected')}else{if(selected.length>=count){showToast(`Chỉ chọn ${count} lá.`);return}selected.push({...deck[index],_deckIndex:index});btn.classList.add('selected')}refs.pickCounter.textContent=`${selected.length}/${count}`;refs.reveal.disabled=selected.length!==count}
 function revealSelected(){if(selected.length!==+refs.count.value)return;createReading(selected)}
@@ -17,6 +17,45 @@ function topicInsight(card,topic,index,total){const pos=card.position.toLowerCas
 function resetReading(){selected=[];deck=[];currentReading=null;refs.question.value='';show(refs.intro)}
 function show(target){[refs.intro,refs.deck,refs.result].forEach(el=>el.hidden=el!==target);target.scrollIntoView({behavior:'smooth',block:'start'})}
 function renderHistory(){if(!history.length){refs.history.innerHTML='<span>Chưa có trải bài.</span>';return}refs.history.innerHTML=history.slice(0,12).map((item,index)=>`<button class="history-item" type="button" data-index="${index}"><span>${formatDate(item.createdAt)} · ${item.count} lá</span><strong>${esc(TOPICS[item.topic]||'Tổng quan')}</strong><small>${esc(item.question||item.summary.slice(0,65)+'…')}</small></button>`).join('');refs.history.querySelectorAll('.history-item').forEach(btn=>btn.onclick=()=>{currentReading=history[+btn.dataset.index];refs.topic.value=currentReading.topic;refs.question.value=currentReading.question||'';refs.count.value=String(currentReading.count);renderReading(currentReading)})}
+async function copyAiPrompt(){
+  if(!currentReading)return;
+  const prompt=buildAiPrompt(currentReading);
+  await navigator.clipboard.writeText(prompt);
+  showToast('Đã copy prompt. Bạn có thể dán vào AI để diễn giải thêm.');
+}
+function buildAiPrompt(r){
+  const cardLines=r.cards.map((saved,i)=>{
+    const c=TAROT_CARDS.find(x=>x.id===saved.id);
+    const meaning=saved.reversed?c.reversed:c.upright;
+    return `${i+1}. Vị trí "${saved.position}": ${c.nameVi} – ${saved.reversed?'LÁ NGƯỢC':'LÁ XUÔI'}\n   Từ khóa: ${c.keywords.join(', ')}\n   Nghĩa đang dùng: ${meaning}\n   Gợi ý của lá: ${c.advice}`;
+  }).join('\n\n');
+  const question=r.question?.trim()||`Xin diễn giải trải bài theo chủ đề ${TOPICS[r.topic]}.`;
+  return `Bạn là người diễn giải Tarot bằng tiếng Việt theo hướng gợi mở, thực tế và dễ hiểu. Không khẳng định chắc chắn tương lai, không hù dọa và không thay thế tư vấn chuyên môn.
+
+CÂU HỎI CỦA NGƯỜI DÙNG:
+${question}
+
+CHỦ ĐỀ:
+${TOPICS[r.topic]}
+
+CÁC LÁ ĐÃ RÚT:
+${cardLines}
+
+KẾT LUẬN HIỆN TẠI CỦA ỨNG DỤNG:
+${r.conclusion||''}
+
+DIỄN GIẢI TỔNG HỢP HIỆN TẠI:
+${r.summary||''}
+
+YÊU CẦU AI:
+1. Bám sát câu hỏi của người dùng và đúng các lá đã rút; không tự đổi lá hoặc chiều xuôi/ngược.
+2. Mở đầu bằng mục "Kết luận ngắn" gồm 2–4 câu, trả lời thẳng trọng tâm câu hỏi.
+3. Sau đó giải thích mối liên hệ giữa các lá theo đúng vị trí trải bài, không chỉ giải nghĩa từng lá rời rạc.
+4. Chỉ ra 3–5 điểm đáng chú ý: thuận lợi, trở ngại, điểm mù hoặc điều kiện cần.
+5. Kết thúc bằng 2–4 gợi ý hành động thực tế trong khả năng kiểm soát của người dùng.
+6. Nếu câu hỏi không thể trả lời chắc chắn theo Tarot, nói rõ mức độ không chắc chắn thay vì khẳng định như sự thật.
+7. Viết tự nhiên, súc tích, dễ đọc; ưu tiên ý nghĩa tổng thể hơn thuật ngữ huyền bí.`;
+}
 async function copyReading(){if(!currentReading)return;await navigator.clipboard.writeText(readingText(currentReading));showToast('Đã sao chép nội dung.')}
 function downloadReading(){if(!currentReading)return;const blob=new Blob([readingText(currentReading)],{type:'text/plain;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`Tarot_${new Date(currentReading.createdAt).toISOString().slice(0,10)}.txt`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 function readingText(r){const lines=[`TAROT VIỆT – ${TOPICS[r.topic]}`,r.question?`Câu hỏi: ${r.question}`:'',`Thời gian: ${formatDate(r.createdAt)}`,'','KẾT LUẬN CUỐI CÙNG:',r.conclusion||'','','DIỄN GIẢI TỔNG HỢP:',r.summary,'',r.action,''];r.cards.forEach((saved,i)=>{const c=TAROT_CARDS.find(x=>x.id===saved.id);lines.push(`${i+1}. ${saved.position}: ${c.nameVi} – ${saved.reversed?'Lá ngược':'Lá xuôi'}`,saved.reversed?c.reversed:c.upright,`Gợi ý: ${c.advice}`,'')});lines.push('Kết quả mang tính gợi mở và giải trí.');return lines.filter((x,i)=>x!==''||lines[i-1]!=='').join('\n')}

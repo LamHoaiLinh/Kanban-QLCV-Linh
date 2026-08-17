@@ -3,3 +3,20 @@
 /* v5.3: kết luận cuối cùng nổi bật */
 .final-conclusion{position:relative;margin:14px 0 16px;padding:18px 20px 18px 22px;border:2px solid rgba(227,189,105,.68);border-radius:18px;background:linear-gradient(135deg,rgba(227,189,105,.2),rgba(139,85,170,.18));box-shadow:0 14px 34px rgba(15,7,22,.28),inset 4px 0 0 var(--gold)}.final-conclusion:before{content:"✦";position:absolute;right:17px;top:12px;color:var(--gold);font-size:25px;opacity:.72}.final-conclusion>span{display:block;color:var(--gold);font-size:11px;font-weight:950;letter-spacing:.14em}.final-conclusion>p{margin:9px 28px 0 0!important;color:#fff7dc!important;font-size:17px;font-weight:800;line-height:1.65!important}.reading-detail{border-top:1px solid rgba(255,255,255,.1);padding-top:10px}.reading-detail>summary{cursor:pointer;color:var(--gold);font-weight:850;font-size:12px;user-select:none}.reading-detail>summary:hover{color:#f5d88f}.reading-detail[open]>summary{margin-bottom:6px}
 @media(max-width:760px){.final-conclusion{padding:15px}.final-conclusion>p{font-size:15px;margin-right:10px!important}}
+
+/* v5.4 - nút prompt cho AI */
+.summary-actions{
+  align-items:stretch;
+  flex-wrap:wrap;
+}
+.summary-actions .ai-prompt-btn{
+  width:auto;
+  margin-top:0;
+  padding-inline:16px;
+  background:linear-gradient(135deg,#e3bd69,#f0d791);
+  color:#27192f;
+  box-shadow:0 8px 20px rgba(227,189,105,.18);
+}
+.summary-actions .ai-prompt-btn:hover{
+  filter:brightness(1.04);
+}

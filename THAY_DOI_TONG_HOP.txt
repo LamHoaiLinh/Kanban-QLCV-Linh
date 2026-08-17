@@ -324,3 +324,13 @@ THAY_DOI_V5.3
 - Kéo task sát mép trên/dưới/trái/phải sẽ tự cuộn liên tục theo hướng tương ứng.
 - Sửa ô + Thêm cột để không tràn chữ ở mức zoom lớn.
 - Không thay đổi dữ liệu, task, Dice, Tarot hoặc Office PDF.
+
+
+=== v5.11 ===
+- Căn lại các trường trong Office PDF/IMG để label, input và help thẳng hàng.
+- Sửa input chọn màu của Chrome: hiển thị thành ô màu thật thay vì một đường kẻ mỏng.
+- Chuyển đổi ảnh: nhãn nền tự đổi theo JPG/PNG/WebP; PNG và WebP ghi rõ giữ nền trong suốt.
+- Nén ảnh: nhãn nền tự đổi giữa JPG và WebP.
+- Ghép ảnh: màu nền hiển thị rõ và nhãn ghi đúng định dạng đang xuất.
+- Tarot: thêm nút Copy prompt cho AI, gồm câu hỏi, chủ đề, lá bài, xuôi/ngược, kết luận và yêu cầu diễn giải.
+- Không thay đổi dữ liệu hoặc logic công việc Kanban.

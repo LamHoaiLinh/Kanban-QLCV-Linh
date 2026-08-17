@@ -111,3 +111,71 @@
   .office-main{padding-top:12px}
   .office-status-bar{padding:7px 14px}
 }
+
+/* ===== v3.5: căn form và color picker rõ ràng ===== */
+.office-grid{
+  align-items:start;
+}
+.office-grid > .office-field{
+  align-content:start;
+}
+.office-field > span{
+  min-height:15px;
+  display:flex;
+  align-items:flex-end;
+  line-height:1.15;
+}
+.office-grid.three > .office-field{
+  grid-template-rows:15px minmax(42px,auto) auto;
+}
+.office-field input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+.office-field select{
+  min-height:42px;
+}
+.office-field-help,
+.office-field small{
+  min-height:16px;
+  margin-top:0;
+  line-height:1.35;
+}
+
+/* Native color input mặc định của Chrome bị CSS chung ép thành một vạch mỏng.
+   Phần này biến nó thành ô màu thật, dễ nhìn và dễ bấm. */
+.office-field input[type="color"]{
+  width:100%;
+  height:42px;
+  min-height:42px;
+  padding:4px;
+  border:1px solid var(--border);
+  border-radius:11px;
+  background:var(--panel-soft);
+  cursor:pointer;
+  overflow:hidden;
+}
+.office-field input[type="color"]::-webkit-color-swatch-wrapper{
+  padding:0;
+}
+.office-field input[type="color"]::-webkit-color-swatch{
+  border:1px solid color-mix(in srgb,var(--text) 20%,var(--border));
+  border-radius:7px;
+}
+.office-field input[type="color"]::-moz-color-swatch{
+  border:1px solid color-mix(in srgb,var(--text) 20%,var(--border));
+  border-radius:7px;
+}
+.office-field input[type="color"]:disabled{
+  opacity:.38;
+  cursor:not-allowed;
+  background:
+    linear-gradient(45deg,#d7ddd9 25%,transparent 25%),
+    linear-gradient(-45deg,#d7ddd9 25%,transparent 25%),
+    linear-gradient(45deg,transparent 75%,#d7ddd9 75%),
+    linear-gradient(-45deg,transparent 75%,#d7ddd9 75%);
+  background-size:14px 14px;
+  background-position:0 0,0 7px,7px -7px,-7px 0;
+}
+
+/* Card có trường trợ giúp dài vẫn không làm input ở cột kế bên lệch hàng. */
+.office-grid.three{
+  row-gap:12px;
+}
