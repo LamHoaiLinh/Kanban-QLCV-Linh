@@ -4,6 +4,7 @@
   class KanbanDragDrop {
     constructor(board, options = {}) {
       this.board = board;
+      this.scrollContainer = board.closest('.board-area') || board;
       this.onStart = options.onStart || (() => {});
       this.onEnd = options.onEnd || (() => {});
       this.canDrag = options.canDrag || (() => true);
@@ -14,6 +15,8 @@
       this.dragType = null;
       this.pointerId = null;
       this.mouseGrip = null;
+      this.autoScrollPoint = null;
+      this.autoScrollFrame = null;
       this.boundDragStart = this.handleDragStart.bind(this);
       this.boundDragOver = this.handleDragOver.bind(this);
       this.boundDragEnd = this.handleDragEnd.bind(this);
@@ -73,6 +76,7 @@
       event.preventDefault();
       event.dataTransfer.dropEffect = 'move';
       this.moveAt(event.clientX, event.clientY);
+      this.setAutoScrollPoint(event.clientX, event.clientY);
     }
 
     handleDragEnd() {
@@ -111,7 +115,7 @@
       if (!this.dragEl || event.pointerId !== this.pointerId) return;
       event.preventDefault();
       this.moveAt(event.clientX, event.clientY);
-      this.autoScroll(event.clientX, event.clientY);
+      this.setAutoScrollPoint(event.clientX, event.clientY);
     }
 
     handlePointerUp(event) {
@@ -153,16 +157,72 @@
       else this.board.insertBefore(this.dragEl, addTile || null);
     }
 
-    autoScroll(x, y) {
-      const margin = 56;
-      const speed = 18;
-      if (x < margin) this.board.scrollLeft -= speed;
-      else if (x > window.innerWidth - margin) this.board.scrollLeft += speed;
-      if (y < margin) this.board.scrollTop -= speed;
-      else if (y > window.innerHeight - margin) this.board.scrollTop += speed;
+    setAutoScrollPoint(x, y) {
+      this.autoScrollPoint = {x, y};
+      if (!this.autoScrollFrame) {
+        this.autoScrollFrame = requestAnimationFrame(() => this.runAutoScroll());
+      }
+    }
+
+    runAutoScroll() {
+      this.autoScrollFrame = null;
+      if (!this.dragEl || !this.autoScrollPoint || !this.scrollContainer) return;
+
+      const scroller = this.scrollContainer;
+      const rect = scroller.getBoundingClientRect();
+      const {x, y} = this.autoScrollPoint;
+      const edgeX = Math.min(92, Math.max(56, rect.width * .08));
+      const edgeY = Math.min(92, Math.max(58, rect.height * .10));
+      const maxSpeed = 24;
+
+      let dx = 0;
+      let dy = 0;
+
+      if (x >= rect.left && x <= rect.right) {
+        if (x < rect.left + edgeX) {
+          const ratio = Math.min(1, (rect.left + edgeX - x) / edgeX);
+          dx = -Math.max(5, Math.round(maxSpeed * ratio));
+        } else if (x > rect.right - edgeX) {
+          const ratio = Math.min(1, (x - (rect.right - edgeX)) / edgeX);
+          dx = Math.max(5, Math.round(maxSpeed * ratio));
+        }
+      }
+
+      if (y >= rect.top - 12 && y <= rect.bottom + 12) {
+        if (y < rect.top + edgeY) {
+          const ratio = Math.min(1, (rect.top + edgeY - y) / edgeY);
+          dy = -Math.max(6, Math.round(maxSpeed * ratio));
+        } else if (y > rect.bottom - edgeY) {
+          const ratio = Math.min(1, (y - (rect.bottom - edgeY)) / edgeY);
+          dy = Math.max(6, Math.round(maxSpeed * ratio));
+        }
+      }
+
+      if (dx || dy) {
+        const oldLeft = scroller.scrollLeft;
+        const oldTop = scroller.scrollTop;
+        scroller.scrollBy({left:dx, top:dy, behavior:'auto'});
+
+        // Sau khi board di chuyển, cập nhật vị trí thẻ theo tọa độ con trỏ hiện tại.
+        if (scroller.scrollLeft !== oldLeft || scroller.scrollTop !== oldTop) {
+          this.moveAt(x, y);
+        }
+
+        this.autoScrollFrame = requestAnimationFrame(() => this.runAutoScroll());
+      } else {
+        // Vẫn kiểm tra tiếp khi người dùng giữ thẻ sát mép nhưng không di chuột.
+        this.autoScrollFrame = requestAnimationFrame(() => this.runAutoScroll());
+      }
+    }
+
+    stopAutoScroll() {
+      this.autoScrollPoint = null;
+      if (this.autoScrollFrame) cancelAnimationFrame(this.autoScrollFrame);
+      this.autoScrollFrame = null;
     }
 
     cleanup() {
+      this.stopAutoScroll();
       this.dragEls.forEach(el => el.classList.remove('dragging'));
       this.dragEl?.classList.remove('dragging');
       document.body.classList.remove('drag-active');

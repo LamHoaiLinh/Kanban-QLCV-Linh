@@ -580,3 +580,118 @@ body.has-background .kanban-column.custom-column-color{background:color-mix(in s
 @supports (height:100dvh){
   .app-shell{height:100dvh}
 }
+
+/* ===== v5.10: vùng bảng cuộn độc lập, background/sidebar cố định ===== */
+@media(min-width:901px){
+  .app-shell{
+    height:100vh;
+    height:100dvh;
+    min-height:0;
+    overflow:hidden;
+  }
+  .sidebar{
+    position:sticky;
+    top:0;
+    align-self:start;
+    height:100vh;
+    height:100dvh;
+    min-height:0;
+    overflow:hidden;
+  }
+  .main-content{
+    height:100vh;
+    height:100dvh;
+    min-height:0;
+    overflow:hidden;
+  }
+  .topbar{
+    min-height:0;
+  }
+  .board-area{
+    min-width:0;
+    min-height:0;
+    width:100%;
+    height:100%;
+    overflow:auto;
+    overscroll-behavior:contain;
+    scrollbar-gutter:stable;
+    background-color:var(--bg);
+  }
+  .board{
+    min-width:max-content;
+    min-height:100%;
+    width:max-content;
+    height:max-content;
+    overflow:visible;
+    padding-bottom:64px;
+  }
+  .kanban-column{
+    max-height:none;
+    height:max-content;
+    flex:0 0 auto;
+  }
+  .card-list{
+    overflow:visible;
+    max-height:none;
+  }
+
+  /* Nền được gắn vào viewport board-area thay vì pseudo-element cuộn theo nội dung. */
+  .board-area::before{
+    display:none!important;
+  }
+  body.has-background .board-area{
+    background-image:
+      linear-gradient(rgba(238,247,242,.34),rgba(238,247,242,.42)),
+      var(--board-bg-image);
+    background-size:cover;
+    background-position:center;
+    background-repeat:no-repeat;
+    background-attachment:scroll;
+  }
+  :root[data-theme="dark"] body.has-background .board-area{
+    background-image:
+      linear-gradient(rgba(13,28,22,.52),rgba(13,28,22,.60)),
+      var(--board-bg-image);
+  }
+
+  /* Thanh cuộn chỉ hiện khi nội dung thật sự vượt viewport. */
+  .board-area::-webkit-scrollbar{
+    width:11px;
+    height:11px;
+  }
+  .board-area::-webkit-scrollbar-track{
+    background:color-mix(in srgb,var(--panel) 55%,transparent);
+  }
+  .board-area::-webkit-scrollbar-thumb{
+    background:color-mix(in srgb,var(--green) 58%,#8aa79b);
+    border:2px solid color-mix(in srgb,var(--panel) 72%,transparent);
+    border-radius:999px;
+  }
+  .board-area::-webkit-scrollbar-thumb:hover{
+    background:var(--green);
+  }
+
+  /* Ô Thêm cột không để chữ vượt viền ở zoom lớn. */
+  .add-column-tile{
+    flex:0 0 168px;
+    width:168px;
+    min-width:168px;
+    max-width:168px;
+    min-height:52px;
+    padding:12px 13px;
+    gap:7px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    justify-content:center;
+    font-size:13px;
+  }
+}
+
+/* Trong lúc kéo chỉ board được phép chuyển vị trí; sidebar/nhạc giữ nguyên. */
+body.drag-active .sidebar{
+  transform:none;
+}
+body.drag-active .music-player{
+  scroll-behavior:auto;
+}

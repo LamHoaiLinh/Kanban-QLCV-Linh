@@ -315,3 +315,12 @@ THAY_DOI_V5.3
 - Thêm PDF A4 dọc → A5 ngang: lấy nửa trên mỗi trang, giữ nội dung vector.
 - Thêm tooltip giải thích cho toàn bộ tab và điều khiển chính trong công cụ PDF.
 - Thêm mô tả trực tiếp cho các chế độ Chuẩn hóa trang khi gộp PDF.
+
+
+=== v5.10 ===
+- Board Kanban có viewport cuộn riêng ở zoom 100%; thanh cuộn ngang/dọc chỉ xuất hiện khi nội dung vượt khung.
+- Sidebar, trình phát nhạc và hình nền không còn bị dịch chuyển khi kéo task.
+- Background được gắn cố định vào vùng nhìn của board thay vì cuộn cùng nội dung.
+- Kéo task sát mép trên/dưới/trái/phải sẽ tự cuộn liên tục theo hướng tương ứng.
+- Sửa ô + Thêm cột để không tràn chữ ở mức zoom lớn.
+- Không thay đổi dữ liệu, task, Dice, Tarot hoặc Office PDF.

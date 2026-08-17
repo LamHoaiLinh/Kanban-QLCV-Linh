@@ -1,6 +1,6 @@
-const CACHE_NAME='linh-kanban-static-v59-scroll-pdf-a5';
+const CACHE_NAME='linh-kanban-static-v510-fixed-board-drag';
 const ASSETS=[
-  './','./index.html','./styles.css?v=5.9','./dragdrop.js?v=3.2','./app.js?v=3.7','./music-player.js?v=3.2',
+  './','./index.html','./styles.css?v=5.10','./dragdrop.js?v=3.3','./app.js?v=3.7','./music-player.js?v=3.2',
   './office-tools/office-tools.css?v=3.4','./office-tools/office-tools.js?v=3.4','./office-tools/vendor/jszip.min.js',
   './dice-launcher.js?v=5.7','./dice-game/index.html?v=5.7.0','./dice-game/styles.css?v=5.7.0','./dice-game/js/app.js?v=5.7.0','./dice-game/js/d10-engine.js?v=5.7.0','./dice-game/assets/D10.glb',
   './tarot-launcher.js?v=5.3','./tarot-game/index.html?v=5.3.0','./tarot-game/styles.css?v=5.3.0','./tarot-game/js/app.js?v=5.3.0','./tarot-game/js/tarot-data.js',
