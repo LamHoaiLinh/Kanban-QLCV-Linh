@@ -365,10 +365,203 @@ async function runRenameInPlace(){try{if(!state.renameRootHandle)throw new Error
 function renderExcelTool(){const tabs=[['inspect','Đọc & xuất JSON'],['manage','Quản lý sheet'],['combine','Gộp sheet'],['workbooks','Gộp nhiều file'],['split','Tách sheet']];mainHost.innerHTML=`<section class="office-tool-panel active"><div class="office-tool-head"><div><h3>Excel</h3><p>Đọc XLSX, XLS, XLSM và CSV; phân biệt ô giá trị với ô công thức.</p></div></div>${subTabs('excel',tabs)}<div id="excelSubHost"></div><div class="office-warning">Ứng dụng đọc công thức và giá trị cached được lưu trong file. Không tự tính lại toàn bộ công thức như Microsoft Excel; không chạy VBA hoặc macro.</div><div class="office-library-warning">Thư viện SheetJS được tải theo phiên bản cố định khi công cụ Excel được mở lần đầu.</div></section>`;bindSubtabs('excel');const h=mainHost.querySelector('#excelSubHost');if(state.sub.excel==='inspect')renderExcelInspect(h);if(state.sub.excel==='manage')renderExcelManage(h);if(state.sub.excel==='combine')renderExcelCombine(h);if(state.sub.excel==='workbooks')renderExcelWorkbooks(h);if(state.sub.excel==='split')renderExcelSplit(h)}
 function excelBrowseCard(extra=''){return `<div class="office-card"><div class="office-dropzone" id="excelDrop"><strong>Browse hoặc kéo thả file Excel/CSV</strong><span>XLSX, XLS, XLSM và CSV.</span><input type="file" accept=".xlsx,.xls,.xlsm,.csv" multiple hidden></div><div class="office-toolbar"><button class="office-btn" id="excelAdd">Chọn thêm file</button><button class="office-btn danger" id="excelClear">Xóa danh sách</button></div><div id="excelFileList"></div></div>${extra}`}
 function bindExcelLibrary(){const add=async files=>{try{startBusy('Đang đọc workbook…');const XLSX=await ensureXlsx();for(let i=0;i<files.length;i++){const file=files[i];if(!/\.(xlsx|xls|xlsm|csv)$/i.test(file.name))continue;const data=await file.arrayBuffer();const wb=XLSX.read(data,{type:'array',cellFormula:true,cellDates:true,cellNF:true,cellText:true,bookVBA:false});state.excelFiles.push({id:uid(),file,wb});setStatus(`Đang đọc ${i+1}/${files.length}`,Math.round((i+1)/files.length*100));}endBusy(`Đã đọc ${state.excelFiles.length} file.`);renderExcelTool()}catch(e){showError(e)}};const drop=mainHost.querySelector('#excelDrop');bindDropzone(drop,f=>/\.(xlsx|xls|xlsm|csv)$/i.test(f.name),add);drop.querySelector('input').onchange=e=>add([...e.target.files]);mainHost.querySelector('#excelAdd').onclick=async()=>add(await fileInput('.xlsx,.xls,.xlsm,.csv',true));mainHost.querySelector('#excelClear').onclick=()=>{state.excelFiles=[];renderExcelTool()};const l=mainHost.querySelector('#excelFileList');l.innerHTML=listRows(state.excelFiles,it=>`${formatBytes(it.file.size)} · ${it.wb.SheetNames.length} sheet`);bindListActions(l,state.excelFiles,renderExcelTool)}
-function renderExcelInspect(h){h.innerHTML=excelBrowseCard(`<div class="office-card"><h4>Cấu trúc workbook</h4><div id="excelOverview"></div><div class="office-toolbar"><label class="office-check"><input id="excelFormatted" type="checkbox" checked> Xuất formattedValue</label><label class="office-check"><input id="excelHyperlinks" type="checkbox" checked> Hyperlink/comment</label><label class="office-check"><input id="excelEmpty" type="checkbox"> Cả ô trống trong vùng dùng</label><span class="spacer"></span><button class="office-btn" id="excelPreviewJson" ${state.excelFiles.length?'':'disabled'}>Xem trước JSON</button><button class="office-btn primary" id="excelExportJson" ${state.excelFiles.length?'':'disabled'}>Xuất JSON</button></div><pre id="excelJsonPreview" class="office-json-preview" hidden></pre></div>`);bindExcelLibrary();renderExcelOverview();mainHost.querySelector('#excelPreviewJson').onclick=()=>{const obj=buildWorkbookJson(state.excelFiles[0]);const pre=mainHost.querySelector('#excelJsonPreview');pre.hidden=false;pre.textContent=JSON.stringify(obj,null,2).slice(0,120000)};mainHost.querySelector('#excelExportJson').onclick=async()=>{try{startBusy('Đang tạo JSON…');const obj=buildWorkbookJson(state.excelFiles[0]);await saveBlob(new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}),`${baseName(state.excelFiles[0].file.name)}_cells.json`,'JSON');endBusy('Đã xuất JSON workbook.')}catch(e){showError(e)}}}
+function renderExcelInspect(h){h.innerHTML=excelBrowseCard(`<div class="office-card"><h4>Cấu trúc workbook</h4><div id="excelOverview"></div><div class="office-toolbar"><label class="office-check"><input id="excelFormatted" type="checkbox" checked> Xuất formattedValue</label><label class="office-check"><input id="excelHyperlinks" type="checkbox" checked> Hyperlink/comment</label><label class="office-check" title="Chỉ nên bật với workbook nhỏ. Với vùng dùng rất lớn, việc xuất cả ô trống có thể tạo hàng triệu hoặc hàng tỷ ô JSON."><input id="excelEmpty" type="checkbox"> Cả ô trống trong vùng dùng</label><span class="spacer"></span><button class="office-btn" id="excelPreviewJson" ${state.excelFiles.length?'':'disabled'}>Xem trước JSON</button><button class="office-btn primary" id="excelExportJson" ${state.excelFiles.length?'':'disabled'}>Xuất JSON</button></div><div class="office-card-note" style="margin-top:8px">File Excel lớn sẽ được xuất JSON tuần tự theo từng sheet/ô để tránh vượt giới hạn bộ nhớ của trình duyệt.</div><pre id="excelJsonPreview" class="office-json-preview" hidden></pre></div>`);
+  bindExcelLibrary();renderExcelOverview();
+  mainHost.querySelector('#excelPreviewJson').onclick=()=>{
+    try{
+      const obj=buildWorkbookJsonPreview(state.excelFiles[0],1200);
+      const pre=mainHost.querySelector('#excelJsonPreview');
+      pre.hidden=false;
+      pre.textContent=JSON.stringify(obj,null,2);
+    }catch(e){showError(e)}
+  };
+  mainHost.querySelector('#excelExportJson').onclick=()=>exportWorkbookJsonStream(state.excelFiles[0]);
+}
 function renderExcelOverview(){const host=mainHost.querySelector('#excelOverview');if(!state.excelFiles.length){host.innerHTML='<div class="office-empty">Chưa chọn workbook.</div>';return}const item=state.excelFiles[0];host.innerHTML=`<strong>${escapeHtml(item.file.name)}</strong><div class="office-sheet-list" style="margin-top:9px">${item.wb.SheetNames.map(n=>{const ws=item.wb.Sheets[n],ref=ws['!ref']||'Trống';return `<span class="office-sheet-chip">${escapeHtml(n)} · ${escapeHtml(ref)}</span>`}).join('')}</div>`}
 function excelCellType(cell){return cell.t==='n'?'number':cell.t==='b'?'boolean':cell.t==='d'?'date':cell.t==='e'?'error':'string'}
-function buildWorkbookJson(item){if(!item)throw new Error('Chưa chọn workbook.');const formatted=mainHost.querySelector('#excelFormatted')?.checked??true,links=mainHost.querySelector('#excelHyperlinks')?.checked??true,includeEmpty=mainHost.querySelector('#excelEmpty')?.checked??false;const XLSX=globalThis.XLSX;return {formatVersion:1,sourceFile:{name:item.file.name,size:item.file.size,exportedAt:new Date().toISOString()},workbook:{sheetOrder:[...item.wb.SheetNames]},sheets:item.wb.SheetNames.map(name=>{const ws=item.wb.Sheets[name],range=ws['!ref']||'A1:A1',cells={};if(includeEmpty){const r=XLSX.utils.decode_range(range);for(let R=r.s.r;R<=r.e.r;R++)for(let C=r.s.c;C<=r.e.c;C++){const addr=XLSX.utils.encode_cell({r:R,c:C}),cell=ws[addr];cells[addr]=cellJson(cell,formatted,links)}}else Object.keys(ws).filter(k=>!k.startsWith('!')).forEach(addr=>cells[addr]=cellJson(ws[addr],formatted,links));return {name,range,mergedRanges:(ws['!merges']||[]).map(r=>XLSX.utils.encode_range(r)),cells}})} }
+function excelJsonOptions(){
+  return {
+    formatted:mainHost.querySelector('#excelFormatted')?.checked??true,
+    links:mainHost.querySelector('#excelHyperlinks')?.checked??true,
+    includeEmpty:mainHost.querySelector('#excelEmpty')?.checked??false
+  };
+}
+function excelRangeCellCount(range){
+  const XLSX=globalThis.XLSX,r=XLSX.utils.decode_range(range||'A1:A1');
+  return (r.e.r-r.s.r+1)*(r.e.c-r.s.c+1);
+}
+function validateExcelEmptyExport(item,includeEmpty){
+  if(!includeEmpty)return;
+  let total=0;
+  for(const name of item.wb.SheetNames){
+    const ws=item.wb.Sheets[name],range=ws['!ref']||'A1:A1';
+    const count=excelRangeCellCount(range);
+    if(count>2000000)throw new Error(`Sheet “${name}” có vùng dùng ${range}, tương đương ${count.toLocaleString('vi-VN')} ô. Không nên bật “Cả ô trống trong vùng dùng” cho sheet này. Hãy bỏ chọn tùy chọn đó rồi xuất lại.`);
+    total+=count;
+    if(total>5000000)throw new Error(`Tổng vùng dùng vượt ${total.toLocaleString('vi-VN')} ô. Hãy bỏ chọn “Cả ô trống trong vùng dùng” để chỉ xuất những ô thực sự có dữ liệu/công thức.`);
+  }
+}
+function buildWorkbookJsonPreview(item,maxCells=1200){
+  if(!item)throw new Error('Chưa chọn workbook.');
+  const {formatted,links,includeEmpty}=excelJsonOptions(),XLSX=globalThis.XLSX;
+  validateExcelEmptyExport(item,includeEmpty);
+  let remaining=maxCells,totalShown=0,truncated=false;
+  const sheets=[];
+  for(const name of item.wb.SheetNames){
+    const ws=item.wb.Sheets[name],range=ws['!ref']||'A1:A1',cells={};
+    if(remaining>0){
+      if(includeEmpty){
+        const r=XLSX.utils.decode_range(range);
+        outer:for(let R=r.s.r;R<=r.e.r;R++)for(let C=r.s.c;C<=r.e.c;C++){
+          if(remaining<=0){truncated=true;break outer}
+          const addr=XLSX.utils.encode_cell({r:R,c:C});
+          cells[addr]=cellJson(ws[addr],formatted,links);
+          remaining--;totalShown++;
+        }
+      }else{
+        for(const addr of Object.keys(ws)){
+          if(addr.startsWith('!'))continue;
+          if(remaining<=0){truncated=true;break}
+          cells[addr]=cellJson(ws[addr],formatted,links);
+          remaining--;totalShown++;
+        }
+      }
+    }else truncated=true;
+    sheets.push({name,range,mergedRanges:(ws['!merges']||[]).map(r=>XLSX.utils.encode_range(r)),cells});
+  }
+  return {
+    formatVersion:1,
+    preview:true,
+    previewLimitCells:maxCells,
+    previewCellsShown:totalShown,
+    previewTruncated:truncated,
+    sourceFile:{name:item.file.name,size:item.file.size,exportedAt:new Date().toISOString()},
+    workbook:{sheetOrder:[...item.wb.SheetNames]},
+    sheets
+  };
+}
+async function createJsonOutputSink(filename){
+  const safe=safeName(filename,'.json');
+  if('showSaveFilePicker'in window){
+    const handle=await showSaveFilePicker({
+      suggestedName:safe,
+      types:[{description:'JSON',accept:{'application/json':['.json']}}]
+    });
+    const writable=await handle.createWritable();
+    return {
+      write:chunk=>writable.write(chunk),
+      close:()=>writable.close(),
+      abort:()=>writable.abort?.()
+    };
+  }
+  const parts=[];
+  return {
+    write:chunk=>{parts.push(chunk)},
+    close:async()=>{
+      const blob=new Blob(parts,{type:'application/json'});
+      const url=URL.createObjectURL(blob),a=document.createElement('a');
+      a.href=url;a.download=safe;document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),3000);
+    },
+    abort:()=>{parts.length=0}
+  };
+}
+async function exportWorkbookJsonStream(item){
+  let sink=null;
+  try{
+    if(!item)throw new Error('Chưa chọn workbook.');
+    const {formatted,links,includeEmpty}=excelJsonOptions(),XLSX=globalThis.XLSX;
+    validateExcelEmptyExport(item,includeEmpty);
+
+    // Mở hộp thoại lưu ngay khi người dùng vừa click, tránh mất user activation.
+    sink=await createJsonOutputSink(`${baseName(item.file.name)}_cells.json`);
+    startBusy('Đang xuất JSON tuần tự…');
+
+    const meta={
+      formatVersion:1,
+      sourceFile:{name:item.file.name,size:item.file.size,exportedAt:new Date().toISOString()},
+      workbook:{sheetOrder:[...item.wb.SheetNames]}
+    };
+    await sink.write('{\n');
+    await sink.write(`  "formatVersion": ${meta.formatVersion},\n`);
+    await sink.write(`  "sourceFile": ${JSON.stringify(meta.sourceFile)},\n`);
+    await sink.write(`  "workbook": ${JSON.stringify(meta.workbook)},\n`);
+    await sink.write('  "sheets": [\n');
+
+    const sheetCount=item.wb.SheetNames.length;
+    for(let si=0;si<sheetCount;si++){
+      assertNotAborted();
+      const name=item.wb.SheetNames[si],ws=item.wb.Sheets[name],range=ws['!ref']||'A1:A1';
+      const merges=(ws['!merges']||[]).map(r=>XLSX.utils.encode_range(r));
+
+      if(si)await sink.write(',\n');
+      await sink.write('    {\n');
+      await sink.write(`      "name": ${JSON.stringify(name)},\n`);
+      await sink.write(`      "range": ${JSON.stringify(range)},\n`);
+      await sink.write(`      "mergedRanges": ${JSON.stringify(merges)},\n`);
+      await sink.write('      "cells": {\n');
+
+      let first=true,buffer='',writtenCells=0;
+      const flush=async(force=false)=>{
+        if(buffer.length>=524288||force){
+          if(buffer){await sink.write(buffer);buffer=''}
+        }
+      };
+
+      const appendCell=async(addr,cell)=>{
+        const prefix=first?'':',\n';
+        first=false;
+        buffer+=`${prefix}        ${JSON.stringify(addr)}: ${JSON.stringify(cellJson(cell,formatted,links))}`;
+        writtenCells++;
+        if(buffer.length>=524288){await sink.write(buffer);buffer=''}
+      };
+
+      if(includeEmpty){
+        const r=XLSX.utils.decode_range(range);
+        const totalRows=r.e.r-r.s.r+1;
+        for(let R=r.s.r;R<=r.e.r;R++){
+          assertNotAborted();
+          for(let C=r.s.c;C<=r.e.c;C++){
+            const addr=XLSX.utils.encode_cell({r:R,c:C});
+            await appendCell(addr,ws[addr]);
+          }
+          if((R-r.s.r)%100===0){
+            const sheetProgress=(R-r.s.r+1)/Math.max(1,totalRows);
+            const overall=((si+sheetProgress)/sheetCount)*100;
+            setStatus(`Sheet ${si+1}/${sheetCount}: ${name} · ${writtenCells.toLocaleString('vi-VN')} ô`,overall);
+            await sleep();
+          }
+        }
+      }else{
+        const keys=Object.keys(ws).filter(k=>!k.startsWith('!'));
+        for(let ki=0;ki<keys.length;ki++){
+          assertNotAborted();
+          const addr=keys[ki];
+          await appendCell(addr,ws[addr]);
+          if(ki%3000===0){
+            const sheetProgress=(ki+1)/Math.max(1,keys.length);
+            const overall=((si+sheetProgress)/sheetCount)*100;
+            setStatus(`Sheet ${si+1}/${sheetCount}: ${name} · ${ki+1}/${keys.length} ô`,overall);
+            await sleep();
+          }
+        }
+      }
+      if(buffer)await sink.write(buffer);
+      await sink.write('\n      }\n    }');
+      setStatus(`Đã xuất sheet ${si+1}/${sheetCount}: ${name}`,((si+1)/sheetCount)*100);
+      await sleep();
+    }
+
+    await sink.write('\n  ]\n}\n');
+    await sink.close();
+    sink=null;
+    endBusy(`Đã xuất JSON ${item.wb.SheetNames.length} sheet mà không tạo một chuỗi JSON khổng lồ trong RAM.`);
+  }catch(e){
+    try{await sink?.abort?.()}catch{}
+    if(e?.name==='AbortError'){endBusy('Đã hủy tác vụ.');return}
+    showError(e);
+  }
+}
 function cellJson(cell,formatted,links){if(!cell)return {kind:'blank',valueType:'blank',rawValue:null};const o=cell.f?{kind:'formula',formula:cell.f,cachedValue:cell.v}:{kind:'value',valueType:excelCellType(cell),rawValue:cell.v};if(formatted&&cell.w!=null)o.formattedValue=cell.w;if(links&&cell.l)o.hyperlink=cell.l.Target||cell.l.target;if(links&&cell.c)o.comments=cell.c.map(c=>({author:c.a,text:c.t}));return o}
 function renderExcelManage(h){h.innerHTML=excelBrowseCard(`<div class="office-card"><h4>Quản lý sheet trong bản kết quả</h4><p class="office-card-note">Các thao tác chỉ áp dụng cho bản đang mở trong trình duyệt. File gốc trên máy không bị thay đổi.</p><div class="office-grid"><label class="office-field"><span>Sheet đang chọn</span><select id="excelManageSheet"></select></label><label class="office-field"><span>Tên mới</span><input id="excelManageName" maxlength="31"></label></div><div class="office-toolbar"><button class="office-btn" id="excelSheetUp">↑ Lên</button><button class="office-btn" id="excelSheetDown">↓ Xuống</button><button class="office-btn" id="excelSheetRename">Đổi tên</button><button class="office-btn" id="excelSheetDuplicate">Nhân bản</button><button class="office-btn danger" id="excelSheetDelete">Xóa sheet</button><span class="spacer"></span><button class="office-btn primary" id="excelManageExport">Xuất workbook XLSX</button></div></div><div class="office-card"><h4>Làm sạch dữ liệu cơ bản</h4><p class="office-card-note">Trim/chuyển số không tác động ô công thức. Xóa hàng/cột trống hoặc dòng trùng sẽ dựng lại sheet và có thể bỏ định dạng phức tạp; nếu sheet có công thức, ứng dụng sẽ không cho chạy thao tác cấu trúc.</p><div class="office-toolbar"><label class="office-check"><input id="excelCleanTrim" type="checkbox" checked> Trim khoảng trắng</label><label class="office-check"><input id="excelCleanSpaces" type="checkbox" checked> Gộp nhiều khoảng trắng</label><label class="office-check"><input id="excelCleanNumbers" type="checkbox"> Text số → number</label><label class="office-check"><input id="excelCleanRows" type="checkbox"> Xóa hàng trống</label><label class="office-check"><input id="excelCleanCols" type="checkbox"> Xóa cột trống</label><label class="office-check"><input id="excelCleanDup" type="checkbox"> Xóa dòng trùng</label><span class="spacer"></span><button class="office-btn" id="excelCleanRun">Làm sạch sheet</button></div><div id="excelManagePreview" class="office-table-wrap"></div></div>`);bindExcelLibrary();renderExcelManageControls();}
 function renderExcelManageControls(){const item=state.excelFiles[0],sel=mainHost.querySelector('#excelManageSheet'),preview=mainHost.querySelector('#excelManagePreview');if(!item){sel.innerHTML='<option>Chưa có workbook</option>';['excelSheetUp','excelSheetDown','excelSheetRename','excelSheetDuplicate','excelSheetDelete','excelManageExport','excelCleanRun'].forEach(id=>mainHost.querySelector('#'+id).disabled=true);preview.innerHTML='<div class="office-empty">Chưa chọn workbook.</div>';return}sel.innerHTML=item.wb.SheetNames.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');const sync=()=>{mainHost.querySelector('#excelManageName').value=sel.value;renderExcelSheetPreview(item,sel.value)};sel.onchange=sync;sync();mainHost.querySelector('#excelSheetUp').onclick=()=>reorderExcelSheet(-1);mainHost.querySelector('#excelSheetDown').onclick=()=>reorderExcelSheet(1);mainHost.querySelector('#excelSheetRename').onclick=renameExcelSheet;mainHost.querySelector('#excelSheetDuplicate').onclick=duplicateExcelSheet;mainHost.querySelector('#excelSheetDelete').onclick=deleteExcelSheet;mainHost.querySelector('#excelManageExport').onclick=exportManagedWorkbook;mainHost.querySelector('#excelCleanRun').onclick=cleanExcelSheet;}

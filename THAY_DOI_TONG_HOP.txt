@@ -334,3 +334,12 @@ THAY_DOI_V5.3
 - Ghép ảnh: màu nền hiển thị rõ và nhãn ghi đúng định dạng đang xuất.
 - Tarot: thêm nút Copy prompt cho AI, gồm câu hỏi, chủ đề, lá bài, xuôi/ngược, kết luận và yêu cầu diễn giải.
 - Không thay đổi dữ liệu hoặc logic công việc Kanban.
+
+
+=== v5.12 ===
+- Sửa lỗi Excel → JSON “Invalid string length” với workbook lớn.
+- Không còn build + JSON.stringify toàn bộ workbook thành một chuỗi khổng lồ trong RAM.
+- JSON được xuất tuần tự theo từng sheet và từng nhóm ô; ưu tiên ghi trực tiếp bằng File System Access API.
+- Xem trước JSON chỉ lấy tối đa 1.200 ô để tránh treo trình duyệt.
+- Chặn tùy chọn “Cả ô trống trong vùng dùng” khi vùng dùng quá lớn để tránh tạo hàng triệu/tỷ ô rỗng.
+- Không thay đổi dữ liệu hoặc logic Kanban khác.
