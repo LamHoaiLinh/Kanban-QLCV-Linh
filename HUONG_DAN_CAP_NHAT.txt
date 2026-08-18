@@ -1,0 +1,10 @@
+BẢN CẬP NHẬT v5.17 - GAME HUB + FARM V2
+
+1. Giải nén file ZIP này.
+2. Upload đè index.html và sw.js lên thư mục gốc GitHub Pages.
+3. Upload mới game-launcher.js vào thư mục gốc.
+4. Upload nguyên thư mục farm-game/.
+5. KHÔNG cần xóa dice-launcher.js, tarot-launcher.js, tetris-launcher.js cũ; index mới không gọi chúng nữa.
+6. Sau khi GitHub Pages cập nhật, mở: ?v=517 hoặc Ctrl+F5.
+
+Các file Kanban KHÔNG nằm trong patch và không bị sửa: app.js, dragdrop.js, music-player.js, styles.css, office-tools/*.
