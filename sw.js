@@ -1,7 +1,7 @@
-const CACHE_NAME='linh-kanban-static-v519-img-long-content';
+const CACHE_NAME='linh-kanban-static-v520-img-long-taint-fix';
 const ASSETS=[
   './','./index.html','./styles.css?v=5.10','./dragdrop.js?v=3.3','./app.js?v=3.7','./music-player.js?v=3.2',
-  './office-tools/office-tools.css?v=3.8','./office-tools/office-tools.js?v=4.1','./office-tools/excel-ai-analysis.mjs?v=1.0.0','./office-tools/vendor/jszip.min.js',
+  './office-tools/office-tools.css?v=3.8','./office-tools/office-tools.js?v=4.2','./office-tools/excel-ai-analysis.mjs?v=1.0.0','./office-tools/vendor/jszip.min.js',
   './game-launcher.js?v=1.0','./farm-game/index.html?v=2.1.0','./farm-game/styles.css?v=2.1.0','./farm-game/asset-loader.css?v=1.0.0','./farm-game/config.js?v=2.0.0','./farm-game/game.js?v=2.1.0','./farm-game/asset-loader.js?v=1.0.0','./farm-game/assets/manifest.json?v=1.0.0','./farm-game/LICENSE_SOURCE.txt',
   './dice-launcher.js?v=5.7','./dice-game/index.html?v=5.7.0','./dice-game/styles.css?v=5.7.0','./dice-game/js/app.js?v=5.7.0','./dice-game/js/d10-engine.js?v=5.7.0','./dice-game/assets/D10.glb',
   './tarot-launcher.js?v=5.4','./tarot-game/index.html?v=5.4.0','./tarot-game/styles.css?v=5.4.0','./tarot-game/js/app.js?v=5.4.0','./tarot-game/js/tarot-data.js',
