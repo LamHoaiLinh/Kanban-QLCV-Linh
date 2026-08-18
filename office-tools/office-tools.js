@@ -4,6 +4,7 @@
  * - Mọi tệp được xử lý cục bộ trong trình duyệt.
  * - Các thư viện PDF/Excel được tải lười khi người dùng mở đúng công cụ.
  */
+import {analyzeWorkbookForAI,createIntegrityTracker} from './excel-ai-analysis.mjs?v=1.0.0';
 const OFFICE_SETTINGS_KEY = 'linh_kanban_office_settings_v1';
 const PINNED_LIBS = {
   pdfLib: 'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js',
@@ -365,11 +366,401 @@ async function runRenameInPlace(){try{if(!state.renameRootHandle)throw new Error
 function renderExcelTool(){const tabs=[['inspect','Đọc & xuất JSON'],['manage','Quản lý sheet'],['combine','Gộp sheet'],['workbooks','Gộp nhiều file'],['split','Tách sheet']];mainHost.innerHTML=`<section class="office-tool-panel active"><div class="office-tool-head"><div><h3>Excel</h3><p>Đọc XLSX, XLS, XLSM và CSV; phân biệt ô giá trị với ô công thức.</p></div></div>${subTabs('excel',tabs)}<div id="excelSubHost"></div><div class="office-warning">Ứng dụng đọc công thức và giá trị cached được lưu trong file. Không tự tính lại toàn bộ công thức như Microsoft Excel; không chạy VBA hoặc macro.</div><div class="office-library-warning">Thư viện SheetJS được tải theo phiên bản cố định khi công cụ Excel được mở lần đầu.</div></section>`;bindSubtabs('excel');const h=mainHost.querySelector('#excelSubHost');if(state.sub.excel==='inspect')renderExcelInspect(h);if(state.sub.excel==='manage')renderExcelManage(h);if(state.sub.excel==='combine')renderExcelCombine(h);if(state.sub.excel==='workbooks')renderExcelWorkbooks(h);if(state.sub.excel==='split')renderExcelSplit(h)}
 function excelBrowseCard(extra=''){return `<div class="office-card"><div class="office-dropzone" id="excelDrop"><strong>Browse hoặc kéo thả file Excel/CSV</strong><span>XLSX, XLS, XLSM và CSV.</span><input type="file" accept=".xlsx,.xls,.xlsm,.csv" multiple hidden></div><div class="office-toolbar"><button class="office-btn" id="excelAdd">Chọn thêm file</button><button class="office-btn danger" id="excelClear">Xóa danh sách</button></div><div id="excelFileList"></div></div>${extra}`}
 function bindExcelLibrary(){const add=async files=>{try{startBusy('Đang đọc workbook…');const XLSX=await ensureXlsx();for(let i=0;i<files.length;i++){const file=files[i];if(!/\.(xlsx|xls|xlsm|csv)$/i.test(file.name))continue;const data=await file.arrayBuffer();const wb=XLSX.read(data,{type:'array',cellFormula:true,cellDates:true,cellNF:true,cellText:true,bookVBA:false});state.excelFiles.push({id:uid(),file,wb});setStatus(`Đang đọc ${i+1}/${files.length}`,Math.round((i+1)/files.length*100));}endBusy(`Đã đọc ${state.excelFiles.length} file.`);renderExcelTool()}catch(e){showError(e)}};const drop=mainHost.querySelector('#excelDrop');bindDropzone(drop,f=>/\.(xlsx|xls|xlsm|csv)$/i.test(f.name),add);drop.querySelector('input').onchange=e=>add([...e.target.files]);mainHost.querySelector('#excelAdd').onclick=async()=>add(await fileInput('.xlsx,.xls,.xlsm,.csv',true));mainHost.querySelector('#excelClear').onclick=()=>{state.excelFiles=[];renderExcelTool()};const l=mainHost.querySelector('#excelFileList');l.innerHTML=listRows(state.excelFiles,it=>`${formatBytes(it.file.size)} · ${it.wb.SheetNames.length} sheet`);bindListActions(l,state.excelFiles,renderExcelTool)}
-function renderExcelInspect(h){h.innerHTML=excelBrowseCard(`<div class="office-card"><h4>Cấu trúc workbook</h4><div id="excelOverview"></div><div class="office-toolbar"><label class="office-check"><input id="excelFormatted" type="checkbox" checked> Xuất formattedValue</label><label class="office-check"><input id="excelHyperlinks" type="checkbox" checked> Hyperlink/comment</label><label class="office-check"><input id="excelEmpty" type="checkbox"> Cả ô trống trong vùng dùng</label><span class="spacer"></span><button class="office-btn" id="excelPreviewJson" ${state.excelFiles.length?'':'disabled'}>Xem trước JSON</button><button class="office-btn primary" id="excelExportJson" ${state.excelFiles.length?'':'disabled'}>Xuất JSON</button></div><pre id="excelJsonPreview" class="office-json-preview" hidden></pre></div>`);bindExcelLibrary();renderExcelOverview();mainHost.querySelector('#excelPreviewJson').onclick=()=>{const obj=buildWorkbookJson(state.excelFiles[0]);const pre=mainHost.querySelector('#excelJsonPreview');pre.hidden=false;pre.textContent=JSON.stringify(obj,null,2).slice(0,120000)};mainHost.querySelector('#excelExportJson').onclick=async()=>{try{startBusy('Đang tạo JSON…');const obj=buildWorkbookJson(state.excelFiles[0]);await saveBlob(new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}),`${baseName(state.excelFiles[0].file.name)}_cells.json`,'JSON');endBusy('Đã xuất JSON workbook.')}catch(e){showError(e)}}}
+function renderExcelInspect(h){h.innerHTML=excelBrowseCard(`<div class="office-card"><h4>Cấu trúc workbook</h4><div id="excelOverview"></div><div class="office-toolbar"><label class="office-check"><input id="excelFormatted" type="checkbox" checked> Xuất formattedValue</label><label class="office-check"><input id="excelHyperlinks" type="checkbox" checked> Hyperlink/comment</label><label class="office-check" title="Chỉ nên bật với workbook nhỏ. Với vùng dùng rất lớn, việc xuất cả ô trống có thể tạo hàng triệu hoặc hàng tỷ ô JSON."><input id="excelEmpty" type="checkbox"> Cả ô trống trong vùng dùng</label><span class="spacer"></span><button class="office-btn" id="excelPreviewJson" ${state.excelFiles.length?'':'disabled'}>Xem trước JSON</button><button class="office-btn primary" id="excelExportJson" ${state.excelFiles.length?'':'disabled'}>Xuất 1 JSON</button></div><div class="office-card-note" style="margin-top:8px">File Excel lớn sẽ được xuất JSON tuần tự theo từng sheet/ô để tránh vượt giới hạn bộ nhớ của trình duyệt.</div><pre id="excelJsonPreview" class="office-json-preview" hidden></pre></div>
+  <div class="office-card excel-chatgpt-split"><div class="office-card-title-row"><div><h4>Chia JSON để gửi ChatGPT</h4><p class="office-card-note">Mỗi phần là một file JSON độc lập. Khi xuất sẽ kèm manifest, structure, formula_map và anomalies để AI hiểu toàn workbook trước khi đọc PART.</p></div><span class="office-recommend-badge">ChatGPT · 5 MB khuyến nghị</span></div><div class="office-grid three"><label class="office-field"><span>Dung lượng mỗi phần</span><select id="excelSplitMb"><option value="5" selected>5 MB — khuyến nghị</option><option value="8">8 MB — ít file hơn</option><option value="10">10 MB</option><option value="20">20 MB</option><option value="50">50 MB</option></select><small>5 MB là mức bảo thủ để giảm nguy cơ chạm giới hạn token của file văn bản.</small></label><label class="office-field"><span>Cách lưu</span><select id="excelSplitSave"><option value="folder" selected>Thư mục gồm nhiều JSON</option></select><small>Chrome/Edge sẽ hỏi chọn thư mục rồi tạo một thư mục con chứa các phần.</small></label><label class="office-field"><span>Ước tính đầu ra</span><div id="excelSplitEstimate" class="office-estimate-box">${state.excelFiles.length?'Đang chờ ước tính…':'Chưa chọn workbook.'}</div><small id="excelSplitAdvice">Nếu JSON lớn hơn khoảng 5 MB, nên dùng chế độ chia nhỏ.</small></label></div><div class="office-chatgpt-note"><strong>Thứ tự AI nên đọc:</strong> manifest → structure → formula_map → anomalies → chỉ các PART liên quan. Cơ chế chia PART theo dung lượng vẫn giữ nguyên.</div><div class="office-toolbar"><span class="spacer"></span><button class="office-btn primary" id="excelExportSplit" ${state.excelFiles.length?'':'disabled'}>Xuất JSON chia nhỏ</button></div></div>`);
+  bindExcelLibrary();renderExcelOverview();
+  mainHost.querySelector('#excelPreviewJson').onclick=()=>{
+    try{
+      const obj=buildWorkbookJsonPreview(state.excelFiles[0],1200);
+      const pre=mainHost.querySelector('#excelJsonPreview');
+      pre.hidden=false;
+      pre.textContent=JSON.stringify(obj,null,2);
+    }catch(e){showError(e)}
+  };
+  mainHost.querySelector('#excelExportJson').onclick=()=>exportWorkbookJsonStream(state.excelFiles[0]);
+  mainHost.querySelector('#excelExportSplit').onclick=()=>exportWorkbookJsonSplit(state.excelFiles[0]);
+  const refreshEstimate=()=>updateExcelSplitEstimate(state.excelFiles[0]);
+  mainHost.querySelector('#excelSplitMb').onchange=refreshEstimate;
+  ['#excelFormatted','#excelHyperlinks','#excelEmpty'].forEach(sel=>mainHost.querySelector(sel)?.addEventListener('change',refreshEstimate));
+  setTimeout(refreshEstimate,0);
+}
 function renderExcelOverview(){const host=mainHost.querySelector('#excelOverview');if(!state.excelFiles.length){host.innerHTML='<div class="office-empty">Chưa chọn workbook.</div>';return}const item=state.excelFiles[0];host.innerHTML=`<strong>${escapeHtml(item.file.name)}</strong><div class="office-sheet-list" style="margin-top:9px">${item.wb.SheetNames.map(n=>{const ws=item.wb.Sheets[n],ref=ws['!ref']||'Trống';return `<span class="office-sheet-chip">${escapeHtml(n)} · ${escapeHtml(ref)}</span>`}).join('')}</div>`}
 function excelCellType(cell){return cell.t==='n'?'number':cell.t==='b'?'boolean':cell.t==='d'?'date':cell.t==='e'?'error':'string'}
-function buildWorkbookJson(item){if(!item)throw new Error('Chưa chọn workbook.');const formatted=mainHost.querySelector('#excelFormatted')?.checked??true,links=mainHost.querySelector('#excelHyperlinks')?.checked??true,includeEmpty=mainHost.querySelector('#excelEmpty')?.checked??false;const XLSX=globalThis.XLSX;return {formatVersion:1,sourceFile:{name:item.file.name,size:item.file.size,exportedAt:new Date().toISOString()},workbook:{sheetOrder:[...item.wb.SheetNames]},sheets:item.wb.SheetNames.map(name=>{const ws=item.wb.Sheets[name],range=ws['!ref']||'A1:A1',cells={};if(includeEmpty){const r=XLSX.utils.decode_range(range);for(let R=r.s.r;R<=r.e.r;R++)for(let C=r.s.c;C<=r.e.c;C++){const addr=XLSX.utils.encode_cell({r:R,c:C}),cell=ws[addr];cells[addr]=cellJson(cell,formatted,links)}}else Object.keys(ws).filter(k=>!k.startsWith('!')).forEach(addr=>cells[addr]=cellJson(ws[addr],formatted,links));return {name,range,mergedRanges:(ws['!merges']||[]).map(r=>XLSX.utils.encode_range(r)),cells}})} }
-function cellJson(cell,formatted,links){if(!cell)return {kind:'blank',valueType:'blank',rawValue:null};const o=cell.f?{kind:'formula',formula:cell.f,cachedValue:cell.v}:{kind:'value',valueType:excelCellType(cell),rawValue:cell.v};if(formatted&&cell.w!=null)o.formattedValue=cell.w;if(links&&cell.l)o.hyperlink=cell.l.Target||cell.l.target;if(links&&cell.c)o.comments=cell.c.map(c=>({author:c.a,text:c.t}));return o}
+function excelJsonOptions(){
+  return {
+    formatted:mainHost.querySelector('#excelFormatted')?.checked??true,
+    links:mainHost.querySelector('#excelHyperlinks')?.checked??true,
+    includeEmpty:mainHost.querySelector('#excelEmpty')?.checked??false
+  };
+}
+function excelRangeCellCount(range){
+  const XLSX=globalThis.XLSX,r=XLSX.utils.decode_range(range||'A1:A1');
+  return (r.e.r-r.s.r+1)*(r.e.c-r.s.c+1);
+}
+function validateExcelEmptyExport(item,includeEmpty){
+  if(!includeEmpty)return;
+  let total=0;
+  for(const name of item.wb.SheetNames){
+    const ws=item.wb.Sheets[name],range=ws['!ref']||'A1:A1';
+    const count=excelRangeCellCount(range);
+    if(count>2000000)throw new Error(`Sheet “${name}” có vùng dùng ${range}, tương đương ${count.toLocaleString('vi-VN')} ô. Không nên bật “Cả ô trống trong vùng dùng” cho sheet này. Hãy bỏ chọn tùy chọn đó rồi xuất lại.`);
+    total+=count;
+    if(total>5000000)throw new Error(`Tổng vùng dùng vượt ${total.toLocaleString('vi-VN')} ô. Hãy bỏ chọn “Cả ô trống trong vùng dùng” để chỉ xuất những ô thực sự có dữ liệu/công thức.`);
+  }
+}
+function buildWorkbookJsonPreview(item,maxCells=1200){
+  if(!item)throw new Error('Chưa chọn workbook.');
+  const {formatted,links,includeEmpty}=excelJsonOptions(),XLSX=globalThis.XLSX;
+  validateExcelEmptyExport(item,includeEmpty);
+  let remaining=maxCells,totalShown=0,truncated=false;
+  const sheets=[];
+  for(const name of item.wb.SheetNames){
+    const ws=item.wb.Sheets[name],range=ws['!ref']||'A1:A1',cells={};
+    if(remaining>0){
+      if(includeEmpty){
+        const r=XLSX.utils.decode_range(range);
+        outer:for(let R=r.s.r;R<=r.e.r;R++)for(let C=r.s.c;C<=r.e.c;C++){
+          if(remaining<=0){truncated=true;break outer}
+          const addr=XLSX.utils.encode_cell({r:R,c:C});
+          cells[addr]=cellJson(ws[addr],formatted,links);
+          remaining--;totalShown++;
+        }
+      }else{
+        for(const addr of Object.keys(ws)){
+          if(addr.startsWith('!'))continue;
+          if(remaining<=0){truncated=true;break}
+          cells[addr]=cellJson(ws[addr],formatted,links);
+          remaining--;totalShown++;
+        }
+      }
+    }else truncated=true;
+    sheets.push({name,range,mergedRanges:(ws['!merges']||[]).map(r=>XLSX.utils.encode_range(r)),cells});
+  }
+  return {
+    formatVersion:1,
+    preview:true,
+    previewLimitCells:maxCells,
+    previewCellsShown:totalShown,
+    previewTruncated:truncated,
+    sourceFile:{name:item.file.name,size:item.file.size,exportedAt:new Date().toISOString()},
+    workbook:{sheetOrder:[...item.wb.SheetNames]},
+    sheets
+  };
+}
+function estimateWorkbookJsonSize(item,sampleLimit=5000){
+  if(!item)return {bytes:0,cells:0,sampled:0};
+  const {formatted,links,includeEmpty}=excelJsonOptions(),XLSX=globalThis.XLSX,encoder=new TextEncoder();
+  validateExcelEmptyExport(item,includeEmpty);
+  let totalCells=0,sampled=0,sampleBytes=0;
+  for(const name of item.wb.SheetNames){
+    const ws=item.wb.Sheets[name],range=ws['!ref']||'A1:A1';
+    if(includeEmpty){
+      const count=excelRangeCellCount(range);totalCells+=count;
+      if(sampled<sampleLimit){
+        const r=XLSX.utils.decode_range(range);
+        outer:for(let R=r.s.r;R<=r.e.r;R++)for(let C=r.s.c;C<=r.e.c;C++){
+          const addr=XLSX.utils.encode_cell({r:R,c:C});
+          sampleBytes+=encoder.encode(`${JSON.stringify(addr)}:${JSON.stringify(cellJson(ws[addr],formatted,links))},`).length;
+          sampled++;if(sampled>=sampleLimit)break outer;
+        }
+      }
+    }else{
+      for(const addr in ws){
+        if(addr.startsWith('!'))continue;
+        totalCells++;
+        if(sampled<sampleLimit){
+          sampleBytes+=encoder.encode(`${JSON.stringify(addr)}:${JSON.stringify(cellJson(ws[addr],formatted,links))},`).length;
+          sampled++;
+        }
+      }
+    }
+  }
+  const avg=sampled?sampleBytes/sampled:40;
+  const metadata=4096+item.wb.SheetNames.length*512;
+  return {bytes:Math.ceil(metadata+avg*totalCells),cells:totalCells,sampled};
+}
+function updateExcelSplitEstimate(item){
+  const host=mainHost.querySelector('#excelSplitEstimate'),advice=mainHost.querySelector('#excelSplitAdvice');
+  if(!host||!advice)return;
+  if(!item){host.textContent='Chưa chọn workbook.';return}
+  try{
+    const estimate=estimateWorkbookJsonSize(item),mb=Math.max(1,+mainHost.querySelector('#excelSplitMb')?.value||5),parts=Math.max(1,Math.ceil(estimate.bytes/(mb*1024*1024*.90)));
+    host.innerHTML=`<strong>~ ${formatBytes(estimate.bytes)}</strong><span>${estimate.cells.toLocaleString('vi-VN')} ô · khoảng ${parts} file</span>`;
+    if(estimate.bytes<=5*1024*1024)advice.textContent='Ước tính nhỏ: có thể xuất 1 JSON; chia nhỏ vẫn dùng được nếu muốn.';
+    else if(parts<=20)advice.textContent=`Khuyến nghị ${mb===5?'giữ 5 MB':'5 MB'} mỗi phần; dự kiến khoảng ${Math.ceil(estimate.bytes/(5*1024*1024*.90))} file ở mức 5 MB.`;
+    else advice.textContent='Workbook rất lớn: nên giữ 5 MB/phần và upload các part theo từng nhóm nếu ChatGPT không nhận hết một lần.';
+  }catch(e){host.textContent='Không ước tính được.';advice.textContent=e.message}
+}
+async function createSplitJsonDestination(item){
+  if(!('showDirectoryPicker'in window))throw new Error('Tính năng chia nhiều file cần Chrome hoặc Edge hỗ trợ chọn thư mục.');
+  const rootHandle=await showDirectoryPicker({mode:'readwrite'});
+  const folderName=safeName(`${baseName(item.file.name)}_JSON_ChatGPT`);
+  const folder=await rootHandle.getDirectoryHandle(folderName,{create:true});
+  return {
+    folderName,
+    async writeFile(name,text){
+      const handle=await folder.getFileHandle(safeName(name),{create:true});
+      const writable=await handle.createWritable();await writable.write(text);await writable.close();
+    }
+  };
+}
+async function exportWorkbookJsonSplit(item){
+  let destination=null;
+  try{
+    if(!item)throw new Error('Chưa chọn workbook.');
+    const {formatted,links,includeEmpty}=excelJsonOptions(),XLSX=globalThis.XLSX,encoder=new TextEncoder();
+    validateExcelEmptyExport(item,includeEmpty);
+    const targetMb=Math.max(1,+mainHost.querySelector('#excelSplitMb')?.value||5),targetBytes=targetMb*1024*1024;
+    destination=await createSplitJsonDestination(item);
+    startBusy('Đang phân tích cấu trúc workbook…');
+
+    let analysis;
+    try{
+      analysis=await analyzeWorkbookForAI(item,XLSX,{
+        progress:(message,percent)=>setStatus(message,percent),
+        yield:sleep,
+        shouldAbort:()=>state.abort
+      });
+    }catch(error){
+      if(error?.name==='AbortError')throw error;
+      analysis={
+        structure:{schema_version:'2.0',source_file:item.file.name,generated_at:new Date().toISOString(),workbook:{sheet_count:item.wb.SheetNames.length},sheets:item.wb.SheetNames.map((name,index)=>({name,index,used_range:item.wb.Sheets[name]?.['!ref']||'A1:A1',analysis_status:'failed'}))},
+        formulaMap:{schema_version:'2.0',source_file:item.file.name,generated_at:new Date().toISOString(),summary:{sheet_count:item.wb.SheetNames.length,total_formula_count:null,formula_group_count:null,unsupported_formula_count:null},sheets:[]},
+        anomalies:{schema_version:'2.0',source_file:item.file.name,generated_at:new Date().toISOString(),summary:{total_anomalies:null},issues:[]},
+        analysis_status:{structure:'partial',formula_map:'failed',anomalies:'failed'},
+        warnings:[`Phân tích metadata gặp lỗi nhưng DATA PART vẫn được tiếp tục xuất: ${error.message}`]
+      };
+    }
+
+    assertNotAborted();
+    setStatus('Đang kiểm tra bất thường…',56);await sleep();
+    setStatus('Đang tạo các file metadata cho AI…',58);
+    const structureFile='structure.json',formulaMapFile='formula_map.json',anomaliesFile='anomalies.json';
+    await destination.writeFile(structureFile,JSON.stringify(analysis.structure,null,2));
+    await destination.writeFile(formulaMapFile,JSON.stringify(analysis.formulaMap,null,2));
+    await destination.writeFile(anomaliesFile,JSON.stringify(analysis.anomalies,null,2));
+    await sleep();
+
+    setStatus('Đang tạo PART dữ liệu chi tiết…',60);
+    const sourceFile={name:item.file.name,size:item.file.size,exportedAt:new Date().toISOString()};
+    const workbook={sheetOrder:[...item.wb.SheetNames]};
+    const outputs=[];
+    const integrity=createIntegrityTracker();
+    const sheetIntegrity=new Map(item.wb.SheetNames.map(name=>[name,{source_record_count:0,exported_record_count:0}]));
+    let partNo=1,currentChunks=[],currentApprox=1200,currentSheet=null,currentChunk=null,chunkIndexBySheet=new Map();
+
+    const updateChunkBounds=addr=>{
+      const pos=XLSX.utils.decode_cell(addr),row=pos.r+1,col=pos.c;
+      currentChunk.start_row=currentChunk.start_row==null?row:Math.min(currentChunk.start_row,row);
+      currentChunk.end_row=currentChunk.end_row==null?row:Math.max(currentChunk.end_row,row);
+      currentChunk.startColumnIndex=currentChunk.startColumnIndex==null?col:Math.min(currentChunk.startColumnIndex,col);
+      currentChunk.endColumnIndex=currentChunk.endColumnIndex==null?col:Math.max(currentChunk.endColumnIndex,col);
+      currentChunk.columns=`${XLSX.utils.encode_col(currentChunk.startColumnIndex)}:${XLSX.utils.encode_col(currentChunk.endColumnIndex)}`;
+      currentChunk.record_count=(currentChunk.record_count||0)+1;
+    };
+    const newChunk=(name,range,merges)=>{
+      const next=(chunkIndexBySheet.get(name)||0)+1;chunkIndexBySheet.set(name,next);
+      const chunk={sheetName:name,sheetRange:range,chunkIndex:next,mergedRanges:next===1?merges:[],start_row:null,end_row:null,columns:null,record_count:0,cells:{}};
+      currentChunks.push(chunk);currentSheet=name;currentChunk=chunk;
+      currentApprox+=encoder.encode(JSON.stringify({sheetName:name,sheetRange:range,chunkIndex:next,mergedRanges:chunk.mergedRanges,start_row:null,end_row:null,columns:null,record_count:0,cells:{}})).length+96;
+      return chunk;
+    };
+    const flushPart=async()=>{
+      if(!currentChunks.length)return;
+      const payload={schema_version:'2.0',formatVersion:2,sourceFile,workbook,splitExport:{partNumber:partNo,targetSizeMB:targetMb},chunks:currentChunks};
+      const text=JSON.stringify(payload);
+      const filename=`${baseName(item.file.name)}_part_${String(partNo).padStart(3,'0')}.json`;
+      await destination.writeFile(filename,text);
+      const blocks=currentChunks.map(c=>({sheet:c.sheetName,chunk_index:c.chunkIndex,start_row:c.start_row,end_row:c.end_row,columns:c.columns,record_count:c.record_count}));
+      outputs.push({file:filename,bytes:encoder.encode(text).length,sheets:[...new Set(currentChunks.map(c=>c.sheetName))],blocks});
+      partNo++;currentChunks=[];currentApprox=1200;currentSheet=null;currentChunk=null;
+    };
+    const appendCell=async(name,range,merges,addr,cell)=>{
+      integrity.source();sheetIntegrity.get(name).source_record_count++;
+      const record=cellJson(cell,formatted,links),entryBytes=encoder.encode(`${JSON.stringify(addr)}:${JSON.stringify(record)},`).length;
+      if(!currentChunk||currentSheet!==name)newChunk(name,range,merges);
+      if(currentApprox+entryBytes>targetBytes*.90&&currentChunk.record_count){await flushPart();newChunk(name,range,merges)}
+      currentChunk.cells[addr]=record;updateChunkBounds(addr);currentApprox+=entryBytes;
+      integrity.exported();sheetIntegrity.get(name).exported_record_count++;
+    };
+
+    const sheetCount=item.wb.SheetNames.length;
+    for(let si=0;si<sheetCount;si++){
+      assertNotAborted();
+      const name=item.wb.SheetNames[si],ws=item.wb.Sheets[name],range=ws['!ref']||'A1:A1',merges=(ws['!merges']||[]).map(r=>XLSX.utils.encode_range(r));
+      if(includeEmpty){
+        const r=XLSX.utils.decode_range(range),totalRows=r.e.r-r.s.r+1;
+        for(let R=r.s.r;R<=r.e.r;R++){
+          assertNotAborted();
+          for(let C=r.s.c;C<=r.e.c;C++){const addr=XLSX.utils.encode_cell({r:R,c:C});await appendCell(name,range,merges,addr,ws[addr])}
+          if((R-r.s.r)%50===0){setStatus(`Đang tạo PART · sheet ${si+1}/${sheetCount}: ${name}`,60+((si+(R-r.s.r+1)/Math.max(1,totalRows))/sheetCount)*36);await sleep()}
+        }
+      }else{
+        let done=0,total=0;for(const key in ws)if(!key.startsWith('!'))total++;
+        for(const addr in ws){
+          if(addr.startsWith('!'))continue;assertNotAborted();await appendCell(name,range,merges,addr,ws[addr]);done++;
+          if(done%2500===0){setStatus(`Đang tạo PART · ${name} · ${done}/${total} ô`,60+((si+done/Math.max(1,total))/sheetCount)*36);await sleep()}
+        }
+      }
+    }
+    await flushPart();
+
+    const tracked=integrity.snapshot();
+    const persistedBySheet=new Map(item.wb.SheetNames.map(name=>[name,0]));
+    let persistedCount=0;
+    for(const part of outputs)for(const block of part.blocks||[]){persistedCount+=block.record_count||0;persistedBySheet.set(block.sheet,(persistedBySheet.get(block.sheet)||0)+(block.record_count||0))}
+    const integrityResult={source_record_count:tracked.source_record_count,exported_record_count:persistedCount,status:tracked.source_record_count===persistedCount?'ok':'mismatch'};
+    const perSheetIntegrity=Object.fromEntries([...sheetIntegrity].map(([name,x])=>{const exported=persistedBySheet.get(name)||0;return [name,{source_record_count:x.source_record_count,exported_record_count:exported,status:x.source_record_count===exported?'ok':'mismatch'}]}));
+    if(integrityResult.status!=='ok')throw new Error(`Kiểm tra tính toàn vẹn thất bại: nguồn ${integrityResult.source_record_count.toLocaleString('vi-VN')} record nhưng tổng record của các PART là ${integrityResult.exported_record_count.toLocaleString('vi-VN')}.`);
+
+    const totalBytes=outputs.reduce((n,p)=>n+p.bytes,0),manifestFile=`${baseName(item.file.name)}_manifest.json`;
+    const structureSheets=analysis.structure?.sheets||[];
+    const manifest={
+      schema_version:'2.0',formatVersion:1,purpose:'Excel JSON parts for ChatGPT',sourceFile,
+      generated_at:new Date().toISOString(),
+      workbook:{sheet_count:item.wb.SheetNames.length,sheetOrder:[...item.wb.SheetNames]},
+      sheets:structureSheets.map(s=>({name:s.name,index:s.index,max_row:s.max_row,max_column:s.max_column,used_range:s.used_range,estimated_data_rows:s.estimated_data_rows,header_row:s.header_row,formula_count:s.formula_count,merged_range_count:s.merged_range_count,hidden:Boolean(s.hidden)})),
+      files:{manifest:manifestFile,structure:structureFile,formula_map:formulaMapFile,anomalies:anomaliesFile,data_parts:outputs.map(p=>p.file)},
+      recommended_read_order:[manifestFile,structureFile,formulaMapFile,anomaliesFile,'relevant_data_parts_only'],
+      analysis_status:analysis.analysis_status,
+      warnings:[...(analysis.warnings||[]),...outputs.filter(p=>p.bytes>targetBytes).map(p=>`${p.file} lớn hơn mục tiêu ${targetMb} MB do metadata hoặc một cell đơn lẻ quá lớn.`)],
+      split:{targetSizeMB:targetMb,totalParts:outputs.length,totalBytes,createdAt:new Date().toISOString()},
+      parts:outputs,
+      integrity:{...integrityResult,by_sheet:perSheetIntegrity},
+      instructions:['Đọc manifest trước để hiểu workbook và xác định file metadata.','Đọc structure để hiểu sheet/cột/kiểu dữ liệu.','Đọc formula_map để hiểu pattern công thức và ngoại lệ.','Đọc anomalies để xác định vùng cần kiểm tra.','Chỉ tải/đọc DATA PART chứa sheet và range liên quan khi cần xác minh chi tiết.']
+    };
+    await destination.writeFile(manifestFile,JSON.stringify(manifest,null,2));
+    setStatus('Đang hoàn tất…',100);
+    endBusy(`Đã tạo ${outputs.length} DATA PART + manifest/structure/formula_map/anomalies. Tính toàn vẹn: ${integrityResult.status.toUpperCase()}.`);
+  }catch(e){
+    if(e?.name==='AbortError'){endBusy('Đã hủy tác vụ.');return}
+    showError(e);
+  }
+}
+
+async function createJsonOutputSink(filename){
+  const safe=safeName(filename,'.json');
+  if('showSaveFilePicker'in window){
+    const handle=await showSaveFilePicker({
+      suggestedName:safe,
+      types:[{description:'JSON',accept:{'application/json':['.json']}}]
+    });
+    const writable=await handle.createWritable();
+    return {
+      write:chunk=>writable.write(chunk),
+      close:()=>writable.close(),
+      abort:()=>writable.abort?.()
+    };
+  }
+  const parts=[];
+  return {
+    write:chunk=>{parts.push(chunk)},
+    close:async()=>{
+      const blob=new Blob(parts,{type:'application/json'});
+      const url=URL.createObjectURL(blob),a=document.createElement('a');
+      a.href=url;a.download=safe;document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),3000);
+    },
+    abort:()=>{parts.length=0}
+  };
+}
+async function exportWorkbookJsonStream(item){
+  let sink=null;
+  try{
+    if(!item)throw new Error('Chưa chọn workbook.');
+    const {formatted,links,includeEmpty}=excelJsonOptions(),XLSX=globalThis.XLSX;
+    validateExcelEmptyExport(item,includeEmpty);
+
+    // Mở hộp thoại lưu ngay khi người dùng vừa click, tránh mất user activation.
+    sink=await createJsonOutputSink(`${baseName(item.file.name)}_cells.json`);
+    startBusy('Đang xuất JSON tuần tự…');
+
+    const meta={
+      formatVersion:1,
+      sourceFile:{name:item.file.name,size:item.file.size,exportedAt:new Date().toISOString()},
+      workbook:{sheetOrder:[...item.wb.SheetNames]}
+    };
+    await sink.write('{\n');
+    await sink.write(`  "formatVersion": ${meta.formatVersion},\n`);
+    await sink.write(`  "sourceFile": ${JSON.stringify(meta.sourceFile)},\n`);
+    await sink.write(`  "workbook": ${JSON.stringify(meta.workbook)},\n`);
+    await sink.write('  "sheets": [\n');
+
+    const sheetCount=item.wb.SheetNames.length;
+    for(let si=0;si<sheetCount;si++){
+      assertNotAborted();
+      const name=item.wb.SheetNames[si],ws=item.wb.Sheets[name],range=ws['!ref']||'A1:A1';
+      const merges=(ws['!merges']||[]).map(r=>XLSX.utils.encode_range(r));
+
+      if(si)await sink.write(',\n');
+      await sink.write('    {\n');
+      await sink.write(`      "name": ${JSON.stringify(name)},\n`);
+      await sink.write(`      "range": ${JSON.stringify(range)},\n`);
+      await sink.write(`      "mergedRanges": ${JSON.stringify(merges)},\n`);
+      await sink.write('      "cells": {\n');
+
+      let first=true,buffer='',writtenCells=0;
+      const flush=async(force=false)=>{
+        if(buffer.length>=524288||force){
+          if(buffer){await sink.write(buffer);buffer=''}
+        }
+      };
+
+      const appendCell=async(addr,cell)=>{
+        const prefix=first?'':',\n';
+        first=false;
+        buffer+=`${prefix}        ${JSON.stringify(addr)}: ${JSON.stringify(cellJson(cell,formatted,links))}`;
+        writtenCells++;
+        if(buffer.length>=524288){await sink.write(buffer);buffer=''}
+      };
+
+      if(includeEmpty){
+        const r=XLSX.utils.decode_range(range);
+        const totalRows=r.e.r-r.s.r+1;
+        for(let R=r.s.r;R<=r.e.r;R++){
+          assertNotAborted();
+          for(let C=r.s.c;C<=r.e.c;C++){
+            const addr=XLSX.utils.encode_cell({r:R,c:C});
+            await appendCell(addr,ws[addr]);
+          }
+          if((R-r.s.r)%100===0){
+            const sheetProgress=(R-r.s.r+1)/Math.max(1,totalRows);
+            const overall=((si+sheetProgress)/sheetCount)*100;
+            setStatus(`Sheet ${si+1}/${sheetCount}: ${name} · ${writtenCells.toLocaleString('vi-VN')} ô`,overall);
+            await sleep();
+          }
+        }
+      }else{
+        const keys=Object.keys(ws).filter(k=>!k.startsWith('!'));
+        for(let ki=0;ki<keys.length;ki++){
+          assertNotAborted();
+          const addr=keys[ki];
+          await appendCell(addr,ws[addr]);
+          if(ki%3000===0){
+            const sheetProgress=(ki+1)/Math.max(1,keys.length);
+            const overall=((si+sheetProgress)/sheetCount)*100;
+            setStatus(`Sheet ${si+1}/${sheetCount}: ${name} · ${ki+1}/${keys.length} ô`,overall);
+            await sleep();
+          }
+        }
+      }
+      if(buffer)await sink.write(buffer);
+      await sink.write('\n      }\n    }');
+      setStatus(`Đã xuất sheet ${si+1}/${sheetCount}: ${name}`,((si+1)/sheetCount)*100);
+      await sleep();
+    }
+
+    await sink.write('\n  ]\n}\n');
+    await sink.close();
+    sink=null;
+    endBusy(`Đã xuất JSON ${item.wb.SheetNames.length} sheet mà không tạo một chuỗi JSON khổng lồ trong RAM.`);
+  }catch(e){
+    try{await sink?.abort?.()}catch{}
+    if(e?.name==='AbortError'){endBusy('Đã hủy tác vụ.');return}
+    showError(e);
+  }
+}
+function cellJson(cell,formatted,links){if(!cell)return {kind:'blank',valueType:'blank',rawValue:null};const cachedAvailable=cell.v!==undefined&&cell.v!==null;const o=cell.f?{kind:'formula',formula:cell.f,cachedValue:cell.v,cachedValueAvailable:cachedAvailable}:{kind:'value',valueType:excelCellType(cell),rawValue:cell.v};if(formatted&&cell.w!=null)o.formattedValue=cell.w;if(links&&cell.l)o.hyperlink=cell.l.Target||cell.l.target;if(links&&cell.c)o.comments=cell.c.map(c=>({author:c.a,text:c.t}));return o}
 function renderExcelManage(h){h.innerHTML=excelBrowseCard(`<div class="office-card"><h4>Quản lý sheet trong bản kết quả</h4><p class="office-card-note">Các thao tác chỉ áp dụng cho bản đang mở trong trình duyệt. File gốc trên máy không bị thay đổi.</p><div class="office-grid"><label class="office-field"><span>Sheet đang chọn</span><select id="excelManageSheet"></select></label><label class="office-field"><span>Tên mới</span><input id="excelManageName" maxlength="31"></label></div><div class="office-toolbar"><button class="office-btn" id="excelSheetUp">↑ Lên</button><button class="office-btn" id="excelSheetDown">↓ Xuống</button><button class="office-btn" id="excelSheetRename">Đổi tên</button><button class="office-btn" id="excelSheetDuplicate">Nhân bản</button><button class="office-btn danger" id="excelSheetDelete">Xóa sheet</button><span class="spacer"></span><button class="office-btn primary" id="excelManageExport">Xuất workbook XLSX</button></div></div><div class="office-card"><h4>Làm sạch dữ liệu cơ bản</h4><p class="office-card-note">Trim/chuyển số không tác động ô công thức. Xóa hàng/cột trống hoặc dòng trùng sẽ dựng lại sheet và có thể bỏ định dạng phức tạp; nếu sheet có công thức, ứng dụng sẽ không cho chạy thao tác cấu trúc.</p><div class="office-toolbar"><label class="office-check"><input id="excelCleanTrim" type="checkbox" checked> Trim khoảng trắng</label><label class="office-check"><input id="excelCleanSpaces" type="checkbox" checked> Gộp nhiều khoảng trắng</label><label class="office-check"><input id="excelCleanNumbers" type="checkbox"> Text số → number</label><label class="office-check"><input id="excelCleanRows" type="checkbox"> Xóa hàng trống</label><label class="office-check"><input id="excelCleanCols" type="checkbox"> Xóa cột trống</label><label class="office-check"><input id="excelCleanDup" type="checkbox"> Xóa dòng trùng</label><span class="spacer"></span><button class="office-btn" id="excelCleanRun">Làm sạch sheet</button></div><div id="excelManagePreview" class="office-table-wrap"></div></div>`);bindExcelLibrary();renderExcelManageControls();}
 function renderExcelManageControls(){const item=state.excelFiles[0],sel=mainHost.querySelector('#excelManageSheet'),preview=mainHost.querySelector('#excelManagePreview');if(!item){sel.innerHTML='<option>Chưa có workbook</option>';['excelSheetUp','excelSheetDown','excelSheetRename','excelSheetDuplicate','excelSheetDelete','excelManageExport','excelCleanRun'].forEach(id=>mainHost.querySelector('#'+id).disabled=true);preview.innerHTML='<div class="office-empty">Chưa chọn workbook.</div>';return}sel.innerHTML=item.wb.SheetNames.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');const sync=()=>{mainHost.querySelector('#excelManageName').value=sel.value;renderExcelSheetPreview(item,sel.value)};sel.onchange=sync;sync();mainHost.querySelector('#excelSheetUp').onclick=()=>reorderExcelSheet(-1);mainHost.querySelector('#excelSheetDown').onclick=()=>reorderExcelSheet(1);mainHost.querySelector('#excelSheetRename').onclick=renameExcelSheet;mainHost.querySelector('#excelSheetDuplicate').onclick=duplicateExcelSheet;mainHost.querySelector('#excelSheetDelete').onclick=deleteExcelSheet;mainHost.querySelector('#excelManageExport').onclick=exportManagedWorkbook;mainHost.querySelector('#excelCleanRun').onclick=cleanExcelSheet;}
 function renderExcelSheetPreview(item,name){const host=mainHost.querySelector('#excelManagePreview'),XLSX=globalThis.XLSX,rows=XLSX.utils.sheet_to_json(item.wb.Sheets[name],{header:1,defval:'',raw:false}).slice(0,20),cols=Math.min(12,Math.max(1,...rows.map(r=>r.length)));host.innerHTML=`<table class="office-table"><tbody>${rows.map((r,i)=>`<tr>${Array.from({length:cols},(_,c)=>`<${i?'td':'th'}>${escapeHtml(r[c]??'')}</${i?'td':'th'}>`).join('')}</tr>`).join('')}</tbody></table><div class="office-card-note" style="padding:8px">Xem trước tối đa 20 dòng và 12 cột.</div>`}

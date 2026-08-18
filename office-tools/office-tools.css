@@ -179,3 +179,11 @@
 .office-grid.three{
   row-gap:12px;
 }
+
+/* v3.7 - chia JSON cho ChatGPT */
+.office-card-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.office-recommend-badge{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border-radius:999px;background:var(--green-soft);color:var(--green-dark);border:1px solid color-mix(in srgb,var(--green) 30%,var(--border));font-size:11px;font-weight:850;white-space:nowrap}
+.office-estimate-box{min-height:42px;border:1px solid var(--border);border-radius:11px;background:var(--panel-soft);padding:7px 10px;display:grid;align-content:center;gap:2px;font-size:12px}
+.office-estimate-box strong{font-size:14px;color:var(--text)}
+.office-estimate-box span{font-size:11px;color:var(--muted)}
+.office-chatgpt-note{margin-top:10px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--green-soft) 70%,var(--panel));border:1px solid var(--border);font-size:12px;line-height:1.5;color:var(--muted)}

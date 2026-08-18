@@ -334,3 +334,30 @@ THAY_DOI_V5.3
 - Ghép ảnh: màu nền hiển thị rõ và nhãn ghi đúng định dạng đang xuất.
 - Tarot: thêm nút Copy prompt cho AI, gồm câu hỏi, chủ đề, lá bài, xuôi/ngược, kết luận và yêu cầu diễn giải.
 - Không thay đổi dữ liệu hoặc logic công việc Kanban.
+
+
+=== v5.12 ===
+- Sửa lỗi Excel → JSON “Invalid string length” với workbook lớn.
+- Không còn build + JSON.stringify toàn bộ workbook thành một chuỗi khổng lồ trong RAM.
+- JSON được xuất tuần tự theo từng sheet và từng nhóm ô; ưu tiên ghi trực tiếp bằng File System Access API.
+- Xem trước JSON chỉ lấy tối đa 1.200 ô để tránh treo trình duyệt.
+- Chặn tùy chọn “Cả ô trống trong vùng dùng” khi vùng dùng quá lớn để tránh tạo hàng triệu/tỷ ô rỗng.
+- Không thay đổi dữ liệu hoặc logic Kanban khác.
+
+
+=== v5.13 ===
+- Excel → JSON: thêm chế độ chia thành nhiều file nhỏ để upload lên ChatGPT.
+- Mặc định 5 MB/phần; có lựa chọn 8/10/20/50 MB.
+- Ước tính dung lượng JSON và số part trước khi xuất.
+- Mỗi part là JSON độc lập, đánh số part_001, part_002...; kèm file manifest.json mô tả thứ tự và dung lượng.
+- Ghi trực tiếp từng part vào thư mục do người dùng chọn bằng File System Access API, không gom toàn bộ JSON lớn vào RAM.
+- Không thay đổi dữ liệu hoặc logic Kanban khác.
+
+
+=== v5.14 ===
+- Chỉ mở rộng Excel → JSON chia nhỏ cho AI; không đổi Kanban board/drag/music/Dice/Tarot.
+- Thêm structure.json: cấu trúc sheet, header, cột, kiểu dữ liệu, merge, hidden, min/max, unique khi phù hợp.
+- Thêm formula_map.json: gom công thức theo pattern tương đối, phân biệt absolute/relative/mixed reference và phát hiện ngoại lệ.
+- Thêm anomalies.json: formula mismatch, formula bị ghi đè/xóa, Excel error, lệch kiểu dữ liệu, duplicate key tiềm năng, dòng trống giữa vùng dữ liệu.
+- Mở rộng manifest schema 2.0 nhưng giữ các trường/filename cũ để tương thích.
+- DATA PART vẫn dùng cơ chế chia dung lượng cũ; bổ sung sheet/range/record_count và integrity check.
