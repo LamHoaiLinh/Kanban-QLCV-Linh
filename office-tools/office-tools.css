@@ -187,3 +187,26 @@
 .office-estimate-box strong{font-size:14px;color:var(--text)}
 .office-estimate-box span{font-size:11px;color:var(--muted)}
 .office-chatgpt-note{margin-top:10px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--green-soft) 70%,var(--panel));border:1px solid var(--border);font-size:12px;line-height:1.5;color:var(--muted)}
+
+/* v4.1 - tạo ảnh dài từ nội dung dán trong IMG */
+.long-image-compose-card{overflow:hidden}
+.long-image-formatbar{display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:8px;border:1px solid var(--border);border-radius:12px 12px 0 0;background:var(--panel-soft)}
+.long-image-formatbar button,.long-image-formatbar select{min-height:34px;border:1px solid var(--border);border-radius:8px;background:var(--panel);color:var(--text);padding:6px 9px;font:inherit;font-size:12px;cursor:pointer}
+.long-image-formatbar button:hover{background:var(--green-soft);color:var(--green-dark)}
+.long-color-control{height:34px;display:flex;align-items:center;gap:4px;padding:3px 5px;border:1px solid var(--border);border-radius:8px;background:var(--panel);font-weight:900}
+.long-color-control input{width:28px;height:25px;padding:1px;border:0;background:transparent;cursor:pointer}
+.long-image-toolbar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:8px 0;font-size:11px;color:var(--muted)}
+.long-image-toolbar .spacer{flex:1}
+.long-image-editor-shell{overflow-x:auto;padding:14px;background:#dfe7e2;border:1px solid var(--border);border-radius:0 0 14px 14px}
+.long-image-editor{width:720px;max-width:100%;min-height:420px;margin:0 auto;padding:48px;box-sizing:border-box;background:#fff;color:#17241e;box-shadow:0 7px 24px rgba(20,55,45,.16);outline:none;font:28px/1.55 Arial,"Segoe UI",sans-serif;overflow-wrap:anywhere;word-break:normal}
+.long-image-editor:empty::before{content:attr(data-placeholder);color:#8b9992;pointer-events:none}
+.long-image-editor p{margin:0 0 1em}.long-image-editor h1{font-size:1.85em;line-height:1.2;margin:.2em 0 .65em}.long-image-editor h2{font-size:1.5em;line-height:1.25;margin:1em 0 .55em}.long-image-editor h3{font-size:1.25em;line-height:1.3;margin:.9em 0 .5em}
+.long-image-editor ul,.long-image-editor ol{padding-left:1.5em}.long-image-editor img{display:block;max-width:100%;height:auto;margin:1em auto;cursor:pointer}.long-image-editor img.long-image-selected{outline:4px solid var(--green);outline-offset:4px}
+.long-image-editor table{width:100%;border-collapse:collapse;margin:1em 0;font-size:.88em}.long-image-editor th,.long-image-editor td{border:1px solid #bfcac4;padding:.5em .6em;text-align:left;vertical-align:top}.long-image-editor th{background:#eaf4ee}
+.long-image-editor blockquote{margin:1em 0;padding:.75em 1em;border-left:6px solid #58aa83;background:#eef8f2;color:#355247}.long-image-editor pre{white-space:pre-wrap;background:#f1f4f2;border-radius:10px;padding:.8em;font:22px/1.5 Consolas,monospace}
+.long-normalize-option{min-height:42px!important;display:flex!important;align-items:center!important;gap:8px;padding:7px 9px;border:1px solid var(--border);border-radius:11px;background:var(--panel-soft);color:var(--text)!important;font-size:12px!important;font-weight:650!important;text-transform:none!important;letter-spacing:0!important;line-height:1.35!important}
+.long-normalize-option input{flex:0 0 auto;width:auto!important;accent-color:var(--green)}
+.long-image-measure-host{position:fixed;left:-100000px;top:0;width:720px;opacity:0;pointer-events:none;z-index:-1}
+.long-image-result-card{margin-top:12px}.long-image-result-viewport{width:100%;max-height:65vh;overflow-y:auto;overflow-x:hidden;background:#dfe7e2;border:1px solid var(--border);border-radius:13px;overscroll-behavior:contain}
+.long-image-result-viewport img{display:block;width:100%;max-width:none;height:auto;margin:0;background:#fff}
+@media(max-width:760px){.long-image-editor-shell{padding:8px}.long-image-editor{padding:28px;font-size:22px;min-height:360px}.long-image-formatbar{gap:4px}.long-image-formatbar button,.long-image-formatbar select{padding:5px 7px}.long-image-result-viewport{max-height:70vh}}

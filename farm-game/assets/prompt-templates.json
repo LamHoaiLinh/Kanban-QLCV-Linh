@@ -1,0 +1,36 @@
+{
+  "version": "1.0.0",
+  "styleId": "farm-soft-2d-v1",
+  "sharedStyle": "2D casual farming game asset, friendly hand-painted vector-like illustration, clean rounded shapes, medium detail, warm natural colors, soft light from upper left, consistent three-quarter view, crisp silhouette, transparent background, centered object, no text",
+  "sharedNegative": "photorealistic, 3D render, pixel art, anime, dark horror mood, busy background, scenery, frame, border, UI panel, words, letters, numbers, logo, watermark, signature, duplicate object, cropped object, cut-off edges, hard black outline, heavy shadow, blur, noise",
+  "templates": {
+    "cropStage": {
+      "variables": ["crop_vi", "crop_en", "stage_vi", "stage_en", "stage_notes", "visual_traits"],
+      "prompt": "{{sharedStyle}}. One {{crop_vi}} ({{crop_en}}) plant at stage {{stage_vi}} ({{stage_en}}). {{stage_notes}}. Botanically recognizable features: {{visual_traits}}. Show one complete plant only, roots/soil not visible, base aligned to bottom center, 12% transparent safe margin, consistent scale with other crop stages.",
+      "negative": "{{sharedNegative}}, multiple growth stages in one image, seed packet, flower pot, garden bed, soil tile",
+      "source": {"width": 1024, "height": 1024, "format": "PNG", "transparent": true},
+      "delivery": {"width": 512, "height": 512, "format": "WebP", "quality": 90, "anchor": "bottom-center"}
+    },
+    "material": {
+      "variables": ["material_vi", "material_en", "visual_traits"],
+      "prompt": "{{sharedStyle}}. One compact inventory icon representing {{material_vi}} ({{material_en}}). {{visual_traits}}. Single readable object or tightly grouped bundle, front three-quarter view, balanced square silhouette, 14% transparent safe margin.",
+      "negative": "{{sharedNegative}}, building, landscape, character, inventory slot background, pile extending beyond canvas",
+      "source": {"width": 1024, "height": 1024, "format": "PNG", "transparent": true},
+      "delivery": {"width": 256, "height": 256, "format": "WebP", "quality": 90, "anchor": "center"}
+    },
+    "building": {
+      "variables": ["building_vi", "building_en", "construction_state", "visual_traits"],
+      "prompt": "{{sharedStyle}}. Standalone farm construction asset: {{building_vi}} ({{building_en}}), state: {{construction_state}}. {{visual_traits}}. Same camera angle and lighting as the Farm villa set, full object visible, base aligned to bottom center, subtle contact shadow only, 10% transparent safe margin.",
+      "negative": "{{sharedNegative}}, aerial view, interior cutaway unless explicitly requested, people, vehicles, surrounding farm scene, dramatic perspective",
+      "source": {"width": 1536, "height": 1536, "format": "PNG", "transparent": true},
+      "delivery": {"width": 768, "height": 768, "format": "WebP", "quality": 90, "anchor": "bottom-center"}
+    },
+    "npc": {
+      "variables": ["npc_name", "npc_role", "age_range", "clothing", "personality", "held_item"],
+      "prompt": "{{sharedStyle}}. Friendly Vietnamese farm-game NPC named {{npc_name}}, role {{npc_role}}, age {{age_range}}. Clothing: {{clothing}}. Personality: {{personality}}. Holding {{held_item}}. Waist-up portrait, slight three-quarter pose facing toward center, both eyes visible, hands readable, 12% transparent safe margin.",
+      "negative": "{{sharedNegative}}, full background, speech bubble, text label, extra fingers, extra arms, cropped head, celebrity likeness, realistic portrait",
+      "source": {"width": 1024, "height": 1024, "format": "PNG", "transparent": true},
+      "delivery": {"width": 512, "height": 512, "format": "WebP", "quality": 90, "anchor": "bottom-center"}
+    }
+  }
+}

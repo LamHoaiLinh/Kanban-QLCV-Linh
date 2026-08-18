@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/farm-assets/manifest.schema.json",
+  "title": "Farm asset manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "manifestId", "basePath", "fallbackPolicy", "stageOrder", "assets"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schemaVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "manifestId": {"const": "farm-assets-v1"},
+    "basePath": {"const": "./assets/"},
+    "fallbackPolicy": {"const": "procedural-or-emoji"},
+    "stageOrder": {"const": ["seed", "sprout", "growing", "mature", "dead"]},
+    "assets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["crops", "materials", "buildings", "npcs"],
+      "properties": {
+        "crops": {"type": "object", "additionalProperties": {"$ref": "#/$defs/crop"}},
+        "materials": {"type": "object", "additionalProperties": {"$ref": "#/$defs/single"}},
+        "buildings": {"type": "object", "additionalProperties": {"$ref": "#/$defs/single"}},
+        "npcs": {"type": "object", "additionalProperties": {"$ref": "#/$defs/single"}}
+      }
+    }
+  },
+  "$defs": {
+    "path": {"type": "string", "pattern": "^[a-z0-9_/-]+\\.webp$"},
+    "single": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "file", "ready"],
+      "properties": {"label": {"type": "string", "minLength": 1}, "fallback": {"type": "string"}, "file": {"$ref": "#/$defs/path"}, "ready": {"type": "boolean"}}
+    },
+    "crop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "fallback", "files", "readyVariants"],
+      "properties": {
+        "label": {"type": "string", "minLength": 1},
+        "fallback": {"type": "string", "minLength": 1},
+        "files": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["seed", "sprout", "growing", "mature", "dead"],
+          "properties": {"seed": {"$ref": "#/$defs/path"}, "sprout": {"$ref": "#/$defs/path"}, "growing": {"$ref": "#/$defs/path"}, "mature": {"$ref": "#/$defs/path"}, "dead": {"$ref": "#/$defs/path"}}
+        },
+        "readyVariants": {"type": "array", "uniqueItems": true, "items": {"enum": ["seed", "sprout", "growing", "mature", "dead"]}}
+      }
+    }
+  }
+}
