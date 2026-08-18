@@ -372,3 +372,15 @@ THAY_DOI_V5.3
 - Ô công thức không có cached value được giữ nguyên và báo số lượng, không tự tính hoặc đoán kết quả.
 - Nếu sau Break Links không còn external formula/defined name, metadata externalLinks được dọn khỏi package.
 - Không thay đổi Kanban board, task, drag/drop, nhạc, Dice, Tarot hoặc Excel JSON/PART hiện có.
+
+
+=== v5.16 ===
+- Thêm game Tetris độc lập trong iframe, Việt hóa, mặc định 1 người; hỗ trợ 2 người chơi đối kháng cục bộ.
+- Điều khiển P1: mũi tên, Ctrl trái/phải để xoay, Space hard drop, C giữ gạch. P2: A/D/S, Q/E, W, F.
+- Tăng độ mượt khi chuyển cột bằng nội suy vị trí hiển thị; hard drop có vệt sáng; soft drop nhanh hơn.
+- Cho chọn tốc độ khởi đầu; cứ 10 hàng tăng cấp/tốc độ; điểm nhân theo cấp; combo và xóa nhiều hàng thưởng thêm.
+- 2 người: xóa 2-4 hàng và combo gửi hàng rác cho đối thủ.
+- Gom PDF/IMG/Rename/Excel thành một nút CÔNG CỤ; giao diện công cụ bên trong giữ nguyên.
+- Excel: thêm đọc XLSB cho upload/JSON/AI analysis; thêm đầu ra XLSB cho quản lý sheet, gộp sheet, gộp workbook và tách sheet.
+- Break Links/Dán Value hỗ trợ XLSB bằng SheetJS; XLSX/XLSM vẫn dùng cách sửa package XML để giữ định dạng tối đa.
+- Không thay đổi dữ liệu/logic Kanban board, drag-drop hay music player.

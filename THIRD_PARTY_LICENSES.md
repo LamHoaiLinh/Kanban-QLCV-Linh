@@ -32,3 +32,9 @@ Các tệp người dùng chọn không được gửi đến các địa chỉ 
 - Giấy phép: MIT.
 - Được tải theo phiên bản cố định từ jsDelivr khi người dùng chọn D10.
 - Dice Arena vẫn có phương án D10 CSS dự phòng nếu thư viện 3D không tải được.
+
+
+## Tetr.js
+- Original author: Simon M. Laroche
+- License: MIT
+- Used as a gameplay/visual reference for the embedded Tetris module. The original MIT license is included at `tetris-game/LICENSE.txt`.

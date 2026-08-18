@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tetris - Kanban</title><link rel="stylesheet" href="styles.css?v=1.0.0"></head>
+<body>
+<header class="game-topbar"><div><span class="eyebrow">TRÒ CHƠI GIẢI TRÍ</span><h1>TETRIS</h1><p>Xếp gạch mượt • combo • tăng tốc theo cấp độ</p></div><div class="top-actions"><button id="pauseBtn" title="Tạm dừng / tiếp tục (Esc)">⏸</button><button id="restartBtn" title="Chơi lại (R)">↻</button><button id="closeBtn" class="close-btn">Quay về Kanban</button></div></header>
+<main class="game-shell">
+  <aside class="setup-panel">
+    <div class="panel-title">THIẾT LẬP</div>
+    <label><span>Số người chơi</span><select id="playerCount"><option value="1" selected>1 người</option><option value="2">2 người đối kháng</option></select></label>
+    <label><span>Tốc độ khởi đầu</span><select id="startSpeed"></select></label>
+    <button id="startBtn" class="primary">Bắt đầu chơi</button>
+    <div class="control-card" id="p1Controls"><b>Người chơi 1</b><span>← → Di chuyển</span><span>↓ Lướt nhanh</span><span>Space Thả xuống</span><span>Ctrl trái / phải Xoay</span><span>C Giữ gạch</span></div>
+    <div class="control-card" id="p2Controls" hidden><b>Người chơi 2</b><span>A / D Di chuyển</span><span>S Lướt nhanh</span><span>W Thả xuống</span><span>Q / E Xoay</span><span>F Giữ gạch</span></div>
+    <div class="tips"><b>Cách tính điểm</b><span>Tốc độ/cấp độ càng cao → hệ số điểm càng lớn.</span><span>Xóa 2–4 hàng cùng lúc được thưởng lớn; xóa liên tục tạo combo.</span><span>2 người: xóa nhiều hàng sẽ gửi hàng rác sang đối thủ.</span></div>
+  </aside>
+  <section class="arena"><div id="boards" class="boards one-player"></div><div id="centerMessage" class="center-message">Chọn tốc độ rồi bấm <b>Bắt đầu chơi</b></div></section>
+  <aside class="score-panel"><div class="panel-title">THÀNH TÍCH</div><div id="matchStatus" class="match-status">Sẵn sàng.</div><div id="highScore" class="high-score">Kỷ lục: 0</div><div class="legend"><i class="i"></i><i class="j"></i><i class="l"></i><i class="o"></i><i class="s"></i><i class="t"></i><i class="z"></i></div></aside>
+</main>
+<footer>Phát triển từ ý tưởng/đồ họa Tetr.js của Simon M. Laroche (MIT). Phiên bản này chạy độc lập và không đọc dữ liệu Kanban.</footer>
+<script type="module" src="game.js?v=1.0.0"></script></body></html>

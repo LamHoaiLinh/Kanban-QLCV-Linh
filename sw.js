@@ -1,9 +1,10 @@
-const CACHE_NAME='linh-kanban-static-v515-excel-breaklinks-values';
+const CACHE_NAME='linh-kanban-static-v516-tetris-xlsb';
 const ASSETS=[
   './','./index.html','./styles.css?v=5.10','./dragdrop.js?v=3.3','./app.js?v=3.7','./music-player.js?v=3.2',
-  './office-tools/office-tools.css?v=3.7','./office-tools/office-tools.js?v=3.9','./office-tools/excel-ai-analysis.mjs?v=1.0.0','./office-tools/vendor/jszip.min.js',
+  './office-tools/office-tools.css?v=3.7','./office-tools/office-tools.js?v=4.0','./office-tools/excel-ai-analysis.mjs?v=1.0.0','./office-tools/vendor/jszip.min.js',
   './dice-launcher.js?v=5.7','./dice-game/index.html?v=5.7.0','./dice-game/styles.css?v=5.7.0','./dice-game/js/app.js?v=5.7.0','./dice-game/js/d10-engine.js?v=5.7.0','./dice-game/assets/D10.glb',
   './tarot-launcher.js?v=5.4','./tarot-game/index.html?v=5.4.0','./tarot-game/styles.css?v=5.4.0','./tarot-game/js/app.js?v=5.4.0','./tarot-game/js/tarot-data.js',
+  './tetris-launcher.js?v=1.0','./tetris-game/index.html?v=1.0.0','./tetris-game/styles.css?v=1.0.0','./tetris-game/game.js?v=1.0.0','./tetris-game/LICENSE.txt',
   './tarot-game/LICENSE_SOURCE.txt','./manifest.webmanifest?v=3.2','./assets/icon.svg',
   './assets/backgrounds/Beautiful Background6.png','./assets/backgrounds/Beautiful Background7.png',
   './assets/backgrounds/Beautiful Background8.png','./assets/backgrounds/Beautiful Background13.png',
@@ -16,7 +17,7 @@ self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys
 self.addEventListener('fetch',event=>{
   if(event.request.method!=='GET')return;
   const url=new URL(event.request.url);
-  const isTool=url.pathname.includes('/dice-game/')||url.pathname.includes('/tarot-game/')||url.pathname.endsWith('/dice-launcher.js')||url.pathname.endsWith('/tarot-launcher.js');
+  const isTool=url.pathname.includes('/dice-game/')||url.pathname.includes('/tarot-game/')||url.pathname.includes('/tetris-game/')||url.pathname.endsWith('/dice-launcher.js')||url.pathname.endsWith('/tarot-launcher.js')||url.pathname.endsWith('/tetris-launcher.js');
   const mustBeFresh=event.request.mode==='navigate'||isTool;
   if(mustBeFresh){
     event.respondWith(fetch(event.request).then(response=>{if(response&&response.status===200){const copy=response.clone();caches.open(CACHE_NAME).then(cache=>cache.put(event.request,copy))}return response}).catch(()=>caches.match(event.request).then(cached=>cached||(event.request.mode==='navigate'?caches.match('./index.html'):undefined))));return;

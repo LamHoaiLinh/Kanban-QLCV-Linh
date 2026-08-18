@@ -695,3 +695,6 @@ body.drag-active .sidebar{
 body.drag-active .music-player{
   scroll-behavior:auto;
 }
+
+/* v5.16 - gom Office thành một nút + Tetris */
+.office-suite-launch-btn{width:60px!important}.office-suite-launch-btn .office-btn-mark{font-size:7px;letter-spacing:-.02em}.tetris-launch-btn{width:54px!important}.tetris-launch-btn .office-btn-mark{font-size:8px;letter-spacing:-.03em}@media(max-width:900px){.office-suite-launch-btn{width:54px!important}.tetris-launch-btn{width:48px!important}.office-suite-launch-btn .office-btn-mark,.tetris-launch-btn .office-btn-mark{font-size:7px}}
