@@ -392,3 +392,16 @@ THAY_DOI_V5.3
 - Người chơi 2: trái/phải = A/D, xuống nhanh = S, xoay 1 chiều = W, giữ gạch = Ctrl trái, thả ngay = Shift trái; bỏ Q/E/F.
 - Điểm/Hàng/Combo/Tốc độ chuyển thành cột dọc bên phải của từng bàn chơi.
 - Không thay đổi Kanban, Office, Dice hoặc Tarot.
+
+
+=== v5.16.3 ===
+- Tetris 2 người: đổi vị trí hiển thị để Người chơi 2 nằm bên trái, Người chơi 1 nằm bên phải, khớp vị trí phím bấm trên bàn phím.
+- Tetris: bỏ hiển thị ghost/ảnh dự đoán điểm rơi để tránh cảm giác có 2 viên xuất hiện cùng lúc khi viên hiện tại chưa chạm đất.
+- Không thay đổi Kanban, Office, Excel, PDF, Dice hoặc Tarot.
+
+
+=== v5.16.4 ===
+- Tetris: khôi phục ghost piece/bóng dự đoán điểm rơi ở cả 1 người và 2 người.
+- Sửa board 2 người luôn đúng tỷ lệ 10×20 (1:2); loại bỏ chiều cao CSS dư làm đáy logic nằm cao hơn đáy khung nhìn.
+- Giữ Người chơi 2 bên trái, Người chơi 1 bên phải.
+- Không thay đổi Kanban, Office, Excel, PDF, Dice hoặc Tarot.

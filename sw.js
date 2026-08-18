@@ -1,10 +1,10 @@
-const CACHE_NAME='linh-kanban-static-v5162-tetris-controls';
+const CACHE_NAME='linh-kanban-static-v5164-tetris-ground-ghost';
 const ASSETS=[
   './','./index.html','./styles.css?v=5.10','./dragdrop.js?v=3.3','./app.js?v=3.7','./music-player.js?v=3.2',
   './office-tools/office-tools.css?v=3.7','./office-tools/office-tools.js?v=4.0','./office-tools/excel-ai-analysis.mjs?v=1.0.0','./office-tools/vendor/jszip.min.js',
   './dice-launcher.js?v=5.7','./dice-game/index.html?v=5.7.0','./dice-game/styles.css?v=5.7.0','./dice-game/js/app.js?v=5.7.0','./dice-game/js/d10-engine.js?v=5.7.0','./dice-game/assets/D10.glb',
   './tarot-launcher.js?v=5.4','./tarot-game/index.html?v=5.4.0','./tarot-game/styles.css?v=5.4.0','./tarot-game/js/app.js?v=5.4.0','./tarot-game/js/tarot-data.js',
-  './tetris-launcher.js?v=1.02','./tetris-game/index.html?v=1.0.2','./tetris-game/styles.css?v=1.0.2','./tetris-game/game.js?v=1.0.2','./tetris-game/LICENSE.txt',
+  './tetris-launcher.js?v=1.04','./tetris-game/index.html?v=1.0.4','./tetris-game/styles.css?v=1.0.4','./tetris-game/game.js?v=1.0.4','./tetris-game/LICENSE.txt',
   './tarot-game/LICENSE_SOURCE.txt','./manifest.webmanifest?v=3.2','./assets/icon.svg',
   './assets/backgrounds/Beautiful Background6.png','./assets/backgrounds/Beautiful Background7.png',
   './assets/backgrounds/Beautiful Background8.png','./assets/backgrounds/Beautiful Background13.png',
