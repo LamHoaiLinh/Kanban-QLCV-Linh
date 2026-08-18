@@ -1,7 +1,7 @@
-const CACHE_NAME='linh-kanban-static-v514-excel-ai-map';
+const CACHE_NAME='linh-kanban-static-v515-excel-breaklinks-values';
 const ASSETS=[
   './','./index.html','./styles.css?v=5.10','./dragdrop.js?v=3.3','./app.js?v=3.7','./music-player.js?v=3.2',
-  './office-tools/office-tools.css?v=3.7','./office-tools/office-tools.js?v=3.8','./office-tools/excel-ai-analysis.mjs?v=1.0.0','./office-tools/vendor/jszip.min.js',
+  './office-tools/office-tools.css?v=3.7','./office-tools/office-tools.js?v=3.9','./office-tools/excel-ai-analysis.mjs?v=1.0.0','./office-tools/vendor/jszip.min.js',
   './dice-launcher.js?v=5.7','./dice-game/index.html?v=5.7.0','./dice-game/styles.css?v=5.7.0','./dice-game/js/app.js?v=5.7.0','./dice-game/js/d10-engine.js?v=5.7.0','./dice-game/assets/D10.glb',
   './tarot-launcher.js?v=5.4','./tarot-game/index.html?v=5.4.0','./tarot-game/styles.css?v=5.4.0','./tarot-game/js/app.js?v=5.4.0','./tarot-game/js/tarot-data.js',
   './tarot-game/LICENSE_SOURCE.txt','./manifest.webmanifest?v=3.2','./assets/icon.svg',

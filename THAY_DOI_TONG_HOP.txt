@@ -361,3 +361,14 @@ THAY_DOI_V5.3
 - Thêm anomalies.json: formula mismatch, formula bị ghi đè/xóa, Excel error, lệch kiểu dữ liệu, duplicate key tiềm năng, dòng trống giữa vùng dữ liệu.
 - Mở rộng manifest schema 2.0 nhưng giữ các trường/filename cũ để tương thích.
 - DATA PART vẫn dùng cơ chế chia dung lượng cũ; bổ sung sheet/range/record_count và integrity check.
+
+
+=== v5.15 ===
+- Excel Tool: thêm tab Break Links / Value.
+- Cho chọn một hoặc nhiều sheet.
+- Break Links chỉ chuyển công thức tham chiếu workbook ngoài thành cached value; công thức nội bộ giữ nguyên.
+- Dán Value chuyển toàn bộ công thức ở các sheet đã chọn thành cached value.
+- Hai thao tác sửa trực tiếp XML trong package XLSX/XLSM, không dựng lại worksheet, nhằm giữ merge/style/màu/hình ảnh/kích thước hàng cột và macro XLSM.
+- Ô công thức không có cached value được giữ nguyên và báo số lượng, không tự tính hoặc đoán kết quả.
+- Nếu sau Break Links không còn external formula/defined name, metadata externalLinks được dọn khỏi package.
+- Không thay đổi Kanban board, task, drag/drop, nhạc, Dice, Tarot hoặc Excel JSON/PART hiện có.

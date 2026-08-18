@@ -363,7 +363,7 @@ async function runRenameSafeZip(){try{updateRenamePreview();if(state.renameEntri
 async function runRenameInPlace(){try{if(!state.renameRootHandle)throw new Error('Hãy chọn thư mục bằng nút Browse thư mục và cấp quyền ghi.');if(mainHost.querySelector('#renConfirm').value.trim()!=='DOI TEN')throw new Error('Hãy gõ chính xác DOI TEN.');updateRenamePreview();if(state.renameEntries.some(e=>!e.valid))throw new Error('Có tên bị trùng hoặc không hợp lệ.');const files=state.renameEntries.filter(e=>e.type==='file'&&e.newName!==e.name);startBusy('Đang đổi tên tại chỗ…');for(let i=0;i<files.length;i++){assertNotAborted();const e=files[i];const target=await e.parentHandle.getFileHandle(e.newName,{create:true});const writable=await target.createWritable();await writable.write(e.file);await writable.close();const check=await target.getFile();if(check.size!==e.file.size)throw new Error(`Kiểm tra dung lượng thất bại: ${e.name}`);await e.parentHandle.removeEntry(e.name);setStatus(`Đã đổi ${i+1}/${files.length}`,Math.round((i+1)/files.length*100));}endBusy(`Đã đổi tên ${files.length} tệp. Thư mục không được đổi tên tại chỗ.`);await pickRenameDirectory();}catch(e){showError(e)}}
 
 // ===== EXCEL =====
-function renderExcelTool(){const tabs=[['inspect','Đọc & xuất JSON'],['manage','Quản lý sheet'],['combine','Gộp sheet'],['workbooks','Gộp nhiều file'],['split','Tách sheet']];mainHost.innerHTML=`<section class="office-tool-panel active"><div class="office-tool-head"><div><h3>Excel</h3><p>Đọc XLSX, XLS, XLSM và CSV; phân biệt ô giá trị với ô công thức.</p></div></div>${subTabs('excel',tabs)}<div id="excelSubHost"></div><div class="office-warning">Ứng dụng đọc công thức và giá trị cached được lưu trong file. Không tự tính lại toàn bộ công thức như Microsoft Excel; không chạy VBA hoặc macro.</div><div class="office-library-warning">Thư viện SheetJS được tải theo phiên bản cố định khi công cụ Excel được mở lần đầu.</div></section>`;bindSubtabs('excel');const h=mainHost.querySelector('#excelSubHost');if(state.sub.excel==='inspect')renderExcelInspect(h);if(state.sub.excel==='manage')renderExcelManage(h);if(state.sub.excel==='combine')renderExcelCombine(h);if(state.sub.excel==='workbooks')renderExcelWorkbooks(h);if(state.sub.excel==='split')renderExcelSplit(h)}
+function renderExcelTool(){const tabs=[['inspect','Đọc & xuất JSON'],['values','Break Links / Value'],['manage','Quản lý sheet'],['combine','Gộp sheet'],['workbooks','Gộp nhiều file'],['split','Tách sheet']];mainHost.innerHTML=`<section class="office-tool-panel active"><div class="office-tool-head"><div><h3>Excel</h3><p>Đọc XLSX, XLS, XLSM và CSV; phân biệt ô giá trị với ô công thức.</p></div></div>${subTabs('excel',tabs)}<div id="excelSubHost"></div><div class="office-warning">Ứng dụng đọc công thức và giá trị cached được lưu trong file. Không tự tính lại toàn bộ công thức như Microsoft Excel; không chạy VBA hoặc macro.</div><div class="office-library-warning">Thư viện SheetJS được tải theo phiên bản cố định khi công cụ Excel được mở lần đầu.</div></section>`;bindSubtabs('excel');const h=mainHost.querySelector('#excelSubHost');if(state.sub.excel==='inspect')renderExcelInspect(h);if(state.sub.excel==='values')renderExcelValues(h);if(state.sub.excel==='manage')renderExcelManage(h);if(state.sub.excel==='combine')renderExcelCombine(h);if(state.sub.excel==='workbooks')renderExcelWorkbooks(h);if(state.sub.excel==='split')renderExcelSplit(h)}
 function excelBrowseCard(extra=''){return `<div class="office-card"><div class="office-dropzone" id="excelDrop"><strong>Browse hoặc kéo thả file Excel/CSV</strong><span>XLSX, XLS, XLSM và CSV.</span><input type="file" accept=".xlsx,.xls,.xlsm,.csv" multiple hidden></div><div class="office-toolbar"><button class="office-btn" id="excelAdd">Chọn thêm file</button><button class="office-btn danger" id="excelClear">Xóa danh sách</button></div><div id="excelFileList"></div></div>${extra}`}
 function bindExcelLibrary(){const add=async files=>{try{startBusy('Đang đọc workbook…');const XLSX=await ensureXlsx();for(let i=0;i<files.length;i++){const file=files[i];if(!/\.(xlsx|xls|xlsm|csv)$/i.test(file.name))continue;const data=await file.arrayBuffer();const wb=XLSX.read(data,{type:'array',cellFormula:true,cellDates:true,cellNF:true,cellText:true,bookVBA:false});state.excelFiles.push({id:uid(),file,wb});setStatus(`Đang đọc ${i+1}/${files.length}`,Math.round((i+1)/files.length*100));}endBusy(`Đã đọc ${state.excelFiles.length} file.`);renderExcelTool()}catch(e){showError(e)}};const drop=mainHost.querySelector('#excelDrop');bindDropzone(drop,f=>/\.(xlsx|xls|xlsm|csv)$/i.test(f.name),add);drop.querySelector('input').onchange=e=>add([...e.target.files]);mainHost.querySelector('#excelAdd').onclick=async()=>add(await fileInput('.xlsx,.xls,.xlsm,.csv',true));mainHost.querySelector('#excelClear').onclick=()=>{state.excelFiles=[];renderExcelTool()};const l=mainHost.querySelector('#excelFileList');l.innerHTML=listRows(state.excelFiles,it=>`${formatBytes(it.file.size)} · ${it.wb.SheetNames.length} sheet`);bindListActions(l,state.excelFiles,renderExcelTool)}
 function renderExcelInspect(h){h.innerHTML=excelBrowseCard(`<div class="office-card"><h4>Cấu trúc workbook</h4><div id="excelOverview"></div><div class="office-toolbar"><label class="office-check"><input id="excelFormatted" type="checkbox" checked> Xuất formattedValue</label><label class="office-check"><input id="excelHyperlinks" type="checkbox" checked> Hyperlink/comment</label><label class="office-check" title="Chỉ nên bật với workbook nhỏ. Với vùng dùng rất lớn, việc xuất cả ô trống có thể tạo hàng triệu hoặc hàng tỷ ô JSON."><input id="excelEmpty" type="checkbox"> Cả ô trống trong vùng dùng</label><span class="spacer"></span><button class="office-btn" id="excelPreviewJson" ${state.excelFiles.length?'':'disabled'}>Xem trước JSON</button><button class="office-btn primary" id="excelExportJson" ${state.excelFiles.length?'':'disabled'}>Xuất 1 JSON</button></div><div class="office-card-note" style="margin-top:8px">File Excel lớn sẽ được xuất JSON tuần tự theo từng sheet/ô để tránh vượt giới hạn bộ nhớ của trình duyệt.</div><pre id="excelJsonPreview" class="office-json-preview" hidden></pre></div>
@@ -761,6 +761,247 @@ async function exportWorkbookJsonStream(item){
   }
 }
 function cellJson(cell,formatted,links){if(!cell)return {kind:'blank',valueType:'blank',rawValue:null};const cachedAvailable=cell.v!==undefined&&cell.v!==null;const o=cell.f?{kind:'formula',formula:cell.f,cachedValue:cell.v,cachedValueAvailable:cachedAvailable}:{kind:'value',valueType:excelCellType(cell),rawValue:cell.v};if(formatted&&cell.w!=null)o.formattedValue=cell.w;if(links&&cell.l)o.hyperlink=cell.l.Target||cell.l.target;if(links&&cell.c)o.comments=cell.c.map(c=>({author:c.a,text:c.t}));return o}
+
+function renderExcelValues(h){
+  const item=state.excelFiles[0];
+  h.innerHTML=excelBrowseCard(`<div class="office-card">
+    <h4>Break Links / Dán Value giữ nguyên định dạng</h4>
+    <p class="office-card-note">Chọn một hoặc nhiều sheet. Hai thao tác đều tạo <b>file Excel mới</b>; file gốc trên máy không bị sửa.</p>
+    <div class="office-toolbar">
+      <button class="office-btn" id="excelValueSelectAll" ${item?'':'disabled'}>Chọn tất cả sheet</button>
+      <button class="office-btn" id="excelValueSelectNone" ${item?'':'disabled'}>Bỏ chọn</button>
+      <span id="excelValueSelectedCount" class="office-card-note"></span>
+    </div>
+    <div id="excelValueSheets" class="office-sheet-list" style="margin-top:10px"></div>
+  </div>
+  <div class="office-grid">
+    <div class="office-card">
+      <h4>Break Links</h4>
+      <p class="office-card-note">Chỉ các công thức có tham chiếu đến <b>workbook bên ngoài</b> trong những sheet đã chọn mới được thay bằng <b>cached value</b> đang lưu trong file. Công thức nội bộ vẫn giữ nguyên.</p>
+      <p class="office-card-note">Nếu một công thức ngoài không có cached value, ứng dụng sẽ giữ nguyên công thức đó và báo số lượng bỏ qua thay vì tự đoán kết quả.</p>
+      <div class="office-toolbar"><span class="spacer"></span><button class="office-btn primary" id="excelBreakLinksRun" ${item?'':'disabled'} data-tooltip="Thay công thức liên kết workbook ngoài bằng giá trị đang được lưu trong file, giữ nguyên style/merge/màu ở mức gói XLSX/XLSM" title="Thay công thức liên kết workbook ngoài bằng cached value">Break Links → Value</button></div>
+    </div>
+    <div class="office-card">
+      <h4>Dán Value các sheet đã chọn</h4>
+      <p class="office-card-note">Tất cả ô công thức trong những sheet đã chọn sẽ được chuyển thành cached value. Sheet không chọn vẫn giữ nguyên công thức.</p>
+      <p class="office-card-note">Cách xử lý sửa trực tiếp XML của file XLSX/XLSM nên không dựng lại sheet; merge, style, màu, kích thước hàng/cột, hình ảnh và macro của XLSM được giữ nguyên trong package.</p>
+      <div class="office-toolbar"><span class="spacer"></span><button class="office-btn primary" id="excelPasteValuesRun" ${item?'':'disabled'} data-tooltip="Chuyển toàn bộ công thức của các sheet đã chọn thành cached value nhưng không dựng lại worksheet" title="Dán Value các sheet đã chọn">Dán Value</button></div>
+    </div>
+  </div>
+  <div id="excelValueCompatibility" class="office-warning" style="margin-top:12px"></div>`);
+  bindExcelLibrary();
+  renderExcelValueSheetChecks();
+  const all=mainHost.querySelector('#excelValueSelectAll'),none=mainHost.querySelector('#excelValueSelectNone');
+  if(all)all.onclick=()=>{mainHost.querySelectorAll('#excelValueSheets input[type="checkbox"]').forEach(x=>x.checked=true);syncExcelValueSelectionCount()};
+  if(none)none.onclick=()=>{mainHost.querySelectorAll('#excelValueSheets input[type="checkbox"]').forEach(x=>x.checked=false);syncExcelValueSelectionCount()};
+  const breakBtn=mainHost.querySelector('#excelBreakLinksRun'),valueBtn=mainHost.querySelector('#excelPasteValuesRun');
+  if(breakBtn)breakBtn.onclick=()=>runExcelFormulaToValue('external');
+  if(valueBtn)valueBtn.onclick=()=>runExcelFormulaToValue('all');
+}
+function renderExcelValueSheetChecks(){
+  const host=mainHost.querySelector('#excelValueSheets'),compat=mainHost.querySelector('#excelValueCompatibility'),item=state.excelFiles[0];
+  if(!host)return;
+  if(!item){host.innerHTML='<div class="office-empty">Chưa chọn workbook.</div>';if(compat)compat.textContent='Hãy chọn file Excel trước.';return}
+  const ext=fileExt(item.file.name);
+  const supported=ext==='.xlsx'||ext==='.xlsm';
+  host.innerHTML=item.wb.SheetNames.map(n=>`<label class="office-sheet-chip"><input type="checkbox" value="${escapeHtml(n)}" checked> ${escapeHtml(n)}</label>`).join('');
+  host.querySelectorAll('input').forEach(x=>x.addEventListener('change',syncExcelValueSelectionCount));
+  syncExcelValueSelectionCount();
+  if(compat){
+    compat.textContent=supported
+      ? `Đang dùng chế độ bảo toàn package ${ext.toUpperCase()}: chỉ sửa XML của ô công thức, không dựng lại worksheet.`
+      : 'Break Links / Dán Value giữ định dạng hiện chỉ hỗ trợ XLSX và XLSM. XLS/CSV không dùng chế độ này để tránh làm mất định dạng.';
+  }
+  mainHost.querySelector('#excelBreakLinksRun').disabled=!supported;
+  mainHost.querySelector('#excelPasteValuesRun').disabled=!supported;
+}
+function syncExcelValueSelectionCount(){
+  const host=mainHost.querySelector('#excelValueSheets'),label=mainHost.querySelector('#excelValueSelectedCount');
+  if(!host||!label)return;
+  const all=host.querySelectorAll('input[type="checkbox"]').length,selected=host.querySelectorAll('input[type="checkbox"]:checked').length;
+  label.textContent=`Đã chọn ${selected}/${all} sheet`;
+}
+function selectedExcelValueSheets(){
+  return [...mainHost.querySelectorAll('#excelValueSheets input[type="checkbox"]:checked')].map(x=>x.value);
+}
+function xmlAttr(attrs,name){
+  const m=String(attrs||'').match(new RegExp(`(?:^|\\s)${name}="([^"]*)"`,'i'));
+  return m?m[1]:'';
+}
+function excelFormulaIsExternal(formula=''){
+  const f=String(formula||'');
+  return /\[[^\]]+\][^!<]*!/i.test(f)||/\[[^\]]+\.(?:xlsx?|xlsm|xlsb|xls|csv)\]/i.test(f)||/\[\d+\][^!<]*!/i.test(f);
+}
+function excelWorksheetSharedFormulaMap(xml){
+  const map=new Map();
+  const re=/<f\b([^>]*)>([\s\S]*?)<\/f>/gi;
+  let m;
+  while((m=re.exec(xml))){
+    const attrs=m[1]||'',body=m[2]||'';
+    if(xmlAttr(attrs,'t').toLowerCase()==='shared'){
+      const si=xmlAttr(attrs,'si');
+      if(si&&body)map.set(si,body);
+    }
+  }
+  return map;
+}
+function excelCellHasCachedValue(cellXml){
+  return /<v(?:\s[^>]*)?(?:\/>|>[\s\S]*?<\/v>)/i.test(cellXml);
+}
+function excelCellFormulaInfo(cellXml,sharedMap){
+  const full=cellXml.match(/<f\b([^>]*)>([\s\S]*?)<\/f>/i);
+  if(full){
+    const attrs=full[1]||'',body=full[2]||'',si=xmlAttr(attrs,'si');
+    const effective=body||(si?sharedMap.get(si)||'':'');
+    return {hasFormula:true,formula:effective,attrs,shared:xmlAttr(attrs,'t').toLowerCase()==='shared',si};
+  }
+  const self=cellXml.match(/<f\b([^>]*)\/>/i);
+  if(self){
+    const attrs=self[1]||'',si=xmlAttr(attrs,'si'),effective=si?sharedMap.get(si)||'':'';
+    return {hasFormula:true,formula:effective,attrs,shared:xmlAttr(attrs,'t').toLowerCase()==='shared',si};
+  }
+  return {hasFormula:false,formula:'',attrs:'',shared:false,si:''};
+}
+function excelRemoveFormulaTag(cellXml){
+  return cellXml.replace(/<f\b[^>]*(?:\/>|>[\s\S]*?<\/f>)/i,'');
+}
+function transformExcelWorksheetXml(xml,mode){
+  const sharedMap=excelWorksheetSharedFormulaMap(xml);
+  let converted=0,skippedNoCached=0,formulaCount=0,externalFormulaCount=0;
+  const out=xml.replace(/<c\b[^>]*\br="[^"]+"[^>]*>[\s\S]*?<\/c>/gi,cellXml=>{
+    const info=excelCellFormulaInfo(cellXml,sharedMap);
+    if(!info.hasFormula)return cellXml;
+    formulaCount++;
+    const external=excelFormulaIsExternal(info.formula);
+    if(external)externalFormulaCount++;
+    const shouldConvert=mode==='all'||(mode==='external'&&external);
+    if(!shouldConvert)return cellXml;
+    if(!excelCellHasCachedValue(cellXml)){skippedNoCached++;return cellXml}
+    converted++;
+    return excelRemoveFormulaTag(cellXml);
+  });
+  return {xml:out,converted,skippedNoCached,formulaCount,externalFormulaCount};
+}
+function excelResolveZipTarget(baseFile,target){
+  if(!target)return '';
+  if(target.startsWith('/'))return target.replace(/^\/+/,'');
+  const parts=baseFile.split('/');parts.pop();
+  for(const part of target.split('/')){
+    if(!part||part==='.')continue;
+    if(part==='..')parts.pop(); else parts.push(part);
+  }
+  return parts.join('/');
+}
+async function excelWorkbookSheetPathMap(zip){
+  const workbookPath='xl/workbook.xml',relsPath='xl/_rels/workbook.xml.rels';
+  const workbookXml=await zip.file(workbookPath)?.async('string');
+  const relsXml=await zip.file(relsPath)?.async('string');
+  if(!workbookXml||!relsXml)throw new Error('Không đọc được cấu trúc workbook XLSX/XLSM.');
+  const parser=new DOMParser(),wbDoc=parser.parseFromString(workbookXml,'application/xml'),relDoc=parser.parseFromString(relsXml,'application/xml');
+  if(wbDoc.querySelector('parsererror')||relDoc.querySelector('parsererror'))throw new Error('Workbook XML không hợp lệ.');
+  const relMap=new Map();
+  [...relDoc.getElementsByTagName('Relationship')].forEach(rel=>relMap.set(rel.getAttribute('Id'),rel.getAttribute('Target')));
+  const map=new Map();
+  [...wbDoc.getElementsByTagName('sheet')].forEach(sheet=>{
+    const name=sheet.getAttribute('name'),rid=sheet.getAttribute('r:id')||sheet.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships','id');
+    const target=relMap.get(rid);
+    if(name&&target)map.set(name,excelResolveZipTarget(workbookPath,target));
+  });
+  return {map,workbookXml,relsXml};
+}
+function excelWorksheetHasExternalFormula(xml){
+  const shared=excelWorksheetSharedFormulaMap(xml);
+  const re=/<c\b[^>]*\br="[^"]+"[^>]*>[\s\S]*?<\/c>/gi;
+  let m;
+  while((m=re.exec(xml))){
+    const info=excelCellFormulaInfo(m[0],shared);
+    if(info.hasFormula&&excelFormulaIsExternal(info.formula))return true;
+  }
+  return false;
+}
+function excelWorkbookHasExternalDefinedName(workbookXml){
+  const re=/<definedName\b[^>]*>([\s\S]*?)<\/definedName>/gi;
+  let m;
+  while((m=re.exec(workbookXml))){
+    if(excelFormulaIsExternal(m[1]||''))return true;
+  }
+  return false;
+}
+async function excelRemoveCalcChain(zip){
+  zip.remove('xl/calcChain.xml');
+  const relPath='xl/_rels/workbook.xml.rels',ctPath='[Content_Types].xml';
+  const rel=await zip.file(relPath)?.async('string');
+  if(rel)zip.file(relPath,rel.replace(/<Relationship\b[^>]*Type="[^"]*\/calcChain"[^>]*\/>/gi,''));
+  const ct=await zip.file(ctPath)?.async('string');
+  if(ct)zip.file(ctPath,ct.replace(/<Override\b[^>]*PartName="\/xl\/calcChain\.xml"[^>]*\/>/gi,''));
+}
+async function excelCleanupExternalLinksIfSafe(zip,sheetPaths,workbookXml){
+  if(excelWorkbookHasExternalDefinedName(workbookXml))return {removed:false,reason:'Workbook còn defined name tham chiếu bên ngoài.'};
+  for(const path of sheetPaths){
+    const xml=await zip.file(path)?.async('string');
+    if(xml&&excelWorksheetHasExternalFormula(xml))return {removed:false,reason:'Workbook vẫn còn công thức liên kết ngoài ở sheet chưa chuyển.'};
+  }
+  const wbPath='xl/workbook.xml',relPath='xl/_rels/workbook.xml.rels',ctPath='[Content_Types].xml';
+  let wb=await zip.file(wbPath)?.async('string');
+  if(wb)zip.file(wbPath,wb.replace(/<externalReferences\b[^>]*>[\s\S]*?<\/externalReferences>/gi,''));
+  let rel=await zip.file(relPath)?.async('string');
+  if(rel)zip.file(relPath,rel.replace(/<Relationship\b[^>]*Type="[^"]*\/externalLink"[^>]*\/>/gi,''));
+  let ct=await zip.file(ctPath)?.async('string');
+  if(ct)zip.file(ctPath,ct.replace(/<Override\b[^>]*PartName="\/xl\/externalLinks\/[^"]+"[^>]*\/>/gi,''));
+  Object.keys(zip.files).filter(p=>p.startsWith('xl/externalLinks/')).forEach(p=>zip.remove(p));
+  return {removed:true,reason:'Đã loại metadata external links vì không còn công thức/defined name bên ngoài.'};
+}
+async function runExcelFormulaToValue(mode){
+  try{
+    const item=state.excelFiles[0];
+    if(!item)throw new Error('Chưa chọn workbook.');
+    const ext=fileExt(item.file.name);
+    if(!['.xlsx','.xlsm'].includes(ext))throw new Error('Chức năng này chỉ hỗ trợ XLSX/XLSM để bảo toàn định dạng.');
+    const selected=selectedExcelValueSheets();
+    if(!selected.length)throw new Error('Hãy chọn ít nhất một sheet.');
+    const actionName=mode==='external'?'Break Links':'Dán Value';
+    startBusy(`${actionName}: đang mở workbook…`);
+    const JSZip=await ensureZip(),zip=await JSZip.loadAsync(await item.file.arrayBuffer());
+    const {map,workbookXml}=await excelWorkbookSheetPathMap(zip);
+    const selectedPaths=[];
+    let converted=0,skippedNoCached=0,externalFound=0,totalFormula=0;
+    for(let i=0;i<selected.length;i++){
+      assertNotAborted();
+      const name=selected[i],path=map.get(name);
+      if(!path||!zip.file(path))throw new Error(`Không tìm thấy XML của sheet “${name}”.`);
+      const xml=await zip.file(path).async('string');
+      const result=transformExcelWorksheetXml(xml,mode);
+      zip.file(path,result.xml);
+      selectedPaths.push(path);
+      converted+=result.converted;skippedNoCached+=result.skippedNoCached;externalFound+=result.externalFormulaCount;totalFormula+=result.formulaCount;
+      setStatus(`${actionName}: ${name} · đã chuyển ${result.converted.toLocaleString('vi-VN')} ô`,Math.round((i+1)/selected.length*65));
+      await sleep();
+    }
+    await excelRemoveCalcChain(zip);
+    let cleanup={removed:false,reason:''};
+    if(mode==='external'){
+      const allPaths=[...map.values()].filter(p=>zip.file(p));
+      cleanup=await excelCleanupExternalLinksIfSafe(zip,allPaths,workbookXml);
+    }
+    setStatus(`${actionName}: đang đóng gói file Excel…`,75);
+    const bytes=await zip.generateAsync({type:'uint8array',compression:'DEFLATE',compressionOptions:{level:6}},meta=>{
+      setStatus(`${actionName}: đang ghi file ${Math.round(meta.percent)}%`,75+meta.percent*.24);
+    });
+    const suffix=mode==='external'?'_break_links':'_values';
+    const outName=`${baseName(item.file.name)}${suffix}${ext}`;
+    const mime=ext==='.xlsm'?'application/vnd.ms-excel.sheet.macroEnabled.12':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    await saveBlob(new Blob([bytes],{type:mime}),outName,ext==='.xlsm'?'XLSM':'XLSX');
+    const baseReport=mode==='external'
+      ? `Đã Break Links ${converted.toLocaleString('vi-VN')}/${externalFound.toLocaleString('vi-VN')} công thức liên kết ngoài trong ${selected.length} sheet.`
+      : `Đã dán Value ${converted.toLocaleString('vi-VN')}/${totalFormula.toLocaleString('vi-VN')} ô công thức trong ${selected.length} sheet.`;
+    const skipped=skippedNoCached?` Có ${skippedNoCached.toLocaleString('vi-VN')} ô không có cached value nên được giữ nguyên.`:'';
+    const linkInfo=mode==='external'&&cleanup.reason?` ${cleanup.reason}`:'';
+    endBusy(baseReport+skipped+linkInfo);
+  }catch(e){
+    if(e?.name==='AbortError'){endBusy('Đã hủy tác vụ.');return}
+    showError(e);
+  }
+}
 function renderExcelManage(h){h.innerHTML=excelBrowseCard(`<div class="office-card"><h4>Quản lý sheet trong bản kết quả</h4><p class="office-card-note">Các thao tác chỉ áp dụng cho bản đang mở trong trình duyệt. File gốc trên máy không bị thay đổi.</p><div class="office-grid"><label class="office-field"><span>Sheet đang chọn</span><select id="excelManageSheet"></select></label><label class="office-field"><span>Tên mới</span><input id="excelManageName" maxlength="31"></label></div><div class="office-toolbar"><button class="office-btn" id="excelSheetUp">↑ Lên</button><button class="office-btn" id="excelSheetDown">↓ Xuống</button><button class="office-btn" id="excelSheetRename">Đổi tên</button><button class="office-btn" id="excelSheetDuplicate">Nhân bản</button><button class="office-btn danger" id="excelSheetDelete">Xóa sheet</button><span class="spacer"></span><button class="office-btn primary" id="excelManageExport">Xuất workbook XLSX</button></div></div><div class="office-card"><h4>Làm sạch dữ liệu cơ bản</h4><p class="office-card-note">Trim/chuyển số không tác động ô công thức. Xóa hàng/cột trống hoặc dòng trùng sẽ dựng lại sheet và có thể bỏ định dạng phức tạp; nếu sheet có công thức, ứng dụng sẽ không cho chạy thao tác cấu trúc.</p><div class="office-toolbar"><label class="office-check"><input id="excelCleanTrim" type="checkbox" checked> Trim khoảng trắng</label><label class="office-check"><input id="excelCleanSpaces" type="checkbox" checked> Gộp nhiều khoảng trắng</label><label class="office-check"><input id="excelCleanNumbers" type="checkbox"> Text số → number</label><label class="office-check"><input id="excelCleanRows" type="checkbox"> Xóa hàng trống</label><label class="office-check"><input id="excelCleanCols" type="checkbox"> Xóa cột trống</label><label class="office-check"><input id="excelCleanDup" type="checkbox"> Xóa dòng trùng</label><span class="spacer"></span><button class="office-btn" id="excelCleanRun">Làm sạch sheet</button></div><div id="excelManagePreview" class="office-table-wrap"></div></div>`);bindExcelLibrary();renderExcelManageControls();}
 function renderExcelManageControls(){const item=state.excelFiles[0],sel=mainHost.querySelector('#excelManageSheet'),preview=mainHost.querySelector('#excelManagePreview');if(!item){sel.innerHTML='<option>Chưa có workbook</option>';['excelSheetUp','excelSheetDown','excelSheetRename','excelSheetDuplicate','excelSheetDelete','excelManageExport','excelCleanRun'].forEach(id=>mainHost.querySelector('#'+id).disabled=true);preview.innerHTML='<div class="office-empty">Chưa chọn workbook.</div>';return}sel.innerHTML=item.wb.SheetNames.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');const sync=()=>{mainHost.querySelector('#excelManageName').value=sel.value;renderExcelSheetPreview(item,sel.value)};sel.onchange=sync;sync();mainHost.querySelector('#excelSheetUp').onclick=()=>reorderExcelSheet(-1);mainHost.querySelector('#excelSheetDown').onclick=()=>reorderExcelSheet(1);mainHost.querySelector('#excelSheetRename').onclick=renameExcelSheet;mainHost.querySelector('#excelSheetDuplicate').onclick=duplicateExcelSheet;mainHost.querySelector('#excelSheetDelete').onclick=deleteExcelSheet;mainHost.querySelector('#excelManageExport').onclick=exportManagedWorkbook;mainHost.querySelector('#excelCleanRun').onclick=cleanExcelSheet;}
 function renderExcelSheetPreview(item,name){const host=mainHost.querySelector('#excelManagePreview'),XLSX=globalThis.XLSX,rows=XLSX.utils.sheet_to_json(item.wb.Sheets[name],{header:1,defval:'',raw:false}).slice(0,20),cols=Math.min(12,Math.max(1,...rows.map(r=>r.length)));host.innerHTML=`<table class="office-table"><tbody>${rows.map((r,i)=>`<tr>${Array.from({length:cols},(_,c)=>`<${i?'td':'th'}>${escapeHtml(r[c]??'')}</${i?'td':'th'}>`).join('')}</tr>`).join('')}</tbody></table><div class="office-card-note" style="padding:8px">Xem trước tối đa 20 dòng và 12 cột.</div>`}
