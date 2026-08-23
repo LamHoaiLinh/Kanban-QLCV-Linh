@@ -10,3 +10,5 @@
 @media(max-width:640px){.goal-grid,.origins10{grid-template-columns:1fr}.steps span{font-size:11px}}
 
 .ship-status-inline{font-size:12px;font-weight:700;color:var(--muted)}.repair-inline{padding:6px 9px;font-size:11px}.choice-card{display:flex;flex-direction:column;gap:3px;text-align:left;border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:12px;padding:11px;width:100%}.choice-card:hover,.choice-card.selected{border-color:#78b696;background:#eef9f3}.origin-choice.locked{cursor:help;opacity:.58}.origin-choice.locked:hover{border-color:#d5b775;background:#fff8e8}.emotion-hot{border-left:4px solid #e5a12d}.unlock-progress{font-size:11px;color:var(--muted);margin-top:4px}
+
+.route-list{grid-template-columns:1fr}.route-card .tag{margin-left:5px}.route-card .row>div{display:flex;gap:4px;flex-wrap:wrap}.contract .btn.danger{margin-left:auto}.contract .down{font-weight:800}.contract .up{font-weight:800}
