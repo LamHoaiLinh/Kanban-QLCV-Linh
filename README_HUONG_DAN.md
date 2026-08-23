@@ -202,3 +202,10 @@ Model xúc xắc và cốc lắc lấy từ asset **Dice Animation 2** của Kag
 - Tarot Việt chạy hoàn toàn trên GitHub Pages, không cần Render hoặc backend.
 - Tarot hỗ trợ 78 lá, rút 1/3/5/7 lá, tự chọn hoặc máy tự rút và diễn giải bằng tiếng Việt.
 - Lịch sử Dice và Tarot lưu bằng khóa riêng, không làm thay đổi dữ liệu Kanban.
+
+## GAME — Đời Lập Nghiệp v1.1
+- Mỗi hành động tiêu tốn thời gian theo phút; công việc có khung giờ và thời lượng riêng.
+- Sau 22:00 vẫn có thể làm việc nhưng dễ hao sức/thiếu ngủ; 01:00 tự sang ngày mới nếu còn thức.
+- Nút **Về nghỉ** ngủ tới sáng; ngủ muộn sẽ dậy muộn và có thể lỡ việc sáng.
+- Có 3 ô lưu, 10 lối sống Roguelite, thời tiết, thứ trong tuần, tình yêu, gia đình, con cái và doanh nghiệp.
+- Trên điện thoại dùng thanh thao tác cố định phía dưới để vào Việc làm hoặc Về nghỉ nhanh.

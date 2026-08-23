@@ -1,3 +1,14 @@
+# v6.22 — Đời Lập Nghiệp v1.1
+- Thêm đồng hồ 24 giờ theo phút; mọi việc, ăn, tập, hẹn hò, mua tài sản và mở cơ sở đều tiêu tốn thời gian.
+- Việc làm có khung giờ, khu vực, thời lượng riêng; việc ngắn không bị ép trả ít tiền.
+- Sau 22:00 vẫn được làm việc nhưng có hao sức/thiếu ngủ; 01:00 tự sang ngày mới nếu còn thức.
+- Nút Về nghỉ tính giờ ngủ/dậy động; ngủ muộn có thể làm lỡ việc sáng.
+- Thêm thời tiết, thứ trong tuần, việc gấp và việc ca đêm.
+- Phương tiện rút ngắn phần di chuyển thay vì cộng tiền máy móc.
+- Tình yêu/gia đình tiêu cả tiền lẫn thời gian; doanh nghiệp giúp người chơi mua lại thời gian.
+- Menu có hướng dẫn toàn bộ cơ chế cơ bản; bổ sung giao diện mobile và thanh thao tác dưới màn hình.
+- Giữ 3 ô lưu và 10 lối sống Roguelite; tương thích save v1 bằng migrate.
+
 # v6.21 — Đời Lập Nghiệp
 - Thêm game **Đời Lập Nghiệp** vào GAME Hub.
 - 3 ô lưu độc lập; 10 lối sống khởi đầu kiểu roguelite và Điểm sự nghiệp mở khóa qua nhiều hành trình.
