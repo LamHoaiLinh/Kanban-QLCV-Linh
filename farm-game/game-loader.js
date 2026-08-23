@@ -16,11 +16,26 @@ function showBootError(error){
   }
 }
 
+function ensurePatchStyle(){
+  if(document.getElementById('farm-ui-patch'))return;
+  const style=document.createElement('style');
+  style.id='farm-ui-patch';
+  style.textContent=`
+    .req-line{display:flex;align-items:center;justify-content:space-between;gap:8px}
+    .req-line .req-crop{display:inline-flex;align-items:center;gap:6px}
+    .req-line .farm-asset.inline-icon.req-icon{display:inline-flex;align-items:center;justify-content:center;vertical-align:middle}
+    .req-line .farm-asset.inline-icon.req-icon img,
+    .req-line .farm-asset.inline-icon.req-icon svg{width:18px;height:18px;display:block}
+  `;
+  document.head.appendChild(style);
+}
+
 window.addEventListener('error',e=>showBootError(e.error||e.message));
 window.addEventListener('unhandledrejection',e=>showBootError(e.reason));
 
 async function bootFarm(){
   try{
+    ensurePatchStyle();
     const stamp=Date.now();
     const response=await fetch(`./game.js?live=${stamp}`,{cache:'no-store'});
     if(!response.ok)throw new Error(`Không tải được game.js (HTTP ${response.status})`);
@@ -44,6 +59,18 @@ async function bootFarm(){
     source=source.replace(
       'initFarmAssets().finally(init);',
       "init();\ninitFarmAssets().then(()=>{if(gameStarted)renderAll()}).catch(()=>{});"
+    );
+
+    // Lift crop art a little so the roots are not hidden by the growth bar.
+    source=source.replace(
+      'const drewAsset=drawFarmAsset(x,assetId,{x:W/2,y:H-12,width:assetSize,height:assetSize,alpha:p.deadAt?.68:1});',
+      'const drewAsset=drawFarmAsset(x,assetId,{x:W/2,y:H-24,width:assetSize,height:assetSize,alpha:p.deadAt?.68:1});'
+    );
+
+    // Show a small crop icon in order requirements for children who cannot read yet.
+    source=source.replace(
+      '<span>${cropById[id].name}</span>',
+      '<span class="req-crop">${farmAssetMarkup(`crop.${id}.mature`,"farm-asset inline-icon req-icon")||cropSymbol(cropById[id])} ${cropById[id].name}</span>'
     );
 
     const blob=new Blob([source],{type:'text/javascript'});
