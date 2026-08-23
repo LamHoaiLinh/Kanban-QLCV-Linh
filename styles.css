@@ -698,3 +698,89 @@ body.drag-active .music-player{
 
 /* v5.16 - gom Office thành một nút + Tetris */
 .office-suite-launch-btn{width:60px!important}.office-suite-launch-btn .office-btn-mark{font-size:7px;letter-spacing:-.02em}.tetris-launch-btn{width:54px!important}.tetris-launch-btn .office-btn-mark{font-size:8px;letter-spacing:-.03em}@media(max-width:900px){.office-suite-launch-btn{width:54px!important}.tetris-launch-btn{width:48px!important}.office-suite-launch-btn .office-btn-mark,.tetris-launch-btn .office-btn-mark{font-size:7px}}
+
+/* === Mobile web usability v6.20: layout-only, no data/schema changes === */
+@media(max-width:700px){
+  html,body{height:100%;min-height:100%;overscroll-behavior:none}
+  body{overflow:hidden;-webkit-text-size-adjust:100%;touch-action:manipulation}
+  .app-shell,.main-content{height:100%;min-height:0}
+  .main-content{grid-template-rows:auto minmax(0,1fr)}
+  .topbar{padding:9px 10px 8px;max-height:46vh;overflow:auto;scrollbar-width:none}
+  .topbar::-webkit-scrollbar{display:none}
+  .topbar-main{display:grid;grid-template-columns:44px minmax(0,1fr);align-items:start;gap:7px 8px}
+  #openSidebarBtn{grid-column:1;grid-row:1;width:44px;height:44px;font-size:20px}
+  .title-note-stack{grid-column:2;grid-row:1;min-width:0}
+  .title-row{min-width:0}
+  .title-row h1{font-size:20px;line-height:1.15;max-width:calc(100vw - 112px)}
+  #editProjectBtn{width:34px;height:34px;flex:0 0 auto}
+  .project-notes-bar{max-width:100%;overflow:hidden}
+  .project-note-tabs{overflow-x:auto;scrollbar-width:none;overscroll-behavior-x:contain}
+  .project-note-tabs::-webkit-scrollbar{display:none}
+  .desk-clock{grid-column:1/-1;width:100%;margin:0}
+  .desk-clock-face{min-width:0}
+  .desk-clock-controls{max-height:none}
+  .header-actions{grid-column:1/-1;width:100%;display:flex;justify-content:space-between;gap:6px;min-width:0}
+  .header-system-actions,.office-launcher{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;min-width:0}
+  .header-system-actions::-webkit-scrollbar,.office-launcher::-webkit-scrollbar{display:none}
+  .header-actions .icon-btn,.header-actions .secondary-btn,.office-launcher .icon-btn{min-width:44px;width:44px;height:44px;min-height:44px;flex:0 0 auto}
+  .header-actions .secondary-btn{font-size:0}
+  .office-suite-launch-btn,.game-suite-launch-btn{width:58px!important;min-width:58px!important}
+  .topbar-sub{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;margin-top:8px}
+  .search-box{grid-column:1/-1;width:100%;height:44px;order:initial}
+  .search-box input{font-size:16px}
+  .search-box kbd{display:none}
+  .project-stats{grid-column:1;display:flex;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:5px;min-width:0}
+  .project-stats::-webkit-scrollbar{display:none}
+  .project-stats .stat-pill{display:inline-flex!important;min-height:32px;flex:0 0 auto}
+  .save-status{grid-column:2;margin:0;align-self:center;font-size:11px}
+  .board-area{min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-x pan-y;scrollbar-gutter:auto}
+  .board{gap:10px;padding:10px 9px 28px;scroll-snap-type:x mandatory;scroll-padding-left:9px}
+  .kanban-column{width:calc(100vw - 28px);min-width:calc(100vw - 28px);max-width:calc(100vw - 28px);padding:10px;scroll-snap-align:start;scroll-snap-stop:always;border-radius:15px}
+  .column-header{position:sticky;top:0;z-index:3;background:color-mix(in srgb,var(--panel-soft) 94%,var(--green-soft));border-radius:10px;padding:6px 4px 10px}
+  .column-grip,.card-grip{min-width:36px;min-height:36px;display:grid;place-items:center;touch-action:none}
+  .column-count{min-width:28px;height:28px}
+  .task-card{padding:13px;min-height:68px}
+  .card-title{font-size:15px}
+  .card-description{font-size:13px;-webkit-line-clamp:3}
+  .add-card-btn{min-height:44px;padding:11px 10px}
+  .add-column-tile{min-width:calc(100vw - 28px);min-height:58px}
+  .sidebar{width:min(92vw,340px);padding:14px 12px 16px;padding-bottom:max(16px,env(safe-area-inset-bottom));overflow-y:auto}
+  .brand-row{position:sticky;top:0;z-index:2;background:var(--panel);padding:4px 2px 12px}
+  #closeSidebarBtn{margin-left:auto;width:44px;height:44px}
+  .project-select{min-height:48px;padding:12px 10px}
+  .project-more{opacity:1;min-width:38px;min-height:38px}
+  .sidebar-tools .secondary-btn,.sidebar-tools .ghost-btn,#addProjectBtn{min-height:46px}
+  .modal-card{width:calc(100vw - 10px);max-height:calc(100dvh - 14px);padding:14px;border-radius:16px}
+  .modal-header{position:sticky;top:-14px;z-index:3;background:var(--panel);padding:10px 0 12px;margin-top:-10px}
+  .modal-actions{position:sticky;bottom:-14px;z-index:3;background:var(--panel);padding:12px 0 8px;margin-bottom:-8px}
+  .field input,.field textarea,.field select{font-size:16px;min-height:44px}
+  .primary-btn,.secondary-btn,.ghost-btn,.danger-btn,.small-btn{min-height:44px}
+  .icon-btn{min-width:44px;min-height:44px}
+  .card-form-grid{gap:12px}
+  .card-form-side{padding:11px}
+  .checklist-row{grid-template-columns:24px minmax(0,1fr) 44px}
+  .remove-check-btn{width:44px;height:44px}
+  .toast{left:8px;right:8px;bottom:max(12px,env(safe-area-inset-bottom));transform:translateY(16px);text-align:center}
+  .toast.show{transform:translateY(0)}
+}
+@media(max-width:390px){
+  .topbar{padding-left:8px;padding-right:8px}
+  .kanban-column,.add-column-tile{width:calc(100vw - 20px);min-width:calc(100vw - 20px);max-width:calc(100vw - 20px)}
+  .board{padding-left:6px;padding-right:6px;scroll-padding-left:6px}
+  .desk-clock{font-size:12px}
+  .clock-current-time{font-size:24px}
+  .header-actions{gap:4px}
+}
+@media(max-width:700px){
+  .desk-clock{padding:7px 8px;border-radius:14px}
+  .desk-clock-head{grid-template-columns:minmax(0,1fr) 40px!important;position:relative}
+  .desk-clock-face{grid-template-columns:minmax(0,1fr) 100px!important;gap:6px}
+  .desk-clock-main{padding:6px 8px;border-radius:12px}
+  .desk-clock-side{display:grid!important;grid-template-columns:1fr!important;align-items:start!important;padding:6px 8px;border-radius:11px;min-height:0}
+  .clock-day-period,.clock-side-title{font-size:9px}
+  .clock-current-time{font-size:22px!important;line-height:1}
+  .clock-date-line{font-size:9px;gap:5px}
+  .timer-display{font-size:19px!important;line-height:1.05}
+  .clock-status{font-size:9px}
+  .clock-toggle-btn{position:static!important;width:40px!important;height:40px!important;min-width:40px!important;min-height:40px!important}
+}
