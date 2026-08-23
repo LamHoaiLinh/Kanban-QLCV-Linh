@@ -1,10 +1,10 @@
-const MANIFEST_URL='./assets/manifest.json?v=1.0.0';
+const MANIFEST_URL='./assets/manifest.json?v=2.0.0';
 const imageCache=new Map();
 let manifest=null;
 
 function imageUrl(path){return new URL(`${manifest.basePath}${path}`,document.baseURI).href}
 function loadImage(id,path){return new Promise(resolve=>{const image=new Image();image.decoding='async';image.onload=()=>{imageCache.set(id,image);resolve()};image.onerror=()=>{console.warn(`Farm asset fallback: ${id}`);resolve()};image.src=imageUrl(path)})}
-function validate(data){return data?.schemaVersion==='1.0.0'&&data?.manifestId==='farm-assets-v1'&&data?.assets?.crops&&data?.assets?.materials&&data?.assets?.buildings&&data?.assets?.npcs}
+function validate(data){return data?.schemaVersion==='1.0.0'&&data?.assets?.crops&&data?.assets?.materials&&data?.assets?.buildings&&data?.assets?.npcs}
 
 export async function initFarmAssets(){
   try{
