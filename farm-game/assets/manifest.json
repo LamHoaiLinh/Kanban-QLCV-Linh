@@ -1,7 +1,7 @@
 {
   "$schema": "./manifest.schema.json",
   "schemaVersion": "1.0.0",
-  "manifestId": "farm-assets-v2",
+  "manifestId": "farm-assets-v3",
   "basePath": "./assets/",
   "fallbackPolicy": "procedural-or-emoji",
   "stageOrder": [
@@ -378,14 +378,14 @@
       "wood": {
         "label": "Gỗ",
         "fallback": "🪵",
-        "file": "materials/wood.webp",
-        "ready": false
+        "file": "materials/wood.svg",
+        "ready": true
       },
       "stone": {
         "label": "Đá",
         "fallback": "🪨",
-        "file": "materials/stone.webp",
-        "ready": false
+        "file": "materials/stone.svg",
+        "ready": true
       },
       "brick": {
         "label": "Gạch",

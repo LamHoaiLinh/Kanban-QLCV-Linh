@@ -1,4 +1,4 @@
-const MANIFEST_URL='./assets/manifest.json?v=2.0.0';
+const MANIFEST_URL='./assets/manifest.json?v=3.0.0';
 const imageCache=new Map();
 let manifest=null;
 
