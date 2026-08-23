@@ -16,7 +16,7 @@ export async function initFarmAssets(){
     const jobs=[];
     for(const [cropId,item] of Object.entries(data.assets.crops))for(const stage of item.readyVariants||[])if(item.files?.[stage])jobs.push(loadImage(`crop.${cropId}.${stage}`,item.files[stage]));
     for(const [group,prefix] of [['materials','material'],['buildings','building'],['npcs','npc']])for(const [id,item] of Object.entries(data.assets[group]))if(item.ready===true)jobs.push(loadImage(`${prefix}.${id}`,item.file));
-    await Promise.all(jobs);
+    Promise.all(jobs).then(()=>document.dispatchEvent(new CustomEvent('farm-assets-ready'))).catch(()=>{});
   }catch(error){manifest=null;imageCache.clear();console.warn('Farm asset manifest không tải được; dùng giao diện dự phòng.',error)}
 }
 
