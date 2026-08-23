@@ -34,3 +34,12 @@
 /* v6.24 mobile overflow hardening */
 .grid>*{min-width:0}.grid3,.grid4,.card,.job,.brief,.brief-item{min-width:0;max-width:100%}
 @media(max-width:680px){.grid{min-width:0;width:100%;overflow:hidden}.grid>div{min-width:0}.screen-title{min-width:0}.screen-title>div{min-width:0}.job-top>div,.business-top>div,.asset-top>div{min-width:0}}
+
+/* v6.25 - readable status meters, durable events, staged food and household issues */
+.progress.metric{position:relative;height:16px;margin-top:6px;background:#e7ede9;border:1px solid rgba(32,52,43,.08);overflow:hidden}
+.progress.metric i{position:absolute;inset:0 auto 0 0;transition:width .25s ease,background .25s ease}
+.progress.metric em{position:absolute;z-index:2;left:50%;top:50%;transform:translate(-50%,-50%);font-style:normal;font-size:9px;font-weight:950;line-height:1;color:#20342b;background:rgba(255,255,255,.78);border-radius:999px;padding:2px 4px;min-width:31px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.progress.metric.good i{background:#2f8a5e}.progress.metric.watch i{background:#d7aa35}.progress.metric.low i{background:#df7d36}.progress.metric.critical i{background:#c95151}
+.food-action{display:flex;flex-direction:column;gap:5px}.food-action .btn{margin-top:auto}.food-locked{margin-top:10px;border-top:1px solid var(--line);padding-top:9px}.food-locked summary{cursor:pointer;font-size:11px;font-weight:850;color:var(--muted)}
+.issue-card{border-color:#ead8ae;background:#fffdf7}.issue-row{border-left:3px solid #d5a545}.issue-row .btn{margin-top:7px}.autosave-tag{background:#edf7f1;color:#2f6c4d}.autosave-note{margin-top:10px;padding:9px 10px;border-radius:10px;background:#eef7f2;border:1px solid #cfe5d7;color:#406454;font-size:10px;line-height:1.45}.choice-consequence{display:block;margin-top:4px;font-size:10px;color:#6c7f75;line-height:1.35}.event-modal .choice button b{display:block}.event-modal .choice button .mini{display:block;margin-top:3px;color:#53685d}
+@media(max-width:680px){.progress.metric{height:15px}.progress.metric em{font-size:8px;min-width:29px}.food-action{padding:9px}.issue-card{margin-top:8px!important}.autosave-note{font-size:9px}}
