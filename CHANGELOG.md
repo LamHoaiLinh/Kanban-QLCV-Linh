@@ -1,3 +1,11 @@
+# v6.21 — Đời Lập Nghiệp
+- Thêm game **Đời Lập Nghiệp** vào GAME Hub.
+- 3 ô lưu độc lập; 10 lối sống khởi đầu kiểu roguelite và Điểm sự nghiệp mở khóa qua nhiều hành trình.
+- Gameplay theo ngày: việc làm, ăn uống, tập luyện, sức khỏe, tinh thần, nhà ở, xe cộ, vay vốn và kinh doanh.
+- Tiến trình đời sống mở dần: hẹn hò, kết hôn, chủ động sinh con, chi phí gia đình và học hành.
+- Ngành kinh doanh có bão hòa và chi phí nhân sự để buộc chuyển dần sang nhóm ngành doanh thu cao hơn.
+- Hiệu ứng tiền +/− nổi chậm rồi mờ dần để người chơi kịp nhìn giao dịch.
+
 # CHANGELOG
 
 ## v4.0 – Dice Arena
