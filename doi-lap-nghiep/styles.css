@@ -103,3 +103,11 @@
 .day-summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:8px}.day-summary-grid>div{padding:8px 9px;border:1px solid var(--line);border-radius:10px;background:#fbfdfc}.day-summary-grid span{display:block;font-size:9px;color:var(--muted)}.day-summary-grid b{display:block;margin-top:3px;font-size:13px}.summary-insight{margin-top:9px;padding:9px 10px;border-left:4px solid #5c9879;border-radius:8px;background:#eef8f2;font-size:10px;line-height:1.45;color:#355d49}
 @media(max-width:680px){.client-strip{align-items:flex-start}.client-strip>span:first-child{width:100%;margin-right:0}.receivable-row{align-items:flex-start;flex-direction:column}.receivable-row .btn{width:100%}.day-summary-grid{grid-template-columns:1fr 1fr}.action-lock-note{font-size:9px}}
 @media(max-width:390px){.day-summary-grid{grid-template-columns:1fr}}
+
+/* v6.33 - free-form eating/training + unified highlighted prices */
+.money-price{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;padding:4px 8px;border-radius:999px;border:1px solid #e0b65f;background:#fff0c2;color:#754600;font-size:10px;font-weight:950;line-height:1.15;box-shadow:0 1px 0 rgba(115,75,0,.05)}
+.money-price.free{border-color:#b9dac8;background:#eef9f2;color:#286746}.money-price.resale{border-color:#b8d5c5;background:#f0f8f3;color:#2b684c}
+.life-price{border-color:#e0b65f;background:#fff0c2;color:#754600;font-weight:950}.life-price.free{border-color:#b9dac8;background:#eef9f2;color:#286746}
+.money-row{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:6px}.overeat-note{margin-top:5px;padding:6px 7px;border-radius:8px;background:#fff0ee;border:1px solid #efc8c0;color:#93493e;line-height:1.35}.overeat-ready{border-color:#e4c0ba;background:#fffdfc}
+.asset-top .money-price,.business-top .money-price{flex:0 0 auto}.owned-furniture>.money-price{margin-top:5px;align-self:flex-start}.brief-item>.money-price{margin-top:5px}
+@media(max-width:680px){.money-price{font-size:9px;padding:3px 6px}.money-row{gap:5px}.asset-top{align-items:flex-start}.asset-top .money-price{max-width:44%;overflow:hidden;text-overflow:ellipsis}}
