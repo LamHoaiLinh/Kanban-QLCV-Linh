@@ -73,3 +73,24 @@
 /* v1.8.0 - navigation clarity */
 .kanban-back-btn{white-space:nowrap;border-color:#bfd7ca;background:#f7fbf9}.kanban-back-btn:hover{background:#eaf6ef}.event-modal>.row.between{justify-content:flex-start}.event-modal>.row.between:has(.tag:only-child){justify-content:flex-start}
 @media(max-width:680px){.top-actions .kanban-back-btn,.top-actions #homeBtn{font-size:11px;padding:8px 9px;min-height:38px}.top-actions #guideGameBtn{min-width:38px;padding:8px}.top-actions{align-items:center}}
+
+/* v6.30 - realtime eating/workout progress + clearer life prices */
+.life-action-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.life-action-head>b{font-size:12px;line-height:1.28;flex:1 1 105px}
+.life-price{display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;padding:4px 7px;border-radius:999px;border:1px solid #e3bd70;background:#fff2cf;color:#7c4e00;font-size:10px;font-weight:950;box-shadow:0 1px 0 rgba(115,75,0,.04)}
+.life-price.free{border-color:#b9dac8;background:#eef9f2;color:#286746}
+.life-local-tag{align-self:flex-start;margin-top:-1px}
+.life-benefits{font-weight:750;color:#40574c}
+.active-life-action{border-color:#75b693!important;background:linear-gradient(135deg,#effaf4,#fbfefc)!important;box-shadow:0 0 0 2px rgba(53,122,91,.08)}
+.life-action-progress{margin-top:auto;padding:8px;border:1px solid #bdddc9;border-radius:10px;background:#f6fcf8}
+.life-action-progress strong{font-size:10px;color:#276949}
+.life-action-progress b{font-size:11px;font-variant-numeric:tabular-nums;color:#1f5f43}
+.life-realtime{height:10px;margin:7px 0 5px}
+.life-banner{border-color:#8fc8ab;background:#eefaf4}
+.life-banner b{color:#245f43}
+@media(max-width:680px){
+ .life-action-head{gap:5px}
+ .life-action-head>b{font-size:11px;flex-basis:90px}
+ .life-price{font-size:9px;padding:3px 6px}
+ .life-action-progress{padding:7px}
+}
