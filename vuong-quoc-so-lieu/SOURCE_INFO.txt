@@ -1,0 +1,7 @@
+OpenDominion Vietnamese Local Demo
+Derived for local gameplay evaluation from OpenDominion source code.
+Upstream project: https://github.com/OpenDominion/OpenDominion
+Upstream branch/source supplied by user: develop
+License: GNU Affero General Public License v3.0 (AGPL-3.0)
+
+This local demo is intentionally standalone and does not reproduce the full Laravel/MySQL multiplayer backend.

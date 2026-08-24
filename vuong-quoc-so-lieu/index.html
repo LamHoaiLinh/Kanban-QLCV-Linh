@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Vương Quốc Số Liệu</title>
+  <link rel="stylesheet" href="assets/styles.css?v=1.0.0" />
+</head>
+<body>
+  <button id="kanbanCloseGame" class="kanban-close-game" type="button" aria-label="Đóng game">×</button>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">VQ</div>
+        <div>
+          <div class="brand-title">Vương Quốc Số Liệu</div>
+          <div class="brand-sub">Chiến thuật · Kinh tế · Chinh phục</div>
+        </div>
+      </div>
+      <div class="realm-card">
+        <div class="muted small">Lãnh địa</div>
+        <div id="realmName" class="realm-name">Đại Việt</div>
+        <div class="muted small">Tộc: Con Người · Thiện</div>
+      </div>
+      <nav id="nav" class="nav"></nav>
+      <div class="save-slot-panel" aria-label="Hồ sơ chơi">
+        <div class="save-slot-title">HỒ SƠ CHƠI</div>
+        <div class="save-slot-grid">
+          <button class="save-slot-btn" data-save-slot="1"><b>Ván 1</b><span data-slot-meta="1">Mới</span></button>
+          <button class="save-slot-btn" data-save-slot="2"><b>Ván 2</b><span data-slot-meta="2">Mới</span></button>
+          <button class="save-slot-btn" data-save-slot="3"><b>Ván 3</b><span data-slot-meta="3">Mới</span></button>
+        </div>
+      </div>
+      <div class="sidebar-bottom">
+        <button id="saveBtn" class="btn ghost full">Lưu ngay</button>
+        <button id="resetBtn" class="btn danger ghost full">Chơi lại từ đầu</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">Vương quốc số liệu</div>
+          <h1 id="pageTitle">Tổng quan</h1>
+        </div>
+        <div class="time-controls">
+          <div class="game-clock-v13">
+            <span>THỜI GIAN VƯƠNG QUỐC</span>
+            <b id="gameClockV13">Ngày 1 · 00:00</b>
+          </div>
+        </div>
+      </header>
+
+      <section id="resourceBar" class="resource-grid"></section>
+      <section id="content" class="content"></section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast"></div>
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="modalTitle">Thông tin</h3>
+        <button id="modalClose" class="icon-btn">×</button>
+      </div>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <script src="assets/game.js?v=1.0.0"></script>
+</body>
+</html>
