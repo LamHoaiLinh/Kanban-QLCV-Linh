@@ -4,9 +4,9 @@ const games=[
  {id:'dice',title:'Dice Arena',sub:'Xúc xắc 3D',icon:'⚄',url:'dice-game/index.html?v=5.7.0',close:'dice-game-close'},
  {id:'tarot',title:'Tarot Việt',sub:'Trải bài và diễn giải',icon:'✦',url:'tarot-game/index.html?v=5.4.0',close:'tarot-game-close'},
  {id:'tetris',title:'Tetris',sub:'Xếp gạch thư giãn / đối kháng',icon:'▦',url:'tetris-game/index.html?v=1.0.4',close:'tetris-game-close'},
- {id:'farm',title:'Nông Trại Nhỏ',sub:'Trồng cây · Kho · Nhà Vườn',icon:'🌿',url:'farm-game/index.html?v=3.1.4',close:'farm-game-close'},
- {id:'thuonglo',title:'Thương Lộ Việt',sub:'Chiến thuật kinh tế · Qua ngày · thế giới tự vận hành',icon:'₫',url:'thuong-lo-viet/index.html?v=7.1.0',close:'thuong-lo-viet-close'},
- {id:'doilapnghiep',title:'Đời Lập Nghiệp',sub:'24 giờ mỗi ngày · mưu sinh · tình yêu · gia đình · doanh nghiệp',icon:'Đ',url:'doi-lap-nghiep/index.html?v=1.8.0',close:'doi-lap-nghiep-close'},
+ {id:'farm',title:'Nông Trại Nhỏ',sub:'Trồng cây · Kho · Nhà Vườn',icon:'🌿',url:'farm-game/index.html?v=3.1.5',close:'farm-game-close'},
+ {id:'thuonglo',title:'Thương Lộ Việt',sub:'Chiến thuật kinh tế · Qua ngày · thế giới tự vận hành',icon:'🚚',url:'thuong-lo-viet/index.html?v=7.1.1',close:'thuong-lo-viet-close'},
+ {id:'doilapnghiep',title:'Đời Lập Nghiệp',sub:'24 giờ mỗi ngày · mưu sinh · tình yêu · gia đình · doanh nghiệp',icon:'💼',url:'doi-lap-nghiep/index.html?v=1.8.1',close:'doi-lap-nghiep-close'},
  {id:'vuongquoc',title:'Vương Quốc Số Liệu',sub:'Chiến thuật · kinh tế · chinh phục',icon:'♜',url:'vuong-quoc-so-lieu/index.html?v=1.0.0',close:'vuong-quoc-so-lieu-close'}
 ];
 if(btn){btn.addEventListener('click',openHub);window.addEventListener('message',e=>{if(games.some(g=>g.close===e.data?.type))closeGame()});window.addEventListener('keydown',e=>{if(e.key==='Escape'&&hub&&!hub.hidden){hub.hidden=true}else if(e.key==='Escape'&&overlay&&!overlay.hidden)closeGame()})}

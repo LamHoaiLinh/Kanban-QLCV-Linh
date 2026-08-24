@@ -64,7 +64,7 @@ export const HELP_CONFIG={
  start:['Chọn một loại hạt giống rồi chạm vào ô đất trống để gieo.','Cây trưởng thành theo thời gian thật, kể cả khi đóng Farm.','Thu hoạch đưa nông sản vào Kho; không cộng Vàng trực tiếp.'],
  crop:['Mỗi cây có thời gian lớn, nhu cầu nước và độ nhạy bệnh khác nhau.','Màu biểu tượng trên ô đất giúp nhận biết cây khô, bệnh hoặc đã sẵn sàng thu hoạch.'],
  water:['Trong khoảng 18 giờ đầu cây gần như an toàn. Sau đó đất sẽ khô dần.','Mưa tự tưới cây. Nâng Hệ thống tưới trong Nhà Vườn giúp giảm thao tác về sau.'],
- disease:['Bệnh chủ yếu xuất hiện sau khi cây bị khô lâu; không có cơ chế cây chết ngẫu nhiên.','Có thể dùng Phân hữu cơ hoặc một ít Vàng để chăm bệnh.'],
+ disease:['Cây sẽ bắt đầu bệnh rõ hơn nếu bị khô lâu; khi thấy biểu tượng ⚠️ hãy dùng thao tác Chăm bệnh để cứu cây và giữ năng suất.','Có thể dùng Phân hữu cơ hoặc một ít Vàng để chăm bệnh; một số cây nhạy bệnh sẽ xuống sức nhanh hơn.'],
  warehouse:['Thu hoạch chỉ thực hiện khi Kho còn đủ chỗ.','1 Kim Cương mở thêm 5 chỗ và luôn cần bạn chủ động xác nhận.'],
  orders:['Có 6 ô đơn hàng. Hoàn thành đơn nhận Vàng, EXP, tình cảm và vật liệu.','Đơn dễ hồi lại rất nhanh, đơn khó tối đa cũng chỉ chờ khoảng 10 phút.'],
  diamond:['Kim Cương không mua bằng Vàng hoặc tiền thật.','Đổi nông sản + vật liệu, hoàn thành thành tựu và mục tiêu để nhận Kim Cương.'],
