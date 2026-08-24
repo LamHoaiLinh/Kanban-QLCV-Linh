@@ -47,10 +47,24 @@ export const DIAMOND_RECIPE_CONFIG=[
 {id:'d5',name:'Giỏ nông sản quý',level:20,crops:{mango:10,dragon_fruit:8,blueberry:12},materials:{iron:2,special_seed:1},diamond:2}
 ];
 
-const villaNames=['Móng','Khung','Tường','Mái','Cửa chính','Cửa sổ','Hiên','Phòng khách','Nhà bếp','Phòng ngủ','Cổng','Hàng rào','Đường đá','Bồn hoa','Cây ăn trái','Ghế nghỉ','Đèn sân','Hồ cá','Cầu nhỏ','Giàn hoa','Xích đu','Bàn trà','Nhà kho','Giếng','Bồn nước','Nhà kính','Khu ươm giống','Kho lạnh','Hệ thống tưới','Khu đóng gói','Cối xay gió','Đài phun nước','Hồ sen','Vườn hoa','Chuồng thú','Biển tên Farm','Đèn dây','Tượng nhỏ','Vườn cây ăn trái','Góc nghỉ chân'];
-export const VILLA_CONFIG=villaNames.map((name,i)=>({
- id:`villa_${i+1}`,name,category:i<10?'Nhà chính':i<22?'Sân vườn':i<30?'Khu nông nghiệp':'Trang trí',level:Math.max(3,Math.ceil((i+1)/2)+2),diamond:i<4?0:(i%5===0?2:1),materials:{wood:3+Math.floor(i/4),stone:2+Math.floor(i/6),...(i>10?{brick:1+Math.floor(i/8)}:{}),...(i>20?{iron:1+Math.floor(i/12)}:{})},gold:120+Math.round(i*i*14)
-}));
+export const VILLA_CONFIG=[
+{id:'villa_1',name:'Khu đất',category:'Khởi tạo',level:1,diamond:0,materials:{},gold:0,desc:'Khu đất đã được chuẩn bị để bắt đầu xây Nhà Vườn.'},
+{id:'villa_2',name:'Móng nhà',category:'Nhà chính',level:3,diamond:0,materials:{stone:4,wood:2},gold:120,desc:'Đổ móng và sàn nền cho căn nhà.'},
+{id:'villa_3',name:'Thân nhà',category:'Nhà chính',level:4,diamond:0,materials:{brick:5,stone:3,wood:3},gold:190,desc:'Dựng các khối tường chính của căn nhà.'},
+{id:'villa_4',name:'Mặt tiền & đầu hồi',category:'Nhà chính',level:5,diamond:0,materials:{wood:5,brick:2,paint:1},gold:240,desc:'Hoàn thiện hình khối mặt tiền và phần đầu hồi gỗ.'},
+{id:'villa_5',name:'Mái nhà',category:'Nhà chính',level:6,diamond:0,materials:{wood:5,iron:2,brick:3},gold:320,desc:'Lợp mái và hoàn thiện các đường nóc mái.'},
+{id:'villa_6',name:'Hiên & bậc tam cấp',category:'Nhà chính',level:7,diamond:0,materials:{stone:4,wood:3},gold:260,desc:'Làm hiên trước, bậc tam cấp và cột hiên.'},
+{id:'villa_7',name:'Nhà xe & mái che',category:'Nhà chính',level:8,diamond:0,materials:{wood:5,iron:2,stone:3},gold:340,desc:'Hoàn thiện khu để xe và mái che bên hông.'},
+{id:'villa_8',name:'Cửa ra vào',category:'Hoàn thiện',level:9,diamond:1,materials:{wood:4,iron:2,glass:1},gold:300,desc:'Lắp cửa chính, cửa phụ và phụ kiện.'},
+{id:'villa_9',name:'Cửa sổ',category:'Hoàn thiện',level:10,diamond:0,materials:{wood:3,glass:5},gold:340,desc:'Lắp cửa sổ, kính và khung chia ô.'},
+{id:'villa_10',name:'Hoàn thiện ngoại thất',category:'Hoàn thiện',level:11,diamond:0,materials:{paint:4,brick:2,wood:2},gold:440,desc:'Sơn, ốp và hoàn thiện các chi tiết mặt ngoài.'},
+{id:'villa_11',name:'Hàng rào & cổng',category:'Sân vườn',level:12,diamond:1,materials:{wood:7,stone:4,iron:2},gold:480,desc:'Bao khuôn viên bằng hàng rào và cổng chính.'},
+{id:'villa_12',name:'Sân & lối đi',category:'Sân vườn',level:13,diamond:0,materials:{stone:6,brick:5},gold:430,desc:'Lát sân, đường vào nhà và lối đi trong vườn.'},
+{id:'villa_13',name:'Luống rau & cây bụi',category:'Sân vườn',level:14,diamond:0,materials:{wood:4,rich_soil:4,fertilizer:3},gold:380,desc:'Bổ sung luống rau và các mảng cây bụi quanh nhà.'},
+{id:'villa_14',name:'Hồ nước & sàn gỗ',category:'Sân vườn',level:15,diamond:1,materials:{stone:5,wood:5,glass:1},gold:540,desc:'Làm hồ nước nhỏ và sàn nghỉ cạnh hồ.'},
+{id:'villa_15',name:'Cây lớn & vườn hoa',category:'Cảnh quan',level:16,diamond:1,materials:{fertilizer:5,special_seed:2,rich_soil:4},gold:520,desc:'Trồng cây bóng mát, cây cảnh và hoa quanh khuôn viên.'},
+{id:'villa_16',name:'Hoàn thiện Nhà Vườn',category:'Cảnh quan',level:18,diamond:2,materials:{wood:3,iron:2,glass:2,paint:2},gold:680,desc:'Bổ sung đèn, ghế nghỉ, cây cạnh hồ và các chi tiết cuối cùng.'}
+];
 
 export const WEATHER_CONFIG=[
 {id:'sunny',name:'Nắng',icon:'☀️',waterFactor:1,growth:1,quality:0},
@@ -68,7 +82,7 @@ export const HELP_CONFIG={
  warehouse:['Thu hoạch chỉ thực hiện khi Kho còn đủ chỗ.','1 Kim Cương mở thêm 5 chỗ và luôn cần bạn chủ động xác nhận.'],
  orders:['Có 6 ô đơn hàng. Hoàn thành đơn nhận Vàng, EXP, tình cảm và vật liệu.','Đơn dễ hồi lại rất nhanh, đơn khó tối đa cũng chỉ chờ khoảng 10 phút.'],
  diamond:['Kim Cương không mua bằng Vàng hoặc tiền thật.','Đổi nông sản + vật liệu, hoàn thành thành tựu và mục tiêu để nhận Kim Cương.'],
- villa:['Nhà Vườn là mục tiêu dài hạn gồm 40 hạng mục.','Cần phối hợp Vàng, vật liệu, Kim Cương và cấp độ.'],
+ villa:['Nhà Vườn gồm 16 giai đoạn xây nối tiếp nhau; mỗi lần chỉ xây được giai đoạn kế tiếp.','Ảnh Nhà Vườn thay đổi theo đúng tiến độ. Cần phối hợp Vàng, vật liệu, Kim Cương và cấp độ.'],
  speed:['Nâng tốc độ cây chỉ dùng Kim Cương và là nâng cấp vĩnh viễn.','Tăng tốc có ích nhưng không nên dồn toàn bộ Kim Cương vào một lựa chọn.'],
  material:['Vật liệu đến từ đơn hàng, thành tựu và đổi nông sản.','Một phần vật liệu dùng cho Nhà Vườn và công thức đổi Kim Cương.'],
  weather:['Thời tiết thay đổi theo chu kỳ và chỉ tác động nhẹ.','Không có thiên tai phá Farm.'],

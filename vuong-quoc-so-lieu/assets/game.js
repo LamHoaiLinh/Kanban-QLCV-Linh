@@ -574,7 +574,7 @@ function renderMilitary(){
   const squads=visibleSquads();
   const squadHtml=squads.map((sq,idx)=>{
     const entries=Object.entries(sq.composition||{}).filter(([,q])=>Number(q)>0);
-    const options=UNIT_LIST.filter(u=>availableUnitCount(u.id,sq.id)>0 || Number(sq.composition?.[u.id]||0)>0).map(u=>`<option value="${u.id}">${u.name} · có thể dùng ${fmt(availableUnitCount(u.id,sq.id))}</option>`).join('');
+    const options=UNIT_LIST.filter(u=>availableUnitCount(u.id)>0).map(u=>`<option value="${u.id}">${u.name} · có thể dùng ${fmt(availableUnitCount(u.id))}</option>`).join('');
     return `<details class="squad-builder" ${idx===0?'open':''}><summary><div><b>${sq.name}</b><div class="small muted">${squadSummary(sq)}</div></div><div class="squad-score">${fmt(squadUnitCount(sq))} quân · Sức mạnh ${fmt(squadPower(sq))}</div></summary><div class="squad-builder-body">${entries.length?`<div class="formation-list">${entries.map(([id,q])=>{const u=UNITS[id];return `<div class="formation-line"><span style="color:${ELEMENT_META[u.element].color}">${u.name}</span><b>× ${fmt(q)}</b><button class="icon-remove" data-remove-squad-unit="${sq.id}|${id}" ${sq.status==='busy'?'disabled':''}>×</button></div>`;}).join('')}</div>`:'<div class="muted">Đội này chưa có quân.</div>'}<div class="formation-add"><select class="compact-input squad-unit-select" id="squad_unit_${sq.id}" ${sq.status==='busy'?'disabled':''}><option value="">Chọn quân available...</option>${options}</select><input class="compact-input narrow" id="squad_qty_${sq.id}" type="number" min="1" value="10" ${sq.status==='busy'?'disabled':''}><button class="btn" data-add-squad-unit="${sq.id}" ${sq.status==='busy'?'disabled':''}>Thêm</button></div>${sq.status==='busy'?`<div class="small warning">Đội đang bận: ${sq.target}. Không thể đổi đội hình.</div>`:''}</div></details>`;
   }).join('');
   const lockedLines=Array.from({length:5-unlocked}, (_,i)=>{ const no=unlocked+i+1; return `<div class="locked-squad-line">Đội ${no} đang khóa · ${teamUnlockHints()[no]||'Chưa mở'}</div>`; }).join('');
@@ -604,7 +604,7 @@ function addSquadUnit(squadId){
   ensureV5State(); const sq=S.squads.find(s=>s.id===Number(squadId)); if(!sq||sq.status==='busy') return;
   const sel=$(`#squad_unit_${sq.id}`), inp=$(`#squad_qty_${sq.id}`); const id=sel?.value; const qty=Math.max(1,parseInt(inp?.value||1,10));
   if(!id||!UNITS[id]) return toast('Hãy chọn loại quân muốn xếp vào đội.');
-  const avail=availableUnitCount(id,sq.id); if(qty>avail) return toast(`Chỉ còn ${fmt(avail)} ${UNITS[id].name} chưa được xếp đội.`);
+  const avail=availableUnitCount(id); if(avail<=0)return toast(`${UNITS[id].name} đã được xếp hết vào đội hình.`); if(qty>avail) return toast(`Chỉ còn ${fmt(avail)} ${UNITS[id].name} chưa được xếp đội.`);
   sq.composition[id]=Number(sq.composition[id]||0)+qty; save(true); render(); toast(`Đã thêm ${qty} ${UNITS[id].name} vào ${sq.name}.`);
 }
 function removeSquadUnit(payload){
@@ -838,6 +838,11 @@ function render(){
 }
 
 
+function sanitizeSquadAssignments(){
+  if(!Array.isArray(S.squads)||!S.units)return;
+  const remaining={};Object.entries(S.units).forEach(([id,q])=>remaining[id]=Math.max(0,Math.floor(Number(q)||0)));
+  S.squads.slice().sort((a,b)=>Number(a.id)-Number(b.id)).forEach(sq=>{const clean={};Object.entries(sq.composition||{}).forEach(([id,raw])=>{if(!UNITS[id])return;const wanted=Math.max(0,Math.floor(Number(raw)||0)),allowed=Math.min(wanted,remaining[id]||0);if(allowed>0){clean[id]=allowed;remaining[id]=Math.max(0,(remaining[id]||0)-allowed)}});sq.composition=clean;});
+}
 function ensureV5State(){
   if(!Array.isArray(S.claims)) S.claims=[];
   if(!Array.isArray(S.guides)) S.guides=[];
@@ -850,6 +855,7 @@ function ensureV5State(){
       status:(Number(sq.busyUntil)||0)>S.hour?'busy':'idle',busyUntil:Number(sq.busyUntil)||0,target:sq.target||''
     }));
   }
+  sanitizeSquadAssignments();
 }
 function terrainBuildings(k){ return Object.entries(BUILDINGS).filter(([,b])=>b.land===k).map(([,b])=>b.name); }
 function branchUnitCount(branch){ return UNIT_LIST.filter(u=>u.branch===branch).reduce((a,u)=>a+(S.units[u.id]||0),0); }
@@ -1584,7 +1590,7 @@ renderMilitary = function(){
   const squads=visibleSquads();
   const squadHtml=squads.map((sq,idx)=>{
     const entries=Object.entries(sq.composition||{}).filter(([,q])=>Number(q)>0);
-    const options=UNIT_LIST.filter(u=>unitUnlockedV11(u) && (availableUnitCount(u.id,sq.id)>0 || Number(sq.composition?.[u.id]||0)>0)).map(u=>`<option value="${u.id}">${u.name} · có thể dùng ${fmt(availableUnitCount(u.id,sq.id))}</option>`).join('');
+    const options=UNIT_LIST.filter(u=>unitUnlockedV11(u) && (availableUnitCount(u.id)>0)).map(u=>`<option value="${u.id}">${u.name} · có thể dùng ${fmt(availableUnitCount(u.id))}</option>`).join('');
     return `<details class="squad-builder" ${idx===0?'open':''}><summary><div><b>${sq.name}</b><div class="small muted">${squadSummary(sq)}</div></div><div class="squad-score">${fmt(squadUnitCount(sq))} quân · Sức mạnh ${fmt(squadPower(sq))}</div></summary><div class="squad-builder-body">${entries.length?`<div class="formation-list">${entries.map(([id,q])=>{const u=UNITS[id];return `<div class="formation-line"><span style="color:${ELEMENT_META[u.element].color}">${u.name}</span><b>× ${fmt(q)}</b><button class="icon-remove" data-remove-squad-unit="${sq.id}|${id}" ${sq.status==='busy'?'disabled':''}>×</button></div>`;}).join('')}</div>`:'<div class="muted">Đội này chưa có quân.</div>'}<div class="formation-add"><select class="compact-input squad-unit-select" id="squad_unit_${sq.id}" ${sq.status==='busy'?'disabled':''}><option value="">Chọn quân available...</option>${options}</select><input class="compact-input narrow" id="squad_qty_${sq.id}" type="number" min="1" value="10" ${sq.status==='busy'?'disabled':''}><button class="btn" data-add-squad-unit="${sq.id}" ${sq.status==='busy'?'disabled':''}>Thêm</button></div>${sq.status==='busy'?`<div class="small warning">Đội đang bận: ${sq.target}. Không thể đổi đội hình.</div>`:''}</div></details>`;
   }).join('');
   const lockedLines=Array.from({length:5-unlocked}, (_,i)=>{ const no=unlocked+i+1; return `<div class="locked-squad-line">Đội ${no} đang khóa · ${teamUnlockHints()[no]||'Chưa mở'}</div>`; }).join('');
