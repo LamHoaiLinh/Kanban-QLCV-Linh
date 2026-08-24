@@ -94,3 +94,12 @@
  .life-price{font-size:9px;padding:3px 6px}
  .life-action-progress{padding:7px}
 }
+
+/* v6.31 - reason-aware locks, payment terms, client trust, schedule buffer & daily review */
+.btn-lock-wrap{display:block;width:100%;margin-top:auto}.btn-lock-wrap .btn{width:100%}.action-lock-note{margin-top:5px;padding:5px 7px;border-radius:8px;background:#fff8e8;border:1px solid #ead7a8;color:#745f2d;line-height:1.35}
+.client-strip{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:7px 0;padding:7px 8px;border-radius:9px;background:#f8fbf9;border:1px solid #dde9e2;font-size:10px}.client-strip>span:first-child{margin-right:auto}.tag.credit{background:#eef1ff;color:#455f9a;border-color:#ccd5f2}.tag.bad{background:#fff0ee;color:#9b4b3e;border-color:#efc8c0}
+.buffer-chip{font-weight:800}.buffer-chip.good,.buffer-text.good{color:#2c7855}.buffer-chip.warn,.buffer-text.warn{color:#9a6c18}.buffer-chip.bad,.buffer-text.bad{color:#ae4c43}.buffer-text{display:block;margin-top:3px;font-weight:750}
+.receivable-panel{margin-bottom:10px;padding:11px;border:1px solid #c8d6ef;border-radius:13px;background:#f7f9ff}.receivable-row{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:9px;border:1px solid #dce4f3;border-radius:10px;background:#fff}.receivable-row>div{min-width:0}.receivable-row strong{display:block;font-size:11px}.receivable-row .claim-net{font-size:16px;margin-top:4px}
+.day-summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:8px}.day-summary-grid>div{padding:8px 9px;border:1px solid var(--line);border-radius:10px;background:#fbfdfc}.day-summary-grid span{display:block;font-size:9px;color:var(--muted)}.day-summary-grid b{display:block;margin-top:3px;font-size:13px}.summary-insight{margin-top:9px;padding:9px 10px;border-left:4px solid #5c9879;border-radius:8px;background:#eef8f2;font-size:10px;line-height:1.45;color:#355d49}
+@media(max-width:680px){.client-strip{align-items:flex-start}.client-strip>span:first-child{width:100%;margin-right:0}.receivable-row{align-items:flex-start;flex-direction:column}.receivable-row .btn{width:100%}.day-summary-grid{grid-template-columns:1fr 1fr}.action-lock-note{font-size:9px}}
+@media(max-width:390px){.day-summary-grid{grid-template-columns:1fr}}
