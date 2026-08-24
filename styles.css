@@ -784,3 +784,8 @@ body.drag-active .music-player{
   .clock-status{font-size:9px}
   .clock-toggle-btn{position:static!important;width:40px!important;height:40px!important;min-width:40px!important;min-height:40px!important}
 }
+
+/* v6.21 - align Công cụ / Game launch buttons */
+.office-launcher .office-suite-launch-btn,.office-launcher .game-suite-launch-btn{width:62px!important;min-width:62px!important;height:40px;min-height:40px;padding:0 6px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;overflow:hidden;line-height:1}
+.office-launcher .office-suite-launch-btn .office-btn-mark,.office-launcher .game-suite-launch-btn .office-btn-mark{display:block;width:100%;margin:0;text-align:center;font-size:8px!important;font-weight:900;line-height:1!important;letter-spacing:0!important;white-space:nowrap;transform:none!important}
+@media(max-width:700px){.office-launcher .office-suite-launch-btn,.office-launcher .game-suite-launch-btn{width:60px!important;min-width:60px!important;height:44px;min-height:44px}.office-launcher .office-suite-launch-btn .office-btn-mark,.office-launcher .game-suite-launch-btn .office-btn-mark{font-size:8px!important}}
