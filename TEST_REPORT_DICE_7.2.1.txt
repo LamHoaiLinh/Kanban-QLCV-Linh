@@ -1,0 +1,26 @@
+DICE ARENA v7.2.1 - HOTFIX KẸT SAU KHI BẮN
+Ngày kiểm tra: 25/08/2026
+
+LỖI XÁC ĐỊNH
+- Ảnh lỗi cho thấy pha CANH LỰC đã kết thúc (LỆCH 45%) và nút BẮN đã được kích hoạt vào mục tiêu Nít, nhưng trận không chuyển lượt.
+- Điểm rủi ro nằm ở luồng fireCurrentTarget() -> launchProjectile(). Bản v7.2 chờ trực tiếp await anim.finished. Nếu Promise Web Animations bị treo/gián đoạn trong iframe/dialog hoặc bất kỳ lỗi runtime nào phát sinh trong hiệu ứng đạn, combatBusy có thể giữ true và phase giữ ở firing. Khi đó toàn bộ Space/nút bắn/lượt tiếp theo đều bị khóa.
+- fireCurrentTarget() cũ chỉ dùng .then(), không có catch/finally nên một Promise reject cũng có thể khóa trận.
+
+ĐÃ SỬA
+1. Thêm watchdog cho Animation.finished bằng Promise.race; hiệu ứng đạn không được phép chờ vô hạn.
+2. Thêm fallback transition khi Web Animations API không khả dụng.
+3. Bọc launchProjectile bằng try/finally để combatBusy luôn được trả về false.
+4. fireCurrentTarget dùng catch/finally: nếu hiệu ứng có lỗi, ghi log và vẫn chuyển sang lượt kế tiếp thay vì đứng game.
+5. Timer khóa mục tiêu tự reset handle sau khi chạy để tránh trạng thái timer cũ khó kiểm soát.
+6. Khi đã bắn, giao diện hiện “Đang bắn: <mục tiêu>” và nút BẮN có trạng thái disabled trực quan.
+7. Bump cache/version Dice lên 7.2.1 và Service Worker mới để GitHub Pages không giữ bản JS 7.2 cũ.
+
+KIỂM TRA TĨNH
+- node --check dice-game/js/app.js: PASS
+- node --check game-launcher.js: PASS
+- node --check sw.js: PASS
+- Không thay đổi luật Công/Khiên, HP, sát thương, nhân vật, dữ liệu Kanban hay game khác.
+
+MỨC ĐỘ CHẮC CHẮN
+- Cao đối với cơ chế gây “kẹt sau khi đã bấm BẮN”: ảnh chụp khớp đúng trạng thái UI sau fireCurrentTarget().
+- Trung bình đối với nguyên nhân môi trường cụ thể làm Animation.finished không settle trên máy người dùng, vì không có Console log tại thời điểm lỗi. Hotfix đã loại bỏ cả hai đường gây khóa: Promise pending và Promise reject.

@@ -301,8 +301,8 @@ function aiTimingScore(attack){let base=randomInt(38,91)-Math.max(0,attack-5)*2;
 function startTargetCycle(c=combat){
   if(!combatSessionAlive(c)||c.phase!=='target')return;refs.timingPanel.hidden=false;refs.targetPanel.hidden=false;const shooter=c.current,candidates=c.fighters.filter(x=>x!==shooter&&!x.down);c.targetCandidates=candidates;if(!candidates.length){c.turnIndex++;beginCombatTurn(c);return}c.targetIndex=randomInt(0,candidates.length-1);highlightTarget(c);
   const interval=Math.max(95,Math.round((timingHalfCycleMs(shooter.attack))*.43));targetTimer=setInterval(()=>{if(!combatSessionAlive(c)){clearInterval(targetTimer);return}c.targetIndex=(c.targetIndex+1)%candidates.length;highlightTarget(c);playTargetTick()},interval);refs.fire.disabled=shooter.kind==='ai';refs.targetHint.textContent=shooter.kind==='ai'?'AI đang khóa mục tiêu…':'Vòng đỏ đang chạy… · Space = BẮN';
-  if(shooter.kind==='ai')targetAutoTimer=setTimeout(()=>{if(!combatSessionAlive(c))return;c.targetIndex=selectAITargetIndex(shooter,candidates);highlightTarget(c);setTimeout(()=>{if(combatSessionAlive(c))fireCurrentTarget(true,c)},160)},randomInt(720,1450));
-  else targetAutoTimer=setTimeout(()=>{if(combatSessionAlive(c))fireCurrentTarget(false,c)},4200)
+  if(shooter.kind==='ai')targetAutoTimer=setTimeout(()=>{targetAutoTimer=0;if(!combatSessionAlive(c))return;c.targetIndex=selectAITargetIndex(shooter,candidates);highlightTarget(c);targetAutoTimer=setTimeout(()=>{targetAutoTimer=0;if(combatSessionAlive(c))fireCurrentTarget(true,c)},160)},randomInt(720,1450));
+  else targetAutoTimer=setTimeout(()=>{targetAutoTimer=0;if(combatSessionAlive(c))fireCurrentTarget(false,c)},4200)
 }
 function selectAITargetIndex(shooter,candidates){
   if(!candidates.length)return 0;
@@ -324,19 +324,48 @@ function weightedRandomIndex(weights){
 }
 function highlightTarget(c=combat){if(!combatSessionAlive(c))return;const target=c.targetCandidates[c.targetIndex];setCombatActive(c.current,target);refs.targetHint.textContent=target?`🔴 ${target.name}`:'—'}
 function fireCurrentTarget(auto=false,c=combat){
-  if(!combatSessionAlive(c)||c.phase!=='target'||combatBusy)return;clearInterval(targetTimer);clearTimeout(targetAutoTimer);targetTimer=0;targetAutoTimer=0;const shooter=c.current,target=c.targetCandidates[c.targetIndex];if(!target)return;c.phase='firing';refs.fire.disabled=true;refs.targetHint.textContent=`🎯 ${target.name}`;launchProjectile(c,shooter,target,c.timingScore).then(()=>{if(combatSessionAlive(c))finishCombatTurn(c)})
+  if(!combatSessionAlive(c)||c.phase!=='target'||combatBusy)return;
+  clearInterval(targetTimer);clearTimeout(targetAutoTimer);targetTimer=0;targetAutoTimer=0;
+  const shooter=c.current,target=c.targetCandidates[c.targetIndex];if(!target)return;
+  c.phase='firing';refs.fire.disabled=true;refs.targetHint.textContent=`💥 Đang bắn: ${target.name}`;
+  // Không để một lỗi hiệu ứng/Animation.finished làm khóa cứng cả trận.
+  void launchProjectile(c,shooter,target,c.timingScore)
+    .catch(error=>{console.error('Combat projectile error:',error);if(combatSessionAlive(c))addCombatLog(`${shooter.name} đã bắn ${target.name}; hiệu ứng gặp lỗi nên lượt được tự tiếp tục.`)})
+    .finally(()=>{combatBusy=false;if(combatSessionAlive(c)&&c.phase==='firing')finishCombatTurn(c)})
 }
 function timingDamageMultiplier(score){if(score===100)return 1.75;if(score<=50)return .1+score*.008;if(score<=75)return .5+(score-50)*.03;return 1.25+(score-75)*.01}
+async function waitForProjectileAnimation(anim,duration){
+  // Chromium/WebView đôi khi giữ Animation.finished ở trạng thái pending khi iframe/dialog
+  // bị throttle hoặc animation bị gián đoạn. Watchdog bảo đảm luôn thoát sau thời gian hữu hạn.
+  if(!anim?.finished){await wait(duration);return}
+  await Promise.race([Promise.resolve(anim.finished).catch(()=>{}),wait(duration+320)])
+}
 async function launchProjectile(c,shooter,target,score){
-  if(!combatSessionAlive(c))return;combatBusy=true;const arena=refs.combatArena,sEl=document.getElementById(`fighter-${shooter.id}`),tEl=document.getElementById(`fighter-${target.id}`);if(!arena||!sEl||!tEl){combatBusy=false;return}
-  const ar=arena.getBoundingClientRect(),sr=sEl.getBoundingClientRect(),tr=tEl.getBoundingClientRect(),sx=sr.left-ar.left+sr.width*.5,sy=sr.top-ar.top+sr.height*.58,tx=tr.left-ar.left+tr.width*.5,ty=tr.top-ar.top+tr.height*.55;
-  const attack=shooter.attack,mult=timingDamageMultiplier(score),raw=Math.max(0,Math.round(attack*mult)),perfect=score===100,size=Math.min(94,14+attack*3+score*.16+(perfect?22:0)),dx=tx-sx,dy=ty-sy,angle=Math.atan2(dy,dx)*180/Math.PI;
-  const bullet=document.createElement('div');bullet.className=`combat-projectile ${perfect?'perfect-shot':''}`;bullet.style.cssText=`left:${sx}px;top:${sy}px;width:${size}px;height:${size}px;--trail:${Math.max(44,size*2.7)}px;transform:translate(-50%,-50%) rotate(${angle}deg)`;bullet.innerHTML='<i></i>';arena.appendChild(bullet);playShootSound(perfect,attack);
-  const miss=raw<=0,mdx=miss?dx+(randomInt(0,1)===0?-55:55):dx,mdy=miss?dy-45:dy;const anim=bullet.animate([{transform:`translate(-50%,-50%) rotate(${angle}deg) scale(.72)`},{transform:`translate(calc(-50% + ${mdx}px),calc(-50% + ${mdy}px)) rotate(${angle}deg) scale(1)`}],{duration:perfect?610:480,easing:'cubic-bezier(.18,.78,.22,1)',fill:'forwards'});await anim.finished.catch(()=>{});bullet.remove();if(!combatSessionAlive(c)){combatBusy=false;return}
-  if(miss){showFighterFloat(target,'💨 HỤT','miss');playTone(190,.12,.04);addCombatLog(`${shooter.name} bắn ${target.name} nhưng trượt.`);combatBusy=false;return}
-  const blocked=Math.min(target.shield,raw),hpDamage=Math.max(0,raw-blocked);target.shield-=blocked;target.hp-=hpDamage;if(target.hp<=0){target.hp=0;target.down=true;shooter.stars+=2}else if(hpDamage>0)shooter.stars+=1;
-  updateCombatFighter(target);updateCombatFighter(shooter);if(blocked>0)playShieldSound();if(hpDamage>0)playHitSound();showImpact(target,perfect);showFighterFloat(target,`${blocked?`🛡️ -${blocked}  `:''}${hpDamage?`❤️ -${hpDamage}`:'❤️ 0'}`,hpDamage?'damage':'shield');addCombatLog(`${shooter.name} → ${target.name}: ${score}% ×${mult.toFixed(2)} · 🛡️ -${blocked} · ❤️ -${hpDamage}${target.down?' · GỤC!':''}`);
-  await wait(480);if(combatSessionAlive(c))combatBusy=false
+  if(!combatSessionAlive(c))return;
+  combatBusy=true;let bullet=null;
+  try{
+    const arena=refs.combatArena,sEl=document.getElementById(`fighter-${shooter.id}`),tEl=document.getElementById(`fighter-${target.id}`);if(!arena||!sEl||!tEl)throw new Error('Không tìm thấy phần tử đấu thủ để vẽ đường đạn.');
+    const ar=arena.getBoundingClientRect(),sr=sEl.getBoundingClientRect(),tr=tEl.getBoundingClientRect(),sx=sr.left-ar.left+sr.width*.5,sy=sr.top-ar.top+sr.height*.58,tx=tr.left-ar.left+tr.width*.5,ty=tr.top-ar.top+tr.height*.55;
+    const attack=shooter.attack,mult=timingDamageMultiplier(score),raw=Math.max(0,Math.round(attack*mult)),perfect=score===100,size=Math.min(94,14+attack*3+score*.16+(perfect?22:0)),dx=tx-sx,dy=ty-sy,angle=Math.atan2(dy,dx)*180/Math.PI;
+    bullet=document.createElement('div');bullet.className=`combat-projectile ${perfect?'perfect-shot':''}`;bullet.style.cssText=`left:${sx}px;top:${sy}px;width:${size}px;height:${size}px;--trail:${Math.max(44,size*2.7)}px;transform:translate(-50%,-50%) rotate(${angle}deg)`;bullet.innerHTML='<i></i>';arena.appendChild(bullet);playShootSound(perfect,attack);
+    const miss=raw<=0,mdx=miss?dx+(randomInt(0,1)===0?-55:55):dx,mdy=miss?dy-45:dy,duration=perfect?610:480;
+    try{
+      if(typeof bullet.animate==='function'){
+        const anim=bullet.animate([{transform:`translate(-50%,-50%) rotate(${angle}deg) scale(.72)`},{transform:`translate(calc(-50% + ${mdx}px),calc(-50% + ${mdy}px)) rotate(${angle}deg) scale(1)`}],{duration,easing:'cubic-bezier(.18,.78,.22,1)',fill:'forwards'});
+        await waitForProjectileAnimation(anim,duration)
+      }else{
+        // Fallback cho trình duyệt/WebView không hỗ trợ Web Animations API.
+        bullet.style.transition=`transform ${duration}ms cubic-bezier(.18,.78,.22,1)`;void bullet.offsetWidth;bullet.style.transform=`translate(calc(-50% + ${mdx}px),calc(-50% + ${mdy}px)) rotate(${angle}deg) scale(1)`;await wait(duration+40)
+      }
+    }catch(error){console.warn('Projectile animation fallback:',error);await wait(Math.min(180,duration))}
+    bullet.remove();bullet=null;if(!combatSessionAlive(c))return;
+    if(miss){showFighterFloat(target,'💨 HỤT','miss');playTone(190,.12,.04);addCombatLog(`${shooter.name} bắn ${target.name} nhưng trượt.`);return}
+    const blocked=Math.min(target.shield,raw),hpDamage=Math.max(0,raw-blocked);target.shield-=blocked;target.hp-=hpDamage;if(target.hp<=0){target.hp=0;target.down=true;shooter.stars+=2}else if(hpDamage>0)shooter.stars+=1;
+    updateCombatFighter(target);updateCombatFighter(shooter);if(blocked>0)playShieldSound();if(hpDamage>0)playHitSound();showImpact(target,perfect);showFighterFloat(target,`${blocked?`🛡️ -${blocked}  `:''}${hpDamage?`❤️ -${hpDamage}`:'❤️ 0'}`,hpDamage?'damage':'shield');addCombatLog(`${shooter.name} → ${target.name}: ${score}% ×${mult.toFixed(2)} · 🛡️ -${blocked} · ❤️ -${hpDamage}${target.down?' · GỤC!':''}`);
+    await wait(480)
+  }finally{
+    bullet?.remove();combatBusy=false
+  }
 }
 function showImpact(target,perfect){const el=document.getElementById(`fighter-${target.id}`);if(!el)return;el.classList.remove('impact','impact-perfect');void el.offsetWidth;el.classList.add(perfect?'impact-perfect':'impact');setTimeout(()=>el.classList.remove('impact','impact-perfect'),520)}
 function showFighterFloat(target,text,type){const el=document.getElementById(`fighter-${target.id}`),box=el?.querySelector('.fighter-float');if(!box)return;box.textContent=text;box.className=`fighter-float show ${type||''}`;setTimeout(()=>{if(box.isConnected)box.className='fighter-float'},900)}

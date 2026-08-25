@@ -19,6 +19,11 @@
 
 # CHANGELOG
 
+## v7.2.1 – Hotfix kẹt sau khi bắn
+- Sửa lỗi Đấu Trường có thể đứng ở pha bắn nếu Web Animations `finished` bị pending hoặc hiệu ứng projectile phát sinh lỗi runtime.
+- Thêm watchdog/fallback cho projectile và `catch/finally` để luôn nhả `combatBusy`, tiếp tục lượt an toàn.
+- Bump Dice/cache lên 7.2.1 để tránh GitHub Pages/Service Worker giữ JS cũ.
+
 ## v4.0 – Dice Arena
 - Thay game Marble Draw bằng Dice Arena.
 - Nút `DRAW` đổi thành `DICE`.
