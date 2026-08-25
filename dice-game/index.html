@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#123b31">
   <title>Dice Arena</title>
-  <link rel="stylesheet" href="styles.css?v=7.0.0">
+  <link rel="stylesheet" href="styles.css?v=7.2.0">
   <script type="importmap">
   {
     "imports": {
@@ -31,7 +31,7 @@
         <div class="roll-mode-row"><span>Kiểu thả hiện tại</span><button id="modeSelectBtn" class="mini-mode-btn" type="button">Thả đồng thời</button></div>
         <button id="rollBtn" class="primary-btn charge-btn" type="button" title="Giữ để nạp lực, thả để tung. Chạm nhanh = lực trung bình.">GIỮ ĐỂ LẤY LỰC · THẢ ĐỂ TUNG</button>
         <div class="charge-meter" aria-hidden="true"><i id="chargeFill"></i></div>
-        <button id="combatModeBtn" class="beast-race-btn" type="button">🎯 ĐẤU TRƯỜNG CHẴN LẺ</button>
+        <button id="combatModeBtn" class="combat-launch-btn" type="button">🎯 ĐẤU TRƯỜNG CHẴN LẺ</button>
         <button id="clearBtn" class="secondary-btn" type="button">Dọn bàn</button>
         <div class="result-box"><div><span>Chế độ</span><strong id="modeLabel">Chưa thả</strong></div><div><span>Tổng điểm</span><strong id="totalLabel">—</strong></div></div>
         <div id="valueList" class="value-list"><span>Chưa có kết quả.</span></div>
@@ -58,7 +58,7 @@
           <div class="combat-setup-top">
             <label><span>Số đấu thủ</span><div class="combat-stepper"><button id="combatMinusPlayer" type="button">−</button><output id="combatPlayerCount">4</output><button id="combatPlusPlayer" type="button">＋</button></div></label>
             <label><span>Số vòng</span><select id="combatRoundCount"><option value="6">6 vòng</option><option value="8" selected>8 vòng</option><option value="10">10 vòng</option></select></label>
-            <div class="combat-rule-badge"><b>Luật cố định</b><span>Luôn 2 xúc xắc/người. Có thể chọn trùng nhân vật.</span></div>
+            <div class="combat-rule-badge"><b>Luật cố định</b><span>Luôn 2 xúc xắc/người · 18 Tim/người · gục trở lại với 9 Tim. Có thể chọn trùng nhân vật.</span></div>
           </div>
           <div id="combatSlotGrid" class="combat-slot-grid"></div>
           <div class="combat-start-row"><button id="combatHelpBtn" type="button">? Xem luật</button><button id="combatStartBtn" class="combat-start-btn" type="button">🎲 BẮT ĐẦU TRẬN</button></div>
@@ -68,8 +68,7 @@
           <div id="combatArena" class="combat-arena" aria-label="Đấu trường"></div>
           <div class="combat-control-grid">
             <div class="combat-dice-box">
-              <div class="combat-box-title"><b>Kết quả xúc xắc</b><span>Tất cả đấu thủ tung cùng lúc.</span></div>
-              <div id="combatDiceStage" class="combat-dice-stage"></div>
+              <div class="combat-box-title"><b>Kết quả vòng này</b><span>2 xúc xắc thật nằm ngay dưới chân từng đấu thủ.</span></div>
               <div id="combatDiceSummary" class="combat-dice-summary"><span>Chưa tung.</span></div>
             </div>
             <div class="combat-action-box">
@@ -95,8 +94,8 @@
             <div class="help-steps">
               <div><b>🔴 LẺ = BẮN</b><span>Số trên xúc xắc đỏ là sức Công.</span></div>
               <div><b>🔵 CHẴN = KHIÊN</b><span>Số trên xúc xắc xanh tạo Khiên cho vòng này.</span></div>
-              <div><b>✨ CANH LỰC</b><span>Bấm càng gần tâm càng mạnh. PERFECT tạo viên đạn khổng lồ.</span></div>
-              <div><b>⭕ KHÓA MỤC TIÊU</b><span>Vòng sáng chạy qua đối thủ. Bấm BẮN khi vòng dừng đúng người muốn bắn.</span></div>
+              <div><b>✨ CANH LỰC</b><span>Bấm càng gần tâm càng mạnh. PERFECT tăng lực rõ rệt và tạo viên đạn khổng lồ.</span></div>
+              <div><b>⭕ KHÓA MỤC TIÊU</b><span>Vòng đỏ đậm chạy qua đối thủ. Bấm BẮN hoặc Space khi vòng đến đúng người muốn bắn.</span></div>
               <div><b>💥 CHỈ TRỪ KHI ĐẠN CHẠM</b><span>Khiên vỡ trước, sau đó mới trừ Tim.</span></div>
             </div>
             <label class="dont-show"><input id="combatDontShowHelp" type="checkbox"> Không hiện hướng dẫn này lần sau</label>
@@ -107,6 +106,6 @@
     </dialog>
     <div id="toast" class="toast" role="status"></div>
   </main>
-  <script type="module" src="js/app.js?v=7.0.0"></script>
+  <script type="module" src="js/app.js?v=7.2.0"></script>
 </body>
 </html>

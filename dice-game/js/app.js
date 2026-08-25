@@ -7,7 +7,7 @@ const refs={
   combatMode:$('#combatModeBtn'),combatDialog:$('#combatDialog'),closeCombat:$('#closeCombatBtn'),combatSetup:$('#combatSetup'),combatGame:$('#combatGame'),combatSlotGrid:$('#combatSlotGrid'),
   combatMinusPlayer:$('#combatMinusPlayer'),combatPlusPlayer:$('#combatPlusPlayer'),combatPlayerCount:$('#combatPlayerCount'),combatRoundCount:$('#combatRoundCount'),combatStart:$('#combatStartBtn'),combatRestart:$('#combatRestartBtn'),combatHelp:$('#combatHelpBtn'),
   combatHelpOverlay:$('#combatHelpOverlay'),combatDontShowHelp:$('#combatDontShowHelp'),combatSkipHelp:$('#combatSkipHelp'),combatRoundLabel:$('#combatRoundLabel'),combatPhaseLabel:$('#combatPhaseLabel'),combatArena:$('#combatArena'),
-  combatDiceStage:$('#combatDiceStage'),combatDiceSummary:$('#combatDiceSummary'),combatCurrentAvatar:$('#combatCurrentAvatar'),combatCurrentName:$('#combatCurrentName'),combatCurrentStats:$('#combatCurrentStats'),
+  combatDiceSummary:$('#combatDiceSummary'),combatCurrentAvatar:$('#combatCurrentAvatar'),combatCurrentName:$('#combatCurrentName'),combatCurrentStats:$('#combatCurrentStats'),
   timingPanel:$('#timingPanel'),timingBar:$('#timingBar'),timingMarker:$('#timingMarker'),timingScoreText:$('#timingScoreText'),timingStop:$('#timingStopBtn'),targetPanel:$('#targetPanel'),targetHint:$('#targetHint'),fire:$('#fireBtn'),combatWait:$('#combatWaitPanel'),combatLog:$('#combatLog')
 };
 const SETTINGS_KEY='linh_dice_game_settings_v4';
@@ -15,7 +15,7 @@ const HISTORY_KEY='linh_dice_game_history_v2';
 const COMBAT_SETUP_KEY='linh_dice_combat_setup_v1';
 const COMBAT_HELP_KEY='linh_dice_combat_help_hidden_v1';
 const CHARGE_MAX_MS=1400,QUICK_TAP_POWER=.5,MIN_HOLD_MS=85;
-let settings=load(SETTINGS_KEY,{count:3,sound:true,type:'d6',rollMode:'together'}),history=load(HISTORY_KEY,[]),rolling=false,audio=null,toastTimer=null,d10Engine=null,d10EnginePromise=null;
+let settings=load(SETTINGS_KEY,{count:3,sound:true,type:'d6',rollMode:'together'}),history=load(HISTORY_KEY,[]),rolling=false,audio=null,toastTimer=null,d10Engine=null,d10EnginePromise=null,d10AssetUnavailable=false;
 let chargeState=null,chargeRaf=0;
 const FACE_ROT={1:['-18deg','0deg','0deg'],6:['-18deg','180deg','0deg'],3:['-18deg','-90deg','0deg'],4:['-18deg','90deg','0deg'],2:['-105deg','0deg','0deg'],5:['75deg','0deg','0deg']};
 
@@ -33,7 +33,7 @@ const FIGHTER_SKINS=[
   {id:'m05',name:'Chú Sơn',gender:'Nam',age:'50 tuổi',src:'assets/fighters/m05.svg'},
   {id:'m06',name:'Ông Minh',gender:'Nam',age:'69 tuổi',src:'assets/fighters/m06.svg'}
 ];
-const COMBAT_MAX_HP=24,COMBAT_RESPAWN_HP=12;
+const COMBAT_MAX_HP=18,COMBAT_RESPAWN_HP=9;
 const DEFAULT_COMBAT_SLOTS=[
   {name:'Sunny',kind:'human',skin:'f01'},
   {name:'Nít',kind:'human',skin:'m02'},
@@ -45,7 +45,7 @@ const DEFAULT_COMBAT_SLOTS=[
 let combatSetupData=load(COMBAT_SETUP_KEY,{count:4,rounds:8,slots:DEFAULT_COMBAT_SLOTS});
 if(!Array.isArray(combatSetupData.slots))combatSetupData.slots=DEFAULT_COMBAT_SLOTS.map(x=>({...x}));
 while(combatSetupData.slots.length<6)combatSetupData.slots.push({...DEFAULT_COMBAT_SLOTS[combatSetupData.slots.length]});
-let combat=null,combatBusy=false,timingRaf=0,targetTimer=0,targetAutoTimer=0;
+let combat=null,combatBusy=false,timingRaf=0,targetTimer=0,targetAutoTimer=0,combatActionTimer=0,combatSessionId=0;
 
 init();
 function init(){
@@ -107,8 +107,20 @@ function releaseCharge(e){
 }
 function cancelCharge(){if(!chargeState)return;const state=chargeState;chargeState=null;cancelAnimationFrame(chargeRaf);state.btn.classList.remove('charging');refs.chargeFill.style.width='0%'}
 function handleShortcuts(e){
-  if(refs.combatDialog.open)return;
   const tag=(document.activeElement?.tagName||'').toUpperCase(),typing=document.activeElement?.isContentEditable||['INPUT','TEXTAREA','SELECT'].includes(tag);
+  if(e.repeat)return;
+  if(refs.combatDialog.open){
+    if(typing)return;
+    if(e.key===' '||e.code==='Space'){
+      e.preventDefault();
+      if(refs.combatHelpOverlay&&!refs.combatHelpOverlay.hidden)return;
+      if(!combat||combatBusy||combat.current?.kind==='ai')return;
+      if(combat.phase==='timing'){stopTimingForHuman();return}
+      if(combat.phase==='target'){fireCurrentTarget(false);return}
+      return;
+    }
+    return;
+  }
   if(typing&&!(e.key==='1'||e.key==='2'))return;
   if(e.key===' '||e.code==='Space'){if(rolling)return;e.preventDefault();quickRoll();return}
   if(e.key==='1'){e.preventDefault();settings.rollMode='together';save(SETTINGS_KEY,settings);syncRollMode();showToast('Đã chọn: Thả đồng thời.');return}
@@ -120,10 +132,16 @@ function getCount(){return Math.max(1,Math.min(10,+refs.count.value||3))}
 function getDieType(){return refs.type.value==='d10'?'d10':'d6'}
 function getDieLabel(){return getDieType()==='d10'?'D10':'D6'}
 function setCount(v){v=Math.max(1,Math.min(10,+v||1));refs.count.value=v;refs.out.textContent=v;settings.count=v;save(SETTINGS_KEY,settings)}
-async function preloadD10(){refs.status.textContent='Đang chuẩn bị asset D10…';try{await ensureD10Engine();d10Engine.setVisible(true);refs.status.textContent='Asset D10 đã sẵn sàng.'}catch(error){console.error(error);refs.status.textContent='Không tải được asset D10; hệ thống sẽ dùng hình D10 dự phòng.'}}
+async function preloadD10(){refs.status.textContent='Đang chuẩn bị asset D10…';try{await ensureD10Engine();d10Engine.setVisible(true);refs.status.textContent='Asset D10 đã sẵn sàng.'}catch(error){console.error(error);refs.status.textContent='D10 3D không khả dụng; D10 CSS nội bộ vẫn hoạt động offline.'}}
 async function ensureD10Engine(){
   if(d10Engine)return d10Engine;
-  if(!d10EnginePromise)d10EnginePromise=import('./d10-engine.js?v=7.0.0').then(async({D10AssetEngine})=>{const engine=new D10AssetEngine(refs.stage,{onSettle:value=>playTone(410+value*24,.09,.032)});await engine.init();d10Engine=engine;return engine}).finally(()=>{d10EnginePromise=null});
+  if(d10AssetUnavailable)throw new Error('D10 3D đã chuyển sang CSS nội bộ trong phiên này.');
+  if(navigator.onLine===false||location.protocol==='file:'){d10AssetUnavailable=true;throw new Error('Offline/local file: dùng D10 CSS nội bộ.');}
+  if(!d10EnginePromise){
+    const load3D=import('./d10-engine.js?v=7.2.0').then(async({D10AssetEngine})=>{const engine=new D10AssetEngine(refs.stage,{onSettle:value=>playTone(410+value*24,.09,.032)});await engine.init();d10Engine=engine;return engine});
+    const timeout=new Promise((_,reject)=>setTimeout(()=>reject(new Error('D10 3D timeout; chuyển sang D10 CSS.')),2200));
+    d10EnginePromise=Promise.race([load3D,timeout]).catch(error=>{d10AssetUnavailable=true;throw error}).finally(()=>{d10EnginePromise=null});
+  }
   return d10EnginePromise;
 }
 function clearArena(){refs.stage.querySelectorAll('.die-wrap,.die-result-badge').forEach(el=>el.remove());d10Engine?.clear();d10Engine?.setVisible(getDieType()==='d10')}
@@ -136,7 +154,7 @@ async function startRoll(mode,power=.5){
     if(dieType==='d10'){
       let usedAsset=false;
       try{const engine=await ensureD10Engine();engine.setVisible(true);usedAsset=true;const values=await engine.roll(count,mode,{power,onStatus:text=>refs.status.textContent=text,onPartial:values=>renderValues(values)});values.forEach((v,i)=>results[i]=v)}
-      catch(error){console.error('D10 asset fallback:',error);d10Engine?.setVisible(false);showToast('Không tải được asset D10; đang dùng D10 dự phòng.');await rollWithCss(count,mode,'d10',results,power,refs.stage)}
+      catch(error){console.error('D10 asset fallback:',error);d10Engine?.setVisible(false);showToast('Đang dùng D10 CSS nội bộ (hoạt động offline).');await rollWithCss(count,mode,'d10',results,power,refs.stage)}
       if(usedAsset)renderValues(results);
     }else{d10Engine?.setVisible(false);await rollWithCss(count,mode,'d6',results,power,refs.stage)}
     refs.total.textContent=results.reduce((a,b)=>a+b,0);refs.status.textContent='Đã có kết quả.';addHistory(results,mode,dieType);playResult();showToast(`Kết quả ${dieType.toUpperCase()}: ${results.join(' · ')}`);
@@ -164,7 +182,6 @@ async function rollCssDie(die,delay=0,power=.5,forcedValue=null){
   }
   const value=forcedValue??randomInt(1,6),rot=FACE_ROT[value],spin=1+power*.72;die.el.style.setProperty('--rx',rot[0]);die.el.style.setProperty('--ry',rot[1]);die.el.style.setProperty('--rz',rot[2]);die.el.style.setProperty('--lift',`${-135-Math.round(power*120)}px`);die.el.style.setProperty('--spin1x',`${Math.round(520*spin)}deg`);die.el.style.setProperty('--spin1y',`${Math.round(610*spin)}deg`);die.el.style.setProperty('--spin1z',`${Math.round(350*spin)}deg`);die.el.style.setProperty('--spin2x',`${Math.round(720*spin)}deg`);die.el.style.setProperty('--spin2y',`${Math.round(830*spin)}deg`);die.el.style.setProperty('--spin2z',`${Math.round(540*spin)}deg`);die.el.style.setProperty('--spin3x',`${Math.round(880*spin)}deg`);die.el.style.setProperty('--spin3y',`${Math.round(970*spin)}deg`);die.el.style.setProperty('--spin3z',`${Math.round(690*spin)}deg`);die.el.style.animationDuration=`${duration}ms`;die.el.classList.remove('rolling');void die.el.offsetWidth;die.el.classList.add('rolling');playTone(220+randomInt(0,80),.08,.025);await wait(duration+30);playTone(360+value*32,.08,.03);return value;
 }
-function setStaticD6(die,value){const rot=FACE_ROT[value];die.el.style.transform=`rotateX(${rot[0]}) rotateY(${rot[1]}) rotateZ(${rot[2]})`}
 function renderValues(values){refs.values.innerHTML=values.length?values.map((v,i)=>`<div class="value-chip" title="Xúc xắc ${i+1}">${v}</div>`).join(''):'<span>Chưa có kết quả.</span>';refs.total.textContent=values.length?values.reduce((a,b)=>a+b,0):'—';renderStageBadges(values)}
 function renderStageBadges(values){refs.stage.querySelectorAll('.die-result-badge').forEach(el=>el.remove());if(!values?.length)return;const total=getCount();values.forEach((v,i)=>{if(v===undefined||v===null||v==='')return;const pos=positionFor(i,total),badge=document.createElement('div');badge.className='die-result-badge';badge.style.left=pos.x+'%';badge.style.top=`${Math.max(16,pos.y-9)}%`;badge.innerHTML=`<small>Viên ${i+1}</small><strong>${v}</strong>`;refs.stage.appendChild(badge)})}
 function renderEmpty(){refs.mode.textContent=`Chưa thả · ${getDieLabel()}`;refs.total.textContent='—';refs.values.innerHTML='<span>Chưa có kết quả.</span>';renderStageBadges([]);refs.status.textContent='Sẵn sàng. Giữ nút để tụ lực; Space = tung nhanh; 1/2 đổi kiểu thả.'}
@@ -200,34 +217,59 @@ function renderCombatSetup(){
 function setCombatPlayerCount(v){combatSetupData.count=Math.max(2,Math.min(6,+v||4));refs.combatPlayerCount.value=combatSetupData.count;refs.combatPlayerCount.textContent=combatSetupData.count;renderCombatSetup();saveCombatSetup()}
 function getSkin(id){return FIGHTER_SKINS.find(x=>x.id===id)||FIGHTER_SKINS[0]}
 function openCombat(){if(rolling)return;resetCombatSetup();refs.combatDialog.showModal();if(localStorage.getItem(COMBAT_HELP_KEY)!=='1')showCombatHelp()}
-function closeCombat(){clearCombatTimers();refs.combatDialog.close()}
-function resetCombatSetup(){clearCombatTimers();combat=null;combatBusy=false;refs.combatSetup.hidden=false;refs.combatGame.hidden=true;refs.combatArena.innerHTML='';refs.combatDiceStage.innerHTML='';refs.combatDiceSummary.innerHTML='<span>Chưa tung.</span>';renderCombatSetup()}
+function closeCombat(){invalidateCombatSession();refs.combatDialog.close()}
+function invalidateCombatSession(){combatSessionId++;clearCombatTimers();combat=null;combatBusy=false}
+function resetCombatSetup(){invalidateCombatSession();refs.combatSetup.hidden=false;refs.combatGame.hidden=true;refs.combatArena.innerHTML='';refs.combatDiceSummary.innerHTML='<span>Chưa tung.</span>';renderCombatSetup()}
 function showCombatHelp(){refs.combatHelpOverlay.hidden=false;refs.combatDontShowHelp.checked=localStorage.getItem(COMBAT_HELP_KEY)==='1'}
 function hideCombatHelp(){if(refs.combatDontShowHelp.checked)localStorage.setItem(COMBAT_HELP_KEY,'1');refs.combatHelpOverlay.hidden=true}
-function clearCombatTimers(){cancelAnimationFrame(timingRaf);timingRaf=0;clearInterval(targetTimer);clearTimeout(targetAutoTimer);targetTimer=0;targetAutoTimer=0}
+function clearCombatTimers(){cancelAnimationFrame(timingRaf);timingRaf=0;clearInterval(targetTimer);clearTimeout(targetAutoTimer);clearTimeout(combatActionTimer);targetTimer=0;targetAutoTimer=0;combatActionTimer=0}
+function combatSessionAlive(c){return !!c&&combat===c&&c.sessionId===combatSessionId&&refs.combatDialog.open}
+function laterCombat(c,fn,ms){clearTimeout(combatActionTimer);combatActionTimer=setTimeout(()=>{combatActionTimer=0;if(combatSessionAlive(c))fn()},ms)}
 function startCombat(){
-  if(combatBusy)return;saveCombatSetup();const count=combatSetupData.count,rounds=+refs.combatRoundCount.value||8;
-  const fighters=Array.from({length:count},(_,i)=>{const cfg=combatSetupData.slots[i],skin=getSkin(cfg.skin);return{id:`p${i}`,slot:i+1,name:cfg.name||`Slot ${i+1}`,kind:cfg.kind||'human',skin,hp:COMBAT_MAX_HP,maxHp:COMBAT_MAX_HP,shield:0,attack:0,dice:[],stars:0,down:false}});
-  combat={round:1,maxRounds:rounds,fighters,turnIndex:0,phase:'rolling',current:null,timingScore:0,timingPos:0,targetIndex:0,targetCandidates:[],log:[]};
-  refs.combatSetup.hidden=true;refs.combatGame.hidden=false;refs.combatHelpOverlay.hidden=true;renderCombatArena();addCombatLog('Trận đấu bắt đầu. Mỗi người luôn tung 2 D6.');beginCombatRound();
+  if(combatBusy)return;saveCombatSetup();const count=combatSetupData.count,rounds=+refs.combatRoundCount.value||8,sessionId=++combatSessionId;
+  clearCombatTimers();
+  const aiStyles=['aggressive','breaker','balanced'];
+  const fighters=Array.from({length:count},(_,i)=>{const cfg=combatSetupData.slots[i],skin=getSkin(cfg.skin);return{id:`p${i}`,slot:i+1,name:cfg.name||`Slot ${i+1}`,kind:cfg.kind||'human',skin,hp:COMBAT_MAX_HP,maxHp:COMBAT_MAX_HP,shield:0,attack:0,dice:[],stars:0,down:false,aiStyle:aiStyles[i%aiStyles.length]}});
+  combat={sessionId,round:1,maxRounds:rounds,fighters,turnIndex:0,phase:'rolling',current:null,timingScore:0,timingPos:0,targetIndex:0,targetCandidates:[],log:[]};combatBusy=false;
+  refs.combatSetup.hidden=true;refs.combatGame.hidden=false;refs.combatHelpOverlay.hidden=true;renderCombatArena();addCombatLog('Trận đấu bắt đầu. Mỗi người luôn tung 2 D6.');beginCombatRound(combat);
 }
-async function beginCombatRound(){
-  if(!combat||combatBusy)return;combatBusy=true;clearCombatTimers();combat.phase='rolling';refs.timingPanel.hidden=true;refs.targetPanel.hidden=true;refs.combatWait.hidden=false;refs.combatWait.innerHTML='<b>🎲 TUNG ĐỒNG THỜI!</b><span>Mỗi đấu thủ 2 viên. Lẻ đỏ = Công, chẵn xanh = Khiên.</span>';refs.combatRoundLabel.textContent=`Vòng ${combat.round}/${combat.maxRounds}`;refs.combatPhaseLabel.textContent='Tất cả xúc xắc đang lăn…';
-  for(const f of combat.fighters){if(f.down){f.down=false;f.hp=COMBAT_RESPAWN_HP;addCombatLog(`${f.name} trở lại với ❤️ ${COMBAT_RESPAWN_HP}.`)}f.shield=0;f.attack=0;f.dice=[]}
-  renderCombatArena();refs.combatDiceStage.innerHTML='';const results=[];playTone(170,.16,.055);
-  try{await rollWithCss(combat.fighters.length*2,'together','d6',results,.72,refs.combatDiceStage)}catch(e){console.error(e);for(let i=0;i<combat.fighters.length*2;i++)results[i]=randomInt(1,6)}
-  combat.fighters.forEach((f,i)=>{f.dice=[results[i*2],results[i*2+1]];f.attack=f.dice.filter(v=>v%2===1).reduce((a,b)=>a+b,0);f.shield=f.dice.filter(v=>v%2===0).reduce((a,b)=>a+b,0)});
-  renderCombatDiceSummary();renderCombatArena();playResult();combat.turnIndex=0;combatBusy=false;await wait(450);beginCombatTurn();
+async function beginCombatRound(c=combat){
+  if(!combatSessionAlive(c)||combatBusy)return;combatBusy=true;clearCombatTimers();c.phase='rolling';refs.timingPanel.hidden=true;refs.targetPanel.hidden=true;refs.combatWait.hidden=false;refs.combatWait.innerHTML='<b>🎲 TUNG ĐỒNG THỜI!</b><span>2 xúc xắc sẽ rơi và nằm ngay dưới chân từng đấu thủ.</span>';refs.combatRoundLabel.textContent=`Vòng ${c.round}/${c.maxRounds}`;refs.combatPhaseLabel.textContent='Tất cả xúc xắc đang lăn…';
+  for(const f of c.fighters){if(f.down){f.down=false;f.hp=COMBAT_RESPAWN_HP;addCombatLog(`${f.name} trở lại với ❤️ ${COMBAT_RESPAWN_HP}.`)}f.shield=0;f.attack=0;f.dice=[]}
+  renderCombatArena();playTone(170,.16,.055);
+  const results=await rollCombatDiceAtFeet(c);
+  if(!combatSessionAlive(c))return;
+  c.fighters.forEach((f,i)=>{f.dice=[results[i*2],results[i*2+1]];f.attack=f.dice.filter(v=>v%2===1).reduce((a,b)=>a+b,0);f.shield=f.dice.filter(v=>v%2===0).reduce((a,b)=>a+b,0);updateCombatFighter(f)});
+  renderCombatDiceSummary();playResult();c.turnIndex=0;combatBusy=false;await wait(420);if(combatSessionAlive(c))beginCombatTurn(c);
+}
+async function rollCombatDiceAtFeet(c){
+  const results=Array(c.fighters.length*2),jobs=[];
+  c.fighters.forEach((f,i)=>{
+    const stage=document.querySelector(`#fighter-${f.id} .fighter-dice-ground`);if(!stage)return;
+    stage.innerHTML='';
+    for(let d=0;d<2;d++){
+      const die=createCombatFootDie(stage,d),idx=i*2+d;
+      jobs.push(rollCssDie(die,randomInt(0,90),.58).then(v=>{results[idx]=v;die.wrap.classList.add(v%2?'odd-result':'even-result');die.wrap.dataset.value=String(v)}));
+    }
+  });
+  try{await Promise.all(jobs)}catch(e){console.error('Combat dice roll fallback:',e)}
+  if(!combatSessionAlive(c))return results;
+  for(let i=0;i<results.length;i++)if(!Number.isFinite(results[i]))results[i]=randomInt(1,6);
+  return results;
+}
+function createCombatFootDie(stage,index){
+  const wrap=document.createElement('div');wrap.className='die-wrap combat-foot-die';wrap.style.left=index===0?'7px':'48px';wrap.style.top='3px';
+  const die=document.createElement('div');die.className='die';for(const [cls,value] of [['front',1],['back',6],['right',3],['left',4],['top',2],['bottom',5]]){const face=document.createElement('div');face.className=`face ${cls}`;face.innerHTML=pips(value);die.appendChild(face)}wrap.appendChild(die);stage.appendChild(wrap);return{type:'d6',el:die,wrap}
 }
 function renderCombatDiceSummary(){
-  refs.combatDiceSummary.innerHTML=combat.fighters.map(f=>`<div class="combat-dice-row"><b>${escapeHTML(f.name)}</b><span>${f.dice.map(v=>`<i class="combat-result-die ${v%2?'odd':'even'}">${v}</i>`).join('')}</span><small>🔴 ${f.attack} · 🛡️ ${f.shield}</small></div>`).join('')
+  if(!combat)return;refs.combatDiceSummary.innerHTML=combat.fighters.map(f=>`<div class="combat-dice-row"><b>${escapeHTML(f.name)}</b><small>🔴 Công ${f.attack}</small><small>🛡️ Khiên ${f.shield}</small></div>`).join('')
 }
-function arenaPosition(i,n){const angle=(-90+i*(360/n))*Math.PI/180,rx=n>=5?38:36,ry=n>=5?36:34;return{x:50+Math.cos(angle)*rx,y:50+Math.sin(angle)*ry}}
+function arenaPosition(i,n){const angle=(-90+i*(360/n))*Math.PI/180,rx=n>=5?38:36,ry=n>=5?25:27;return{x:50+Math.cos(angle)*rx,y:50+Math.sin(angle)*ry}}
 function renderCombatArena(){
   if(!combat)return;const n=combat.fighters.length;
   refs.combatArena.innerHTML='<div class="arena-center-mark">DICE<br>ARENA</div>'+combat.fighters.map((f,i)=>{const pos=arenaPosition(i,n),mirror=pos.x>52?'mirror':'';return `<div id="fighter-${f.id}" class="combat-fighter ${f.down?'down':''}" style="left:${pos.x}%;top:${pos.y}%" data-id="${f.id}">
-    <div class="fighter-status"><strong>${escapeHTML(f.name)}</strong><span class="fighter-icons"><i>❤️ ${f.hp}</i><i>🛡️ ${f.shield}</i><i>⭐ ${f.stars}</i></span><span class="fighter-dice">${f.dice.map(v=>`<i class="${v%2?'odd':'even'}">${v}</i>`).join('')}</span></div>
-    <img class="fighter-avatar ${mirror}" src="${f.skin.src}" alt="${escapeHTML(f.name)}"><div class="fighter-ground"></div><div class="target-light"></div><div class="fighter-float"></div>
+    <div class="fighter-status"><strong>${escapeHTML(f.name)}</strong><span class="fighter-icons"><i>❤️ ${f.hp}</i><i>🛡️ ${f.shield}</i><i>⭐ ${f.stars}</i></span></div>
+    <img class="fighter-avatar ${mirror}" src="${f.skin.src}" alt="${escapeHTML(f.name)}"><div class="fighter-ground"></div><div class="turn-light"></div><div class="target-light"></div><div class="fighter-dice-ground"></div><div class="fighter-float"></div>
   </div>`}).join('');
 }
 function updateCombatFighter(f){
@@ -236,56 +278,75 @@ function updateCombatFighter(f){
 function setCombatActive(shooter,target=null){
   refs.combatArena.querySelectorAll('.combat-fighter').forEach(el=>{el.classList.toggle('active-turn',el.dataset.id===shooter?.id);el.classList.toggle('targeted',el.dataset.id===target?.id)});
 }
-async function beginCombatTurn(){
-  if(!combat||combatBusy)return;clearCombatTimers();
-  while(combat.turnIndex<combat.fighters.length&&combat.fighters[combat.turnIndex].down)combat.turnIndex++;
-  if(combat.turnIndex>=combat.fighters.length){finishCombatRound();return}
-  const f=combat.fighters[combat.turnIndex];combat.current=f;setCombatActive(f);refs.combatCurrentAvatar.src=f.skin.src;refs.combatCurrentName.textContent=f.name;refs.combatCurrentStats.textContent=`❤️ ${f.hp} · 🛡️ ${f.shield} · 🔴 ${f.attack}`;refs.combatPhaseLabel.textContent=`Lượt ${f.name}`;refs.timingScoreText.textContent='—';refs.targetPanel.hidden=true;
-  if(f.attack<=0){refs.timingPanel.hidden=true;refs.combatWait.hidden=false;refs.combatWait.innerHTML=`<b>🛡️ ${f.name} toàn thủ</b><span>Không có xúc xắc đỏ, lượt bắn được bỏ qua.</span>`;playShieldSound();await wait(760);combat.turnIndex++;beginCombatTurn();return}
-  refs.combatWait.hidden=true;startTiming(f)
+async function beginCombatTurn(c=combat){
+  if(!combatSessionAlive(c)||combatBusy)return;clearCombatTimers();
+  while(c.turnIndex<c.fighters.length&&c.fighters[c.turnIndex].down)c.turnIndex++;
+  if(c.turnIndex>=c.fighters.length){finishCombatRound(c);return}
+  const f=c.fighters[c.turnIndex];c.current=f;setCombatActive(f);refs.combatCurrentAvatar.src=f.skin.src;refs.combatCurrentName.textContent=f.name;refs.combatCurrentStats.textContent=`❤️ ${f.hp} · 🛡️ ${f.shield} · 🔴 ${f.attack}`;refs.combatPhaseLabel.textContent=`Lượt ${f.name}`;refs.timingScoreText.textContent='—';refs.targetPanel.hidden=true;
+  if(f.attack<=0){refs.timingPanel.hidden=true;refs.combatWait.hidden=false;refs.combatWait.innerHTML=`<b>🛡️ ${f.name} toàn thủ</b><span>Không có xúc xắc đỏ, lượt bắn được bỏ qua.</span>`;playShieldSound();await wait(720);if(!combatSessionAlive(c))return;c.turnIndex++;beginCombatTurn(c);return}
+  refs.combatWait.hidden=true;startTiming(c,f)
 }
 function timingHalfCycleMs(attack){return Math.max(205,700-Math.min(10,attack)*48)}
-function startTiming(f){
-  combat.phase='timing';combat.timingScore=0;refs.timingPanel.hidden=false;refs.timingStop.disabled=f.kind==='ai';refs.targetPanel.hidden=true;refs.timingScoreText.textContent=`🔴 ${f.attack} · Canh tâm`;const half=timingHalfCycleMs(f.attack),start=performance.now();combat.timingStart=start;combat.timingHalf=half;let lastSide=-1;
-  const frame=now=>{if(!combat||combat.phase!=='timing')return;const t=(now-start)/half,frac=t%2<=1?t%2:2-(t%2);combat.timingPos=frac*100;refs.timingMarker.style.left=`${combat.timingPos}%`;const side=Math.floor(t);if(side!==lastSide){lastSide=side;playTone(350+Math.min(10,f.attack)*12,.025,.009)}timingRaf=requestAnimationFrame(frame)};timingRaf=requestAnimationFrame(frame);
-  if(f.kind==='ai'){const delay=randomInt(Math.max(280,half),Math.max(520,half*2));targetAutoTimer=setTimeout(()=>stopTiming(true),delay)}
+function startTiming(c,f){
+  if(!combatSessionAlive(c))return;c.phase='timing';c.timingScore=0;refs.timingPanel.hidden=false;refs.timingStop.disabled=f.kind==='ai';refs.targetPanel.hidden=true;refs.timingScoreText.textContent=`🔴 ${f.attack} · Canh tâm`;const half=timingHalfCycleMs(f.attack),start=performance.now();c.timingStart=start;c.timingHalf=half;let lastSide=-1;
+  const frame=now=>{if(!combatSessionAlive(c)||c.phase!=='timing')return;const t=(now-start)/half,frac=t%2<=1?t%2:2-(t%2);c.timingPos=frac*100;refs.timingMarker.style.left=`${c.timingPos}%`;const side=Math.floor(t);if(side!==lastSide){lastSide=side;playTone(350+Math.min(10,f.attack)*12,.025,.009)}timingRaf=requestAnimationFrame(frame)};timingRaf=requestAnimationFrame(frame);
+  if(f.kind==='ai'){const delay=randomInt(Math.max(280,half),Math.max(520,half*2));targetAutoTimer=setTimeout(()=>{if(combatSessionAlive(c))stopTiming(true,c)},delay)}
 }
 function scoreTiming(pos){const dist=Math.abs(50-pos);if(dist<=2.5)return 100;return Math.max(5,Math.min(99,Math.round(100-dist*1.9)))}
-function stopTimingForHuman(){if(!combat||combat.phase!=='timing'||combat.current?.kind==='ai')return;stopTiming(false)}
-function stopTiming(isAI=false){
-  if(!combat||combat.phase!=='timing')return;cancelAnimationFrame(timingRaf);timingRaf=0;clearTimeout(targetAutoTimer);let score=isAI?aiTimingScore(combat.current.attack):scoreTiming(combat.timingPos);combat.timingScore=score;const label=score===100?'PERFECT!':score>=82?'TUYỆT!':score>=62?'TỐT!':score>=35?'LỆCH':'TRƯỢT';refs.timingScoreText.textContent=`${label} · ${score}%`;refs.timingMarker.style.left=`${50+(100-score)/1.9*(Math.random()<.5?-1:1)}%`;if(score===100)playPerfectSound();else playTone(380+score*3,.11,.045);combat.phase='target';setTimeout(startTargetCycle,320)
+function stopTimingForHuman(){if(!combat||combat.phase!=='timing'||combat.current?.kind==='ai')return;stopTiming(false,combat)}
+function stopTiming(isAI=false,c=combat){
+  if(!combatSessionAlive(c)||c.phase!=='timing')return;cancelAnimationFrame(timingRaf);timingRaf=0;clearTimeout(targetAutoTimer);let score=isAI?aiTimingScore(c.current.attack):scoreTiming(c.timingPos);c.timingScore=score;const label=score===100?'PERFECT!':score>=82?'TUYỆT!':score>=62?'TỐT!':score>=35?'LỆCH':'TRƯỢT';refs.timingScoreText.textContent=`${label} · ${score}%`;refs.timingMarker.style.left=`${50+(100-score)/1.9*(randomInt(0,1)===0?-1:1)}%`;if(score===100)playPerfectSound();else playTone(380+score*3,.11,.045);c.phase='target';laterCombat(c,()=>startTargetCycle(c),300)
 }
 function aiTimingScore(attack){let base=randomInt(38,91)-Math.max(0,attack-5)*2;if(randomInt(1,100)<=5)return 100;return Math.max(18,Math.min(96,base))}
-function startTargetCycle(){
-  if(!combat||combat.phase!=='target')return;refs.timingPanel.hidden=false;refs.targetPanel.hidden=false;const shooter=combat.current,candidates=combat.fighters.filter(x=>x!==shooter&&!x.down);combat.targetCandidates=candidates;if(!candidates.length){combat.turnIndex++;beginCombatTurn();return}combat.targetIndex=randomInt(0,candidates.length-1);highlightTarget();
-  const interval=Math.max(95,Math.round((timingHalfCycleMs(shooter.attack))*.43));targetTimer=setInterval(()=>{combat.targetIndex=(combat.targetIndex+1)%candidates.length;highlightTarget();playTargetTick()},interval);refs.fire.disabled=shooter.kind==='ai';refs.targetHint.textContent=shooter.kind==='ai'?'AI đang khóa mục tiêu…':'Vòng sáng đang chạy…';
-  if(shooter.kind==='ai')targetAutoTimer=setTimeout(()=>fireCurrentTarget(true),randomInt(720,1450));
-  else targetAutoTimer=setTimeout(()=>fireCurrentTarget(false),4200)
+function startTargetCycle(c=combat){
+  if(!combatSessionAlive(c)||c.phase!=='target')return;refs.timingPanel.hidden=false;refs.targetPanel.hidden=false;const shooter=c.current,candidates=c.fighters.filter(x=>x!==shooter&&!x.down);c.targetCandidates=candidates;if(!candidates.length){c.turnIndex++;beginCombatTurn(c);return}c.targetIndex=randomInt(0,candidates.length-1);highlightTarget(c);
+  const interval=Math.max(95,Math.round((timingHalfCycleMs(shooter.attack))*.43));targetTimer=setInterval(()=>{if(!combatSessionAlive(c)){clearInterval(targetTimer);return}c.targetIndex=(c.targetIndex+1)%candidates.length;highlightTarget(c);playTargetTick()},interval);refs.fire.disabled=shooter.kind==='ai';refs.targetHint.textContent=shooter.kind==='ai'?'AI đang khóa mục tiêu…':'Vòng đỏ đang chạy… · Space = BẮN';
+  if(shooter.kind==='ai')targetAutoTimer=setTimeout(()=>{if(!combatSessionAlive(c))return;c.targetIndex=selectAITargetIndex(shooter,candidates);highlightTarget(c);setTimeout(()=>{if(combatSessionAlive(c))fireCurrentTarget(true,c)},160)},randomInt(720,1450));
+  else targetAutoTimer=setTimeout(()=>{if(combatSessionAlive(c))fireCurrentTarget(false,c)},4200)
 }
-function highlightTarget(){const target=combat.targetCandidates[combat.targetIndex];setCombatActive(combat.current,target);refs.targetHint.textContent=target?`⭕ ${target.name}`:'—'}
-function fireCurrentTarget(auto=false){
-  if(!combat||combat.phase!=='target'||combatBusy)return;clearInterval(targetTimer);clearTimeout(targetAutoTimer);targetTimer=0;targetAutoTimer=0;const shooter=combat.current,target=combat.targetCandidates[combat.targetIndex];if(!target)return;combat.phase='firing';refs.fire.disabled=true;refs.targetHint.textContent=`🎯 ${target.name}`;launchProjectile(shooter,target,combat.timingScore).then(()=>finishCombatTurn())
+function selectAITargetIndex(shooter,candidates){
+  if(!candidates.length)return 0;
+  if(shooter.aiStyle==='aggressive'){
+    const ranked=candidates.map((x,i)=>({x,i,score:x.hp*10+x.shield})).sort((a,b)=>a.score-b.score||b.x.attack-a.x.attack);
+    const best=ranked[0].score,pool=ranked.filter(o=>o.score===best);return pool[randomInt(0,pool.length-1)].i
+  }
+  if(shooter.aiStyle==='breaker'){
+    const ranked=candidates.map((x,i)=>({x,i,score:x.shield*8-x.attack*2+x.hp*.15})).sort((a,b)=>a.score-b.score);
+    const threshold=ranked[0].score+2,pool=ranked.filter(o=>o.score<=threshold);return pool[randomInt(0,pool.length-1)].i
+  }
+  const maxHp=Math.max(...candidates.map(x=>x.maxHp||COMBAT_MAX_HP));
+  const weights=candidates.map(x=>Math.max(1,2+(maxHp-x.hp)*.35+(8-x.shield)*.18+x.attack*.10));
+  return weightedRandomIndex(weights)
 }
-async function launchProjectile(shooter,target,score){
-  combatBusy=true;const arena=refs.combatArena,sEl=document.getElementById(`fighter-${shooter.id}`),tEl=document.getElementById(`fighter-${target.id}`);if(!arena||!sEl||!tEl){combatBusy=false;return}
+function weightedRandomIndex(weights){
+  const scaled=weights.map(w=>Math.max(1,Math.round(w*100))),total=scaled.reduce((a,b)=>a+b,0);let pick=randomInt(1,total);
+  for(let i=0;i<scaled.length;i++){pick-=scaled[i];if(pick<=0)return i}return scaled.length-1
+}
+function highlightTarget(c=combat){if(!combatSessionAlive(c))return;const target=c.targetCandidates[c.targetIndex];setCombatActive(c.current,target);refs.targetHint.textContent=target?`🔴 ${target.name}`:'—'}
+function fireCurrentTarget(auto=false,c=combat){
+  if(!combatSessionAlive(c)||c.phase!=='target'||combatBusy)return;clearInterval(targetTimer);clearTimeout(targetAutoTimer);targetTimer=0;targetAutoTimer=0;const shooter=c.current,target=c.targetCandidates[c.targetIndex];if(!target)return;c.phase='firing';refs.fire.disabled=true;refs.targetHint.textContent=`🎯 ${target.name}`;launchProjectile(c,shooter,target,c.timingScore).then(()=>{if(combatSessionAlive(c))finishCombatTurn(c)})
+}
+function timingDamageMultiplier(score){if(score===100)return 1.75;if(score<=50)return .1+score*.008;if(score<=75)return .5+(score-50)*.03;return 1.25+(score-75)*.01}
+async function launchProjectile(c,shooter,target,score){
+  if(!combatSessionAlive(c))return;combatBusy=true;const arena=refs.combatArena,sEl=document.getElementById(`fighter-${shooter.id}`),tEl=document.getElementById(`fighter-${target.id}`);if(!arena||!sEl||!tEl){combatBusy=false;return}
   const ar=arena.getBoundingClientRect(),sr=sEl.getBoundingClientRect(),tr=tEl.getBoundingClientRect(),sx=sr.left-ar.left+sr.width*.5,sy=sr.top-ar.top+sr.height*.58,tx=tr.left-ar.left+tr.width*.5,ty=tr.top-ar.top+tr.height*.55;
-  const attack=shooter.attack,raw=Math.max(0,Math.round(attack*score/100)),perfect=score===100,size=Math.min(94,14+attack*3+score*.16+(perfect?22:0)),dx=tx-sx,dy=ty-sy,angle=Math.atan2(dy,dx)*180/Math.PI;
+  const attack=shooter.attack,mult=timingDamageMultiplier(score),raw=Math.max(0,Math.round(attack*mult)),perfect=score===100,size=Math.min(94,14+attack*3+score*.16+(perfect?22:0)),dx=tx-sx,dy=ty-sy,angle=Math.atan2(dy,dx)*180/Math.PI;
   const bullet=document.createElement('div');bullet.className=`combat-projectile ${perfect?'perfect-shot':''}`;bullet.style.cssText=`left:${sx}px;top:${sy}px;width:${size}px;height:${size}px;--trail:${Math.max(44,size*2.7)}px;transform:translate(-50%,-50%) rotate(${angle}deg)`;bullet.innerHTML='<i></i>';arena.appendChild(bullet);playShootSound(perfect,attack);
-  const miss=raw<=0,mdx=miss?dx+(Math.random()<.5?-55:55):dx,mdy=miss?dy-45:dy;const anim=bullet.animate([{transform:`translate(-50%,-50%) rotate(${angle}deg) scale(.72)`},{transform:`translate(calc(-50% + ${mdx}px),calc(-50% + ${mdy}px)) rotate(${angle}deg) scale(1)`}],{duration:perfect?610:480,easing:'cubic-bezier(.18,.78,.22,1)',fill:'forwards'});await anim.finished.catch(()=>{});bullet.remove();
+  const miss=raw<=0,mdx=miss?dx+(randomInt(0,1)===0?-55:55):dx,mdy=miss?dy-45:dy;const anim=bullet.animate([{transform:`translate(-50%,-50%) rotate(${angle}deg) scale(.72)`},{transform:`translate(calc(-50% + ${mdx}px),calc(-50% + ${mdy}px)) rotate(${angle}deg) scale(1)`}],{duration:perfect?610:480,easing:'cubic-bezier(.18,.78,.22,1)',fill:'forwards'});await anim.finished.catch(()=>{});bullet.remove();if(!combatSessionAlive(c)){combatBusy=false;return}
   if(miss){showFighterFloat(target,'💨 HỤT','miss');playTone(190,.12,.04);addCombatLog(`${shooter.name} bắn ${target.name} nhưng trượt.`);combatBusy=false;return}
   const blocked=Math.min(target.shield,raw),hpDamage=Math.max(0,raw-blocked);target.shield-=blocked;target.hp-=hpDamage;if(target.hp<=0){target.hp=0;target.down=true;shooter.stars+=2}else if(hpDamage>0)shooter.stars+=1;
-  updateCombatFighter(target);updateCombatFighter(shooter);if(blocked>0)playShieldSound();if(hpDamage>0)playHitSound();showImpact(target,perfect);showFighterFloat(target,`${blocked?`🛡️ -${blocked}  `:''}${hpDamage?`❤️ -${hpDamage}`:'❤️ 0'}`,hpDamage?'damage':'shield');addCombatLog(`${shooter.name} → ${target.name}: ${score}% · 🛡️ -${blocked} · ❤️ -${hpDamage}${target.down?' · GỤC!':''}`);
-  await wait(520);combatBusy=false
+  updateCombatFighter(target);updateCombatFighter(shooter);if(blocked>0)playShieldSound();if(hpDamage>0)playHitSound();showImpact(target,perfect);showFighterFloat(target,`${blocked?`🛡️ -${blocked}  `:''}${hpDamage?`❤️ -${hpDamage}`:'❤️ 0'}`,hpDamage?'damage':'shield');addCombatLog(`${shooter.name} → ${target.name}: ${score}% ×${mult.toFixed(2)} · 🛡️ -${blocked} · ❤️ -${hpDamage}${target.down?' · GỤC!':''}`);
+  await wait(480);if(combatSessionAlive(c))combatBusy=false
 }
 function showImpact(target,perfect){const el=document.getElementById(`fighter-${target.id}`);if(!el)return;el.classList.remove('impact','impact-perfect');void el.offsetWidth;el.classList.add(perfect?'impact-perfect':'impact');setTimeout(()=>el.classList.remove('impact','impact-perfect'),520)}
-function showFighterFloat(target,text,type){const el=document.getElementById(`fighter-${target.id}`),box=el?.querySelector('.fighter-float');if(!box)return;box.textContent=text;box.className=`fighter-float show ${type||''}`;setTimeout(()=>box.className='fighter-float',900)}
-function finishCombatTurn(){combat.turnIndex++;setTimeout(()=>{combatBusy=false;beginCombatTurn()},180)}
-async function finishCombatRound(){
-  combat.phase='roundEnd';setCombatActive(null);refs.timingPanel.hidden=true;refs.targetPanel.hidden=true;refs.combatWait.hidden=false;refs.combatWait.innerHTML='<b>✅ HẾT VÒNG</b><span>Khiên sẽ được tạo lại từ xúc xắc ở vòng kế tiếp.</span>';refs.combatPhaseLabel.textContent=`Kết thúc vòng ${combat.round}`;await wait(800);
-  if(combat.round>=combat.maxRounds){finishCombat();return}combat.round++;beginCombatRound()
+function showFighterFloat(target,text,type){const el=document.getElementById(`fighter-${target.id}`),box=el?.querySelector('.fighter-float');if(!box)return;box.textContent=text;box.className=`fighter-float show ${type||''}`;setTimeout(()=>{if(box.isConnected)box.className='fighter-float'},900)}
+function finishCombatTurn(c=combat){if(!combatSessionAlive(c))return;c.turnIndex++;laterCombat(c,()=>{combatBusy=false;beginCombatTurn(c)},170)}
+async function finishCombatRound(c=combat){
+  if(!combatSessionAlive(c))return;c.phase='roundEnd';setCombatActive(null);refs.timingPanel.hidden=true;refs.targetPanel.hidden=true;refs.combatWait.hidden=false;refs.combatWait.innerHTML='<b>✅ HẾT VÒNG</b><span>Khiên sẽ được tạo lại từ xúc xắc ở vòng kế tiếp.</span>';refs.combatPhaseLabel.textContent=`Kết thúc vòng ${c.round}`;await wait(760);if(!combatSessionAlive(c))return;
+  if(c.round>=c.maxRounds){finishCombat(c);return}c.round++;beginCombatRound(c)
 }
-function finishCombat(){
-  clearCombatTimers();combat.phase='finished';const ranked=[...combat.fighters].sort((a,b)=>b.stars-a.stars||b.hp-a.hp),winner=ranked[0];refs.combatPhaseLabel.textContent=`🏆 ${winner.name} thắng!`;refs.combatWait.hidden=false;refs.combatWait.innerHTML=`<b>🏆 ${escapeHTML(winner.name)} · ⭐ ${winner.stars}</b><span>Hết ${combat.maxRounds} vòng. Nếu bằng Sao, người còn nhiều Tim hơn xếp trên.</span>`;refs.combatLog.innerHTML=`<div class="combat-finish"><strong>🏆 ${escapeHTML(winner.name)} chiến thắng</strong>${ranked.map((f,i)=>`<span>${i+1}. ${escapeHTML(f.name)} · ⭐ ${f.stars} · ❤️ ${f.hp}</span>`).join('')}</div>`+refs.combatLog.innerHTML
+function finishCombat(c=combat){
+  if(!combatSessionAlive(c))return;clearCombatTimers();c.phase='finished';const ranked=[...c.fighters].sort((a,b)=>b.stars-a.stars||b.hp-a.hp),winner=ranked[0];setCombatActive(null);refs.combatPhaseLabel.textContent=`🏆 ${winner.name} thắng!`;refs.combatWait.hidden=false;refs.combatWait.innerHTML=`<b>🏆 ${escapeHTML(winner.name)} · ⭐ ${winner.stars}</b><span>Hết ${c.maxRounds} vòng. Nếu bằng Sao, người còn nhiều Tim hơn xếp trên.</span>`;refs.combatLog.innerHTML=`<div class="combat-finish"><strong>🏆 ${escapeHTML(winner.name)} chiến thắng</strong>${ranked.map((f,i)=>`<span>${i+1}. ${escapeHTML(f.name)} · ⭐ ${f.stars} · ❤️ ${f.hp}</span>`).join('')}</div>`+refs.combatLog.innerHTML
 }
 function addCombatLog(msg){if(!combat)return;combat.log.push(`V${combat.round} · ${msg}`);combat.log=combat.log.slice(-24);refs.combatLog.innerHTML=combat.log.slice(-10).reverse().map(x=>`<div>${escapeHTML(x)}</div>`).join('')}
 function playTargetTick(){playTone(640,.025,.012)}
@@ -296,7 +357,6 @@ function playPerfectSound(){[740,960,1220].forEach((f,i)=>setTimeout(()=>playTon
 function escapeHTML(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 
 function randomInt(min,max){const range=max-min+1,limit=Math.floor(0x100000000/range)*range,a=new Uint32Array(1);do{crypto.getRandomValues(a)}while(a[0]>=limit);return min+(a[0]%range)}
-function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=randomInt(0,i);[a[i],a[j]]=[a[j],a[i]]}return a}
 function playTone(freq,duration,gain){if(!settings.sound)return;try{audio=audio||new(window.AudioContext||window.webkitAudioContext)();const t=audio.currentTime,o=audio.createOscillator(),g=audio.createGain();o.frequency.value=freq;o.type='sine';g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(gain,t+.008);g.gain.exponentialRampToValueAtTime(.0001,t+duration);o.connect(g);g.connect(audio.destination);o.start(t);o.stop(t+duration+.02)}catch{}}
 function playResult(){[520,660,820].forEach((f,i)=>setTimeout(()=>playTone(f,.14,.05),i*100))}
 function syncSound(){refs.sound.textContent=settings.sound?'♪':'∅';refs.sound.classList.toggle('active',settings.sound)}

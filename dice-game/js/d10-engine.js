@@ -3,8 +3,6 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {clone as cloneSkeleton} from 'three/addons/utils/SkeletonUtils.js';
 
 const WORLD_UP=new THREE.Vector3(0,1,0);
-const SCREEN_UP_ON_TABLE=new THREE.Vector3(0,0,-1);
-const LOCAL_Y=new THREE.Vector3(0,1,0);
 
 // Hướng pháp tuyến của từng mặt được đọc trực tiếp từ asset D10.glb.
 // Bảng này dùng để đưa đúng con số đã quay lên mặt trên.
@@ -54,22 +52,8 @@ function randomQuaternion(){
     s2*Math.sin(2*Math.PI*u3),s2*Math.cos(2*Math.PI*u3)
   );
 }
-function easeOutCubic(t){return 1-Math.pow(1-t,3)}
-function easeInOutCubic(t){return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2}
 function wait(ms){return new Promise(resolve=>setTimeout(resolve,ms))}
 
-function resultQuaternion(value){
-  const normal=FACE_NORMAL_BY_VALUE[value].clone().normalize();
-  const align=new THREE.Quaternion().setFromUnitVectors(normal,WORLD_UP);
-  // Hướng “đầu chữ” trên từng mặt. Với nhóm mặt dưới phải đảo chiều trước khi đưa lên trên.
-  const localFaceUp=LOCAL_Y.clone().addScaledVector(normal,-LOCAL_Y.dot(normal)).normalize();
-  if(normal.y<0)localFaceUp.multiplyScalar(-1);
-  const afterAlign=localFaceUp.applyQuaternion(align).setY(0).normalize();
-  const cross=afterAlign.clone().cross(SCREEN_UP_ON_TABLE).dot(WORLD_UP);
-  const dot=THREE.MathUtils.clamp(afterAlign.dot(SCREEN_UP_ON_TABLE),-1,1);
-  const yaw=new THREE.Quaternion().setFromAxisAngle(WORLD_UP,Math.atan2(cross,dot));
-  return yaw.multiply(align).normalize();
-}
 
 export class D10AssetEngine{
   constructor(stage,{onSettle=()=>{}}={}){
