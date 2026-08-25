@@ -78,3 +78,17 @@
 - 6 Linh Thú có passive khác nhau, 5 xúc xắc D6, giữ/reroll tối đa 1 lần, combo Đôi/Bộ ba/Sảnh/Chẵn/Lẻ/Song 6.
 - 5 địa hình thay đổi luật: Thảo Nguyên, Khúc Cua, Bùn Lầy, Cầu Hẹp, Nước Rút.
 - 5 AI dùng cùng xác suất xúc xắc, chỉ khác chiến lược giữ/reroll.
+
+## Dice Arena 7.0 – Đấu Trường Chẵn Lẻ
+- Thay mode đua Linh Thú bằng **Đấu Trường Chẵn Lẻ** trong Dice Arena; chế độ tung xúc xắc tự do vẫn giữ nguyên.
+- Mỗi đấu thủ luôn dùng đúng 2 D6; toàn bộ đấu thủ tung đồng thời ở đầu vòng và lưu kết quả riêng theo slot.
+- Xúc xắc lẻ hiển thị đỏ và cộng Công; xúc xắc chẵn hiển thị xanh và cộng Khiên.
+- Hỗ trợ 2–6 slot, mỗi slot chọn Người chơi hoặc AI, đổi tên tự do và có thể chọn trùng nhân vật.
+- Có 12 nhân vật toàn thân, cân bằng 6 nữ/6 nam, trải từ trẻ em đến người lớn tuổi.
+- Đấu thủ được bố trí thành vòng tròn để đường đạn dễ quan sát.
+- Sau pha canh lực, vòng sáng khóa mục tiêu chạy qua các đối thủ với tốc độ bám theo tốc độ thanh canh lực; bấm BẮN để chốt đúng người đang sáng.
+- Viên đạn có vệt sáng vàng; kích thước tăng theo Công và độ chính xác. PERFECT tạo đạn khổng lồ và hiệu ứng va chạm mạnh.
+- Chỉ trừ Khiên/Tim sau khi projectile thực sự chạm mục tiêu; số nổi dùng biểu tượng `🛡️ -x` và `❤️ -y` để trẻ nhỏ dễ hiểu.
+- Thêm âm hiệu riêng cho tung xúc xắc, thanh canh, đổi mục tiêu, bắn, PERFECT, khiên vỡ và trúng đạn.
+- Popup luật nhanh có tùy chọn **Không hiện hướng dẫn này lần sau**.
+- Service Worker cập nhật cache lên `linh-kanban-static-v700-dice-even-odd-arena`.

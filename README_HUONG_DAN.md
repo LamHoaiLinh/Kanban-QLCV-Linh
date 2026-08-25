@@ -228,3 +228,16 @@ Dice Arena vẫn giữ chế độ xúc xắc tự do. Nút **ĐẠI HỘI LINH 
 - Địa hình: Thảo Nguyên → Khúc Cua → Bùn Lầy → Cầu Hẹp → Nước Rút.
 - 5 AI cùng xác suất xúc xắc, chỉ khác chiến lược và passive.
 - Linh Thú đạt 100m trước sẽ thắng.
+
+## Dice Arena 7.0 – Đấu Trường Chẵn Lẻ
+- Bấm **DICE** → **ĐẤU TRƯỜNG CHẴN LẺ**.
+- Chọn 2–6 đấu thủ. Mỗi slot có thể là người chơi hoặc AI, đổi tên được, chọn trùng skin được.
+- Có 12 skin toàn thân: 6 nữ + 6 nam, nhiều độ tuổi khác nhau.
+- Luật cố định: mỗi đấu thủ 2 D6. Tất cả tung đồng thời ở đầu vòng.
+- **Lẻ đỏ = Công**, **chẵn xanh = Khiên**.
+- Có Công: tới lượt **Canh lực** → bấm gần tâm để tăng hiệu lực. PERFECT cho đạn lớn nhất.
+- Sau đó vòng sáng chạy qua các đối thủ. Bấm **BẮN!** khi vòng sáng ở người muốn nhắm.
+- Đạn phải bay tới và chạm mục tiêu rồi game mới trừ Khiên/Tim. Khiên bị trừ trước, Tim trừ phần còn lại.
+- Số nổi ưu tiên icon để trẻ nhỏ dễ nhìn: `🛡️ -3`, `❤️ -4`.
+- Toàn chẵn thì lượt bắn được bỏ qua tự động và chỉ giữ Khiên trong vòng hiện tại.
+- Có âm hiệu riêng cho tung, canh lực, khóa mục tiêu, bắn, khiên và trúng đạn. Nút `♪` ở đầu Dice Arena bật/tắt toàn bộ âm thanh.

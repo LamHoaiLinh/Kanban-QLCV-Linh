@@ -1,7 +1,7 @@
 // Một nút GAME duy nhất quản lý các game độc lập trong iframe. Dữ liệu từng game tách riêng khỏi Kanban.
 const btn=document.querySelector('.game-suite-launch-btn');let hub=null,overlay=null,frame=null,style=null;
 const games=[
- {id:'dice',title:'Dice Arena',sub:'Xúc xắc 3D · Đại Hội Linh Thú',icon:'⚄',url:'dice-game/index.html?v=6.0.0',close:'dice-game-close'},
+ {id:'dice',title:'Dice Arena',sub:'Xúc xắc 3D · Đấu Trường Chẵn Lẻ',icon:'⚄',url:'dice-game/index.html?v=7.0.0',close:'dice-game-close'},
  {id:'tarot',title:'Tarot Việt',sub:'Trải bài và diễn giải',icon:'✦',url:'tarot-game/index.html?v=5.4.0',close:'tarot-game-close'},
  {id:'tetris',title:'Tetris',sub:'Xếp gạch thư giãn / đối kháng',icon:'▦',url:'tetris-game/index.html?v=1.0.4',close:'tetris-game-close'},
  {id:'farm',title:'Nông Trại Nhỏ',sub:'Trồng cây · Kho · Nhà Vườn',icon:'🌿',url:'farm-game/index.html?v=3.2.1',close:'farm-game-close'},

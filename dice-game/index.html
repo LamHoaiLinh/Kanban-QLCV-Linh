@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#123b31">
   <title>Dice Arena</title>
-  <link rel="stylesheet" href="styles.css?v=6.0.0">
+  <link rel="stylesheet" href="styles.css?v=7.0.0">
   <script type="importmap">
   {
     "imports": {
@@ -31,7 +31,7 @@
         <div class="roll-mode-row"><span>Kiểu thả hiện tại</span><button id="modeSelectBtn" class="mini-mode-btn" type="button">Thả đồng thời</button></div>
         <button id="rollBtn" class="primary-btn charge-btn" type="button" title="Giữ để nạp lực, thả để tung. Chạm nhanh = lực trung bình.">GIỮ ĐỂ LẤY LỰC · THẢ ĐỂ TUNG</button>
         <div class="charge-meter" aria-hidden="true"><i id="chargeFill"></i></div>
-        <button id="beastRaceBtn" class="beast-race-btn" type="button">🐉 ĐẠI HỘI LINH THÚ</button>
+        <button id="combatModeBtn" class="beast-race-btn" type="button">🎯 ĐẤU TRƯỜNG CHẴN LẺ</button>
         <button id="clearBtn" class="secondary-btn" type="button">Dọn bàn</button>
         <div class="result-box"><div><span>Chế độ</span><strong id="modeLabel">Chưa thả</strong></div><div><span>Tổng điểm</span><strong id="totalLabel">—</strong></div></div>
         <div id="valueList" class="value-list"><span>Chưa có kết quả.</span></div>
@@ -48,39 +48,65 @@
     </section>
     <dialog id="modeDialog" class="mode-dialog"><form method="dialog" class="mode-card"><div class="dialog-head"><div><span class="eyebrow">CHỌN CÁCH THẢ</span><h2><b id="dialogCount">3</b> xúc xắc <span id="dialogDieType">D6</span></h2></div><button value="cancel" aria-label="Đóng">×</button></div><div class="mode-grid"><button id="togetherBtn" type="button" class="mode-option"><div class="mode-dice">◆◆◆</div><strong>Thả đồng thời</strong><span>Tất cả xúc xắc lăn cùng lúc.</span></button><button id="sequenceBtn" type="button" class="mode-option"><div class="mode-dice">◆ → ◆ → ◆</div><strong>Thả từng viên</strong><span>Hiện kết quả lần lượt từng viên.</span></button></div></form></dialog>
 
-    <dialog id="beastRaceDialog" class="beast-dialog">
-      <div class="beast-game-card">
-        <header class="beast-header">
-          <div><span class="eyebrow">DICE ARENA · CHẾ ĐỘ ĐUA</span><h2>🐉 ĐẠI HỘI LINH THÚ</h2><p>Thả 5 D6 · giữ/reroll · tạo combo · về đích 100m trước 5 đối thủ.</p></div>
-          <button id="closeRaceBtn" type="button" aria-label="Đóng">×</button>
+    <dialog id="combatDialog" class="combat-dialog">
+      <div class="combat-shell">
+        <header class="combat-header">
+          <div><span class="eyebrow">DICE ARENA · CHẾ ĐỘ GIA ĐÌNH</span><h2>🎯 ĐẤU TRƯỜNG CHẴN LẺ</h2><p>2 D6 mỗi người · Lẻ đỏ = Công · Chẵn xanh = Khiên · Canh lực · Khóa mục tiêu · Bắn!</p></div>
+          <button id="closeCombatBtn" type="button" aria-label="Đóng">×</button>
         </header>
-        <section id="raceSetup" class="race-setup">
-          <div class="race-story"><strong>Chọn Linh Thú xuất trận</strong><span>Mỗi Linh Thú biến cùng một bộ xúc xắc thành một lối chạy khác nhau.</span></div>
-          <div id="beastChoices" class="beast-choices"></div>
-          <div class="race-rules"><b>Luật nhanh</b><span>5 xúc xắc → chọn tối đa 2 viên để reroll 1 lần → chốt lượt. Đôi, bộ ba, sảnh, toàn chẵn/lẻ và đặc tính Linh Thú tạo thêm quãng đường.</span></div>
+        <section id="combatSetup" class="combat-setup">
+          <div class="combat-setup-top">
+            <label><span>Số đấu thủ</span><div class="combat-stepper"><button id="combatMinusPlayer" type="button">−</button><output id="combatPlayerCount">4</output><button id="combatPlusPlayer" type="button">＋</button></div></label>
+            <label><span>Số vòng</span><select id="combatRoundCount"><option value="6">6 vòng</option><option value="8" selected>8 vòng</option><option value="10">10 vòng</option></select></label>
+            <div class="combat-rule-badge"><b>Luật cố định</b><span>Luôn 2 xúc xắc/người. Có thể chọn trùng nhân vật.</span></div>
+          </div>
+          <div id="combatSlotGrid" class="combat-slot-grid"></div>
+          <div class="combat-start-row"><button id="combatHelpBtn" type="button">? Xem luật</button><button id="combatStartBtn" class="combat-start-btn" type="button">🎲 BẮT ĐẦU TRẬN</button></div>
         </section>
-        <section id="raceGame" class="race-game" hidden>
-          <div class="race-hud"><span id="raceRound">Lượt 1</span><strong id="raceTerrain">🌿 Thảo Nguyên</strong><span id="raceStats">0m / 100m</span></div>
-          <div id="raceTrack" class="race-track"></div>
-          <div class="race-console">
-            <div class="race-dice-zone">
-              <div id="raceDiceStage" class="race-dice-stage"></div>
-              <div id="raceDiceChoices" class="race-dice-choices"><span>Giữ nút tung để bắt đầu lượt.</span></div>
+        <section id="combatGame" class="combat-game" hidden>
+          <div class="combat-hud"><span id="combatRoundLabel">Vòng 1/8</span><strong id="combatPhaseLabel">Chuẩn bị tung xúc xắc…</strong><button id="combatRestartBtn" type="button">Đổi người / Chơi lại</button></div>
+          <div id="combatArena" class="combat-arena" aria-label="Đấu trường"></div>
+          <div class="combat-control-grid">
+            <div class="combat-dice-box">
+              <div class="combat-box-title"><b>Kết quả xúc xắc</b><span>Tất cả đấu thủ tung cùng lúc.</span></div>
+              <div id="combatDiceStage" class="combat-dice-stage"></div>
+              <div id="combatDiceSummary" class="combat-dice-summary"><span>Chưa tung.</span></div>
             </div>
-            <div class="race-command">
-              <div id="raceComboInfo" class="race-combo-info">Chưa có bộ xúc xắc.</div>
-              <button id="raceRollBtn" class="race-charge-btn" type="button">GIỮ ĐỂ TUNG 5 XÚC XẮC</button>
-              <div class="charge-meter race-charge-meter"><i id="raceChargeFill"></i></div>
-              <div class="race-command-row"><button id="raceRerollBtn" type="button" disabled>Reroll đã chọn</button><button id="raceLockBtn" type="button" disabled>Chốt lượt</button></div>
-              <button id="raceRestartBtn" class="race-restart" type="button">Đổi Linh Thú / Chơi lại</button>
+            <div class="combat-action-box">
+              <div class="combat-current"><img id="combatCurrentAvatar" alt=""><div><span>Lượt hiện tại</span><strong id="combatCurrentName">—</strong><small id="combatCurrentStats">❤️ — · 🛡️ — · 🔴 —</small></div></div>
+              <div id="timingPanel" class="timing-panel" hidden>
+                <div class="timing-heading"><span>1. CANH LỰC</span><b id="timingScoreText">—</b></div>
+                <div id="timingBar" class="timing-bar"><i class="zone good-left"></i><i class="zone great-left"></i><i class="zone perfect"></i><i class="zone great-right"></i><i class="zone good-right"></i><b id="timingMarker" class="timing-marker"></b></div>
+                <button id="timingStopBtn" type="button" class="timing-stop-btn">BẤM CANH!</button>
+              </div>
+              <div id="targetPanel" class="target-panel" hidden>
+                <div class="timing-heading"><span>2. KHÓA MỤC TIÊU</span><b id="targetHint">Vòng sáng đang chạy…</b></div>
+                <button id="fireBtn" type="button" class="fire-btn">🎯 BẮN!</button>
+              </div>
+              <div id="combatWaitPanel" class="combat-wait"><b>Chuẩn bị…</b><span>Xúc xắc sẽ quyết định Công và Khiên.</span></div>
             </div>
           </div>
-          <div id="raceLog" class="race-log"></div>
+          <div id="combatLog" class="combat-log"></div>
         </section>
+        <div id="combatHelpOverlay" class="combat-help-overlay" hidden>
+          <div class="combat-help-card">
+            <span class="eyebrow">LUẬT NHANH · NHÌN MÀU LÀ CHƠI</span>
+            <h3>🎲 → 🎯 → 💥</h3>
+            <div class="help-steps">
+              <div><b>🔴 LẺ = BẮN</b><span>Số trên xúc xắc đỏ là sức Công.</span></div>
+              <div><b>🔵 CHẴN = KHIÊN</b><span>Số trên xúc xắc xanh tạo Khiên cho vòng này.</span></div>
+              <div><b>✨ CANH LỰC</b><span>Bấm càng gần tâm càng mạnh. PERFECT tạo viên đạn khổng lồ.</span></div>
+              <div><b>⭕ KHÓA MỤC TIÊU</b><span>Vòng sáng chạy qua đối thủ. Bấm BẮN khi vòng dừng đúng người muốn bắn.</span></div>
+              <div><b>💥 CHỈ TRỪ KHI ĐẠN CHẠM</b><span>Khiên vỡ trước, sau đó mới trừ Tim.</span></div>
+            </div>
+            <label class="dont-show"><input id="combatDontShowHelp" type="checkbox"> Không hiện hướng dẫn này lần sau</label>
+            <button id="combatSkipHelp" class="combat-start-btn" type="button">BỎ QUA · VÀO CHƠI</button>
+          </div>
+        </div>
       </div>
     </dialog>
     <div id="toast" class="toast" role="status"></div>
   </main>
-  <script type="module" src="js/app.js?v=6.0.0"></script>
+  <script type="module" src="js/app.js?v=7.0.0"></script>
 </body>
 </html>

@@ -4,41 +4,54 @@ const refs={
   roll:$('#rollBtn'),clear:$('#clearBtn'),modeSelect:$('#modeSelectBtn'),chargeFill:$('#chargeFill'),dialog:$('#modeDialog'),dialogCount:$('#dialogCount'),dialogType:$('#dialogDieType'),
   together:$('#togetherBtn'),sequence:$('#sequenceBtn'),mode:$('#modeLabel'),total:$('#totalLabel'),values:$('#valueList'),status:$('#statusText'),history:$('#historyList'),
   clearHistory:$('#clearHistoryBtn'),sound:$('#soundBtn'),fullscreen:$('#fullscreenBtn'),close:$('#closeDiceBtn'),toast:$('#toast'),
-  beastRace:$('#beastRaceBtn'),raceDialog:$('#beastRaceDialog'),closeRace:$('#closeRaceBtn'),raceSetup:$('#raceSetup'),raceGame:$('#raceGame'),beastChoices:$('#beastChoices'),
-  raceRound:$('#raceRound'),raceTerrain:$('#raceTerrain'),raceStats:$('#raceStats'),raceTrack:$('#raceTrack'),raceDiceStage:$('#raceDiceStage'),raceDiceChoices:$('#raceDiceChoices'),
-  raceComboInfo:$('#raceComboInfo'),raceRoll:$('#raceRollBtn'),raceChargeFill:$('#raceChargeFill'),raceReroll:$('#raceRerollBtn'),raceLock:$('#raceLockBtn'),raceRestart:$('#raceRestartBtn'),raceLog:$('#raceLog')
+  combatMode:$('#combatModeBtn'),combatDialog:$('#combatDialog'),closeCombat:$('#closeCombatBtn'),combatSetup:$('#combatSetup'),combatGame:$('#combatGame'),combatSlotGrid:$('#combatSlotGrid'),
+  combatMinusPlayer:$('#combatMinusPlayer'),combatPlusPlayer:$('#combatPlusPlayer'),combatPlayerCount:$('#combatPlayerCount'),combatRoundCount:$('#combatRoundCount'),combatStart:$('#combatStartBtn'),combatRestart:$('#combatRestartBtn'),combatHelp:$('#combatHelpBtn'),
+  combatHelpOverlay:$('#combatHelpOverlay'),combatDontShowHelp:$('#combatDontShowHelp'),combatSkipHelp:$('#combatSkipHelp'),combatRoundLabel:$('#combatRoundLabel'),combatPhaseLabel:$('#combatPhaseLabel'),combatArena:$('#combatArena'),
+  combatDiceStage:$('#combatDiceStage'),combatDiceSummary:$('#combatDiceSummary'),combatCurrentAvatar:$('#combatCurrentAvatar'),combatCurrentName:$('#combatCurrentName'),combatCurrentStats:$('#combatCurrentStats'),
+  timingPanel:$('#timingPanel'),timingBar:$('#timingBar'),timingMarker:$('#timingMarker'),timingScoreText:$('#timingScoreText'),timingStop:$('#timingStopBtn'),targetPanel:$('#targetPanel'),targetHint:$('#targetHint'),fire:$('#fireBtn'),combatWait:$('#combatWaitPanel'),combatLog:$('#combatLog')
 };
 const SETTINGS_KEY='linh_dice_game_settings_v4';
 const HISTORY_KEY='linh_dice_game_history_v2';
-const RACE_KEY='linh_dice_beast_race_v1';
+const COMBAT_SETUP_KEY='linh_dice_combat_setup_v1';
+const COMBAT_HELP_KEY='linh_dice_combat_help_hidden_v1';
 const CHARGE_MAX_MS=1400,QUICK_TAP_POWER=.5,MIN_HOLD_MS=85;
 let settings=load(SETTINGS_KEY,{count:3,sound:true,type:'d6',rollMode:'together'}),history=load(HISTORY_KEY,[]),rolling=false,audio=null,toastTimer=null,d10Engine=null,d10EnginePromise=null;
 let chargeState=null,chargeRaf=0;
 const FACE_ROT={1:['-18deg','0deg','0deg'],6:['-18deg','180deg','0deg'],3:['-18deg','-90deg','0deg'],4:['-18deg','90deg','0deg'],2:['-105deg','0deg','0deg'],5:['75deg','0deg','0deg']};
 
-const BEASTS=[
-  {id:'tianma',icon:'🐎',name:'Thiên Mã',desc:'Ưa tốc độ thuần túy.',passive:'Mỗi viên 5 hoặc 6: +1m.'},
-  {id:'xuangui',icon:'🐢',name:'Huyền Quy',desc:'Ổn định, không sợ số thấp.',passive:'Có 1 hoặc 2: +2m; toàn chẵn thêm +1m.'},
-  {id:'chihu',icon:'🦊',name:'Xích Hồ',desc:'Bậc thầy sửa vận.',passive:'Được reroll tối đa 3 viên thay vì 2.'},
-  {id:'baihu',icon:'🐯',name:'Bạch Hổ',desc:'Càng bị dẫn càng bùng nổ.',passive:'Nếu chưa dẫn đầu: +2m.'},
-  {id:'qingniao',icon:'🦅',name:'Thanh Điểu',desc:'Sở trường sảnh và vượt mặt.',passive:'Combo Sảnh nhận thêm +3m.'},
-  {id:'kuangniu',icon:'🐂',name:'Cuồng Ngưu',desc:'Cặp và bộ ba càng mạnh.',passive:'Đôi +2m; Bộ ba +3m.'}
+const FIGHTER_SKINS=[
+  {id:'f01',name:'Bé Mây',gender:'Nữ',age:'7 tuổi',src:'assets/fighters/f01.svg'},
+  {id:'f02',name:'Linh',gender:'Nữ',age:'13 tuổi',src:'assets/fighters/f02.svg'},
+  {id:'f03',name:'An',gender:'Nữ',age:'20 tuổi',src:'assets/fighters/f03.svg'},
+  {id:'f04',name:'Vy',gender:'Nữ',age:'31 tuổi',src:'assets/fighters/f04.svg'},
+  {id:'f05',name:'Cô Mai',gender:'Nữ',age:'48 tuổi',src:'assets/fighters/f05.svg'},
+  {id:'f06',name:'Bà Ngọc',gender:'Nữ',age:'67 tuổi',src:'assets/fighters/f06.svg'},
+  {id:'m01',name:'Bé Tí',gender:'Nam',age:'8 tuổi',src:'assets/fighters/m01.svg'},
+  {id:'m02',name:'Khang',gender:'Nam',age:'14 tuổi',src:'assets/fighters/m02.svg'},
+  {id:'m03',name:'Nam',gender:'Nam',age:'21 tuổi',src:'assets/fighters/m03.svg'},
+  {id:'m04',name:'Huy',gender:'Nam',age:'34 tuổi',src:'assets/fighters/m04.svg'},
+  {id:'m05',name:'Chú Sơn',gender:'Nam',age:'50 tuổi',src:'assets/fighters/m05.svg'},
+  {id:'m06',name:'Ông Minh',gender:'Nam',age:'69 tuổi',src:'assets/fighters/m06.svg'}
 ];
-const TERRAINS=[
-  {min:0,id:'grass',icon:'🌿',name:'Thảo Nguyên',desc:'Không có luật phụ.'},
-  {min:25,id:'curve',icon:'↪️',name:'Khúc Cua',desc:'Sảnh +2m; lao quá mạnh bị -1m.'},
-  {min:50,id:'mud',icon:'🟫',name:'Bùn Lầy',desc:'Toàn chẵn +3m.'},
-  {min:72,id:'bridge',icon:'🌉',name:'Cầu Hẹp',desc:'Sảnh +3m; Bộ ba +1m.'},
-  {min:90,id:'sprint',icon:'🔥',name:'Nước Rút',desc:'Có ít nhất hai viên 5/6: +3m.'}
+const COMBAT_MAX_HP=24,COMBAT_RESPAWN_HP=12;
+const DEFAULT_COMBAT_SLOTS=[
+  {name:'Sunny',kind:'human',skin:'f01'},
+  {name:'Nít',kind:'human',skin:'m02'},
+  {name:'Bố',kind:'human',skin:'m04'},
+  {name:'Miu AI',kind:'ai',skin:'f03'},
+  {name:'Tùng AI',kind:'ai',skin:'m03'},
+  {name:'Mây AI',kind:'ai',skin:'f04'}
 ];
-let raceStats=load(RACE_KEY,{races:0,wins:0,bestRound:null});
-let race=null,raceBusy=false;
+let combatSetupData=load(COMBAT_SETUP_KEY,{count:4,rounds:8,slots:DEFAULT_COMBAT_SLOTS});
+if(!Array.isArray(combatSetupData.slots))combatSetupData.slots=DEFAULT_COMBAT_SLOTS.map(x=>({...x}));
+while(combatSetupData.slots.length<6)combatSetupData.slots.push({...DEFAULT_COMBAT_SLOTS[combatSetupData.slots.length]});
+let combat=null,combatBusy=false,timingRaf=0,targetTimer=0,targetAutoTimer=0;
 
 init();
 function init(){
   bind();
   refs.type.value=settings.type==='d10'?'d10':'d6';settings.rollMode=settings.rollMode==='sequence'?'sequence':'together';
-  setCount(settings.count);syncSound();syncRollMode();renderHistory();renderEmpty();renderBeastChoices();
+  setCount(settings.count);syncSound();syncRollMode();renderHistory();renderEmpty();renderCombatSetup();
   if(getDieType()==='d10')preloadD10();
 }
 function bind(){
@@ -57,8 +70,9 @@ function bind(){
   refs.clearHistory.onclick=()=>{history=[];save(HISTORY_KEY,history);renderHistory()};
   refs.sound.onclick=()=>{settings.sound=!settings.sound;save(SETTINGS_KEY,settings);syncSound()};
   refs.fullscreen.onclick=toggleFullscreen;refs.close.onclick=closeGame;
-  refs.beastRace.onclick=openRace;refs.closeRace.onclick=closeRace;refs.raceRestart.onclick=resetRaceSetup;
-  bindChargeButton(refs.raceRoll,'race');refs.raceReroll.onclick=rerollRaceSelection;refs.raceLock.onclick=commitRaceTurn;
+  refs.combatMode.onclick=openCombat;refs.closeCombat.onclick=closeCombat;refs.combatRestart.onclick=resetCombatSetup;refs.combatHelp.onclick=showCombatHelp;refs.combatSkipHelp.onclick=hideCombatHelp;
+  refs.combatMinusPlayer.onclick=()=>setCombatPlayerCount((+refs.combatPlayerCount.value||4)-1);refs.combatPlusPlayer.onclick=()=>setCombatPlayerCount((+refs.combatPlayerCount.value||4)+1);
+  refs.combatRoundCount.onchange=()=>{combatSetupData.rounds=+refs.combatRoundCount.value||8;saveCombatSetup()};refs.combatStart.onclick=startCombat;refs.timingStop.onclick=stopTimingForHuman;refs.fire.onclick=fireCurrentTarget;
   window.addEventListener('pointerup',releaseCharge,{passive:false});window.addEventListener('pointercancel',cancelCharge,{passive:true});
   window.addEventListener('keydown',handleShortcuts,{passive:false});
 }
@@ -72,16 +86,14 @@ function bindChargeButton(btn,target){
 function beginCharge(target,btn){
   if(chargeState)return;
   if(target==='main'&&rolling)return;
-  if(target==='race'&&(!race||raceBusy||race.phase!=='awaitRoll'))return;
   chargeState={target,btn,start:performance.now(),power:0};btn.classList.add('charging');
-  if(target==='main')refs.status.textContent='Đang tụ lực… thả tay để tung xúc xắc.';
-  else refs.raceComboInfo.innerHTML='<b>Đang tụ lực…</b>Lực ném chỉ thay đổi chuyển động, không thay đổi xác suất mặt xúc xắc.';
+  refs.status.textContent='Đang tụ lực… thả tay để tung xúc xắc.';
   updateChargeFrame();
 }
 function updateChargeFrame(){
   if(!chargeState)return;
   const held=performance.now()-chargeState.start,power=Math.min(1,held/CHARGE_MAX_MS);chargeState.power=power;
-  const fill=chargeState.target==='main'?refs.chargeFill:refs.raceChargeFill;fill.style.width=`${Math.round(power*100)}%`;
+  refs.chargeFill.style.width=`${Math.round(power*100)}%`;
   chargeRaf=requestAnimationFrame(updateChargeFrame);
 }
 function releaseCharge(e){
@@ -90,12 +102,12 @@ function releaseCharge(e){
   e?.preventDefault?.();
   const state=chargeState;chargeState=null;cancelAnimationFrame(chargeRaf);state.btn.classList.remove('charging');
   const held=performance.now()-state.start,power=held<MIN_HOLD_MS?QUICK_TAP_POWER:Math.min(1,held/CHARGE_MAX_MS);
-  (state.target==='main'?refs.chargeFill:refs.raceChargeFill).style.width='0%';
-  if(state.target==='main')startRoll(settings.rollMode,power);else startRaceDiceRoll(power);
+  refs.chargeFill.style.width='0%';
+  startRoll(settings.rollMode,power);
 }
-function cancelCharge(){if(!chargeState)return;const state=chargeState;chargeState=null;cancelAnimationFrame(chargeRaf);state.btn.classList.remove('charging');(state.target==='main'?refs.chargeFill:refs.raceChargeFill).style.width='0%'}
+function cancelCharge(){if(!chargeState)return;const state=chargeState;chargeState=null;cancelAnimationFrame(chargeRaf);state.btn.classList.remove('charging');refs.chargeFill.style.width='0%'}
 function handleShortcuts(e){
-  if(refs.raceDialog.open)return;
+  if(refs.combatDialog.open)return;
   const tag=(document.activeElement?.tagName||'').toUpperCase(),typing=document.activeElement?.isContentEditable||['INPUT','TEXTAREA','SELECT'].includes(tag);
   if(typing&&!(e.key==='1'||e.key==='2'))return;
   if(e.key===' '||e.code==='Space'){if(rolling)return;e.preventDefault();quickRoll();return}
@@ -111,7 +123,7 @@ function setCount(v){v=Math.max(1,Math.min(10,+v||1));refs.count.value=v;refs.ou
 async function preloadD10(){refs.status.textContent='Đang chuẩn bị asset D10…';try{await ensureD10Engine();d10Engine.setVisible(true);refs.status.textContent='Asset D10 đã sẵn sàng.'}catch(error){console.error(error);refs.status.textContent='Không tải được asset D10; hệ thống sẽ dùng hình D10 dự phòng.'}}
 async function ensureD10Engine(){
   if(d10Engine)return d10Engine;
-  if(!d10EnginePromise)d10EnginePromise=import('./d10-engine.js?v=6.0.0').then(async({D10AssetEngine})=>{const engine=new D10AssetEngine(refs.stage,{onSettle:value=>playTone(410+value*24,.09,.032)});await engine.init();d10Engine=engine;return engine}).finally(()=>{d10EnginePromise=null});
+  if(!d10EnginePromise)d10EnginePromise=import('./d10-engine.js?v=7.0.0').then(async({D10AssetEngine})=>{const engine=new D10AssetEngine(refs.stage,{onSettle:value=>playTone(410+value*24,.09,.032)});await engine.init();d10Engine=engine;return engine}).finally(()=>{d10EnginePromise=null});
   return d10EnginePromise;
 }
 function clearArena(){refs.stage.querySelectorAll('.die-wrap,.die-result-badge').forEach(el=>el.remove());d10Engine?.clear();d10Engine?.setVisible(getDieType()==='d10')}
@@ -158,91 +170,130 @@ function renderStageBadges(values){refs.stage.querySelectorAll('.die-result-badg
 function renderEmpty(){refs.mode.textContent=`Chưa thả · ${getDieLabel()}`;refs.total.textContent='—';refs.values.innerHTML='<span>Chưa có kết quả.</span>';renderStageBadges([]);refs.status.textContent='Sẵn sàng. Giữ nút để tụ lực; Space = tung nhanh; 1/2 đổi kiểu thả.'}
 function addHistory(values,mode,type){history.unshift({time:new Date().toISOString(),mode,type,values,total:values.reduce((a,b)=>a+b,0)});history=history.slice(0,20);save(HISTORY_KEY,history);renderHistory()}
 function renderHistory(){refs.history.innerHTML=history.length?history.slice(0,10).map(x=>`<div class="history-row"><span>${(x.type||'d6').toUpperCase()} · ${x.mode==='together'?'Đồng thời':'Từng viên'} · ${formatTime(x.time)}</span><strong>${x.values.join(' – ')} = ${x.total}</strong></div>`).join(''):'<span>Chưa có lượt thả.</span>'}
-function toggleControls(disabled){[refs.count,refs.type,refs.minus,refs.plus,refs.modeSelect,refs.clear,refs.beastRace].forEach(el=>el.disabled=disabled);refs.roll.disabled=disabled}
+function toggleControls(disabled){[refs.count,refs.type,refs.minus,refs.plus,refs.modeSelect,refs.clear,refs.combatMode].forEach(el=>el.disabled=disabled);refs.roll.disabled=disabled}
 
-/* ======================== ĐẠI HỘI LINH THÚ ======================== */
-function renderBeastChoices(){refs.beastChoices.innerHTML=BEASTS.map(b=>`<button class="beast-choice" data-beast="${b.id}"><span class="beast-icon">${b.icon}</span><strong>${b.name}</strong><small>${b.desc}</small><em>${b.passive}</em></button>`).join('');refs.beastChoices.querySelectorAll('[data-beast]').forEach(btn=>btn.onclick=()=>startBeastRace(btn.dataset.beast))}
-function openRace(){if(rolling)return;resetRaceSetup();refs.raceDialog.showModal()}
-function closeRace(){cancelCharge();refs.raceDialog.close()}
-function resetRaceSetup(){cancelCharge();race=null;raceBusy=false;refs.raceSetup.hidden=false;refs.raceGame.hidden=true;refs.raceDiceStage.innerHTML='';refs.raceDiceChoices.innerHTML='<span>Giữ nút tung để bắt đầu lượt.</span>';renderBeastChoices()}
-function startBeastRace(beastId){
-  const playerBeast=BEASTS.find(x=>x.id===beastId)||BEASTS[0],others=shuffle(BEASTS.filter(x=>x.id!==playerBeast.id)).slice(0,5);
-  const racers=[{id:'player',name:'Ngươi',beast:playerBeast,distance:0,player:true},...others.map((b,i)=>({id:`ai${i}`,name:['Hắc Phong','Lưu Vân','Tử Điện','Bạch Sa','Kim Vũ'][i],beast:b,distance:0,player:false}))];
-  race={round:1,racers,player:racers[0],dice:[],selected:new Set(),rerollsLeft:1,phase:'awaitRoll',log:[],finished:false};
-  refs.raceSetup.hidden=true;refs.raceGame.hidden=false;refs.raceRoll.disabled=false;refs.raceReroll.disabled=true;refs.raceLock.disabled=true;refs.raceDiceStage.innerHTML='';
-  addRaceLog(`Ngươi chọn ${playerBeast.icon} ${playerBeast.name}. ${playerBeast.passive}`);renderRace();
+/* ======================== ĐẤU TRƯỜNG CHẴN LẺ ======================== */
+function saveCombatSetup(){
+  combatSetupData.count=Math.max(2,Math.min(6,+refs.combatPlayerCount.value||combatSetupData.count||4));
+  combatSetupData.rounds=+refs.combatRoundCount.value||8;
+  const cards=[...refs.combatSlotGrid.querySelectorAll('.combat-slot-card')];
+  if(cards.length)cards.forEach((card,i)=>{combatSetupData.slots[i]={name:card.querySelector('[data-role="name"]').value.trim()||`Slot ${i+1}`,kind:card.querySelector('[data-role="kind"]').value,skin:card.querySelector('[data-role="skin"]').value}});
+  save(COMBAT_SETUP_KEY,combatSetupData);
 }
-function getTerrain(){const lead=Math.max(...race.racers.map(r=>r.distance));return [...TERRAINS].reverse().find(t=>lead>=t.min)||TERRAINS[0]}
-function renderRace(){
-  if(!race)return;const terrain=getTerrain();refs.raceRound.textContent=`Lượt ${race.round}`;refs.raceTerrain.textContent=`${terrain.icon} ${terrain.name} · ${terrain.desc}`;refs.raceStats.textContent=`${Math.floor(race.player.distance)}m / 100m`;
-  refs.raceTrack.innerHTML=race.racers.map(r=>`<div class="race-lane ${r.player?'player-lane':''}"><span class="race-lane-label">${r.player?'★ ':''}${r.name} · ${r.beast.name}</span><span class="race-runner" style="left:calc(${Math.min(96,Math.max(0,r.distance))}% - 22px)"><i>${r.beast.icon}</i><b>${Math.floor(r.distance)}m</b></span></div>`).join('');
-  refs.raceLog.innerHTML=race.log.slice(-8).reverse().map(x=>`<div>${x}</div>`).join('');
+function renderCombatSetup(){
+  const count=Math.max(2,Math.min(6,+combatSetupData.count||4));refs.combatPlayerCount.value=count;refs.combatPlayerCount.textContent=count;refs.combatRoundCount.value=String(combatSetupData.rounds||8);
+  refs.combatSlotGrid.innerHTML=Array.from({length:6},(_,i)=>{
+    const cfg={...DEFAULT_COMBAT_SLOTS[i],...(combatSetupData.slots[i]||{})},skin=getSkin(cfg.skin),enabled=i<count;
+    return `<article class="combat-slot-card ${enabled?'':'slot-hidden'}" data-slot="${i}">
+      <div class="slot-label">SLOT ${i+1}</div><img data-role="preview" src="${skin.src}" alt="${escapeHTML(skin.name)}">
+      <label><span>Tên</span><input data-role="name" maxlength="14" value="${escapeHTML(cfg.name)}"></label>
+      <label><span>Điều khiển</span><select data-role="kind"><option value="human" ${cfg.kind==='human'?'selected':''}>Người chơi</option><option value="ai" ${cfg.kind==='ai'?'selected':''}>AI</option></select></label>
+      <label><span>Nhân vật</span><select data-role="skin">${FIGHTER_SKINS.map(x=>`<option value="${x.id}" ${x.id===skin.id?'selected':''}>${x.name} · ${x.gender} · ${x.age}</option>`).join('')}</select></label>
+    </article>`;
+  }).join('');
+  refs.combatSlotGrid.querySelectorAll('.combat-slot-card').forEach(card=>{
+    const sel=card.querySelector('[data-role="skin"]'),preview=card.querySelector('[data-role="preview"]');
+    sel.onchange=()=>{preview.src=getSkin(sel.value).src;saveCombatSetup()};
+    card.querySelector('[data-role="name"]').onchange=saveCombatSetup;card.querySelector('[data-role="kind"]').onchange=saveCombatSetup;
+  });
 }
-async function startRaceDiceRoll(power=.5){
-  if(!race||raceBusy||race.phase!=='awaitRoll')return;raceBusy=true;refs.raceRoll.disabled=true;refs.raceReroll.disabled=true;refs.raceLock.disabled=true;race.selected.clear();race.rerollsLeft=1;refs.raceDiceStage.innerHTML='';
-  refs.raceComboInfo.innerHTML='<b>Xúc xắc đang lăn…</b>Lực ném không tác động tới xác suất.';
-  const values=[];try{await rollWithCss(5,'together','d6',values,power,refs.raceDiceStage);race.dice=values;race.phase='choose';renderRaceDiceChoices();renderRaceEvaluation();refs.raceLock.disabled=false;refs.raceReroll.disabled=true;playResult()}finally{raceBusy=false}
+function setCombatPlayerCount(v){combatSetupData.count=Math.max(2,Math.min(6,+v||4));refs.combatPlayerCount.value=combatSetupData.count;refs.combatPlayerCount.textContent=combatSetupData.count;renderCombatSetup();saveCombatSetup()}
+function getSkin(id){return FIGHTER_SKINS.find(x=>x.id===id)||FIGHTER_SKINS[0]}
+function openCombat(){if(rolling)return;resetCombatSetup();refs.combatDialog.showModal();if(localStorage.getItem(COMBAT_HELP_KEY)!=='1')showCombatHelp()}
+function closeCombat(){clearCombatTimers();refs.combatDialog.close()}
+function resetCombatSetup(){clearCombatTimers();combat=null;combatBusy=false;refs.combatSetup.hidden=false;refs.combatGame.hidden=true;refs.combatArena.innerHTML='';refs.combatDiceStage.innerHTML='';refs.combatDiceSummary.innerHTML='<span>Chưa tung.</span>';renderCombatSetup()}
+function showCombatHelp(){refs.combatHelpOverlay.hidden=false;refs.combatDontShowHelp.checked=localStorage.getItem(COMBAT_HELP_KEY)==='1'}
+function hideCombatHelp(){if(refs.combatDontShowHelp.checked)localStorage.setItem(COMBAT_HELP_KEY,'1');refs.combatHelpOverlay.hidden=true}
+function clearCombatTimers(){cancelAnimationFrame(timingRaf);timingRaf=0;clearInterval(targetTimer);clearTimeout(targetAutoTimer);targetTimer=0;targetAutoTimer=0}
+function startCombat(){
+  if(combatBusy)return;saveCombatSetup();const count=combatSetupData.count,rounds=+refs.combatRoundCount.value||8;
+  const fighters=Array.from({length:count},(_,i)=>{const cfg=combatSetupData.slots[i],skin=getSkin(cfg.skin);return{id:`p${i}`,slot:i+1,name:cfg.name||`Slot ${i+1}`,kind:cfg.kind||'human',skin,hp:COMBAT_MAX_HP,maxHp:COMBAT_MAX_HP,shield:0,attack:0,dice:[],stars:0,down:false}});
+  combat={round:1,maxRounds:rounds,fighters,turnIndex:0,phase:'rolling',current:null,timingScore:0,timingPos:0,targetIndex:0,targetCandidates:[],log:[]};
+  refs.combatSetup.hidden=true;refs.combatGame.hidden=false;refs.combatHelpOverlay.hidden=true;renderCombatArena();addCombatLog('Trận đấu bắt đầu. Mỗi người luôn tung 2 D6.');beginCombatRound();
 }
-function renderRaceDiceChoices(){
-  if(!race?.dice.length)return;const maxSelect=race.player.beast.id==='chihu'?3:2;
-  refs.raceDiceChoices.innerHTML=race.dice.map((v,i)=>`<button class="race-die-chip ${race.selected.has(i)?'selected':''}" data-rdie="${i}" ${race.rerollsLeft<1?'disabled':''}>${v}</button>`).join('')+`<span>Chọn tối đa ${maxSelect} viên để reroll.</span>`;
-  refs.raceDiceChoices.querySelectorAll('[data-rdie]').forEach(btn=>btn.onclick=()=>{const idx=Number(btn.dataset.rdie);if(race.selected.has(idx))race.selected.delete(idx);else{if(race.selected.size>=maxSelect){showToast(`Linh Thú này chỉ reroll tối đa ${maxSelect} viên.`);return}race.selected.add(idx)}renderRaceDiceChoices();refs.raceReroll.disabled=race.rerollsLeft<1||race.selected.size===0});
+async function beginCombatRound(){
+  if(!combat||combatBusy)return;combatBusy=true;clearCombatTimers();combat.phase='rolling';refs.timingPanel.hidden=true;refs.targetPanel.hidden=true;refs.combatWait.hidden=false;refs.combatWait.innerHTML='<b>🎲 TUNG ĐỒNG THỜI!</b><span>Mỗi đấu thủ 2 viên. Lẻ đỏ = Công, chẵn xanh = Khiên.</span>';refs.combatRoundLabel.textContent=`Vòng ${combat.round}/${combat.maxRounds}`;refs.combatPhaseLabel.textContent='Tất cả xúc xắc đang lăn…';
+  for(const f of combat.fighters){if(f.down){f.down=false;f.hp=COMBAT_RESPAWN_HP;addCombatLog(`${f.name} trở lại với ❤️ ${COMBAT_RESPAWN_HP}.`)}f.shield=0;f.attack=0;f.dice=[]}
+  renderCombatArena();refs.combatDiceStage.innerHTML='';const results=[];playTone(170,.16,.055);
+  try{await rollWithCss(combat.fighters.length*2,'together','d6',results,.72,refs.combatDiceStage)}catch(e){console.error(e);for(let i=0;i<combat.fighters.length*2;i++)results[i]=randomInt(1,6)}
+  combat.fighters.forEach((f,i)=>{f.dice=[results[i*2],results[i*2+1]];f.attack=f.dice.filter(v=>v%2===1).reduce((a,b)=>a+b,0);f.shield=f.dice.filter(v=>v%2===0).reduce((a,b)=>a+b,0)});
+  renderCombatDiceSummary();renderCombatArena();playResult();combat.turnIndex=0;combatBusy=false;await wait(450);beginCombatTurn();
 }
-async function rerollRaceSelection(){
-  if(!race||raceBusy||race.phase!=='choose'||race.rerollsLeft<1||!race.selected.size)return;raceBusy=true;refs.raceReroll.disabled=true;refs.raceLock.disabled=true;
-  const indices=[...race.selected];race.rerollsLeft--;race.selected.clear();const power=.72;
-  try{
-    refs.raceDiceStage.innerHTML='';const jobs=[];
-    for(let i=0;i<5;i++){
-      const die=createCssDie(i,5,'d6',refs.raceDiceStage);
-      if(indices.includes(i))jobs.push(rollCssDie(die,i*45,power).then(v=>{race.dice[i]=v}));else setStaticD6(die,race.dice[i]);
-    }
-    await Promise.all(jobs);renderRaceDiceChoices();renderRaceEvaluation();refs.raceLock.disabled=false;
-  }finally{raceBusy=false}
+function renderCombatDiceSummary(){
+  refs.combatDiceSummary.innerHTML=combat.fighters.map(f=>`<div class="combat-dice-row"><b>${escapeHTML(f.name)}</b><span>${f.dice.map(v=>`<i class="combat-result-die ${v%2?'odd':'even'}">${v}</i>`).join('')}</span><small>🔴 ${f.attack} · 🛡️ ${f.shield}</small></div>`).join('')
 }
-function renderRaceEvaluation(){const ev=evaluateRaceDice(race.dice,race.player,getTerrain());refs.raceComboInfo.innerHTML=`<b>Dự kiến +${ev.distance}m</b>${ev.tags.length?ev.tags.join(' · '):'Không có combo phụ.'}<br><span>Tổng xúc xắc ${race.dice.reduce((a,b)=>a+b,0)} · quãng cơ bản ${ev.base}m.</span>`}
-async function commitRaceTurn(){
-  if(!race||raceBusy||race.phase!=='choose')return;raceBusy=true;refs.raceLock.disabled=true;refs.raceReroll.disabled=true;race.phase='resolving';
-  const terrain=getTerrain(),pev=evaluateRaceDice(race.dice,race.player,terrain);race.player.distance+=pev.distance;addRaceLog(`★ Ngươi: ${race.dice.join('-')} → +${pev.distance}m${pev.tags.length?` (${pev.tags.join(', ')})`:''}`);renderRace();await wait(450);
-  for(const ai of race.racers.filter(r=>!r.player)){
-    let dice=Array.from({length:5},()=>randomInt(1,6));const reroll=chooseAIReroll(dice,ai);for(const idx of reroll)dice[idx]=randomInt(1,6);const ev=evaluateRaceDice(dice,ai,terrain);ai.distance+=ev.distance;addRaceLog(`${ai.beast.icon} ${ai.name}: ${dice.join('-')} → +${ev.distance}m`);
-  }
-  renderRace();await wait(620);
-  const finishers=race.racers.filter(r=>r.distance>=100).sort((a,b)=>b.distance-a.distance);
-  if(finishers.length){finishRace(finishers);raceBusy=false;return}
-  race.round++;race.dice=[];race.selected.clear();race.rerollsLeft=1;race.phase='awaitRoll';refs.raceDiceStage.innerHTML='';refs.raceDiceChoices.innerHTML='<span>Giữ nút tung để bắt đầu lượt tiếp theo.</span>';refs.raceComboInfo.innerHTML='<b>Lượt mới</b>Quan sát địa hình rồi quyết định giữ hay reroll.';refs.raceRoll.disabled=false;renderRace();raceBusy=false;
+function arenaPosition(i,n){const angle=(-90+i*(360/n))*Math.PI/180,rx=n>=5?38:36,ry=n>=5?36:34;return{x:50+Math.cos(angle)*rx,y:50+Math.sin(angle)*ry}}
+function renderCombatArena(){
+  if(!combat)return;const n=combat.fighters.length;
+  refs.combatArena.innerHTML='<div class="arena-center-mark">DICE<br>ARENA</div>'+combat.fighters.map((f,i)=>{const pos=arenaPosition(i,n),mirror=pos.x>52?'mirror':'';return `<div id="fighter-${f.id}" class="combat-fighter ${f.down?'down':''}" style="left:${pos.x}%;top:${pos.y}%" data-id="${f.id}">
+    <div class="fighter-status"><strong>${escapeHTML(f.name)}</strong><span class="fighter-icons"><i>❤️ ${f.hp}</i><i>🛡️ ${f.shield}</i><i>⭐ ${f.stars}</i></span><span class="fighter-dice">${f.dice.map(v=>`<i class="${v%2?'odd':'even'}">${v}</i>`).join('')}</span></div>
+    <img class="fighter-avatar ${mirror}" src="${f.skin.src}" alt="${escapeHTML(f.name)}"><div class="fighter-ground"></div><div class="target-light"></div><div class="fighter-float"></div>
+  </div>`}).join('');
 }
-function evaluateRaceDice(values,racer,terrain){
-  const sum=values.reduce((a,b)=>a+b,0),counts={};values.forEach(v=>counts[v]=(counts[v]||0)+1);const groups=Object.values(counts),hasPair=groups.some(c=>c>=2),hasTriple=groups.some(c=>c>=3),hasDoubleSix=(counts[6]||0)>=2;
-  const unique=new Set(values),hasStraight=[1,2,3].every(x=>unique.has(x))||[4,5,6].every(x=>unique.has(x)),allEven=values.every(v=>v%2===0),allOdd=values.every(v=>v%2===1);
-  let base=Math.max(4,Math.round(sum/2.15)),bonus=0,tags=[];
-  if(hasPair){bonus+=2;tags.push('Song Kình +2')};if(hasTriple){bonus+=5;tags.push('Tam Liên +5')};if(hasStraight){bonus+=4;tags.push('Lưu Thủy Bộ +4')};if(allEven){bonus+=3;tags.push('Ổn Định +3')};if(allOdd){bonus+=4;tags.push('Cuồng Tốc +4')};if(hasDoubleSix){bonus+=3;tags.push('Song Lục Bạo Phát +3')};
-  const b=racer.beast;
-  if(b.id==='tianma'){const n=values.filter(v=>v>=5).length;if(n){bonus+=n;tags.push(`Thiên Mã +${n}`)}}
-  if(b.id==='xuangui'){if(values.some(v=>v<=2)){bonus+=2;tags.push('Huyền Quy +2')}if(allEven){bonus+=1;tags.push('Quy Giáp +1')}}
-  if(b.id==='baihu'&&racer.distance<Math.max(...race.racers.map(r=>r.distance))){bonus+=2;tags.push('Bạch Hổ truy kích +2')}
-  if(b.id==='qingniao'&&hasStraight){bonus+=3;tags.push('Thanh Điểu phá phong +3')}
-  if(b.id==='kuangniu'){if(hasPair){bonus+=2;tags.push('Cuồng Ngưu đôi +2')}if(hasTriple){bonus+=3;tags.push('Cuồng Ngưu tam +3')}}
-  if(terrain.id==='curve'){if(hasStraight){bonus+=2;tags.push('Ôm cua +2')}if(base>=11){bonus-=1;tags.push('Quá tốc -1')}}
-  if(terrain.id==='mud'&&allEven){bonus+=3;tags.push('Bám bùn +3')}
-  if(terrain.id==='bridge'){if(hasStraight){bonus+=3;tags.push('Vượt cầu +3')}if(hasTriple){bonus+=1;tags.push('Trấn cầu +1')}}
-  if(terrain.id==='sprint'&&values.filter(v=>v>=5).length>=2){bonus+=3;tags.push('Nước rút +3')}
-  const ahead=race?.racers?.filter(r=>r!==racer&&r.distance>racer.distance).sort((a,b)=>a.distance-b.distance)[0];if(ahead&&ahead.distance-racer.distance<=6){bonus+=1;tags.push('Bám gió +1')}
-  return{base,bonus,distance:Math.max(2,base+bonus),tags};
+function updateCombatFighter(f){
+  const el=document.getElementById(`fighter-${f.id}`);if(!el)return;const icons=el.querySelector('.fighter-icons');if(icons)icons.innerHTML=`<i>❤️ ${Math.max(0,f.hp)}</i><i>🛡️ ${Math.max(0,f.shield)}</i><i>⭐ ${f.stars}</i>`;el.classList.toggle('down',f.down)
 }
-function chooseAIReroll(values,racer){
-  const max=racer.beast.id==='chihu'?3:2,counts={};values.forEach(v=>counts[v]=(counts[v]||0)+1),unique=new Set(values),keep=new Set();
-  for(let i=0;i<values.length;i++)if((counts[values[i]]||0)>=2)keep.add(i);
-  const straight=[1,2,3].every(x=>unique.has(x))?[1,2,3]:[4,5,6].every(x=>unique.has(x))?[4,5,6]:null;if(straight)values.forEach((v,i)=>{if(straight.includes(v))keep.add(i)});
-  return values.map((v,i)=>({v,i})).filter(x=>!keep.has(x.i)).sort((a,b)=>a.v-b.v).slice(0,max).filter(x=>x.v<=3).map(x=>x.i);
+function setCombatActive(shooter,target=null){
+  refs.combatArena.querySelectorAll('.combat-fighter').forEach(el=>{el.classList.toggle('active-turn',el.dataset.id===shooter?.id);el.classList.toggle('targeted',el.dataset.id===target?.id)});
 }
-function finishRace(finishers){
-  race.finished=true;race.phase='finished';const winner=finishers[0],won=winner.player;raceStats.races++;if(won)raceStats.wins++;if(won&&(raceStats.bestRound==null||race.round<raceStats.bestRound))raceStats.bestRound=race.round;save(RACE_KEY,raceStats);
-  refs.raceRoll.disabled=true;refs.raceReroll.disabled=true;refs.raceLock.disabled=true;
-  refs.raceComboInfo.innerHTML=`<div class="race-finish"><h3>${won?'🏆 NGƯƠI ĐOẠT QUÁN QUÂN':'🏁 '+winner.name+' VỀ NHẤT'}</h3><p>${winner.beast.icon} ${winner.beast.name} cán đích ${Math.floor(winner.distance)}m ở lượt ${race.round}. Thành tích: ${raceStats.wins}/${raceStats.races} lần thắng${raceStats.bestRound?` · nhanh nhất ${raceStats.bestRound} lượt`:''}.</p></div>`;
-  addRaceLog(won?'Đại Hội Linh Thú gọi tên ngươi.':'Hẹn lần sau phục thù.');renderRace();
+async function beginCombatTurn(){
+  if(!combat||combatBusy)return;clearCombatTimers();
+  while(combat.turnIndex<combat.fighters.length&&combat.fighters[combat.turnIndex].down)combat.turnIndex++;
+  if(combat.turnIndex>=combat.fighters.length){finishCombatRound();return}
+  const f=combat.fighters[combat.turnIndex];combat.current=f;setCombatActive(f);refs.combatCurrentAvatar.src=f.skin.src;refs.combatCurrentName.textContent=f.name;refs.combatCurrentStats.textContent=`❤️ ${f.hp} · 🛡️ ${f.shield} · 🔴 ${f.attack}`;refs.combatPhaseLabel.textContent=`Lượt ${f.name}`;refs.timingScoreText.textContent='—';refs.targetPanel.hidden=true;
+  if(f.attack<=0){refs.timingPanel.hidden=true;refs.combatWait.hidden=false;refs.combatWait.innerHTML=`<b>🛡️ ${f.name} toàn thủ</b><span>Không có xúc xắc đỏ, lượt bắn được bỏ qua.</span>`;playShieldSound();await wait(760);combat.turnIndex++;beginCombatTurn();return}
+  refs.combatWait.hidden=true;startTiming(f)
 }
-function addRaceLog(msg){if(!race)return;race.log.push(`L${race.round} · ${msg}`);race.log=race.log.slice(-20);refs.raceLog.innerHTML=race.log.slice(-8).reverse().map(x=>`<div>${x}</div>`).join('')}
+function timingHalfCycleMs(attack){return Math.max(205,700-Math.min(10,attack)*48)}
+function startTiming(f){
+  combat.phase='timing';combat.timingScore=0;refs.timingPanel.hidden=false;refs.timingStop.disabled=f.kind==='ai';refs.targetPanel.hidden=true;refs.timingScoreText.textContent=`🔴 ${f.attack} · Canh tâm`;const half=timingHalfCycleMs(f.attack),start=performance.now();combat.timingStart=start;combat.timingHalf=half;let lastSide=-1;
+  const frame=now=>{if(!combat||combat.phase!=='timing')return;const t=(now-start)/half,frac=t%2<=1?t%2:2-(t%2);combat.timingPos=frac*100;refs.timingMarker.style.left=`${combat.timingPos}%`;const side=Math.floor(t);if(side!==lastSide){lastSide=side;playTone(350+Math.min(10,f.attack)*12,.025,.009)}timingRaf=requestAnimationFrame(frame)};timingRaf=requestAnimationFrame(frame);
+  if(f.kind==='ai'){const delay=randomInt(Math.max(280,half),Math.max(520,half*2));targetAutoTimer=setTimeout(()=>stopTiming(true),delay)}
+}
+function scoreTiming(pos){const dist=Math.abs(50-pos);if(dist<=2.5)return 100;return Math.max(5,Math.min(99,Math.round(100-dist*1.9)))}
+function stopTimingForHuman(){if(!combat||combat.phase!=='timing'||combat.current?.kind==='ai')return;stopTiming(false)}
+function stopTiming(isAI=false){
+  if(!combat||combat.phase!=='timing')return;cancelAnimationFrame(timingRaf);timingRaf=0;clearTimeout(targetAutoTimer);let score=isAI?aiTimingScore(combat.current.attack):scoreTiming(combat.timingPos);combat.timingScore=score;const label=score===100?'PERFECT!':score>=82?'TUYỆT!':score>=62?'TỐT!':score>=35?'LỆCH':'TRƯỢT';refs.timingScoreText.textContent=`${label} · ${score}%`;refs.timingMarker.style.left=`${50+(100-score)/1.9*(Math.random()<.5?-1:1)}%`;if(score===100)playPerfectSound();else playTone(380+score*3,.11,.045);combat.phase='target';setTimeout(startTargetCycle,320)
+}
+function aiTimingScore(attack){let base=randomInt(38,91)-Math.max(0,attack-5)*2;if(randomInt(1,100)<=5)return 100;return Math.max(18,Math.min(96,base))}
+function startTargetCycle(){
+  if(!combat||combat.phase!=='target')return;refs.timingPanel.hidden=false;refs.targetPanel.hidden=false;const shooter=combat.current,candidates=combat.fighters.filter(x=>x!==shooter&&!x.down);combat.targetCandidates=candidates;if(!candidates.length){combat.turnIndex++;beginCombatTurn();return}combat.targetIndex=randomInt(0,candidates.length-1);highlightTarget();
+  const interval=Math.max(95,Math.round((timingHalfCycleMs(shooter.attack))*.43));targetTimer=setInterval(()=>{combat.targetIndex=(combat.targetIndex+1)%candidates.length;highlightTarget();playTargetTick()},interval);refs.fire.disabled=shooter.kind==='ai';refs.targetHint.textContent=shooter.kind==='ai'?'AI đang khóa mục tiêu…':'Vòng sáng đang chạy…';
+  if(shooter.kind==='ai')targetAutoTimer=setTimeout(()=>fireCurrentTarget(true),randomInt(720,1450));
+  else targetAutoTimer=setTimeout(()=>fireCurrentTarget(false),4200)
+}
+function highlightTarget(){const target=combat.targetCandidates[combat.targetIndex];setCombatActive(combat.current,target);refs.targetHint.textContent=target?`⭕ ${target.name}`:'—'}
+function fireCurrentTarget(auto=false){
+  if(!combat||combat.phase!=='target'||combatBusy)return;clearInterval(targetTimer);clearTimeout(targetAutoTimer);targetTimer=0;targetAutoTimer=0;const shooter=combat.current,target=combat.targetCandidates[combat.targetIndex];if(!target)return;combat.phase='firing';refs.fire.disabled=true;refs.targetHint.textContent=`🎯 ${target.name}`;launchProjectile(shooter,target,combat.timingScore).then(()=>finishCombatTurn())
+}
+async function launchProjectile(shooter,target,score){
+  combatBusy=true;const arena=refs.combatArena,sEl=document.getElementById(`fighter-${shooter.id}`),tEl=document.getElementById(`fighter-${target.id}`);if(!arena||!sEl||!tEl){combatBusy=false;return}
+  const ar=arena.getBoundingClientRect(),sr=sEl.getBoundingClientRect(),tr=tEl.getBoundingClientRect(),sx=sr.left-ar.left+sr.width*.5,sy=sr.top-ar.top+sr.height*.58,tx=tr.left-ar.left+tr.width*.5,ty=tr.top-ar.top+tr.height*.55;
+  const attack=shooter.attack,raw=Math.max(0,Math.round(attack*score/100)),perfect=score===100,size=Math.min(94,14+attack*3+score*.16+(perfect?22:0)),dx=tx-sx,dy=ty-sy,angle=Math.atan2(dy,dx)*180/Math.PI;
+  const bullet=document.createElement('div');bullet.className=`combat-projectile ${perfect?'perfect-shot':''}`;bullet.style.cssText=`left:${sx}px;top:${sy}px;width:${size}px;height:${size}px;--trail:${Math.max(44,size*2.7)}px;transform:translate(-50%,-50%) rotate(${angle}deg)`;bullet.innerHTML='<i></i>';arena.appendChild(bullet);playShootSound(perfect,attack);
+  const miss=raw<=0,mdx=miss?dx+(Math.random()<.5?-55:55):dx,mdy=miss?dy-45:dy;const anim=bullet.animate([{transform:`translate(-50%,-50%) rotate(${angle}deg) scale(.72)`},{transform:`translate(calc(-50% + ${mdx}px),calc(-50% + ${mdy}px)) rotate(${angle}deg) scale(1)`}],{duration:perfect?610:480,easing:'cubic-bezier(.18,.78,.22,1)',fill:'forwards'});await anim.finished.catch(()=>{});bullet.remove();
+  if(miss){showFighterFloat(target,'💨 HỤT','miss');playTone(190,.12,.04);addCombatLog(`${shooter.name} bắn ${target.name} nhưng trượt.`);combatBusy=false;return}
+  const blocked=Math.min(target.shield,raw),hpDamage=Math.max(0,raw-blocked);target.shield-=blocked;target.hp-=hpDamage;if(target.hp<=0){target.hp=0;target.down=true;shooter.stars+=2}else if(hpDamage>0)shooter.stars+=1;
+  updateCombatFighter(target);updateCombatFighter(shooter);if(blocked>0)playShieldSound();if(hpDamage>0)playHitSound();showImpact(target,perfect);showFighterFloat(target,`${blocked?`🛡️ -${blocked}  `:''}${hpDamage?`❤️ -${hpDamage}`:'❤️ 0'}`,hpDamage?'damage':'shield');addCombatLog(`${shooter.name} → ${target.name}: ${score}% · 🛡️ -${blocked} · ❤️ -${hpDamage}${target.down?' · GỤC!':''}`);
+  await wait(520);combatBusy=false
+}
+function showImpact(target,perfect){const el=document.getElementById(`fighter-${target.id}`);if(!el)return;el.classList.remove('impact','impact-perfect');void el.offsetWidth;el.classList.add(perfect?'impact-perfect':'impact');setTimeout(()=>el.classList.remove('impact','impact-perfect'),520)}
+function showFighterFloat(target,text,type){const el=document.getElementById(`fighter-${target.id}`),box=el?.querySelector('.fighter-float');if(!box)return;box.textContent=text;box.className=`fighter-float show ${type||''}`;setTimeout(()=>box.className='fighter-float',900)}
+function finishCombatTurn(){combat.turnIndex++;setTimeout(()=>{combatBusy=false;beginCombatTurn()},180)}
+async function finishCombatRound(){
+  combat.phase='roundEnd';setCombatActive(null);refs.timingPanel.hidden=true;refs.targetPanel.hidden=true;refs.combatWait.hidden=false;refs.combatWait.innerHTML='<b>✅ HẾT VÒNG</b><span>Khiên sẽ được tạo lại từ xúc xắc ở vòng kế tiếp.</span>';refs.combatPhaseLabel.textContent=`Kết thúc vòng ${combat.round}`;await wait(800);
+  if(combat.round>=combat.maxRounds){finishCombat();return}combat.round++;beginCombatRound()
+}
+function finishCombat(){
+  clearCombatTimers();combat.phase='finished';const ranked=[...combat.fighters].sort((a,b)=>b.stars-a.stars||b.hp-a.hp),winner=ranked[0];refs.combatPhaseLabel.textContent=`🏆 ${winner.name} thắng!`;refs.combatWait.hidden=false;refs.combatWait.innerHTML=`<b>🏆 ${escapeHTML(winner.name)} · ⭐ ${winner.stars}</b><span>Hết ${combat.maxRounds} vòng. Nếu bằng Sao, người còn nhiều Tim hơn xếp trên.</span>`;refs.combatLog.innerHTML=`<div class="combat-finish"><strong>🏆 ${escapeHTML(winner.name)} chiến thắng</strong>${ranked.map((f,i)=>`<span>${i+1}. ${escapeHTML(f.name)} · ⭐ ${f.stars} · ❤️ ${f.hp}</span>`).join('')}</div>`+refs.combatLog.innerHTML
+}
+function addCombatLog(msg){if(!combat)return;combat.log.push(`V${combat.round} · ${msg}`);combat.log=combat.log.slice(-24);refs.combatLog.innerHTML=combat.log.slice(-10).reverse().map(x=>`<div>${escapeHTML(x)}</div>`).join('')}
+function playTargetTick(){playTone(640,.025,.012)}
+function playShootSound(perfect=false,attack=1){playTone(perfect?980:760+attack*14,.07,perfect?.085:.055);setTimeout(()=>playTone(perfect?520:430,.10,perfect?.06:.038),55)}
+function playShieldSound(){playTone(920,.055,.045);setTimeout(()=>playTone(680,.08,.035),45)}
+function playHitSound(){playTone(180,.10,.055);setTimeout(()=>playTone(125,.13,.04),55)}
+function playPerfectSound(){[740,960,1220].forEach((f,i)=>setTimeout(()=>playTone(f,.13,.06),i*70))}
+function escapeHTML(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 
 function randomInt(min,max){const range=max-min+1,limit=Math.floor(0x100000000/range)*range,a=new Uint32Array(1);do{crypto.getRandomValues(a)}while(a[0]>=limit);return min+(a[0]%range)}
 function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=randomInt(0,i);[a[i],a[j]]=[a[j],a[i]]}return a}
