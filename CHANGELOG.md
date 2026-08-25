@@ -63,3 +63,9 @@
 - Added user-provided `dice-game/assets/D10.glb`.
 - Added `dice-game/js/d10-engine.js` for Three.js rendering and asset animation.
 - D6 remains CSS-based; D10 uses GLB with CSS fallback.
+
+
+## Update Game Hub + Bách Chiêu v1.0 + Farm realtime orders
+- Thêm Bách Chiêu v1.0 (từ bản hoàn thiện Smooth Input) vào Game Hub.
+- Dùng ảnh tu tiên làm banner Game Hub.
+- Nông Trại Nhỏ: đồng hồ đơn hàng chạy theo thời gian thực và tiếp tục trôi khi đóng game; hết hạn khi offline không khởi động lại cooldown từ lúc mở game.

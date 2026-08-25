@@ -1,0 +1,54 @@
+BÁCH CHIÊU v2.1 - TEST REPORT
+Ngày build: 2026-08-24
+
+MỤC TIÊU BẢN NÀY
+- Tăng tốc phần nhập môn.
+- Chỉ Ante 1 cho đối thủ đơn giản.
+- Từ Ante 2, AI phải dùng chuỗi nhiều kỹ thuật thay vì một con số Attack đơn.
+- Bổ sung Thế Võ, Hư Chiêu/Phá Thế, Né/Khóa/Vật và Tuyệt Kỹ điều kiện.
+
+KIỂM TRA ĐÃ CHẠY
+1. JavaScript syntax: PASS (node --check).
+2. Python local server compile: PASS.
+3. Cấu trúc Run: PASS - 9 Ante, 9 Trùm.
+4. Tutorial: PASS - 10 bài học/5 Ante, 2 bài mỗi Ante.
+5. Trùm tutorial: PASS - không gắn lesson/hướng dẫn chọn lá.
+6. Ante 2 AI: PASS - tạo intent dạng comboPlan và chuỗi >=2 kỹ thuật.
+7. Ante 2 mẫu test: Thăm Dò -> Liên Quyền -> Trọng Kích, ước tính khoảng 22 damage trước phòng thủ.
+8. AI execution: PASS - chuỗi gây damage/trạng thái/block theo từng kỹ thuật.
+9. AI plan validation: PASS - toàn bộ ID kỹ thuật trong mọi plan đều hợp lệ.
+10. Card database: PASS - không có card undefined/hole, không trùng ID.
+11. Ante 6: PASS - mở Thế Công/Thế Thủ; Thế Linh vào reward pool.
+12. Ante 7: PASS - mở Hư Chiêu; Phá Thế/Dẫn Thế vào reward pool.
+13. Ante 8: PASS - mở Thoái Né + Bắt Khóa; Quật Ngã vào reward pool.
+14. Ante 9: PASS - Tuyệt Kỹ tạm thời sinh theo điều kiện; card tạm không quay lại deck sau lượt.
+15. Save key: v2.1 dùng bachchieu_slots_v21_ai_combo, không ghi đè v2.0/v1.
+
+CÂN BẰNG CÓ CHỦ ĐÍCH
+- Ante 1: đối thủ đơn giản, HP thấp, intent một hành động để học thao tác.
+- Ante 2: AI bắt đầu MỞ/NỐI/KẾT, chuỗi 2-3 kỹ thuật, damage tăng rõ.
+- Ante 3+: AI có cự ly/khống chế.
+- Ante 4+: AI có chuẩn bị/dồn lực.
+- Ante 6+: boss dùng Thế Võ.
+- Ante 7+: boss dùng Hư Thực/Phá Thế.
+- Ante 8+: có chuỗi Khóa/Vật.
+- Ante 9: Tông Sư phối hợp nhiều kiểu kế hoạch.
+
+GIỚI HẠN KIỂM TRA
+- Môi trường sandbox hiện tại chặn Chrome headless truy cập localhost/file URL theo policy quản trị, nên không thể chạy automation browser end-to-end bằng Chromium.
+- Đã thay bằng smoke-test trực tiếp engine JavaScript trong VM, kiểm tra dữ liệu, progression, AI plan và các cơ chế mới.
+- Balance thực tế vẫn cần playtest người dùng; đặc biệt cần quan sát Ante 2-4 có quá mạnh/yếu không và thời lượng trung bình mỗi Run.
+
+[v2.3] Kiểm tra nhanh: JS syntax PASS; float hao Thể lực PASS; float HP PASS; slash dài/đậm PASS; pattern song song/cross PASS.
+
+[v2.4] JS syntax PASS; hàng đợi float PASS; 10 kỹ thuật mới đã thêm vào CARD pool và mapping unlock PASS; intro võ đạo PASS.
+
+[v2.5] JS syntax PASS; Cửu Trùng Thiên copy PASS; Tam Đại Sinh Tử Ải copy PASS; Đạo Ấn/Bế Quan/Thiên Cơ/Trấn Thiên Ải copy PASS.
+
+[v2.6] Đổi tên hiển thị 77 chiêu thức + 6 hệ phái + 4 Pháp Thể; ID/logic giữ nguyên; node --check PASS.
+
+[v2.6] Đã đổi thêm toàn bộ tên chiêu AI sang pháp quyết/ấn quyết/thần thông tu tiên; chuẩn hóa tag Ngự Phong/Hộ Thể/Phược Linh/Kết Pháp.
+
+[v2.7] Kiểm tra nhanh: JS syntax PASS; intro overlay PASS; renderMenu sau intro PASS; card frame layout PASS; RUN_GAME.bat rewritten.
+
+[v2.8] Chỉnh khoảng cách khung thẻ, rõ ý hướng dẫn sát cơ, thêm actionLock chống lỗi khi bấm quá nhanh.
