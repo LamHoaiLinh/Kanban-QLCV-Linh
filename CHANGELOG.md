@@ -69,3 +69,12 @@
 - Thêm Bách Chiêu v1.0 (từ bản hoàn thiện Smooth Input) vào Game Hub.
 - Dùng ảnh tu tiên làm banner Game Hub.
 - Nông Trại Nhỏ: đồng hồ đơn hàng chạy theo thời gian thực và tiếp tục trôi khi đóng game; hết hạn khi offline không khởi động lại cooldown từ lúc mở game.
+
+
+## Dice Arena 6.0 – Đại Hội Linh Thú
+- Thêm cơ chế giữ để nạp lực, thả để tung; chạm nhanh dùng lực trung bình.
+- Lực ném thay đổi chuyển động xúc xắc nhưng không tác động xác suất kết quả.
+- Thêm nút ĐẠI HỘI LINH THÚ mở game đua trong popup riêng.
+- 6 Linh Thú có passive khác nhau, 5 xúc xắc D6, giữ/reroll tối đa 1 lần, combo Đôi/Bộ ba/Sảnh/Chẵn/Lẻ/Song 6.
+- 5 địa hình thay đổi luật: Thảo Nguyên, Khúc Cua, Bùn Lầy, Cầu Hẹp, Nước Rút.
+- 5 AI dùng cùng xác suất xúc xắc, chỉ khác chiến lược giữ/reroll.

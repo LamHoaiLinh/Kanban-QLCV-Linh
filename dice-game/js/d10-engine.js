@@ -151,42 +151,42 @@ export class D10AssetEngine{
     const gapX=total<=3?3.25:total<=5?2.6:2.35,gapZ=2.45;
     return{x:(col-(Math.min(total,cols)-1)/2)*gapX,z:(row-(rows-1)/2)*gapZ};
   }
-  async roll(count,mode,{onStatus=()=>{},onPartial=()=>{}}={}){
+  async roll(count,mode,{power=.5,onStatus=()=>{},onPartial=()=>{}}={}){
     await this.init();this.setVisible(true);this.clear();
     const results=[];
     if(mode==='together'){
       onStatus(`Đang thả ${count} xúc xắc D10 bằng asset 3D…`);
       const items=Array.from({length:count},(_,i)=>this.createInstance(i,count));
-      const values=await Promise.all(items.map((item,i)=>this.animateOne(item,i*65)));
+      const values=await Promise.all(items.map((item,i)=>this.animateOne(item,i*65,power)));
       values.forEach((v,i)=>results[i]=v);onPartial([...results]);
     }else{
       for(let i=0;i<count;i++){
         onStatus(`Đang thả xúc xắc D10 ${i+1}/${count}…`);
-        const item=this.createInstance(i,count);results[i]=await this.animateOne(item,0);onPartial([...results]);await wait(300);
+        const item=this.createInstance(i,count);results[i]=await this.animateOne(item,0,power);onPartial([...results]);await wait(300);
       }
     }
     return results;
   }
-  async animateOne(item,delay){
+  async animateOne(item,delay,power=.5){
     await wait(delay);
 
     const floorY=item.restY;
     const startX=item.targetPosition.x+randomRange(-.42,.42);
     const startZ=item.targetPosition.z+randomRange(-.36,.36);
 
-    item.group.position.set(startX,floorY+randomRange(5.35,6.05),startZ);
+    item.group.position.set(startX,floorY+randomRange(4.8+power*1.5,5.5+power*1.8),startZ);
     item.group.quaternion.copy(randomQuaternion());
 
     // Điều kiện ban đầu được sinh bằng Web Crypto.
     const velocity=new THREE.Vector3(
-      randomRange(-1.45,1.45),
-      randomRange(-2.35,-1.0),
-      randomRange(-1.15,1.15)
+      randomRange(-1.05-power*1.2,1.05+power*1.2),
+      randomRange(-1.8-power*1.8,-.8-power*.5),
+      randomRange(-.9-power*1.05,.9+power*1.05)
     );
     const angularVelocity=new THREE.Vector3(
-      randomRange(-16.5,16.5),
-      randomRange(-18.5,18.5),
-      randomRange(-16.5,16.5)
+      randomRange(-11-power*13,11+power*13),
+      randomRange(-12-power*15,12+power*15),
+      randomRange(-11-power*13,11+power*13)
     );
 
     const gravity=-19.5;

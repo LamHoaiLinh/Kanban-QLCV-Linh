@@ -209,3 +209,22 @@ Model xúc xắc và cốc lắc lấy từ asset **Dice Animation 2** của Kag
 - Nút **Về nghỉ** ngủ tới sáng; ngủ muộn sẽ dậy muộn và có thể lỡ việc sáng.
 - Có 3 ô lưu, 10 lối sống Roguelite, thời tiết, thứ trong tuần, tình yêu, gia đình, con cái và doanh nghiệp.
 - Trên điện thoại dùng thanh thao tác cố định phía dưới để vào Việc làm hoặc Về nghỉ nhanh.
+
+
+## Dice Arena 6.0 – Đại Hội Linh Thú
+Dice Arena vẫn giữ chế độ xúc xắc tự do. Nút **ĐẠI HỘI LINH THÚ** mở một game đua riêng trong popup.
+
+### Cơ chế tung mới
+- Giữ nút tung để nạp lực, thả tay/chuột ở đâu cũng tung.
+- Chạm nhanh dùng lực trung bình.
+- Lực tung chỉ thay đổi cảm giác chuyển động, không cộng điểm hay sửa kết quả.
+- Phím Space vẫn tung nhanh; phím 1/2 đổi kiểu đồng thời / từng viên.
+
+### Đại Hội Linh Thú
+- Chọn 1 trong 6 Linh Thú.
+- Mỗi lượt tung 5 D6.
+- Chọn tối đa 2 viên để reroll 1 lần (Xích Hồ: 3 viên).
+- Combo: Đôi, Bộ ba, Sảnh, Toàn chẵn, Toàn lẻ, Song 6.
+- Địa hình: Thảo Nguyên → Khúc Cua → Bùn Lầy → Cầu Hẹp → Nước Rút.
+- 5 AI cùng xác suất xúc xắc, chỉ khác chiến lược và passive.
+- Linh Thú đạt 100m trước sẽ thắng.

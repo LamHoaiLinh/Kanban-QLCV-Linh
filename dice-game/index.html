@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#123b31">
   <title>Dice Arena</title>
-  <link rel="stylesheet" href="styles.css?v=5.7.0">
+  <link rel="stylesheet" href="styles.css?v=6.0.0">
   <script type="importmap">
   {
     "imports": {
@@ -28,7 +28,10 @@
         <label class="die-type-field"><span>Loại xúc xắc</span><select id="dieTypeSelect" aria-label="Loại xúc xắc"><option value="d6">D6 – số 1 đến 6</option><option value="d10">D10 – số 0 đến 9</option></select></label>
         <div class="counter"><button id="minusBtn" type="button">−</button><output id="countOutput">3</output><button id="plusBtn" type="button">＋</button></div>
         <input id="countRange" type="range" min="1" max="10" value="3" step="1" aria-label="Số lượng xúc xắc">
-        <button id="rollBtn" class="primary-btn" type="button" title="Bấm để chọn kiểu lắc. Phím tắt: Space để lắc, 1 = đồng thời, 2 = từng viên">Thả xúc xắc</button>
+        <div class="roll-mode-row"><span>Kiểu thả hiện tại</span><button id="modeSelectBtn" class="mini-mode-btn" type="button">Thả đồng thời</button></div>
+        <button id="rollBtn" class="primary-btn charge-btn" type="button" title="Giữ để nạp lực, thả để tung. Chạm nhanh = lực trung bình.">GIỮ ĐỂ LẤY LỰC · THẢ ĐỂ TUNG</button>
+        <div class="charge-meter" aria-hidden="true"><i id="chargeFill"></i></div>
+        <button id="beastRaceBtn" class="beast-race-btn" type="button">🐉 ĐẠI HỘI LINH THÚ</button>
         <button id="clearBtn" class="secondary-btn" type="button">Dọn bàn</button>
         <div class="result-box"><div><span>Chế độ</span><strong id="modeLabel">Chưa thả</strong></div><div><span>Tổng điểm</span><strong id="totalLabel">—</strong></div></div>
         <div id="valueList" class="value-list"><span>Chưa có kết quả.</span></div>
@@ -44,8 +47,40 @@
       <aside class="history-panel glass"><div class="history-head"><div><span class="eyebrow">LỊCH SỬ</span><h2>10 lượt gần nhất</h2></div><button id="clearHistoryBtn" type="button">Xóa</button></div><div id="historyList" class="history-list"><span>Chưa có lượt thả.</span></div></aside>
     </section>
     <dialog id="modeDialog" class="mode-dialog"><form method="dialog" class="mode-card"><div class="dialog-head"><div><span class="eyebrow">CHỌN CÁCH THẢ</span><h2><b id="dialogCount">3</b> xúc xắc <span id="dialogDieType">D6</span></h2></div><button value="cancel" aria-label="Đóng">×</button></div><div class="mode-grid"><button id="togetherBtn" type="button" class="mode-option"><div class="mode-dice">◆◆◆</div><strong>Thả đồng thời</strong><span>Tất cả xúc xắc lăn cùng lúc.</span></button><button id="sequenceBtn" type="button" class="mode-option"><div class="mode-dice">◆ → ◆ → ◆</div><strong>Thả từng viên</strong><span>Hiện kết quả lần lượt từng viên.</span></button></div></form></dialog>
+
+    <dialog id="beastRaceDialog" class="beast-dialog">
+      <div class="beast-game-card">
+        <header class="beast-header">
+          <div><span class="eyebrow">DICE ARENA · CHẾ ĐỘ ĐUA</span><h2>🐉 ĐẠI HỘI LINH THÚ</h2><p>Thả 5 D6 · giữ/reroll · tạo combo · về đích 100m trước 5 đối thủ.</p></div>
+          <button id="closeRaceBtn" type="button" aria-label="Đóng">×</button>
+        </header>
+        <section id="raceSetup" class="race-setup">
+          <div class="race-story"><strong>Chọn Linh Thú xuất trận</strong><span>Mỗi Linh Thú biến cùng một bộ xúc xắc thành một lối chạy khác nhau.</span></div>
+          <div id="beastChoices" class="beast-choices"></div>
+          <div class="race-rules"><b>Luật nhanh</b><span>5 xúc xắc → chọn tối đa 2 viên để reroll 1 lần → chốt lượt. Đôi, bộ ba, sảnh, toàn chẵn/lẻ và đặc tính Linh Thú tạo thêm quãng đường.</span></div>
+        </section>
+        <section id="raceGame" class="race-game" hidden>
+          <div class="race-hud"><span id="raceRound">Lượt 1</span><strong id="raceTerrain">🌿 Thảo Nguyên</strong><span id="raceStats">0m / 100m</span></div>
+          <div id="raceTrack" class="race-track"></div>
+          <div class="race-console">
+            <div class="race-dice-zone">
+              <div id="raceDiceStage" class="race-dice-stage"></div>
+              <div id="raceDiceChoices" class="race-dice-choices"><span>Giữ nút tung để bắt đầu lượt.</span></div>
+            </div>
+            <div class="race-command">
+              <div id="raceComboInfo" class="race-combo-info">Chưa có bộ xúc xắc.</div>
+              <button id="raceRollBtn" class="race-charge-btn" type="button">GIỮ ĐỂ TUNG 5 XÚC XẮC</button>
+              <div class="charge-meter race-charge-meter"><i id="raceChargeFill"></i></div>
+              <div class="race-command-row"><button id="raceRerollBtn" type="button" disabled>Reroll đã chọn</button><button id="raceLockBtn" type="button" disabled>Chốt lượt</button></div>
+              <button id="raceRestartBtn" class="race-restart" type="button">Đổi Linh Thú / Chơi lại</button>
+            </div>
+          </div>
+          <div id="raceLog" class="race-log"></div>
+        </section>
+      </div>
+    </dialog>
     <div id="toast" class="toast" role="status"></div>
   </main>
-  <script type="module" src="js/app.js?v=5.7.0"></script>
+  <script type="module" src="js/app.js?v=6.0.0"></script>
 </body>
 </html>

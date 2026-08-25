@@ -1,0 +1,12 @@
+DICE ARENA 6.0 – KIỂM TRA TĨNH
+
+PASS – js/app.js: node --check
+PASS – js/d10-engine.js: node --check
+PASS – sw.js: node --check
+PASS – game-launcher.js: node --check
+PASS – dice-launcher.js: node --check
+PASS – 44/44 DOM id được app.js tham chiếu đều tồn tại trong dice-game/index.html
+PASS – Service Worker cache version đã tăng lên v640 và URL Dice Arena lên 6.0.0
+PASS – Dice Arena tự do và Đại Hội Linh Thú dùng storage key riêng.
+
+Ghi chú: môi trường headless Chromium trong container không kết thúc ổn định do DBus/Chromium sandbox của môi trường, nên không dùng kết quả browser-headless làm tiêu chí PASS/FAIL.
