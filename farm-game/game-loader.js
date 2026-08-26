@@ -52,9 +52,9 @@ async function bootFarm(){
     if(!response.ok)throw new Error(`Không tải được game.js (HTTP ${response.status})`);
     let source=await response.text();
 
-    const configUrl=new URL('./config.js?v=3.2.0',location.href).href;
+    const configUrl=new URL('./config.js?v=3.3.0',location.href).href;
     const assetUrl=new URL('./asset-loader.js?v=2.1.0',location.href).href;
-    source=source.replace("from './config.js?v=3.2.0';",`from '${configUrl}';`);
+    source=source.replace("from './config.js?v=3.3.0';",`from '${configUrl}';`);
     source=source.replace("from './asset-loader.js?v=2.1.0';",`from '${assetUrl}';`);
 
     const firstHelpers=source.indexOf('function levelCropPool()');

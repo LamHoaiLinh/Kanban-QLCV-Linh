@@ -8,7 +8,8 @@ export const INITIAL_GOLD=450;
 export const INITIAL_WAREHOUSE=50;
 
 export const MATERIAL_CONFIG={
-  wood:{name:'Gỗ',icon:'🪵'},stone:{name:'Đá',icon:'🪨'},brick:{name:'Gạch',icon:'🧱'},iron:{name:'Sắt',icon:'⚙️'},glass:{name:'Kính',icon:'🔷'},paint:{name:'Sơn',icon:'🎨'},fabric:{name:'Vải',icon:'🧵'},rich_soil:{name:'Đất tốt',icon:'🟫'},fertilizer:{name:'Phân hữu cơ',icon:'🌿'},special_seed:{name:'Hạt giống đặc biệt',icon:'🌟'}
+  // sellPrice chỉ là giá xả kho (~40% chi phí quy đổi nông sản), tránh biến đổi vật liệu thành cách kiếm lời vô hạn.
+  wood:{name:'Gỗ',icon:'🪵',sellPrice:6},stone:{name:'Đá',icon:'🪨',sellPrice:10},brick:{name:'Gạch',icon:'🧱',sellPrice:20},iron:{name:'Sắt',icon:'⚙️',sellPrice:31},glass:{name:'Kính',icon:'🔷',sellPrice:48},paint:{name:'Sơn',icon:'🎨',sellPrice:93},fabric:{name:'Vải',icon:'🧵',sellPrice:133},rich_soil:{name:'Đất tốt',icon:'🟫',sellPrice:288},fertilizer:{name:'Phân hữu cơ',icon:'🌿',sellPrice:405},special_seed:{name:'Hạt giống đặc biệt',icon:'🌟',sellPrice:317}
 };
 
 // growMin là thời gian thật. Cây dài ngày không nhất thiết có ROI/phút cao nhất.
