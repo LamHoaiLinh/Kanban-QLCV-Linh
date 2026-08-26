@@ -1,0 +1,7 @@
+ĐẠI LỤC NGHỀ NGHIỆP 1.0.4 — BLACK SCREEN FIX
+
+- Game index.html nay tự chứa CSS + data + app, tránh service worker/cache trộn file khác phiên bản.
+- Launcher tăng lên 1.0.4, game-launcher lên 1.64.
+- Cache service worker đổi tên để ép cập nhật.
+- Có màn hình báo lỗi khởi động thay vì chỉ hiện nền đen.
+- Giữ nguyên logic 3 Slot, yeubo/koyeubo, unlock audit 1.0.3 và dữ liệu game.
