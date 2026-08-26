@@ -30,3 +30,10 @@ Lưu ý: Nếu đã chơi bản demo v1, game giữ tiến trình chính nhưng 
 - Vũ khí mở theo hai lớp: cấp Chế tác để chế tạo và cấp Chiến đấu để được phép trang bị.
 - Chuỗi vũ khí: Kiếm sắt -> Kiếm thép -> Kiếm Mithril -> Đại kiếm Hắc Diện -> Đại kiếm Titan -> Tinh Kiếm -> Ma Đao Hư Không.
 - Có 3 Slot chơi độc lập. Save cũ tự chuyển sang Slot 1 trong lần mở đầu tiên.
+
+FIX 1.0.2 - 26/08/2026
+- Không reset thời gian khi bấm lại đúng hành động đang chạy.
+- Engine chạy bằng timer độc lập 100ms, không phụ thuộc riêng requestAnimationFrame.
+- Giữ vị trí cuộn khi giao diện render lại sau mỗi lượt.
+- Auto-fit desktop theo kích thước iframe/màn hình; mobile giữ layout responsive.
+- Ẩn scrollbar nhưng vẫn cho phép cuộn; chặn tràn ngang.
