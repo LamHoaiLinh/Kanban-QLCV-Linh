@@ -73,3 +73,11 @@ html,body,#app{max-width:100%;overflow-x:hidden!important}
 .logs{overflow-y:auto;overflow-x:hidden!important}
 .action-card.selected{cursor:default}
 @media(max-width:850px){#app{zoom:1!important;width:100%!important;height:auto!important}.app-shell{width:100%!important;height:auto!important;min-height:100vh}.sidebar,.center,.inventory-panel{overflow-x:hidden!important}.nav-group{overflow-x:auto!important;overflow-y:hidden!important}}
+/* ===== Unlock reliability / ready state ===== */
+.nav-item.ready-unlock{opacity:1;border-color:#8a692e;background:linear-gradient(90deg,#2b2418,#1d2235)}
+.nav-item.ready-unlock .nav-name,.nav-item.ready-unlock .nav-level{color:#ffd278}
+.nav-item.ready-unlock .lockline{color:#e8bd67;font-weight:800}
+.goal-card.goal-ready{border-color:#8a692e;box-shadow:0 0 0 1px #ffc85722 inset}
+.goal-unlock-btn{width:100%;margin-top:8px}
+.unlock-box.unlock-ready{border-color:#8a692e;background:linear-gradient(180deg,#1d1b24,#141a2c)}
+.soft-disabled{opacity:.72}

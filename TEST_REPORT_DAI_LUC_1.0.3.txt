@@ -1,0 +1,29 @@
+ĐẠI LỤC NGHỀ NGHIỆP — KIỂM TRA LOGIC 1.0.3
+
+1. Lỗi đã xác định và sửa
+- renderSkill() gọi renderUnlockSkill() khi nghề chưa mở nhưng hàm renderUnlockSkill() bị thiếu trong bản tích hợp.
+- Hậu quả: khi bấm nghề chưa mở (ví dụ Khai khoáng), JavaScript phát sinh ReferenceError và màn hình không chuyển sang phần Mở khóa, dù các điều kiện đã đạt.
+- Đã bổ sung màn hình Mở khóa nghề đầy đủ, hiển thị từng điều kiện và nút mở khóa.
+- Khi đủ điều kiện, sidebar hiển thị “Sẵn sàng mở” và thẻ Mục tiêu có nút “Mở <nghề>”.
+
+2. Chuỗi mở khóa đã rà soát
+- Thu nhặt: mở sẵn.
+- Khai khoáng: Thu nhặt Lv3 + 20 xu.
+- Đốn gỗ: Tổng cấp 6 + 60 xu.
+- Luyện kim: Khai khoáng Lv4 + 10 Quặng sắt + 120 xu.
+- Chế tác: Luyện kim Lv3 + Đốn gỗ Lv3 + 220 xu.
+- Chiến đấu: Chế tác Lv4 + sở hữu Kiếm sắt (không tiêu hao Kiếm sắt).
+Không phát hiện vòng khóa chết/circular dependency.
+
+3. Dữ liệu đã rà soát
+- 78 vật phẩm, 78 hành động.
+- Không có input/output công thức tham chiếu vật phẩm không tồn tại.
+- Không có điều kiện nghề/bản đồ tham chiếu skill/item không tồn tại.
+- Giá Luyện kim giữ mức thành phẩm ~109–111% giá nguyên liệu cơ sở.
+- Giá chế tác/trang bị không tạo vòng mua nguyên liệu -> chế -> bán nhanh có lãi vô hạn.
+- Chuỗi trang bị chiến đấu tăng theo Chế tác/Chiến đấu Lv, không có món yêu cầu trước nguồn nguyên liệu của chính nó.
+
+4. Kiểm tra kỹ thuật
+- Toàn bộ file .js trong Kanban đã chạy node --check: không phát hiện lỗi cú pháp.
+- Giữ nguyên 3 Slot, Giftcode yeubo/koyeubo, engine timer, auto-fit và save hiện hành.
+- Tăng cache/version Đại Lục Nghề Nghiệp lên 1.0.3 để GitHub Pages không giữ app.js cũ.
