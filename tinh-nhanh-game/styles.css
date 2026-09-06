@@ -16,7 +16,7 @@
 
 /* v3.1.1 - Bàn phím số ảo và nút bỏ qua kiểm tra đầu vào */
 .tap-keypad-hint{margin-top:7px;font-size:10px;color:var(--muted);font-weight:800;text-align:center}
-.number-pad{width:min(390px,100%);margin:10px auto 0;padding:10px;border:1px solid var(--border);border-radius:20px;background:rgba(255,255,255,.98);box-shadow:0 12px 28px rgba(82,55,72,.10);display:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
+.number-pad{position:fixed;z-index:130;left:50%;top:0;transform:translateX(-50%);width:min(390px,calc(100vw - 20px));margin:0;padding:10px;border:1px solid var(--border);border-radius:20px;background:rgba(255,255,255,.98);box-shadow:0 12px 28px rgba(82,55,72,.14);display:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
 .number-pad.open{display:block}
 .number-pad-title{font-size:10px;font-weight:900;color:var(--muted);text-align:center;margin:0 0 7px;letter-spacing:.03em;text-transform:uppercase}
 .number-pad-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
@@ -26,9 +26,7 @@
 .number-pad-grid .key-hide{font-size:12px;background:var(--purple2);color:#6658a2}
 .answer-input[readonly]{cursor:pointer;caret-color:transparent;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .skip-branch{font-size:12px;min-height:48px;color:#8d5d72!important;background:#fff7fb!important;border-color:#f0cad9!important}
-.session.keypad-visible .question-wrap{justify-content:flex-start;padding-top:18px}
-.session.keypad-visible .question{margin-top:10px;margin-bottom:12px}
-@media(max-width:520px){.number-pad{padding:8px;border-radius:17px}.number-pad-grid{gap:6px}.number-pad-grid button{min-height:47px;border-radius:12px;font-size:19px}.number-pad-grid .key-fn,.number-pad-grid .key-hide{font-size:11px}.session.keypad-visible .question-wrap{min-height:0;padding-top:8px}.session.keypad-visible .question{font-size:clamp(31px,11vw,48px);margin:8px 0 10px}.tap-keypad-hint{margin-top:5px}.skip-branch{font-size:11px}}
+@media(max-width:520px){.number-pad{width:min(390px,calc(100vw - 16px));padding:8px;border-radius:17px}.number-pad-grid{gap:6px}.number-pad-grid button{min-height:47px;border-radius:12px;font-size:19px}.number-pad-grid .key-fn,.number-pad-grid .key-hide{font-size:11px}.tap-keypad-hint{margin-top:5px}.skip-branch{font-size:11px}}
 .number-pad-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px}
 .number-pad-head .number-pad-title{margin:0;flex:1;text-align:left}
 .number-pad-hide{border:0;background:transparent;color:var(--muted);font-size:11px;font-weight:900;padding:7px 9px;border-radius:10px}
