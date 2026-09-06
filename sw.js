@@ -1,4 +1,4 @@
-const CACHE_NAME='linh-kanban-static-v730-tinhnhanh-adaptive-choice';
+const CACHE_NAME='linh-kanban-static-v731-tinhnhanh-3d-feedback';
 const ASSETS=[
   './','./index.html','./styles.css?v=6.21','./dragdrop.js?v=3.3','./app.js?v=3.7','./music-player.js?v=3.2',
   './office-tools/office-tools.css?v=3.8','./office-tools/office-tools.js?v=4.3','./office-tools/excel-ai-analysis.mjs?v=1.0.0','./office-tools/vendor/jszip.min.js',
@@ -9,7 +9,7 @@ const ASSETS=[
   './dice-game/assets/fighters/f01.svg','./dice-game/assets/fighters/f02.svg','./dice-game/assets/fighters/f03.svg','./dice-game/assets/fighters/f04.svg','./dice-game/assets/fighters/f05.svg','./dice-game/assets/fighters/f06.svg','./dice-game/assets/fighters/m01.svg','./dice-game/assets/fighters/m02.svg','./dice-game/assets/fighters/m03.svg','./dice-game/assets/fighters/m04.svg','./dice-game/assets/fighters/m05.svg','./dice-game/assets/fighters/m06.svg',
   './tarot-launcher.js?v=5.4','./tarot-game/index.html?v=5.4.0','./tarot-game/styles.css?v=5.4.0','./tarot-game/js/app.js?v=5.4.0','./tarot-game/js/tarot-data.js',
   './tetris-launcher.js?v=1.04','./tetris-game/index.html?v=1.0.4','./tetris-game/styles.css?v=1.0.4','./tetris-game/game.js?v=1.0.4','./tetris-game/LICENSE.txt',
-  './tarot-game/LICENSE_SOURCE.txt','./tinh-nhanh-game/index.html?v=3.2.0','./tinh-nhanh-game/styles.css?v=3.2.0','./tinh-nhanh-game/skills.js?v=3.2.0','./tinh-nhanh-game/core.js?v=3.2.0','./tinh-nhanh-game/app.js?v=3.2.0','./tinh-nhanh-game/assets/icon-256.png','./tinh-nhanh-game/LICENSE_SOURCE.txt','./tinh-nhanh-game/SOURCE_INFO.txt','./manifest.webmanifest?v=3.2','./assets/icon.svg',
+  './tarot-game/LICENSE_SOURCE.txt','./tinh-nhanh-game/index.html?v=3.3.0','./tinh-nhanh-game/styles.css?v=3.3.0','./tinh-nhanh-game/skills.js?v=3.3.0','./tinh-nhanh-game/core.js?v=3.3.0','./tinh-nhanh-game/app.js?v=3.3.0','./tinh-nhanh-game/assets/icon-256.png','./tinh-nhanh-game/LICENSE_SOURCE.txt','./tinh-nhanh-game/SOURCE_INFO.txt','./manifest.webmanifest?v=3.2','./assets/icon.svg',
   './assets/backgrounds/Beautiful Background6.png','./assets/backgrounds/Beautiful Background7.png',
   './assets/backgrounds/Beautiful Background8.png','./assets/backgrounds/Beautiful Background13.png',
   './assets/backgrounds/Beautiful Background15.png','./assets/backgrounds/Beautiful Background28.png',
