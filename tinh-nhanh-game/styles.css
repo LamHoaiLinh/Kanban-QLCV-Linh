@@ -33,3 +33,11 @@
 .number-pad-head .number-pad-title{margin:0;flex:1;text-align:left}
 .number-pad-hide{border:0;background:transparent;color:var(--muted);font-size:11px;font-weight:900;padding:7px 9px;border-radius:10px}
 .number-pad-grid .key-submit{background:var(--green2);border-color:#a9ddbf;color:#2c8d60;font-size:22px}
+
+
+/* v3.1.2 - sửa nút bắt đầu trong modal + quay về Kanban an toàn */
+.kanban-top-btn{width:auto!important;min-width:86px;padding:0 11px;font-size:12px!important;font-weight:900;color:#74546a;white-space:nowrap}
+.modal-kanban-row{display:flex;justify-content:flex-start;margin:-2px 0 10px}
+.kanban-back-btn,.kanban-session-btn{min-height:40px;border:1px solid var(--border);border-radius:13px;background:#fff;color:#74546a;padding:0 11px;font-size:11px;font-weight:900;white-space:nowrap;box-shadow:0 4px 12px rgba(80,50,70,.04);touch-action:manipulation}
+.kanban-session-btn{flex:0 0 auto}
+@media(max-width:520px){.kanban-top-btn{min-width:76px;padding:0 8px;font-size:10px!important}.kanban-back-btn,.kanban-session-btn{min-height:38px;padding:0 8px;font-size:10px}.session-top{gap:6px;padding-left:8px;padding-right:8px}.session-top .badge{padding:4px 6px}.session-top .x-btn{width:36px;height:36px}}
