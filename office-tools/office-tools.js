@@ -5,7 +5,7 @@
  * - Các thư viện PDF/Excel được tải lười khi người dùng mở đúng công cụ.
  */
 import {analyzeWorkbookForAI,createIntegrityTracker} from './excel-ai-analysis.mjs?v=1.0.0';
-import {renderPdfSigningTool} from './pdf-signing.js?v=1.2.0';
+import {renderPdfSigningTool} from './pdf-signing.js?v=1.3.0';
 const OFFICE_SETTINGS_KEY = 'linh_kanban_office_settings_v1';
 const PINNED_LIBS = {
   pdfLib: 'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js',

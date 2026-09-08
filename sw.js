@@ -1,4 +1,4 @@
-const CACHE_NAME='linh-kanban-static-v735-pdf-sign-personal-v2';
+const CACHE_NAME='linh-kanban-static-v736-pdf-sign-personal-v3';
 const ASSETS=[
   './','./index.html','./styles.css?v=6.22','./dragdrop.js?v=3.3','./app.js?v=3.7','./music-player.js?v=3.3',
   './office-tools/office-tools.css?v=4.6.0','./office-tools/office-tools.js?v=4.6.0','./office-tools/pdf-signing.js?v=1.2.0','./office-tools/excel-ai-analysis.mjs?v=1.0.0','./office-tools/vendor/jszip.min.js',

@@ -16,7 +16,6 @@ const AGENT_URL = 'http://127.0.0.1:8765';
 const AGENT_DOWNLOAD = './office-tools/downloads/KanBan_Signing_Agent.exe';
 const SIGN_LIBS = {
   forge: 'https://unpkg.com/node-forge@1.3.1/dist/forge.min.js',
-  signpdf: 'https://esm.sh/@signpdf/signpdf@3.3.0',
   placeholderPdfLib: 'https://esm.sh/@signpdf/placeholder-pdf-lib@3.3.0?deps=pdf-lib@1.17.1',
   pdfLibEsm: 'https://esm.sh/pdf-lib@1.17.1'
 };
@@ -790,28 +789,66 @@ async function signPersonal(){
   if(!r)return;
   return signPersonalWithPassword(r.password);
 }
-async function makeForgeKeySigner(mods,privateKey,certificate){
+function concatU8(a,b){
+  const out=new Uint8Array(a.length+b.length);out.set(a,0);out.set(b,a.length);return out;
+}
+function asciiBytes(s){const a=new Uint8Array(s.length);for(let i=0;i<s.length;i++)a[i]=s.charCodeAt(i)&255;return a;}
+function bytesToHex(a){let out='';const CH=0x4000;for(let i=0;i<a.length;i+=CH){const end=Math.min(a.length,i+CH);for(let j=i;j<end;j++)out+=a[j].toString(16).padStart(2,'0');}return out;}
+async function forgeCmsDetachedSignature(dataBytes,privateKey,certificate,signingTime=new Date()){
   const forge=await ensureForge();
-  const BaseSigner=mods.signpdf.Signer;
-  if(!BaseSigner)throw new Error('Thư viện ký PDF không cung cấp Signer base.');
-  return new (class extends BaseSigner{
-    async sign(pdfBuffer,signingTime=undefined){
-      if(!privateKey?.n||!privateKey?.e)throw new Error('Ký cá nhân trên trình duyệt hiện hỗ trợ certificate RSA.');
-      const p7=forge.pkcs7.createSignedData();
-      p7.content=forge.util.createBuffer(u8ToBinaryString(pdfBuffer));
-      p7.addCertificate(certificate);
-      p7.addSigner({
-        key:privateKey,certificate,digestAlgorithm:forge.pki.oids.sha256,
-        authenticatedAttributes:[
-          {type:forge.pki.oids.contentType,value:forge.pki.oids.data},
-          {type:forge.pki.oids.signingTime,value:signingTime||new Date()},
-          {type:forge.pki.oids.messageDigest}
-        ]
-      });
-      p7.sign({detached:true});
-      return binaryStringToU8(forge.asn1.toDer(p7.toAsn1()).getBytes());
-    }
-  })();
+  if(!privateKey?.n||!privateKey?.e)throw new Error('Certificate cá nhân phải dùng khóa RSA.');
+  const p7=forge.pkcs7.createSignedData();
+  p7.content=forge.util.createBuffer(u8ToBinaryString(dataBytes),'raw');
+  p7.addCertificate(certificate);
+  p7.addSigner({
+    key:privateKey,certificate,digestAlgorithm:forge.pki.oids.sha256,
+    authenticatedAttributes:[
+      {type:forge.pki.oids.contentType,value:forge.pki.oids.data},
+      {type:forge.pki.oids.signingTime,value:signingTime||new Date()},
+      {type:forge.pki.oids.messageDigest}
+    ]
+  });
+  p7.sign({detached:true});
+  const der=forge.asn1.toDer(p7.toAsn1()).getBytes();
+  if(!der||der.length<64)throw new Error('CMS tạo ra không hợp lệ hoặc quá ngắn.');
+  return binaryStringToU8(der);
+}
+async function signPreparedPdfWithForge(preparedBytes,privateKey,certificate,signingTime=new Date()){
+  // Tự xử lý ByteRange/Contents để tránh lớp Buffer/DER của @signpdf trên browser.
+  // Thuật toán tương đương SignPdf: ký chính xác hai vùng byte ngoài /Contents.
+  let pdf=new Uint8Array(preparedBytes);
+  if(pdf.length&&pdf[pdf.length-1]===10)pdf=pdf.slice(0,-1);
+  if(pdf.length&&pdf[pdf.length-1]===13)pdf=pdf.slice(0,-1);
+  const tail=u8ToBinaryString(pdf.slice(Math.max(0,pdf.length-12)));
+  if(!tail.includes('%%EOF'))throw new Error('PDF sau chuẩn bị không có %%EOF hợp lệ.');
+
+  let bin=u8ToBinaryString(pdf);
+  const re=/\/ByteRange\s*\[\s*0\s+\/\*{10}\s+\/\*{10}\s+\/\*{10}\s*\]/g;
+  const matches=[...bin.matchAll(re)];
+  if(matches.length!==1)throw new Error(matches.length?`Có ${matches.length} ByteRange placeholder; cần đúng 1.`:'Không tìm thấy ByteRange placeholder để ký.');
+  const m=matches[0], brPos=m.index, brText=m[0], brEnd=brPos+brText.length;
+  const contentsTag=bin.indexOf('/Contents ',brEnd);
+  if(contentsTag<0)throw new Error('Không tìm thấy /Contents của chữ ký.');
+  const phPos=bin.indexOf('<',contentsTag), phEnd=bin.indexOf('>',phPos);
+  if(phPos<0||phEnd<0||phEnd<=phPos)throw new Error('Placeholder /Contents không hợp lệ.');
+  const placeholderHexLen=phEnd-phPos-1;
+  if(placeholderHexLen<2048)throw new Error('Placeholder chữ ký quá nhỏ.');
+
+  const byteRange=[0,phPos,phEnd+1,pdf.length-(phEnd+1)];
+  let actual=`/ByteRange [${byteRange.join(' ')}]`;
+  if(actual.length>brText.length)throw new Error('ByteRange thực tế dài hơn placeholder.');
+  actual=actual+' '.repeat(brText.length-actual.length);
+  const withRange=new Uint8Array(pdf);
+  withRange.set(asciiBytes(actual),brPos);
+
+  const raw=concatU8(withRange.slice(0,phPos),withRange.slice(phEnd+1));
+  const cms=await forgeCmsDetachedSignature(raw,privateKey,certificate,signingTime);
+  let hex=bytesToHex(cms);
+  if(hex.length>placeholderHexLen)throw new Error(`Chữ ký CMS vượt placeholder: ${hex.length} > ${placeholderHexLen}.`);
+  hex=hex+'0'.repeat(placeholderHexLen-hex.length);
+  const result=new Uint8Array(withRange);
+  result.set(asciiBytes(hex),phPos+1);
+  return result;
 }
 async function signPersonalWithPassword(pass){
   try{
@@ -830,15 +867,13 @@ async function signPersonalWithPassword(pass){
       signatureLength:32768,widgetRect:rect,signingTime:new Date()
     });
     const prepared=await pdfDoc.save({useObjectStreams:false,updateFieldAppearances:false});
-    const signer=await makeForgeKeySigner(mods,keyMaterial.privateKey,keyMaterial.certificate);
-    const engine=mods.signpdf.default?.sign?mods.signpdf.default:new mods.signpdf.SignPdf();
-    api.setStatus('Đang tạo chữ ký CMS…',70);
-    const signed=await engine.sign(prepared,signer);
+    api.setStatus('Đang tạo chữ ký CMS và ByteRange…',70);
+    const signed=await signPreparedPdfWithForge(prepared,keyMaterial.privateKey,keyMaterial.certificate,new Date());
     await api.saveBlob(new Blob([signed],{type:'application/pdf'}),`${safeStem(st.file.name)}_BAN_SAO_KY_CA_NHAN.pdf`,'Bản sao PDF đã ký cá nhân');
     api.endBusy('Đã tạo bản sao và ký cá nhân. File gốc không thay đổi.');
   }catch(e){
     const msg=String(e?.message||e);
-    const friendly=/password|decrypt|mật khẩu/i.test(msg)?'Mật khẩu certificate không đúng. Nếu quên mật khẩu, hãy xóa certificate và tạo lại.':msg;
+    const friendly=/password|decrypt|mật khẩu/i.test(msg)?'Mật khẩu certificate không đúng. Nếu quên mật khẩu, hãy xóa certificate và tạo lại.':(/DER|ASN\.1/i.test(msg)?'Lỗi ASN.1/CMS khi tạo chữ ký. Bản này đã bỏ lớp @signpdf Signer; nếu vẫn gặp lỗi, hãy xóa certificate cũ và tạo certificate mới rồi thử lại. Chi tiết: '+msg:msg);
     api.showError(new Error(`Ký cá nhân thất bại: ${friendly}`));
   }
 }
@@ -858,7 +893,7 @@ async function signEnterprise(){
 function pdfRectBottomLeft(){const {x,y,w,h}=st.rect;return [x,st.pageSize.height-(y+h),x+w,st.pageSize.height-y];}
 
 async function ensureForge(){if(globalThis.forge)return globalThis.forge;if(forgeLoading)return forgeLoading;forgeLoading=new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=SIGN_LIBS.forge;s.async=true;s.onload=()=>globalThis.forge?resolve(globalThis.forge):reject(new Error('node-forge không khởi tạo.'));s.onerror=()=>reject(new Error('Không tải được node-forge. Kiểm tra Internet.'));document.head.appendChild(s);});return forgeLoading;}
-async function ensureSignModules(){if(signModulesLoading)return signModulesLoading;signModulesLoading=(async()=>{try{const [signpdf,placeholder,pdfLib]=await Promise.all([import(SIGN_LIBS.signpdf),import(SIGN_LIBS.placeholderPdfLib),import(SIGN_LIBS.pdfLibEsm)]);return {signpdf,placeholder,pdfLib};}catch(e){signModulesLoading=null;throw new Error('Không tải được thư viện ký PDF trên trình duyệt. Kiểm tra Internet rồi thử lại. '+(e.message||e));}})();return signModulesLoading;}
+async function ensureSignModules(){if(signModulesLoading)return signModulesLoading;signModulesLoading=(async()=>{try{const [placeholder,pdfLib]=await Promise.all([import(SIGN_LIBS.placeholderPdfLib),import(SIGN_LIBS.pdfLibEsm)]);return {placeholder,pdfLib};}catch(e){signModulesLoading=null;throw new Error('Không tải được thư viện PDF trên trình duyệt. Kiểm tra Internet rồi thử lại. '+(e.message||e));}})();return signModulesLoading;}
 function forgeGenerateKeyPair(forge,bits){return new Promise((resolve,reject)=>forge.pki.rsa.generateKeyPair({bits,e:0x10001,workers:2},(err,k)=>err?reject(err):resolve(k)));}
 function randomHex(bytes){const a=new Uint8Array(bytes);crypto.getRandomValues(a);return [...a].map(x=>x.toString(16).padStart(2,'0')).join('');}
 
