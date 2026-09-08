@@ -8,7 +8,7 @@
   <title>Kanban Cá Nhân</title>
   <link rel="manifest" href="manifest.webmanifest?v=3.2">
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=6.21">
+  <link rel="stylesheet" href="styles.css?v=6.22">
   <link rel="stylesheet" href="office-tools/office-tools.css?v=4.4">
 </head>
 <body>
@@ -422,6 +422,14 @@
         <div><div class="eyebrow">NHẠC LOCAL</div><h2>Danh sách bài hát</h2><div id="musicPlaylistFolder" class="music-playlist-folder">Chưa chọn thư mục</div></div>
         <button class="icon-btn" data-close="musicPlaylistDialog" type="button" aria-label="Đóng">×</button>
       </div>
+      <div class="music-playlist-search-row">
+        <label class="music-playlist-search" for="musicPlaylistSearch">
+          <span class="music-search-icon" aria-hidden="true">⌕</span>
+          <input id="musicPlaylistSearch" type="search" autocomplete="off" spellcheck="false" placeholder="Tìm tên bài hát, ca sĩ hoặc tên file…" aria-label="Tìm bài hát">
+          <kbd>Esc</kbd>
+        </label>
+        <button id="musicPlaylistSearchClear" class="secondary-btn compact-btn music-search-clear" type="button" disabled>Xóa tìm kiếm</button>
+      </div>
       <div class="music-playlist-toolbar">
         <label><span>Sắp xếp</span><select id="musicSortSelect"><option value="file-asc">Tên file A–Z</option><option value="title-asc">Tên bài hát A–Z</option></select></label>
         <label><span>Thư mục gần đây</span><select id="musicRecentSelect"><option value="">Chưa có thư mục gần đây</option></select></label>
@@ -478,8 +486,8 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="dragdrop.js?v=3.3"></script>
   <script src="app.js?v=3.7"></script>
-  <script src="music-player.js?v=3.2"></script>
-  <script type="module" src="office-tools/office-tools.js?v=4.4"></script>
+  <script src="music-player.js?v=3.3"></script>
+  <script type="module" src="office-tools/office-tools.js?v=4.5"></script>
   <script type="module" src="game-launcher.js?v=1.65"></script>
 </body>
 </html>

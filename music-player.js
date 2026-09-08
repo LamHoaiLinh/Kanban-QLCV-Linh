@@ -50,7 +50,7 @@
       'musicPrevLine','musicCurrentLine','musicNextLine','musicPrevBtn','musicPlayPauseBtn','musicNextBtn','musicShuffleBtn',
       'musicRepeatBtn','musicProgress','musicCurrentTime','musicDuration','musicVolume','musicPlaylistBtn','musicStatus',
       'musicPlaylistDialog','musicPlaylistList','musicPlaylistCount','musicPlaylistFolder','musicSortSelect','musicRecentSelect',
-      'musicOpenRecentBtn','musicPlaylistBrowseBtn','musicPlaylistEmpty'
+      'musicOpenRecentBtn','musicPlaylistBrowseBtn','musicPlaylistEmpty','musicPlaylistSearch','musicPlaylistSearchClear'
     ].forEach(id => refs[id] = document.getElementById(id));
   }
 
@@ -62,6 +62,9 @@
     refs.musicOpenRecentBtn.addEventListener('click', openSelectedRecentFolder);
     refs.musicPlaylistBrowseBtn.addEventListener('click', () => { refs.musicPlaylistDialog.close(); browseMusicDirectory(); });
     refs.musicSortSelect.addEventListener('change', changeSortMode);
+    refs.musicPlaylistSearch.addEventListener('input', handlePlaylistSearch);
+    refs.musicPlaylistSearch.addEventListener('keydown', handlePlaylistSearchKeydown);
+    refs.musicPlaylistSearchClear.addEventListener('click', clearPlaylistSearch);
     refs.musicPlaylistList.addEventListener('click', handlePlaylistClick);
 
     refs.musicPrevBtn.addEventListener('click', playPrevious);
@@ -586,14 +589,55 @@
     renderPlaylist();
     renderRecentFolders();
     refs.musicPlaylistDialog.showModal();
-    requestAnimationFrame(scrollCurrentTrackIntoView);
+    requestAnimationFrame(() => {
+      scrollCurrentTrackIntoView();
+      refs.musicPlaylistSearch?.focus({ preventScroll: true });
+    });
+  }
+
+  function normalizeMusicSearch(value) {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D')
+      .toLocaleLowerCase('vi')
+      .trim();
+  }
+
+  function getPlaylistSearchQuery() {
+    return normalizeMusicSearch(refs.musicPlaylistSearch?.value || '');
+  }
+
+  function trackMatchesPlaylistSearch(track, query) {
+    if (!query) return true;
+    const haystack = normalizeMusicSearch([
+      track.title,
+      track.artist,
+      track.name,
+      track.relativePath
+    ].filter(Boolean).join(' '));
+    return haystack.includes(query);
+  }
+
+  function getVisiblePlaylistTracks() {
+    const query = getPlaylistSearchQuery();
+    return tracks
+      .map((track, index) => ({ track, index }))
+      .filter(item => trackMatchesPlaylistSearch(item.track, query));
   }
 
   function renderPlaylist() {
+    const query = getPlaylistSearchQuery();
+    const visible = getVisiblePlaylistTracks();
     refs.musicPlaylistFolder.textContent = currentDirectoryName || 'Chưa chọn thư mục';
-    refs.musicPlaylistCount.textContent = `${tracks.length} bài`;
-    refs.musicPlaylistEmpty.hidden = Boolean(tracks.length);
-    refs.musicPlaylistList.innerHTML = tracks.map((track, index) => {
+    refs.musicPlaylistCount.textContent = query ? `${visible.length}/${tracks.length} bài` : `${tracks.length} bài`;
+    refs.musicPlaylistSearchClear.disabled = !query;
+    refs.musicPlaylistEmpty.hidden = Boolean(visible.length);
+    refs.musicPlaylistEmpty.textContent = tracks.length
+      ? 'Không tìm thấy bài hát phù hợp. Hãy thử từ khóa khác.'
+      : 'Chưa có bài hát. Hãy chọn hoặc kéo thả một thư mục nhạc.';
+    refs.musicPlaylistList.innerHTML = visible.map(({ track, index }) => {
       const active = index === currentIndex;
       const artist = track.artist ? `<span class="playlist-track-artist">${escapeHtml(track.artist)}</span>` : '';
       return `<button class="playlist-track${active ? ' active' : ''}" type="button" data-track-index="${index}">
@@ -601,6 +645,26 @@
         <span class="playlist-track-copy"><span class="playlist-track-title">${escapeHtml(track.title)}</span>${artist}<span class="playlist-track-path">${escapeHtml(track.relativePath)}</span></span>
       </button>`;
     }).join('');
+  }
+
+  function handlePlaylistSearch() {
+    const previousScrollTop = refs.musicPlaylistList.scrollTop;
+    renderPlaylist();
+    refs.musicPlaylistList.scrollTop = getPlaylistSearchQuery() ? 0 : previousScrollTop;
+  }
+
+  function handlePlaylistSearchKeydown(event) {
+    if (event.key !== 'Escape' || !refs.musicPlaylistSearch.value) return;
+    event.preventDefault();
+    clearPlaylistSearch();
+  }
+
+  function clearPlaylistSearch() {
+    if (!refs.musicPlaylistSearch.value) return;
+    refs.musicPlaylistSearch.value = '';
+    renderPlaylist();
+    requestAnimationFrame(scrollCurrentTrackIntoView);
+    refs.musicPlaylistSearch.focus({ preventScroll: true });
   }
 
   function handlePlaylistClick(event) {

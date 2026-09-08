@@ -12,7 +12,7 @@ const SIGN_DB_NAME = 'linh_kanban_pdf_signing_store_v1';
 const SIGN_DB_STORE = 'secrets';
 const PERSONAL_P12_KEY = 'personal-p12';
 const AGENT_URL = 'http://127.0.0.1:8765';
-const AGENT_DOWNLOAD = './office-tools/downloads/KanBan_Signing_Agent_SETUP.zip';
+const AGENT_DOWNLOAD = './office-tools/downloads/KanBan_Signing_Agent.exe';
 const SIGN_LIBS = {
   forge: 'https://unpkg.com/node-forge@1.3.1/dist/forge.min.js',
   signpdf: 'https://esm.sh/@signpdf/signpdf@3.3.0',
@@ -165,7 +165,7 @@ function identityCard(){
     </div>
     <div class="office-sign-agent-panel">
       <div><b id="agentStatus">${agentOnline?`✓ Đã kết nối ${esc(st.agent.version||'KanBan Signing Agent')}`:'Chưa kết nối Agent tại 127.0.0.1:8765'}</b><span>${agentOnline?'USB Token/chứng thư được xử lý cục bộ trên Windows.':'Cài một lần trên Windows; sau đó chỉ cần cắm Token và mở Agent.'}</span></div>
-      <div class="office-toolbar"><a class="office-btn primary" href="${AGENT_DOWNLOAD}" download>Tải phần mềm hỗ trợ ký số</a><button class="office-btn" id="agentCheck">Kiểm tra kết nối</button><button class="office-btn" id="agentCertRefresh" ${agentOnline?'':'disabled'}>Đọc chứng thư</button></div>
+      <div class="office-toolbar"><a class="office-btn primary" href="${AGENT_DOWNLOAD}" download>Tải Signing Agent (.exe)</a><button class="office-btn" id="agentCheck">Kiểm tra kết nối</button><button class="office-btn" id="agentCertRefresh" ${agentOnline?'':'disabled'}>Đọc chứng thư</button></div>
     </div>
     <div class="office-grid">
       <label class="office-field"><span>Chứng thư Windows</span><select id="esCert" ${agentOnline?'':'disabled'}>${certificateOptions()}</select><small>Ứng dụng ưu tiên certificate khớp tên/MST; tránh certificate localhost/test.</small></label>
