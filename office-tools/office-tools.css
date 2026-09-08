@@ -212,7 +212,9 @@
 @media(max-width:760px){.long-image-editor-shell{padding:8px}.long-image-editor{padding:28px;font-size:22px;min-height:360px}.long-image-formatbar{gap:4px}.long-image-formatbar button,.long-image-formatbar select{padding:5px 7px}.long-image-result-viewport{max-height:70vh}}
 
 /* ===== v4.4: PDF > Ký số (cá nhân + doanh nghiệp) ===== */
-.office-sign-modebar{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.office-sign-topline{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:stretch;margin-bottom:12px}
+.office-sign-modebar{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:0}
+.office-sign-fullscreen-btn{min-width:128px;white-space:nowrap}
 .office-sign-mode{display:grid;gap:3px;text-align:left;padding:12px 14px;border:1px solid var(--border);border-radius:14px;background:var(--panel);color:var(--text);cursor:pointer;transition:.16s ease}
 .office-sign-mode b{font-size:14px}.office-sign-mode span{font-size:11px;color:var(--muted)}
 .office-sign-mode:hover{transform:translateY(-1px);border-color:color-mix(in srgb,var(--green) 55%,var(--border))}
@@ -237,7 +239,24 @@
 .office-sign-details{margin-top:9px;border:1px solid var(--border);border-radius:12px;background:var(--panel)}.office-sign-details>summary{cursor:pointer;padding:9px 11px;font-size:12px;font-weight:850;color:var(--text);user-select:none}.office-sign-details[open]>summary{border-bottom:1px solid var(--border);background:var(--panel-soft);border-radius:12px 12px 0 0}.office-sign-details>.office-grid,.office-sign-details>.office-sign-checkgrid{padding:10px}
 .office-sign-checkgrid{display:flex;gap:7px;flex-wrap:wrap}.office-sign-checkgrid .office-check{min-height:34px;padding:6px 9px;border:1px solid var(--border);border-radius:9px;background:var(--panel-soft)}
 .office-inline-input{display:flex;gap:5px;align-items:stretch}.office-inline-input .office-btn:first-child{flex:1}
-.office-sign-action-card{position:sticky;bottom:4px;z-index:2;box-shadow:0 -5px 16px rgba(24,49,40,.06)}.office-sign-summary{display:flex;gap:6px;flex-wrap:wrap;margin:7px 0 10px}.office-sign-summary span{display:inline-flex;padding:5px 8px;border:1px solid var(--border);border-radius:999px;background:var(--panel-soft);font-size:10.5px;color:var(--muted)}.office-sign-main-btn{min-width:170px;font-weight:900}
+.office-sign-action-card{position:static;z-index:auto;box-shadow:0 8px 25px rgba(26,64,50,.05)}.office-sign-summary{display:flex;gap:6px;flex-wrap:wrap;margin:7px 0 10px}.office-sign-summary span{display:inline-flex;padding:5px 8px;border:1px solid var(--border);border-radius:999px;background:var(--panel-soft);font-size:10.5px;color:var(--muted)}.office-sign-main-btn{min-width:170px;font-weight:900}
 .office-recommend-badge.good{background:var(--green-soft);color:var(--green-dark)}
 @media(max-width:1120px){.office-sign-grid{grid-template-columns:1fr}.office-sign-action-card{position:static}.office-sign-pdf-stage{max-height:62vh}}
 @media(max-width:760px){.office-sign-modebar{grid-template-columns:1fr}.office-sign-agent-panel{grid-template-columns:1fr}.office-sign-agent-panel .office-toolbar{justify-content:flex-start}.office-sign-pdf-stage{padding:6px;max-height:57vh}.office-sign-presetbar{overflow-x:auto;flex-wrap:nowrap;padding-bottom:3px}.office-sign-presetbar button{white-space:nowrap}.office-sign-design-preview{min-height:130px}.office-sign-box-hint{display:none}}
+
+
+/* ===== v4.5.1 PDF Signing UX: fullscreen + modal certificate/password ===== */
+.office-tools-dialog.office-sign-fullscreen{width:100vw!important;height:100dvh!important;max-height:none!important;margin:0!important}
+.office-tools-dialog.office-sign-fullscreen .office-shell{border-radius:0!important;border-left:0;border-right:0}
+.office-tools-dialog.office-sign-fullscreen .office-main{padding:14px 16px 24px}
+.office-tools-dialog.office-sign-fullscreen .office-sign-pdf-stage{max-height:76vh}
+.office-sign-modal-layer{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;padding:18px;background:rgba(10,28,22,.52);backdrop-filter:blur(5px)}
+.office-sign-modal{width:min(540px,calc(100vw - 32px));max-height:min(760px,calc(100dvh - 36px));overflow:auto;background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:20px;box-shadow:0 28px 90px rgba(10,28,22,.34)}
+.office-sign-modal.wide{width:min(760px,calc(100vw - 32px))}
+.office-sign-modal-head{position:sticky;top:0;z-index:2;display:flex;align-items:flex-start;gap:12px;padding:15px 16px;border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--panel) 96%,var(--green-soft))}
+.office-sign-modal-head>div{min-width:0;flex:1}.office-sign-modal-head h3{margin:0;font-size:18px}.office-sign-modal-head p{margin:4px 0 0;color:var(--muted);font-size:11.5px;line-height:1.45}
+.office-sign-modal-form{padding:15px 16px}.office-sign-modal-fields{display:grid;gap:12px}
+.office-sign-modal-error{min-height:20px;margin-top:8px;color:var(--danger,#c94d4d);font-size:12px;font-weight:700;line-height:1.4}
+.office-sign-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+.office-sign-modal .office-warning{margin-top:10px}
+@media(max-width:760px){.office-sign-topline{grid-template-columns:1fr}.office-sign-fullscreen-btn{width:100%}.office-sign-modal-layer{padding:0}.office-sign-modal,.office-sign-modal.wide{width:100vw;max-height:100dvh;height:auto;border-radius:0}}
