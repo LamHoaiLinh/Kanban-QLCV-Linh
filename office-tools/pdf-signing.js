@@ -1,5 +1,6 @@
 /*
  * PDF Signing module for Kanban Cá Nhân.
+ * V7: personal signing uses the same global PDFLib loader as Office Tools and a local placeholder builder (no @signpdf placeholder ESM).
  * Scope: ONLY the PDF > Ký số sub-tool.
  * - Does not read/write Kanban task data.
  * - Uses a dedicated localStorage key + dedicated IndexedDB database.
@@ -16,8 +17,6 @@ const AGENT_URL = 'http://127.0.0.1:8765';
 const AGENT_DOWNLOAD = './office-tools/downloads/KanBan_Signing_Agent.exe';
 const SIGN_LIBS = {
   forge: 'https://unpkg.com/node-forge@1.3.1/dist/forge.min.js',
-  placeholderPdfLib: 'https://esm.sh/@signpdf/placeholder-pdf-lib@3.3.0?deps=pdf-lib@1.17.1',
-  pdfLibEsm: 'https://esm.sh/pdf-lib@1.17.1'
 };
 
 const DEFAULTS = {
@@ -829,6 +828,101 @@ function certificateIssuerAndSerialAsn1(forge,certificate){
   if(!serial||serial.type!==forge.asn1.Type.INTEGER||!issuer)throw new Error('Certificate thiếu issuer/serial ASN.1.');
   return {certAsn1,issuer,serialValue:serial.value};
 }
+
+function pdfTextObject(PDFHexString,value=''){
+  // PDFHexString.fromText handles Vietnamese/Unicode safely.
+  return PDFHexString.fromText(String(value ?? ''));
+}
+
+function addKanBanPdfLibSignaturePlaceholder({
+  pdfDoc,
+  pdfPage,
+  pdfLib,
+  reason='',
+  contactInfo='',
+  name='',
+  location='',
+  signingTime=new Date(),
+  signatureLength=32768,
+  widgetRect=[0,0,0,0],
+}={}){
+  if(!pdfDoc||!pdfPage)throw new Error('Thiếu PDFDocument/PDFPage khi tạo placeholder chữ ký.');
+  if(!pdfLib)throw new Error('PDFLib chưa sẵn sàng.');
+  const {
+    PDFArray,PDFDict,PDFHexString,PDFName,PDFNumber,PDFInvalidObject,PDFString
+  }=pdfLib;
+  const required={PDFArray,PDFDict,PDFHexString,PDFName,PDFNumber,PDFInvalidObject,PDFString};
+  for(const [k,v] of Object.entries(required))if(!v)throw new Error(`PDFLib thiếu export ${k}.`);
+
+  const doc=pdfDoc, page=pdfPage;
+  const byteRangePlaceholder='**********';
+  const byteRange=PDFArray.withContext(doc.context);
+  byteRange.push(PDFNumber.of(0));
+  byteRange.push(PDFName.of(byteRangePlaceholder));
+  byteRange.push(PDFName.of(byteRangePlaceholder));
+  byteRange.push(PDFName.of(byteRangePlaceholder));
+
+  // Contents is deliberately fixed-size so the CMS can be injected later without rewriting offsets.
+  const placeholder=PDFHexString.of(String.fromCharCode(0).repeat(Number(signatureLength)||32768));
+  const signatureDict=doc.context.obj({
+    Type:PDFName.of('Sig'),
+    Filter:PDFName.of('Adobe.PPKLite'),
+    SubFilter:PDFName.of('adbe.pkcs7.detached'),
+    ByteRange:byteRange,
+    Contents:placeholder,
+    Reason:pdfTextObject(PDFHexString,reason),
+    M:PDFString.fromDate(signingTime instanceof Date?signingTime:new Date()),
+    ContactInfo:pdfTextObject(PDFHexString,contactInfo),
+    Name:pdfTextObject(PDFHexString,name),
+    Location:pdfTextObject(PDFHexString,location),
+  });
+
+  // Keep the signature dictionary out of object streams and keep the literal placeholder bytes stable.
+  const signatureBuffer=new Uint8Array(signatureDict.sizeInBytes());
+  signatureDict.copyBytesInto(signatureBuffer,0);
+  const signatureObj=PDFInvalidObject.of(signatureBuffer);
+  const signatureDictRef=doc.context.register(signatureObj);
+
+  const rect=PDFArray.withContext(doc.context);
+  (Array.isArray(widgetRect)?widgetRect:[0,0,0,0]).map(Number).forEach(c=>rect.push(PDFNumber.of(Number.isFinite(c)?c:0)));
+  const uniqueField=`KanBanPersonal_${Date.now()}_${Math.floor(Math.random()*1e6)}`;
+  const widgetDict=doc.context.obj({
+    Type:PDFName.of('Annot'),
+    Subtype:PDFName.of('Widget'),
+    FT:PDFName.of('Sig'),
+    Rect:rect,
+    V:signatureDictRef,
+    T:pdfTextObject(PDFHexString,uniqueField),
+    F:PDFNumber.of(4),
+    P:page.ref,
+  });
+  const widgetDictRef=doc.context.register(widgetDict);
+
+  let annotations=page.node.lookupMaybe(PDFName.of('Annots'),PDFArray);
+  if(typeof annotations==='undefined')annotations=doc.context.obj([]);
+  annotations.push(widgetDictRef);
+  page.node.set(PDFName.of('Annots'),annotations);
+
+  let acroForm=doc.catalog.lookupMaybe(PDFName.of('AcroForm'),PDFDict);
+  if(typeof acroForm==='undefined'){
+    acroForm=doc.context.obj({Fields:[]});
+    const acroFormRef=doc.context.register(acroForm);
+    doc.catalog.set(PDFName.of('AcroForm'),acroFormRef);
+  }
+  // Preserve existing AcroForm fields/signatures. lookupMaybe dereferences PDFRef using
+  // the SAME PDFLib class instance as pdfDoc, avoiding cross-bundle instanceof issues.
+  let sigFlags=acroForm.lookupMaybe(PDFName.of('SigFlags'),PDFNumber);
+  const flags=sigFlags?.asNumber?.()||0;
+  acroForm.set(PDFName.of('SigFlags'),PDFNumber.of(flags|1|2));
+  let fields=acroForm.lookupMaybe(PDFName.of('Fields'),PDFArray);
+  if(typeof fields==='undefined'){
+    fields=doc.context.obj([]);
+    acroForm.set(PDFName.of('Fields'),fields);
+  }
+  fields.push(widgetDictRef);
+  return uniqueField;
+}
+
 async function forgeCmsDetachedSignature(dataBytes,privateKey,certificate,signingTime=new Date()){
   /*
    * V6: KHÔNG dùng forge.pkcs7.createSignedData().
@@ -942,30 +1036,52 @@ async function signPersonalWithPassword(pass){
   try{
     api.startBusy('Đang chuẩn bị bản sao để ký cá nhân…');
     const keyMaterial=await getPersonalKeyMaterial(pass);
-    stage='tạo appearance và nạp thư viện PDF';
-    const [mods,appearanceBlob]=await Promise.all([ensureSignModules(),createAppearancePng()]);
-    const {PDFDocument}=mods.pdfLib;
+
+    stage='tạo ảnh chữ ký';
+    const appearanceBlob=await createAppearancePng();
+    if(!appearanceBlob)throw new Error('Không tạo được ảnh appearance.');
+
+    stage='nạp PDFLib';
+    const pdfLib=await api.ensurePdfLib();
+    if(!pdfLib?.PDFDocument)throw new Error('PDFLib không khởi tạo đúng.');
+    const {PDFDocument}=pdfLib;
+
+    stage='đọc bản sao PDF';
     const pdfDoc=await PDFDocument.load(st.bytes,{ignoreEncryption:false});
     const page=pdfDoc.getPage(st.page-1);
-    const png=await pdfDoc.embedPng(new Uint8Array(await appearanceBlob.arrayBuffer()));
+
+    stage='nhúng appearance vào trang';
+    const pngBytes=new Uint8Array(await appearanceBlob.arrayBuffer());
+    const png=await pdfDoc.embedPng(pngBytes);
     const rect=pdfRectBottomLeft();
     page.drawImage(png,{x:rect[0],y:rect[1],width:rect[2]-rect[0],height:rect[3]-rect[1]});
-    mods.placeholder.pdflibAddPlaceholder({
-      pdfDoc,pdfPage:page,reason:'Ký số cá nhân',contactInfo:st.personal.email||'',
-      name:st.personal.name||'Người ký',location:'KanBan Cá Nhân',
-      signatureLength:32768,widgetRect:rect,signingTime:new Date()
+
+    stage='tạo placeholder chữ ký PDF';
+    addKanBanPdfLibSignaturePlaceholder({
+      pdfDoc,pdfPage:page,pdfLib,
+      reason:'Ky so ca nhan',
+      contactInfo:st.personal.email||'',
+      name:st.personal.name||'Nguoi ky',
+      location:'KanBan Ca Nhan',
+      signatureLength:32768,
+      widgetRect:rect,
+      signingTime:new Date(),
     });
-    stage='tạo PDF placeholder/ByteRange';
+
+    stage='lưu PDF placeholder/ByteRange';
     const prepared=await pdfDoc.save({useObjectStreams:false,updateFieldAppearances:false});
     api.setStatus('Đang tạo chữ ký CMS và ByteRange…',70);
+
     stage='tạo CMS detached SHA-256/RSA';
     const signed=await signPreparedPdfWithForge(prepared,keyMaterial.privateKey,keyMaterial.certificate,new Date());
+
     stage='lưu bản sao PDF đã ký';
     await api.saveBlob(new Blob([signed],{type:'application/pdf'}),`${safeStem(st.file.name)}_BAN_SAO_KY_CA_NHAN.pdf`,'Bản sao PDF đã ký cá nhân');
     api.endBusy('Đã tạo bản sao và ký cá nhân. File gốc không thay đổi.');
   }catch(e){
     const msg=String(e?.message||e);
     const friendly=/password|decrypt|mật khẩu/i.test(msg)?'Mật khẩu certificate không đúng.':msg;
+    console.error('[KanBan personal signing]',stage,e);
     api.showError(new Error(`Ký cá nhân thất bại ở bước “${stage}”: ${friendly}`));
   }
 }
@@ -985,7 +1101,7 @@ async function signEnterprise(){
 function pdfRectBottomLeft(){const {x,y,w,h}=st.rect;return [x,st.pageSize.height-(y+h),x+w,st.pageSize.height-y];}
 
 async function ensureForge(){if(globalThis.forge)return globalThis.forge;if(forgeLoading)return forgeLoading;forgeLoading=new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=SIGN_LIBS.forge;s.async=true;s.onload=()=>globalThis.forge?resolve(globalThis.forge):reject(new Error('node-forge không khởi tạo.'));s.onerror=()=>reject(new Error('Không tải được node-forge. Kiểm tra Internet.'));document.head.appendChild(s);});return forgeLoading;}
-async function ensureSignModules(){if(signModulesLoading)return signModulesLoading;signModulesLoading=(async()=>{try{const [placeholder,pdfLib]=await Promise.all([import(SIGN_LIBS.placeholderPdfLib),import(SIGN_LIBS.pdfLibEsm)]);return {placeholder,pdfLib};}catch(e){signModulesLoading=null;throw new Error('Không tải được thư viện PDF trên trình duyệt. Kiểm tra Internet rồi thử lại. '+(e.message||e));}})();return signModulesLoading;}
+async function ensureSignModules(){const pdfLib=await api.ensurePdfLib();return {pdfLib};}
 function forgeGenerateKeyPair(forge,bits){return new Promise((resolve,reject)=>forge.pki.rsa.generateKeyPair({bits,e:0x10001,workers:2},(err,k)=>err?reject(err):resolve(k)));}
 function randomHex(bytes){const a=new Uint8Array(bytes);crypto.getRandomValues(a);return [...a].map(x=>x.toString(16).padStart(2,'0')).join('');}
 
