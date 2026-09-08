@@ -184,7 +184,7 @@ function identityCard(){
         <label class="office-field"><span>Hiệu lực certificate mới</span><select id="psYears">${[1,2,3,5,10].map(n=>`<option value="${n}" ${Number(st.personal.years)===n?'selected':''}>${n} năm</option>`).join('')}</select><small>Mật khẩu chỉ được hỏi trong popup khi tạo/kiểm tra/ký và không được lưu.</small></label>
         <div class="office-field"><span>Cách dùng</span><div class="office-sign-security-note">Nếu quên mật khẩu, bấm <b>Xóa certificate</b> rồi tạo lại. Tên/email/thông tin hiển thị vẫn được giữ.</div></div>
       </div>
-      <div class="office-toolbar"><button class="office-btn primary" id="psCreate">${meta?'Tạo certificate mới / cập nhật':'Tạo certificate cá nhân'}</button><button class="office-btn danger" id="psDelete" ${meta?'':'disabled'}>Xóa certificate</button><button class="office-btn" id="psImport">Nhập P12/PFX</button><button class="office-btn" id="psBackup" ${meta?'':'disabled'}>Tải bản sao P12</button><button class="office-btn" id="psCheck" ${meta?'':'disabled'}>Kiểm tra mật khẩu</button></div>
+      <div class="office-toolbar"><button class="office-btn primary" id="psCreate">${meta?'Tạo certificate mới / cập nhật':'Tạo certificate cá nhân'}</button><button class="office-btn danger" id="psDelete" ${meta?'':'disabled'}>Xóa certificate</button><button class="office-btn" id="psImport">Nhập P12/PFX</button><button class="office-btn" id="psBackup" ${meta?'':'disabled'}>Tải bản sao P12</button><button class="office-btn" id="psCheck" ${meta?'':'disabled'}>Kiểm tra certificate</button></div>
       <div class="office-warning" style="margin-top:10px">Self-signed giúp phát hiện PDF bị sửa sau khi ký nhưng Foxit/Adobe có thể hiển thị <b>Unknown/Untrusted signer</b>. Không xem nó tương đương chữ ký số công cộng do CA cấp.</div>
     </div>`;
   }
@@ -622,12 +622,15 @@ async function createPersonalCertificate(options={}){
     const keys=await forgeGenerateKeyPair(forge,2048);
     const cert=forge.pki.createCertificate();
     cert.publicKey=keys.publicKey;
-    cert.serialNumber=randomHex(16);
+    cert.serialNumber='01'+randomHex(15); // ASN.1 INTEGER dương, tránh serial có high-bit
     cert.validity.notBefore=new Date(Date.now()-86400000);
     cert.validity.notAfter=new Date();
     cert.validity.notAfter.setFullYear(cert.validity.notAfter.getFullYear()+(Number(st.personal.years)||5));
-    const attrs=[{name:'commonName',value:name},{name:'organizationName',value:'Chữ ký cá nhân'}];
-    if(email)attrs.push({name:'emailAddress',value:email});
+    const attrs=[
+      {name:'commonName',value:name,valueTagClass:forge.asn1.Type.UTF8},
+      {name:'organizationName',value:'KanBan Personal',valueTagClass:forge.asn1.Type.UTF8}
+    ];
+    if(email)attrs.push({name:'emailAddress',value:email,valueTagClass:forge.asn1.Type.IA5STRING});
     cert.setSubject(attrs);cert.setIssuer(attrs);
     cert.setExtensions([{name:'basicConstraints',cA:false},{name:'keyUsage',digitalSignature:true,nonRepudiation:true},{name:'extKeyUsage',clientAuth:true,emailProtection:true},{name:'subjectKeyIdentifier'}]);
     cert.sign(keys.privateKey,forge.md.sha256.create());
@@ -635,7 +638,10 @@ async function createPersonalCertificate(options={}){
     const encryptedKeyPem=forge.pki.encryptRsaPrivateKey(keys.privateKey,pass,{algorithm:'aes256'});
     // Kiểm tra ngay bằng chính mật khẩu vừa nhập trước khi lưu.
     if(!forge.pki.decryptRsaPrivateKey(encryptedKeyPem,pass))throw new Error('Không kiểm tra được private key sau khi tạo.');
-    const meta={subject:name,email,bits:2048,notAfter:cert.validity.notAfter.toLocaleDateString('vi-VN'),createdAt:new Date().toISOString(),certPem,storage:'pem-v2'};
+    // Tự kiểm tra engine CMS ngay lúc tạo để không lưu certificate nếu engine ký chưa hoạt động.
+    const cmsSelfTest=await forgeCmsDetachedSignature(asciiBytes('KanBan Personal CMS self-test v6'),keys.privateKey,cert,new Date());
+    if(!cmsSelfTest || cmsSelfTest.length<128)throw new Error('CMS self-test không tạo được chữ ký hợp lệ.');
+    const meta={subject:name,email,bits:2048,notAfter:cert.validity.notAfter.toLocaleDateString('vi-VN'),createdAt:new Date().toISOString(),certPem,storage:'pem-v2',engine:'cms-manual-v6'};
     const record={kind:'pem-v2',certPem,encryptedKeyPem,meta};
     await idbPut(PERSONAL_SECRET_KEY,record);
     // Xóa bản P12 cũ để không vô tình dùng lại certificate lỗi.
@@ -741,8 +747,15 @@ async function backupPersonalP12(){
 }
 async function checkPersonalSecret(){
   if(!st.certRecord)return createPersonalCertificate();
-  const r=await requestPersonalPassword({title:'Kiểm tra mật khẩu certificate',confirm:'Kiểm tra',verify:true});
-  if(r)alert('Mật khẩu đúng. Certificate cá nhân sẵn sàng để ký.');
+  const r=await requestPersonalPassword({title:'Kiểm tra certificate & engine ký',confirm:'Chạy kiểm tra',verify:true});
+  if(!r)return;
+  try{
+    api.startBusy('Đang ký thử CMS nội bộ…');
+    const km=await getPersonalKeyMaterial(r.password);
+    const cms=await forgeCmsDetachedSignature(asciiBytes('KanBan CMS test '+new Date().toISOString()),km.privateKey,km.certificate,new Date());
+    api.endBusy('Certificate và engine CMS hoạt động bình thường.');
+    alert(`Kiểm tra thành công.\n- Mật khẩu đúng\n- Private key khớp certificate\n- RSA/SHA-256 ký thử thành công\n- CMS DER hợp lệ (${cms.length} bytes)`);
+  }catch(e){api.showError(new Error('Kiểm tra certificate thất bại: '+(e?.message||e)))}
 }
 async function loadPersonalRecordQuiet(){
   try{
@@ -794,23 +807,97 @@ function concatU8(a,b){
 }
 function asciiBytes(s){const a=new Uint8Array(s.length);for(let i=0;i<s.length;i++)a[i]=s.charCodeAt(i)&255;return a;}
 function bytesToHex(a){let out='';const CH=0x4000;for(let i=0;i<a.length;i+=CH){const end=Math.min(a.length,i+CH);for(let j=i;j<end;j++)out+=a[j].toString(16).padStart(2,'0');}return out;}
+function forgeUpdateDigestFromU8(md,bytes){
+  const CH=0x8000;
+  for(let i=0;i<bytes.length;i+=CH)md.update(u8ToBinaryString(bytes.subarray(i,Math.min(bytes.length,i+CH))));
+}
+function forgeAlgorithmIdentifier(forge,oid){
+  return forge.asn1.create(forge.asn1.Class.UNIVERSAL,forge.asn1.Type.SEQUENCE,true,[
+    forge.asn1.create(forge.asn1.Class.UNIVERSAL,forge.asn1.Type.OID,false,forge.asn1.oidToDer(oid).getBytes()),
+    forge.asn1.create(forge.asn1.Class.UNIVERSAL,forge.asn1.Type.NULL,false,'')
+  ]);
+}
+function certificateIssuerAndSerialAsn1(forge,certificate){
+  // Lấy trực tiếp issuer + serial từ ASN.1 của certificate để tránh tái mã hóa DN/serial khác với certificate nhúng.
+  const certAsn1=forge.pki.certificateToAsn1(certificate);
+  const tbs=certAsn1?.value?.[0];
+  if(!tbs?.value?.length)throw new Error('Không đọc được TBS certificate để tạo SignerInfo.');
+  let i=0;
+  if(tbs.value[0]?.tagClass===forge.asn1.Class.CONTEXT_SPECIFIC && tbs.value[0]?.type===0)i=1; // v3 version [0]
+  const serial=tbs.value[i];
+  const issuer=tbs.value[i+2]; // serial, signatureAlgorithm, issuer
+  if(!serial||serial.type!==forge.asn1.Type.INTEGER||!issuer)throw new Error('Certificate thiếu issuer/serial ASN.1.');
+  return {certAsn1,issuer,serialValue:serial.value};
+}
 async function forgeCmsDetachedSignature(dataBytes,privateKey,certificate,signingTime=new Date()){
+  /*
+   * V6: KHÔNG dùng forge.pkcs7.createSignedData().
+   * Forge PKCS#7 builder đã phát sinh "Too few bytes to parse DER" trên Chrome với một số certificate tự tạo.
+   * Ta tạo CMS SignedData tối giản đúng chuẩn adbe.pkcs7.detached:
+   * - SHA-256 + RSA PKCS#1 v1.5
+   * - detached content (không nhúng dữ liệu PDF vào CMS)
+   * - không SignedAttributes; dạng này được adbe.pkcs7.detached cho phép
+   * - certificate được nhúng trong CMS
+   */
   const forge=await ensureForge();
-  if(!privateKey?.n||!privateKey?.e)throw new Error('Certificate cá nhân phải dùng khóa RSA.');
-  const p7=forge.pkcs7.createSignedData();
-  p7.content=forge.util.createBuffer(u8ToBinaryString(dataBytes),'raw');
-  p7.addCertificate(certificate);
-  p7.addSigner({
-    key:privateKey,certificate,digestAlgorithm:forge.pki.oids.sha256,
-    authenticatedAttributes:[
-      {type:forge.pki.oids.contentType,value:forge.pki.oids.data},
-      {type:forge.pki.oids.signingTime,value:signingTime||new Date()},
-      {type:forge.pki.oids.messageDigest}
-    ]
-  });
-  p7.sign({detached:true});
-  const der=forge.asn1.toDer(p7.toAsn1()).getBytes();
-  if(!der||der.length<64)throw new Error('CMS tạo ra không hợp lệ hoặc quá ngắn.');
+  if(!privateKey?.n||!privateKey?.e||!privateKey?.d)throw new Error('Private key cá nhân không phải RSA hợp lệ.');
+  if(!certificate?.publicKey?.n)throw new Error('Certificate cá nhân không có RSA public key hợp lệ.');
+  if(!(dataBytes instanceof Uint8Array))dataBytes=new Uint8Array(dataBytes||[]);
+  if(!dataBytes.length)throw new Error('Không có dữ liệu ByteRange để ký.');
+
+  // 1) Ký trực tiếp nội dung detached bằng SHA-256/RSA PKCS#1 v1.5.
+  const mdSign=forge.md.sha256.create();
+  forgeUpdateDigestFromU8(mdSign,dataBytes);
+  const signature=privateKey.sign(mdSign,'RSASSA-PKCS1-V1_5');
+  if(!signature||signature.length<128)throw new Error('RSA không tạo được chữ ký hợp lệ.');
+
+  // 2) Tự verify chữ ký trước khi đóng gói CMS.
+  const mdVerify=forge.md.sha256.create();
+  forgeUpdateDigestFromU8(mdVerify,dataBytes);
+  if(!certificate.publicKey.verify(mdVerify.digest().getBytes(),signature)){
+    throw new Error('RSA self-test thất bại: private key không khớp certificate.');
+  }
+
+  // 3) Dựng CMS SignedData DER thủ công, không qua forge.pkcs7.
+  const A=forge.asn1, C=A.Class, T=A.Type;
+  const {certAsn1,issuer,serialValue}=certificateIssuerAndSerialAsn1(forge,certificate);
+  const signerInfo=A.create(C.UNIVERSAL,T.SEQUENCE,true,[
+    A.create(C.UNIVERSAL,T.INTEGER,false,A.integerToDer(1).getBytes()),
+    A.create(C.UNIVERSAL,T.SEQUENCE,true,[
+      issuer,
+      A.create(C.UNIVERSAL,T.INTEGER,false,serialValue)
+    ]),
+    forgeAlgorithmIdentifier(forge,forge.pki.oids.sha256),
+    forgeAlgorithmIdentifier(forge,forge.pki.oids.rsaEncryption),
+    A.create(C.UNIVERSAL,T.OCTETSTRING,false,signature)
+  ]);
+
+  const signedData=A.create(C.UNIVERSAL,T.SEQUENCE,true,[
+    A.create(C.UNIVERSAL,T.INTEGER,false,A.integerToDer(1).getBytes()),
+    A.create(C.UNIVERSAL,T.SET,true,[forgeAlgorithmIdentifier(forge,forge.pki.oids.sha256)]),
+    // EncapsulatedContentInfo: chỉ OID data, KHÔNG có eContent => detached.
+    A.create(C.UNIVERSAL,T.SEQUENCE,true,[
+      A.create(C.UNIVERSAL,T.OID,false,A.oidToDer(forge.pki.oids.data).getBytes())
+    ]),
+    // certificates [0] IMPLICIT CertificateSet
+    A.create(C.CONTEXT_SPECIFIC,0,true,[certAsn1]),
+    A.create(C.UNIVERSAL,T.SET,true,[signerInfo])
+  ]);
+
+  const contentInfo=A.create(C.UNIVERSAL,T.SEQUENCE,true,[
+    A.create(C.UNIVERSAL,T.OID,false,A.oidToDer(forge.pki.oids.signedData).getBytes()),
+    A.create(C.CONTEXT_SPECIFIC,0,true,[signedData])
+  ]);
+
+  const der=A.toDer(contentInfo).getBytes();
+  if(!der||der.length<128)throw new Error('CMS DER tạo ra không hợp lệ hoặc quá ngắn.');
+
+  // 4) Round-trip parser để phát hiện cấu trúc DER lỗi TRƯỚC khi nhúng vào PDF.
+  try{
+    A.fromDer(forge.util.createBuffer(der),{strict:true,parseAllBytes:true,decodeBitStrings:false});
+  }catch(err){
+    throw new Error('CMS DER self-test thất bại: '+(err?.message||err));
+  }
   return binaryStringToU8(der);
 }
 async function signPreparedPdfWithForge(preparedBytes,privateKey,certificate,signingTime=new Date()){
@@ -851,9 +938,11 @@ async function signPreparedPdfWithForge(preparedBytes,privateKey,certificate,sig
   return result;
 }
 async function signPersonalWithPassword(pass){
+  let stage='mở certificate/private key';
   try{
     api.startBusy('Đang chuẩn bị bản sao để ký cá nhân…');
     const keyMaterial=await getPersonalKeyMaterial(pass);
+    stage='tạo appearance và nạp thư viện PDF';
     const [mods,appearanceBlob]=await Promise.all([ensureSignModules(),createAppearancePng()]);
     const {PDFDocument}=mods.pdfLib;
     const pdfDoc=await PDFDocument.load(st.bytes,{ignoreEncryption:false});
@@ -866,15 +955,18 @@ async function signPersonalWithPassword(pass){
       name:st.personal.name||'Người ký',location:'KanBan Cá Nhân',
       signatureLength:32768,widgetRect:rect,signingTime:new Date()
     });
+    stage='tạo PDF placeholder/ByteRange';
     const prepared=await pdfDoc.save({useObjectStreams:false,updateFieldAppearances:false});
     api.setStatus('Đang tạo chữ ký CMS và ByteRange…',70);
+    stage='tạo CMS detached SHA-256/RSA';
     const signed=await signPreparedPdfWithForge(prepared,keyMaterial.privateKey,keyMaterial.certificate,new Date());
+    stage='lưu bản sao PDF đã ký';
     await api.saveBlob(new Blob([signed],{type:'application/pdf'}),`${safeStem(st.file.name)}_BAN_SAO_KY_CA_NHAN.pdf`,'Bản sao PDF đã ký cá nhân');
     api.endBusy('Đã tạo bản sao và ký cá nhân. File gốc không thay đổi.');
   }catch(e){
     const msg=String(e?.message||e);
-    const friendly=/password|decrypt|mật khẩu/i.test(msg)?'Mật khẩu certificate không đúng. Nếu quên mật khẩu, hãy xóa certificate và tạo lại.':(/DER|ASN\.1/i.test(msg)?'Lỗi ASN.1/CMS khi tạo chữ ký. Bản này đã bỏ lớp @signpdf Signer; nếu vẫn gặp lỗi, hãy xóa certificate cũ và tạo certificate mới rồi thử lại. Chi tiết: '+msg:msg);
-    api.showError(new Error(`Ký cá nhân thất bại: ${friendly}`));
+    const friendly=/password|decrypt|mật khẩu/i.test(msg)?'Mật khẩu certificate không đúng.':msg;
+    api.showError(new Error(`Ký cá nhân thất bại ở bước “${stage}”: ${friendly}`));
   }
 }
 async function signEnterprise(){
