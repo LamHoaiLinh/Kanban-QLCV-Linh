@@ -260,3 +260,12 @@
 .office-sign-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
 .office-sign-modal .office-warning{margin-top:10px}
 @media(max-width:760px){.office-sign-topline{grid-template-columns:1fr}.office-sign-fullscreen-btn{width:100%}.office-sign-modal-layer{padding:0}.office-sign-modal,.office-sign-modal.wide{width:100vw;max-height:100dvh;height:auto;border-radius:0}}
+
+
+/* ===== v4.6 PDF Signing: certificate đơn giản + nhiều dòng thông tin ===== */
+.office-sign-extra-block{margin-top:10px;padding:10px;border:1px solid var(--border);border-radius:12px;background:var(--panel-soft)}
+.office-sign-extra-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}.office-sign-extra-head>div{display:grid;gap:2px}.office-sign-extra-head b{font-size:12px}.office-sign-extra-head span{font-size:10.5px;color:var(--muted)}
+.office-sign-extra-list{display:grid;gap:7px}.office-sign-extra-row{display:grid;grid-template-columns:minmax(130px,.65fr) minmax(170px,1.35fr) auto;gap:7px;align-items:end}.office-sign-extra-row .office-field{margin:0}.office-sign-extra-remove{min-height:40px;align-self:end}.office-sign-extra-empty{padding:8px 10px;border:1px dashed var(--border);border-radius:9px;color:var(--muted);font-size:11px;text-align:center;background:var(--panel)}
+.office-sign-modal-note{padding:9px 10px;border:1px solid var(--border);border-radius:10px;background:var(--panel-soft);color:var(--muted);font-size:11px;line-height:1.45}
+.office-sign-confirm-risk{display:flex;align-items:flex-start;gap:8px;margin-top:10px;padding:10px 11px;border:1px solid var(--border);border-radius:10px;background:var(--panel-soft);font-size:12px;font-weight:700}.office-sign-confirm-risk input{margin-top:2px;accent-color:var(--green)}
+@media(max-width:760px){.office-sign-extra-row{grid-template-columns:1fr}.office-sign-extra-remove{width:100%}}

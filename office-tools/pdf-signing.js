@@ -3,14 +3,15 @@
  * Scope: ONLY the PDF > Ký số sub-tool.
  * - Does not read/write Kanban task data.
  * - Uses a dedicated localStorage key + dedicated IndexedDB database.
- * - Personal signing: self-signed P12 generated and used locally in browser.
+ * - Personal signing: self-signed certificate + encrypted private key stored locally in browser.
  * - Enterprise signing: sends PDF only to a local Windows Signing Agent on 127.0.0.1.
  */
 
 const SIGN_SETTINGS_KEY = 'linh_kanban_pdf_signing_settings_v1';
 const SIGN_DB_NAME = 'linh_kanban_pdf_signing_store_v1';
 const SIGN_DB_STORE = 'secrets';
-const PERSONAL_P12_KEY = 'personal-p12';
+const PERSONAL_SECRET_KEY = 'personal-secret-v2';
+const LEGACY_PERSONAL_P12_KEY = 'personal-p12';
 const AGENT_URL = 'http://127.0.0.1:8765';
 const AGENT_DOWNLOAD = './office-tools/downloads/KanBan_Signing_Agent.exe';
 const SIGN_LIBS = {
@@ -22,8 +23,8 @@ const SIGN_LIBS = {
 
 const DEFAULTS = {
   mode: 'personal',
-  personal: {name:'',email:'',extraLabel:'Thông tin',extraValue:'',years:5,certMeta:null},
-  enterprise: {company:'',tax:'',certThumbprint:'',certLabel:'',tsa:''},
+  personal: {name:'',email:'',years:5,certMeta:null,extraFields:[]},
+  enterprise: {company:'',tax:'',certThumbprint:'',certLabel:'',tsa:'',extraFields:[]},
   design: {
     preset:'professional', layout:'logo-left',
     background:'#eef4ff', backgroundOpacity:100,
@@ -55,22 +56,53 @@ function createState(){
   const design={...DEFAULTS.design,...(saved.design||{})};
   // Font file tùy chỉnh chỉ tồn tại trong phiên hiện tại; không lưu byte font vào dữ liệu KanBan.
   design.customFontName='';
+  const personal={...DEFAULTS.personal,...(saved.personal||{})};
+  const enterprise={...DEFAULTS.enterprise,...(saved.enterprise||{})};
+  // Migrate cấu hình cũ chỉ có 1 nhãn/giá trị sang danh sách linh hoạt.
+  if(!Array.isArray(personal.extraFields)) personal.extraFields=[];
+  if(!personal.extraFields.length && saved.personal?.extraValue){
+    personal.extraFields=[{label:saved.personal.extraLabel||'Thông tin',value:saved.personal.extraValue||''}];
+  }
+  personal.extraFields=normalizeExtraFields(personal.extraFields);
+  if(!Array.isArray(enterprise.extraFields)) enterprise.extraFields=[];
+  enterprise.extraFields=normalizeExtraFields(enterprise.extraFields);
   return {
     mode: saved.mode || DEFAULTS.mode,
-    personal: {...DEFAULTS.personal,...(saved.personal||{})},
-    enterprise: {...DEFAULTS.enterprise,...(saved.enterprise||{})},
+    personal,
+    enterprise,
     design,
     file:null, bytes:null, pdfjsDoc:null, page:1, pageCount:0, pageSize:{width:595,height:842},
     rect:{x:55,y:690,w:250,h:70}, // top-left PDF coordinates
     previewScale:1,
     hasDigitalSignature:false,
-    allowRewriteSigned:false,
     customFontFace:null,
     customFontUrl:null,
     certRecord:null,
     agent:{online:false,version:'',certificates:[],busy:false},
     dragging:null,
   };
+}
+
+function normalizeExtraFields(fields){
+  return (Array.isArray(fields)?fields:[]).slice(0,12).map(x=>({
+    label:String(x?.label||'').slice(0,80), value:String(x?.value||'').slice(0,300)
+  }));
+}
+function extraFieldsHtml(mode,fields){
+  const prefix=mode==='personal'?'ps':'es';
+  const rows=normalizeExtraFields(fields);
+  const labelHints='Chức danh,Điện thoại,Website,Địa chỉ,Phòng ban,Mã nhân viên,CCCD,Email phụ';
+  return `<div class="office-sign-extra-block">
+    <div class="office-sign-extra-head"><div><b>Thông tin hiển thị thêm</b><span>Tự đặt nhãn bất kỳ: chức danh, điện thoại, website, địa chỉ…</span></div><button class="office-btn" type="button" id="${prefix}AddExtra">+ Thêm</button></div>
+    <datalist id="${prefix}ExtraHints">${labelHints.split(',').map(x=>`<option value="${escAttr(x)}"></option>`).join('')}</datalist>
+    <div class="office-sign-extra-list" id="${prefix}ExtraList">
+      ${rows.length?rows.map((r,i)=>`<div class="office-sign-extra-row" data-extra-row="${i}">
+        <label class="office-field"><span>Nhãn</span><input data-extra-label="${i}" list="${prefix}ExtraHints" value="${escAttr(r.label)}" placeholder="Ví dụ: Điện thoại"></label>
+        <label class="office-field"><span>Giá trị</span><input data-extra-value="${i}" value="${escAttr(r.value)}" placeholder="Ví dụ: 0901 234 567"></label>
+        <button type="button" class="office-btn danger office-sign-extra-remove" data-extra-remove="${i}" title="Xóa dòng này">Xóa</button>
+      </div>`).join(''):'<div class="office-sign-extra-empty">Chưa có thông tin thêm. Bấm “+ Thêm” nếu cần.</div>'}
+    </div>
+  </div>`;
 }
 
 function cloneSafeSettings(){
@@ -135,7 +167,6 @@ function documentCard(){
     ${st.file?`<div class="office-sign-pagebar"><button class="office-btn" id="signPrevPage" ${st.page<=1?'disabled':''}>←</button><label>Trang <input id="signPageNo" type="number" min="1" max="${st.pageCount}" value="${st.page}"> / ${st.pageCount}</label><button class="office-btn" id="signNextPage" ${st.page>=st.pageCount?'disabled':''}>→</button><span class="spacer"></span><button class="office-btn" id="signResetBox">Đặt lại ô ký</button></div>
     <div class="office-sign-pdf-stage" id="signPdfStage"><div class="office-sign-pdf-wrap" id="signPdfWrap"><canvas id="signPdfCanvas"></canvas><div class="office-sign-box" id="signBox"><span class="office-sign-box-hint">KÉO ĐỂ DI CHUYỂN</span><i class="office-sign-resize" title="Kéo để đổi kích thước"></i></div></div></div>
     <div class="office-sign-coords" id="signCoords"></div>`:''}
-    ${st.hasDigitalSignature&&st.mode==='personal'?`<div class="office-warning office-sign-signed-warning"><strong>PDF đã có chữ ký số.</strong> Ký cá nhân thuần trình duyệt phải lưu lại cấu trúc PDF và có thể làm chữ ký cũ mất hiệu lực. <label class="office-check"><input id="signAllowRewrite" type="checkbox" ${st.allowRewriteSigned?'checked':''}> Tôi hiểu rủi ro và vẫn muốn ký cá nhân trên bản này</label></div>`:''}
   </div>`;
 }
 
@@ -143,19 +174,18 @@ function identityCard(){
   if(st.mode==='personal'){
     const meta=st.personal.certMeta;
     return `<div class="office-card">
-      <div class="office-card-title-row"><div><h4>2. Chữ ký cá nhân</h4><p class="office-card-note">Tạo certificate self-signed ngay trên máy. Private key được lưu trong P12 đã mã hóa trong kho riêng của trình duyệt; mật khẩu không được lưu.</p></div><span class="office-recommend-badge">Không cần USB Token</span></div>
+      <div class="office-card-title-row"><div><h4>2. Chữ ký cá nhân</h4><p class="office-card-note">Certificate self-signed được tạo ngay trên máy. Private key được mã hóa bằng mật khẩu và lưu trong kho riêng của trình duyệt; không cần USB Token.</p></div><span class="office-recommend-badge">Không cần USB Token</span></div>
       <div class="office-grid">
         <label class="office-field"><span>Họ và tên</span><input id="psName" value="${escAttr(st.personal.name)}" placeholder="Ví dụ: Lâm Hoài Linh"></label>
         <label class="office-field"><span>Email</span><input id="psEmail" type="email" value="${escAttr(st.personal.email)}" placeholder="email@example.com"></label>
-        <label class="office-field"><span>Nhãn thông tin thêm</span><select id="psExtraLabel">${['Thông tin','CCCD','Chức danh','Mã cá nhân','Điện thoại'].map(x=>`<option ${st.personal.extraLabel===x?'selected':''}>${x}</option>`).join('')}</select></label>
-        <label class="office-field"><span>Giá trị</span><input id="psExtraValue" value="${escAttr(st.personal.extraValue)}" placeholder="Không bắt buộc"></label>
       </div>
-      <div class="office-sign-cert-status ${meta?'good':''}">${meta?`<b>✓ Đã có certificate cá nhân</b><span>${esc(meta.subject||st.personal.name)} · RSA ${meta.bits||2048} · hết hạn ${esc(meta.notAfter||'')}</span>`:'<b>Chưa có certificate cá nhân</b><span>Tạo một lần rồi dùng lại trên trình duyệt này.</span>'}</div>
+      ${extraFieldsHtml('personal',st.personal.extraFields)}
+      <div class="office-sign-cert-status ${meta?'good':''}">${meta?`<b>✓ Đã có certificate cá nhân</b><span>${esc(meta.subject||st.personal.name)} · RSA ${meta.bits||2048} · hết hạn ${esc(meta.notAfter||'')}</span>`:'<b>Chưa có certificate cá nhân</b><span>Khi bấm Ký cá nhân, KanBan sẽ mở popup tạo certificate ngay.</span>'}</div>
       <div class="office-grid office-sign-personal-tools">
-        <label class="office-field"><span>Hiệu lực certificate mới</span><select id="psYears">${[1,2,3,5,10].map(n=>`<option value="${n}" ${Number(st.personal.years)===n?'selected':''}>${n} năm</option>`).join('')}</select><small>Mật khẩu sẽ được hỏi trong popup khi tạo hoặc ký, không lưu trong KanBan.</small></label>
-        <div class="office-field"><span>Thao tác</span><div class="office-sign-security-note">Khi bấm <b>Ký cá nhân</b>, KanBan sẽ tự yêu cầu tạo certificate nếu chưa có và sẽ hiện popup nhập mật khẩu khi cần.</div></div>
+        <label class="office-field"><span>Hiệu lực certificate mới</span><select id="psYears">${[1,2,3,5,10].map(n=>`<option value="${n}" ${Number(st.personal.years)===n?'selected':''}>${n} năm</option>`).join('')}</select><small>Mật khẩu chỉ được hỏi trong popup khi tạo/kiểm tra/ký và không được lưu.</small></label>
+        <div class="office-field"><span>Cách dùng</span><div class="office-sign-security-note">Nếu quên mật khẩu, bấm <b>Xóa certificate</b> rồi tạo lại. Tên/email/thông tin hiển thị vẫn được giữ.</div></div>
       </div>
-      <div class="office-toolbar"><button class="office-btn primary" id="psCreate">${meta?'Tạo certificate mới / cập nhật':'Tạo certificate cá nhân'}</button><button class="office-btn" id="psImport">Nhập P12/PFX</button><button class="office-btn" id="psBackup" ${meta?'':'disabled'}>Tải bản sao P12</button><button class="office-btn" id="psCheck" ${meta?'':'disabled'}>Kiểm tra mật khẩu</button></div>
+      <div class="office-toolbar"><button class="office-btn primary" id="psCreate">${meta?'Tạo certificate mới / cập nhật':'Tạo certificate cá nhân'}</button><button class="office-btn danger" id="psDelete" ${meta?'':'disabled'}>Xóa certificate</button><button class="office-btn" id="psImport">Nhập P12/PFX</button><button class="office-btn" id="psBackup" ${meta?'':'disabled'}>Tải bản sao P12</button><button class="office-btn" id="psCheck" ${meta?'':'disabled'}>Kiểm tra mật khẩu</button></div>
       <div class="office-warning" style="margin-top:10px">Self-signed giúp phát hiện PDF bị sửa sau khi ký nhưng Foxit/Adobe có thể hiển thị <b>Unknown/Untrusted signer</b>. Không xem nó tương đương chữ ký số công cộng do CA cấp.</div>
     </div>`;
   }
@@ -166,13 +196,14 @@ function identityCard(){
       <label class="office-field"><span>Tên doanh nghiệp</span><input id="esCompany" value="${escAttr(st.enterprise.company)}" placeholder="CÔNG TY ..."></label>
       <label class="office-field"><span>MST</span><input id="esTax" value="${escAttr(st.enterprise.tax)}" placeholder="Mã số thuế"></label>
     </div>
+    ${extraFieldsHtml('enterprise',st.enterprise.extraFields)}
     <div class="office-sign-agent-panel">
       <div><b id="agentStatus">${agentOnline?`✓ Đã kết nối ${esc(st.agent.version||'KanBan Signing Agent')}`:'Chưa kết nối Agent tại 127.0.0.1:8765'}</b><span>${agentOnline?'USB Token/chứng thư được xử lý cục bộ trên Windows.':'Cài một lần trên Windows; sau đó chỉ cần cắm Token và mở Agent.'}</span></div>
       <div class="office-toolbar"><a class="office-btn primary" href="${AGENT_DOWNLOAD}" download>Tải Signing Agent (.exe)</a><button class="office-btn" id="agentCheck">Kiểm tra kết nối</button><button class="office-btn" id="agentCertRefresh" ${agentOnline?'':'disabled'}>Đọc chứng thư</button></div>
     </div>
     <div class="office-grid">
       <label class="office-field"><span>Chứng thư Windows</span><select id="esCert" ${agentOnline?'':'disabled'}>${certificateOptions()}</select><small>Ứng dụng ưu tiên certificate khớp tên/MST; tránh certificate localhost/test.</small></label>
-      <label class="office-field"><span>PIN USB Token</span><input id="esPin" type="password" autocomplete="off" placeholder="Không lưu PIN" ${agentOnline?'':'disabled'}></label>
+      <div class="office-field"><span>PIN USB Token</span><div class="office-sign-security-note">PIN sẽ được hỏi bằng popup khi bấm <b>KÝ DOANH NGHIỆP</b>; không lưu trong KanBan.</div></div>
       <label class="office-field"><span>TSA URL (tùy chọn)</span><input id="esTsa" value="${escAttr(st.enterprise.tsa)}" placeholder="Để trống nếu không dùng"></label>
       <div class="office-field"><span>Bảo mật</span><div class="office-sign-security-note">PDF và PIN chỉ gửi tới <b>127.0.0.1</b> trên chính máy. Agent không upload file lên máy chủ.</div></div>
     </div>
@@ -292,28 +323,47 @@ function bindDocument(){
   host.querySelector('#signNextPage')?.addEventListener('click',()=>setPage(st.page+1));
   host.querySelector('#signPageNo')?.addEventListener('change',e=>setPage(Number(e.target.value)||1));
   host.querySelector('#signResetBox')?.addEventListener('click',()=>{resetRect();renderPdfPage();});
-  const allow=host.querySelector('#signAllowRewrite');if(allow)allow.onchange=e=>st.allowRewriteSigned=e.target.checked;
 }
 function bindIdentity(){
   if(st.mode==='personal'){
     bindInput('#psName',v=>st.personal.name=v);
     bindInput('#psEmail',v=>st.personal.email=v);
-    bindInput('#psExtraValue',v=>st.personal.extraValue=v);
-    host.querySelector('#psExtraLabel')?.addEventListener('change',e=>{st.personal.extraLabel=e.target.value;saveSettings();renderDesignPreview();});
+    bindExtraFields('personal');
     host.querySelector('#psYears')?.addEventListener('change',e=>{st.personal.years=Number(e.target.value)||5;saveSettings();});
     host.querySelector('#psCreate')?.addEventListener('click',createPersonalCertificate);
+    host.querySelector('#psDelete')?.addEventListener('click',deletePersonalCertificate);
     host.querySelector('#psImport')?.addEventListener('click',importPersonalP12);
     host.querySelector('#psBackup')?.addEventListener('click',backupPersonalP12);
-    host.querySelector('#psCheck')?.addEventListener('click',checkPersonalP12);
+    host.querySelector('#psCheck')?.addEventListener('click',checkPersonalSecret);
   }else{
     bindInput('#esCompany',v=>st.enterprise.company=v);
     bindInput('#esTax',v=>st.enterprise.tax=v);
+    bindExtraFields('enterprise');
     bindInput('#esTsa',v=>st.enterprise.tsa=v);
     host.querySelector('#agentCheck')?.addEventListener('click',()=>checkAgent(true));
     host.querySelector('#agentCertRefresh')?.addEventListener('click',refreshAgentCertificates);
     host.querySelector('#esCert')?.addEventListener('change',e=>{st.enterprise.certThumbprint=e.target.value;const c=st.agent.certificates.find(x=>x.thumbprint===e.target.value);st.enterprise.certLabel=c?.who||'';saveSettings();renderDesignPreview();});
   }
 }
+function bindExtraFields(mode){
+  const target=mode==='personal'?st.personal:st.enterprise;
+  const prefix=mode==='personal'?'ps':'es';
+  host.querySelector(`#${prefix}AddExtra`)?.addEventListener('click',()=>{
+    target.extraFields=normalizeExtraFields(target.extraFields);
+    if(target.extraFields.length>=12)return alert('Tối đa 12 dòng thông tin thêm.');
+    target.extraFields.push({label:'',value:''});saveSettings();render();
+  });
+  host.querySelectorAll(`[data-extra-label]`).forEach(el=>el.addEventListener('input',e=>{
+    const i=Number(e.currentTarget.dataset.extraLabel);target.extraFields[i]??={label:'',value:''};target.extraFields[i].label=e.currentTarget.value;saveSettings();renderDesignPreview();updateBoxArtwork();
+  }));
+  host.querySelectorAll(`[data-extra-value]`).forEach(el=>el.addEventListener('input',e=>{
+    const i=Number(e.currentTarget.dataset.extraValue);target.extraFields[i]??={label:'',value:''};target.extraFields[i].value=e.currentTarget.value;saveSettings();renderDesignPreview();updateBoxArtwork();
+  }));
+  host.querySelectorAll(`[data-extra-remove]`).forEach(el=>el.addEventListener('click',e=>{
+    const i=Number(e.currentTarget.dataset.extraRemove);target.extraFields.splice(i,1);saveSettings();render();
+  }));
+}
+
 function bindInput(sel,setter){
   const el=host.querySelector(sel);if(!el)return;el.addEventListener('input',e=>{setter(e.target.value);saveSettings();renderDesignPreview();updateBoxArtwork();});
 }
@@ -365,7 +415,7 @@ async function loadPdf(file){
     const pdfjs=await api.ensurePdfJs();
     const task=pdfjs.getDocument({data:bytes.slice()});
     const doc=await task.promise;
-    st.file=file;st.bytes=bytes;st.pdfjsDoc=doc;st.page=1;st.pageCount=doc.numPages;st.hasDigitalSignature=bytesContainAscii(bytes,'/ByteRange');st.allowRewriteSigned=false;
+    st.file=file;st.bytes=bytes;st.pdfjsDoc=doc;st.page=1;st.pageCount=doc.numPages;st.hasDigitalSignature=bytesContainAscii(bytes,'/ByteRange');
     const p=await doc.getPage(1);const vp=p.getViewport({scale:1});st.pageSize={width:vp.width,height:vp.height};resetRect();
     api.endBusy(`Đã đọc ${doc.numPages} trang PDF.`);render();
   }catch(e){api.showError(e)}
@@ -451,7 +501,9 @@ async function drawSignatureArtwork(canvas,width,height,pxPerPt){
   else if(d.logoMode==='seal'){const size=Math.min(inner.h*.82,inner.w*.25)*logoPct;const cx=inner.x+size/2,cy=inner.y+inner.h/2;ctx.save();ctx.strokeStyle=d.accentColor||d.primaryColor;ctx.lineWidth=Math.max(1,1.6*s);ctx.beginPath();ctx.arc(cx,cy,size*.46,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.arc(cx,cy,size*.36,0,Math.PI*2);ctx.stroke();ctx.fillStyle=d.accentColor||d.primaryColor;ctx.font=`${Math.round(size*.26)}px ${currentFontFamily()}`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(initials(primaryText()),cx,cy);ctx.restore();text.x+=size+logoGap;text.w-=size+logoGap;}
 
   const lines=signatureLines();const family=currentFontFamily();const align=d.align;ctx.textAlign=align;ctx.textBaseline='alphabetic';const tx=align==='center'?text.x+text.w/2:align==='right'?text.x+text.w:text.x;let total=0;
-  const metrics=lines.map(line=>{const size=(line.kind==='primary'?d.primarySize:line.kind==='label'?d.labelSize:d.metaSize)*s;const lh=size*d.lineHeight;total+=lh;return {line,size,lh};});
+  let metrics=lines.map(line=>{const size=(line.kind==='primary'?d.primarySize:line.kind==='label'?d.labelSize:d.metaSize)*s;const lh=size*d.lineHeight;total+=lh;return {line,size,lh};});
+  // Nhiều dòng thông tin: tự co toàn bộ cỡ chữ theo chiều cao để không tràn khỏi ô ký.
+  if(total>text.h&&total>0){const fit=Math.max(.52,text.h/total);total=0;metrics=metrics.map(m=>{const size=m.size*fit,lh=m.lh*fit;total+=lh;return {...m,size,lh};});}
   let y=text.y+Math.max(0,(text.h-total)/2);
   for(const m of metrics){y+=m.lh*.78;ctx.fillStyle=m.line.kind==='primary'?d.primaryColor:d.secondaryColor;const weight=m.line.kind==='primary'?d.fontWeight:(m.line.kind==='label'?'500':'400');let fs=m.size;ctx.font=`${weight} ${fs}px ${family}`;const max=text.w;while(fs>3*s&&ctx.measureText(m.line.text).width>max){fs*=.94;ctx.font=`${weight} ${fs}px ${family}`;}ctx.fillText(m.line.text,tx,y,max);y+=m.lh*.22;}
 }
@@ -462,8 +514,9 @@ function signatureLines(){
   lines.push({kind:'primary',text:primaryText()||'NGƯỜI KÝ'});
   if(st.mode==='enterprise'){
     if(d.showExtra&&st.enterprise.tax)lines.push({kind:'meta',text:`MST: ${st.enterprise.tax}`});
+    if(d.showExtra)normalizeExtraFields(st.enterprise.extraFields).forEach(f=>{if(f.value.trim())lines.push({kind:'meta',text:`${f.label.trim()||'Thông tin'}: ${f.value.trim()}`})});
   }else{
-    if(d.showExtra&&st.personal.extraValue)lines.push({kind:'meta',text:`${st.personal.extraLabel||'Thông tin'}: ${st.personal.extraValue}`});
+    if(d.showExtra)normalizeExtraFields(st.personal.extraFields).forEach(f=>{if(f.value.trim())lines.push({kind:'meta',text:`${f.label.trim()||'Thông tin'}: ${f.value.trim()}`})});
     if(d.showEmail&&st.personal.email)lines.push({kind:'meta',text:`Email: ${st.personal.email}`});
   }
   if(d.customLine1.trim())lines.push({kind:'meta',text:d.customLine1.trim()});if(d.customLine2.trim())lines.push({kind:'meta',text:d.customLine2.trim()});
@@ -526,12 +579,12 @@ async function requestPersonalPassword({title='Nhập mật khẩu certificate',
     title,
     subtitle:'Mật khẩu chỉ dùng trong lần thao tác này và không được lưu.',
     confirm,
-    html:`<label class="office-field"><span>Mật khẩu P12/PFX</span><input name="password" type="password" autocomplete="current-password" required placeholder="Nhập mật khẩu certificate"></label>`,
+    html:`<label class="office-field"><span>Mật khẩu certificate</span><input name="password" type="password" autocomplete="current-password" required placeholder="Nhập mật khẩu certificate"></label>`,
     validate:async v=>{
       if(!v.password)return 'Vui lòng nhập mật khẩu.';
       if(verify){
-        try{await parseP12Meta(st.certRecord.bytes,v.password)}
-        catch{return 'Mật khẩu không đúng hoặc file certificate không đọc được. Vui lòng thử lại.'}
+        try{await getPersonalKeyMaterial(v.password)}
+        catch{return 'Mật khẩu không đúng. Nếu đã quên mật khẩu, hãy đóng popup, bấm “Xóa certificate” rồi tạo lại.'}
       }
       return '';
     }
@@ -542,20 +595,18 @@ async function createPersonalCertificate(options={}){
   const continueToSign=Boolean(options.continueToSign);
   const result=await openSigningForm({
     title:st.certRecord?'Tạo certificate cá nhân mới':'Tạo certificate cá nhân',
-    subtitle:'Certificate self-signed được tạo ngay trên trình duyệt. Private key được mã hóa trong P12 và lưu cục bộ.',
+    subtitle:'Không cần USB Token. Certificate và private key được tạo ngay trên trình duyệt; private key được mã hóa bằng mật khẩu.',
     confirm:continueToSign?'Tạo & ký PDF':'Tạo certificate',
     wide:true,
     html:`<div class="office-grid">
       <label class="office-field"><span>Họ và tên</span><input name="name" value="${escAttr(st.personal.name)}" required placeholder="Ví dụ: Lâm Hoài Linh"></label>
       <label class="office-field"><span>Email</span><input name="email" type="email" value="${escAttr(st.personal.email)}" placeholder="email@example.com"></label>
-      <label class="office-field"><span>Nhãn thông tin thêm</span><select name="extraLabel">${['Thông tin','CCCD','Chức danh','Mã cá nhân','Điện thoại'].map(x=>`<option ${st.personal.extraLabel===x?'selected':''}>${x}</option>`).join('')}</select></label>
-      <label class="office-field"><span>Giá trị</span><input name="extraValue" value="${escAttr(st.personal.extraValue)}" placeholder="Không bắt buộc"></label>
       <label class="office-field"><span>Hiệu lực</span><select name="years">${[1,2,3,5,10].map(n=>`<option value="${n}" ${Number(st.personal.years)===n?'selected':''}>${n} năm</option>`).join('')}</select></label>
       <div></div>
-      <label class="office-field"><span>Mật khẩu P12</span><input name="password" type="password" autocomplete="new-password" required placeholder="Ít nhất 6 ký tự"></label>
+      <label class="office-field"><span>Mật khẩu certificate</span><input name="password" type="password" autocomplete="new-password" required placeholder="Ít nhất 6 ký tự"></label>
       <label class="office-field"><span>Nhập lại mật khẩu</span><input name="password2" type="password" autocomplete="new-password" required placeholder="Nhập lại mật khẩu"></label>
     </div>
-    <div class="office-warning">Hãy nhớ mật khẩu và nên tải bản sao P12 sau khi tạo. Nếu quên mật khẩu, certificate hiện tại không thể dùng để ký.</div>`,
+    <div class="office-sign-modal-note">Các dòng như Chức danh, Điện thoại, Website… được lấy từ phần “Thông tin hiển thị thêm” trên giao diện và có thể sửa bất cứ lúc nào mà không cần tạo lại certificate.</div>`,
     validate:v=>{
       if(!String(v.name||'').trim())return 'Vui lòng nhập họ và tên.';
       if(String(v.password||'').length<6)return 'Mật khẩu nên có ít nhất 6 ký tự.';
@@ -565,7 +616,7 @@ async function createPersonalCertificate(options={}){
   });
   if(!result)return false;
   const name=String(result.name||'').trim(),email=String(result.email||'').trim(),pass=String(result.password||'');
-  st.personal.name=name;st.personal.email=email;st.personal.extraLabel=result.extraLabel||'Thông tin';st.personal.extraValue=result.extraValue||'';st.personal.years=Number(result.years)||5;
+  st.personal.name=name;st.personal.email=email;st.personal.years=Number(result.years)||5;
   try{
     api.startBusy('Đang tạo RSA key và certificate cá nhân…');
     const forge=await ensureForge();
@@ -581,52 +632,127 @@ async function createPersonalCertificate(options={}){
     cert.setSubject(attrs);cert.setIssuer(attrs);
     cert.setExtensions([{name:'basicConstraints',cA:false},{name:'keyUsage',digitalSignature:true,nonRepudiation:true},{name:'extKeyUsage',clientAuth:true,emailProtection:true},{name:'subjectKeyIdentifier'}]);
     cert.sign(keys.privateKey,forge.md.sha256.create());
-    const p12=forge.pkcs12.toPkcs12Asn1(keys.privateKey,[cert],pass,{algorithm:'3des',friendlyName:name});
-    const der=forge.asn1.toDer(p12).getBytes();
-    const bytes=binaryStringToU8(der);
-    await parseP12Meta(bytes,pass);
-    const meta={subject:name,email,bits:2048,notAfter:cert.validity.notAfter.toLocaleDateString('vi-VN'),createdAt:new Date().toISOString(),certPem:forge.pki.certificateToPem(cert)};
-    const stored=bytes.slice();
-    await idbPut(PERSONAL_P12_KEY,{bytes:stored.buffer,meta});
-    st.certRecord={bytes:stored,meta};st.personal.certMeta=meta;saveSettings();
+    const certPem=forge.pki.certificateToPem(cert);
+    const encryptedKeyPem=forge.pki.encryptRsaPrivateKey(keys.privateKey,pass,{algorithm:'aes256'});
+    // Kiểm tra ngay bằng chính mật khẩu vừa nhập trước khi lưu.
+    if(!forge.pki.decryptRsaPrivateKey(encryptedKeyPem,pass))throw new Error('Không kiểm tra được private key sau khi tạo.');
+    const meta={subject:name,email,bits:2048,notAfter:cert.validity.notAfter.toLocaleDateString('vi-VN'),createdAt:new Date().toISOString(),certPem,storage:'pem-v2'};
+    const record={kind:'pem-v2',certPem,encryptedKeyPem,meta};
+    await idbPut(PERSONAL_SECRET_KEY,record);
+    // Xóa bản P12 cũ để không vô tình dùng lại certificate lỗi.
+    await idbDelete(LEGACY_PERSONAL_P12_KEY).catch(()=>{});
+    st.certRecord=record;st.personal.certMeta=meta;saveSettings();
     api.endBusy('Đã tạo certificate cá nhân.');
     render();
-    if(continueToSign){
-      await signPersonalWithPassword(pass);
-    }else{
-      setTimeout(()=>alert('Đã tạo certificate cá nhân. Nên bấm “Tải bản sao P12” và lưu ở nơi an toàn.'),50);
-    }
+    if(continueToSign){if(await confirmPersonalRewriteIfNeeded())await signPersonalWithPassword(pass);}
+    else setTimeout(()=>alert('Đã tạo certificate cá nhân. Mật khẩu không được lưu. Nên tải bản sao P12 và cất ở nơi an toàn.'),50);
     return true;
   }catch(e){api.showError(e);return false}
 }
+
+async function deletePersonalCertificate(){
+  if(!st.certRecord)return;
+  const ok=confirm('Xóa certificate cá nhân đang lưu trên trình duyệt này?\n\nTên, email và các thông tin hiển thị vẫn được giữ để anh tạo certificate mới.');
+  if(!ok)return;
+  try{
+    await idbDelete(PERSONAL_SECRET_KEY).catch(()=>{});
+    await idbDelete(LEGACY_PERSONAL_P12_KEY).catch(()=>{});
+    st.certRecord=null;st.personal.certMeta=null;saveSettings();render();
+    api.setStatus('Đã xóa certificate cá nhân. Có thể tạo lại ngay.',100);
+  }catch(e){api.showError(e)}
+}
+
+async function parseImportedP12(bytes,password){
+  const forge=await ensureForge();
+  const asn1=forge.asn1.fromDer(u8ToBinaryString(bytes));
+  const p12=forge.pkcs12.pkcs12FromAsn1(asn1,false,password);
+  const certBags=p12.getBags({bagType:forge.pki.oids.certBag})[forge.pki.oids.certBag]||[];
+  let keyBags=p12.getBags({bagType:forge.pki.oids.pkcs8ShroudedKeyBag})[forge.pki.oids.pkcs8ShroudedKeyBag]||[];
+  if(!keyBags.length)keyBags=p12.getBags({bagType:forge.pki.oids.keyBag})[forge.pki.oids.keyBag]||[];
+  const privateKey=keyBags.find(b=>b?.key)?.key;
+  if(!privateKey)throw new Error('P12/PFX không có private key.');
+  let certificate=null;
+  for(const b of certBags){
+    if(!b?.cert)continue;
+    const pub=b.cert.publicKey;
+    if(pub?.n&&privateKey?.n&&privateKey.n.compareTo(pub.n)===0){certificate=b.cert;break}
+  }
+  certificate ||= certBags.find(b=>b?.cert)?.cert;
+  if(!certificate)throw new Error('P12/PFX không có certificate.');
+  const cn=certificate.subject.getField('CN')?.value||'Certificate cá nhân';
+  const email=certificate.subject.getField('E')?.value||'';
+  let bits=2048;try{bits=certificate.publicKey.n.bitLength()}catch{}
+  const certPem=forge.pki.certificateToPem(certificate);
+  return {forge,privateKey,certificate,certPem,meta:{subject:cn,email,bits,notAfter:certificate.validity.notAfter.toLocaleDateString('vi-VN'),importedAt:new Date().toISOString(),certPem,storage:'pem-v2'}};
+}
+
 async function importPersonalP12(){
   const files=await api.fileInput('.p12,.pfx,application/x-pkcs12',false);const f=files?.[0];if(!f)return;
   const bytes=new Uint8Array(await f.arrayBuffer());
   const result=await openSigningForm({
     title:'Nhập P12/PFX cá nhân',
-    subtitle:`File: ${f.name}. Mật khẩu chỉ dùng để kiểm tra và không được lưu.`,
+    subtitle:`File: ${f.name}. Sau khi nhập, KanBan chuyển certificate sang kho nội bộ ổn định hơn để ký trên trình duyệt.`,
     confirm:'Nhập certificate',
     html:`<label class="office-field"><span>Mật khẩu P12/PFX</span><input name="password" type="password" autocomplete="current-password" required placeholder="Nhập mật khẩu"></label>`,
-    validate:async v=>{try{await parseP12Meta(bytes,v.password);return ''}catch{return 'Mật khẩu không đúng hoặc P12/PFX không hợp lệ.'}}
+    validate:async v=>{try{await parseImportedP12(bytes,v.password);return ''}catch{return 'Mật khẩu không đúng hoặc P12/PFX không hợp lệ.'}}
   });
   if(!result)return;
   try{
     api.startBusy('Đang nhập P12/PFX…');
-    const meta=await parseP12Meta(bytes,result.password);
-    const stored=bytes.slice();
-    await idbPut(PERSONAL_P12_KEY,{bytes:stored.buffer,meta});
-    st.certRecord={bytes:stored,meta};st.personal.certMeta=meta;st.personal.name=meta.subject||st.personal.name;st.personal.email=meta.email||st.personal.email;saveSettings();
-    api.endBusy('Đã nhập P12/PFX cá nhân.');render();
+    const parsed=await parseImportedP12(bytes,result.password);
+    const encryptedKeyPem=parsed.forge.pki.encryptRsaPrivateKey(parsed.privateKey,result.password,{algorithm:'aes256'});
+    const record={kind:'pem-v2',certPem:parsed.certPem,encryptedKeyPem,meta:parsed.meta};
+    await idbPut(PERSONAL_SECRET_KEY,record);
+    await idbDelete(LEGACY_PERSONAL_P12_KEY).catch(()=>{});
+    st.certRecord=record;st.personal.certMeta=parsed.meta;st.personal.name=parsed.meta.subject||st.personal.name;st.personal.email=parsed.meta.email||st.personal.email;saveSettings();
+    api.endBusy('Đã nhập certificate cá nhân.');render();
   }catch(e){api.showError(e)}
 }
-async function backupPersonalP12(){if(!st.certRecord)return;await api.saveBlob(new Blob([st.certRecord.bytes],{type:'application/x-pkcs12'}),`${safeStem(st.personal.name||'chu_ky_ca_nhan')}.p12`,'PKCS#12');}
-async function checkPersonalP12(){
+
+async function getPersonalKeyMaterial(password){
+  if(!st.certRecord)throw new Error('Chưa có certificate cá nhân.');
+  const forge=await ensureForge();
+  if(st.certRecord.kind==='pem-v2'){
+    const privateKey=forge.pki.decryptRsaPrivateKey(st.certRecord.encryptedKeyPem,password);
+    if(!privateKey)throw new Error('Mật khẩu không đúng.');
+    const certificate=forge.pki.certificateFromPem(st.certRecord.certPem);
+    return {forge,privateKey,certificate};
+  }
+  // Tương thích certificate P12 của các bản KanBan cũ; nếu mở được sẽ tự chuyển sang định dạng mới.
+  if(st.certRecord.bytes){
+    const parsed=await parseImportedP12(st.certRecord.bytes,password);
+    const encryptedKeyPem=parsed.forge.pki.encryptRsaPrivateKey(parsed.privateKey,password,{algorithm:'aes256'});
+    const record={kind:'pem-v2',certPem:parsed.certPem,encryptedKeyPem,meta:parsed.meta};
+    await idbPut(PERSONAL_SECRET_KEY,record);
+    st.certRecord=record;st.personal.certMeta=parsed.meta;saveSettings();
+    return {forge:parsed.forge,privateKey:parsed.privateKey,certificate:parsed.certificate};
+  }
+  throw new Error('Dữ liệu certificate không hợp lệ. Hãy xóa và tạo lại.');
+}
+
+async function backupPersonalP12(){
+  if(!st.certRecord)return;
+  const r=await requestPersonalPassword({title:'Mật khẩu để xuất bản sao P12',confirm:'Tạo P12',verify:true});if(!r)return;
+  try{
+    const {forge,privateKey,certificate}=await getPersonalKeyMaterial(r.password);
+    const p12=forge.pkcs12.toPkcs12Asn1(privateKey,[certificate],r.password,{algorithm:'3des',friendlyName:st.personal.name||'KanBan Personal'});
+    const bytes=binaryStringToU8(forge.asn1.toDer(p12).getBytes());
+    await api.saveBlob(new Blob([bytes],{type:'application/x-pkcs12'}),`${safeStem(st.personal.name||'chu_ky_ca_nhan')}.p12`,'PKCS#12');
+  }catch(e){api.showError(e)}
+}
+async function checkPersonalSecret(){
   if(!st.certRecord)return createPersonalCertificate();
   const r=await requestPersonalPassword({title:'Kiểm tra mật khẩu certificate',confirm:'Kiểm tra',verify:true});
   if(r)alert('Mật khẩu đúng. Certificate cá nhân sẵn sàng để ký.');
 }
-async function parseP12Meta(bytes,password){const forge=await ensureForge();const asn1=forge.asn1.fromDer(u8ToBinaryString(bytes));const p12=forge.pkcs12.pkcs12FromAsn1(asn1,false,password);const bags=p12.getBags({bagType:forge.pki.oids.certBag})[forge.pki.oids.certBag]||[];const cert=bags[0]?.cert;if(!cert)throw new Error('P12 không có certificate.');const cn=cert.subject.getField('CN')?.value||'Certificate cá nhân';const email=cert.subject.getField('E')?.value||'';let bits=2048;try{bits=cert.publicKey.n.bitLength()}catch{}return {subject:cn,email,bits,notAfter:cert.validity.notAfter.toLocaleDateString('vi-VN'),importedAt:new Date().toISOString(),certPem:forge.pki.certificateToPem(cert)};}
-async function loadPersonalRecordQuiet(){try{const r=await idbGet(PERSONAL_P12_KEY);if(r?.bytes){st.certRecord={bytes:new Uint8Array(r.bytes),meta:r.meta||{}};st.personal.certMeta=r.meta||st.personal.certMeta;}}catch{}}
+async function loadPersonalRecordQuiet(){
+  try{
+    const fresh=await idbGet(PERSONAL_SECRET_KEY);
+    if(fresh?.encryptedKeyPem&&fresh?.certPem){st.certRecord=fresh;st.personal.certMeta=fresh.meta||st.personal.certMeta;return}
+    const legacy=await idbGet(LEGACY_PERSONAL_P12_KEY);
+    if(legacy?.bytes){st.certRecord={kind:'legacy-p12',bytes:new Uint8Array(legacy.bytes),meta:legacy.meta||{}};st.personal.certMeta=legacy.meta||st.personal.certMeta;}
+  }catch{}
+}
 
 async function checkAgent(show=true){
   try{const r=await fetch(`${AGENT_URL}/health`,{method:'GET',headers:{'X-KanBan-Agent':'linh-kanban-v1'},cache:'no-store',targetAddressSpace:'loopback'});if(!r.ok)throw new Error(`HTTP ${r.status}`);const j=await r.json();st.agent.online=true;st.agent.version=j.version||'KanBan Signing Agent';if(show)alert(`Đã kết nối ${st.agent.version}.`);render();await refreshAgentCertificates();return true;}catch(e){st.agent.online=false;st.agent.certificates=[];if(show)alert('Chưa kết nối Signing Agent. Hãy tải/cài Agent, mở Agent rồi thử lại.');render();return false;}
@@ -636,10 +762,22 @@ async function refreshAgentCertificates(){
   try{api.startBusy('Đang đọc chứng thư Windows qua Agent…');const q=new URLSearchParams({company:st.enterprise.company||'',tax:st.enterprise.tax||''});const r=await fetch(`${AGENT_URL}/certificates?${q}`,{headers:{'X-KanBan-Agent':'linh-kanban-v1'},cache:'no-store',targetAddressSpace:'loopback'});if(!r.ok)throw new Error(await r.text());const j=await r.json();st.agent.certificates=Array.isArray(j.certificates)?j.certificates:[];const best=[...st.agent.certificates].sort((a,b)=>scoreCert(b)-scoreCert(a))[0];const current=st.agent.certificates.find(c=>c.thumbprint===st.enterprise.certThumbprint);if(best&&scoreCert(best)>0&&(!current||scoreCert(best)>scoreCert(current)+50)){st.enterprise.certThumbprint=best.thumbprint;st.enterprise.certLabel=best.who||'';saveSettings();}api.endBusy(`Đã đọc ${st.agent.certificates.length} chứng thư Windows.`);render();}catch(e){api.showError(e)}
 }
 
+async function confirmPersonalRewriteIfNeeded(){
+  if(!st.hasDigitalSignature)return true;
+  const r=await openSigningForm({
+    title:'PDF đã có chữ ký số',
+    subtitle:'KanBan luôn xuất ra một file mới và không thay đổi file gốc.',
+    confirm:'Tôi hiểu, tiếp tục ký bản sao',
+    html:`<div class="office-warning"><b>Lưu ý về chữ ký đã có</b><br>Ký cá nhân thuần trình duyệt cần dựng lại cấu trúc PDF để chèn hình chữ ký. Vì vậy chữ ký số đã có trên <b>bản sao mới</b> có thể bị Foxit/Adobe đánh dấu không còn hợp lệ. <b>File gốc của anh vẫn nguyên vẹn.</b></div>
+      <label class="office-check office-sign-confirm-risk"><input name="understand" type="checkbox" value="yes"> Tôi đã hiểu và muốn tạo bản sao để ký cá nhân</label>`,
+    validate:v=>v.understand==='yes'?'':'Vui lòng đánh dấu xác nhận trước khi tiếp tục.'
+  });
+  return Boolean(r);
+}
+
 async function runSign(){
   if(!st.file||!st.bytes)return alert('Hãy chọn PDF.');
   if(st.mode==='personal'){
-    if(st.hasDigitalSignature&&!st.allowRewriteSigned)return alert('PDF đã có chữ ký số. Ký cá nhân thuần trình duyệt có thể làm chữ ký cũ mất hiệu lực. Nếu vẫn muốn tiếp tục, hãy đánh dấu ô xác nhận rủi ro bên dưới preview PDF.');
     if(!st.certRecord)return createPersonalCertificate({continueToSign:true});
     return signPersonal();
   }
@@ -647,35 +785,21 @@ async function runSign(){
 }
 async function signPersonal(){
   if(!st.certRecord)return createPersonalCertificate({continueToSign:true});
-  if(st.hasDigitalSignature&&!st.allowRewriteSigned)return alert('PDF đã có chữ ký số. Ký cá nhân thuần trình duyệt có thể làm chữ ký cũ mất hiệu lực. Nếu vẫn muốn tiếp tục, hãy đánh dấu ô xác nhận rủi ro bên dưới preview PDF.');
-  const r=await requestPersonalPassword({title:'Nhập mật khẩu để ký PDF',confirm:'KÝ PDF',verify:true});
+  if(!(await confirmPersonalRewriteIfNeeded()))return;
+  const r=await requestPersonalPassword({title:'Nhập mật khẩu certificate để ký',confirm:'KÝ BẢN SAO PDF',verify:true});
   if(!r)return;
   return signPersonalWithPassword(r.password);
 }
-async function makeForgeP12Signer(mods,p12Bytes,passphrase){
+async function makeForgeKeySigner(mods,privateKey,certificate){
   const forge=await ensureForge();
   const BaseSigner=mods.signpdf.Signer;
   if(!BaseSigner)throw new Error('Thư viện ký PDF không cung cấp Signer base.');
   return new (class extends BaseSigner{
     async sign(pdfBuffer,signingTime=undefined){
-      const p12Asn1=forge.asn1.fromDer(forge.util.createBuffer(u8ToBinaryString(p12Bytes)));
-      const p12=forge.pkcs12.pkcs12FromAsn1(p12Asn1,false,passphrase);
-      const certBags=p12.getBags({bagType:forge.pki.oids.certBag})[forge.pki.oids.certBag]||[];
-      let keyBags=p12.getBags({bagType:forge.pki.oids.pkcs8ShroudedKeyBag})[forge.pki.oids.pkcs8ShroudedKeyBag]||[];
-      if(!keyBags.length)keyBags=p12.getBags({bagType:forge.pki.oids.keyBag})[forge.pki.oids.keyBag]||[];
-      const privateKey=keyBags[0]?.key;
-      if(!privateKey)throw new Error('Certificate không có private key để ký.');
-      if(!privateKey.n||!privateKey.e)throw new Error('Ký cá nhân trên trình duyệt hiện hỗ trợ certificate RSA.');
+      if(!privateKey?.n||!privateKey?.e)throw new Error('Ký cá nhân trên trình duyệt hiện hỗ trợ certificate RSA.');
       const p7=forge.pkcs7.createSignedData();
       p7.content=forge.util.createBuffer(u8ToBinaryString(pdfBuffer));
-      let certificate=null;
-      for(const bag of certBags){
-        if(!bag?.cert)continue;
-        p7.addCertificate(bag.cert);
-        const pub=bag.cert.publicKey;
-        if(pub?.n&&pub?.e&&privateKey.n.compareTo(pub.n)===0&&privateKey.e.compareTo(pub.e)===0)certificate=bag.cert;
-      }
-      if(!certificate)throw new Error('Không tìm thấy certificate khớp với private key.');
+      p7.addCertificate(certificate);
       p7.addSigner({
         key:privateKey,certificate,digestAlgorithm:forge.pki.oids.sha256,
         authenticatedAttributes:[
@@ -691,8 +815,8 @@ async function makeForgeP12Signer(mods,p12Bytes,passphrase){
 }
 async function signPersonalWithPassword(pass){
   try{
-    api.startBusy('Đang chuẩn bị chữ ký cá nhân…');
-    await parseP12Meta(st.certRecord.bytes,pass);
+    api.startBusy('Đang chuẩn bị bản sao để ký cá nhân…');
+    const keyMaterial=await getPersonalKeyMaterial(pass);
     const [mods,appearanceBlob]=await Promise.all([ensureSignModules(),createAppearancePng()]);
     const {PDFDocument}=mods.pdfLib;
     const pdfDoc=await PDFDocument.load(st.bytes,{ignoreEncryption:false});
@@ -706,23 +830,30 @@ async function signPersonalWithPassword(pass){
       signatureLength:32768,widgetRect:rect,signingTime:new Date()
     });
     const prepared=await pdfDoc.save({useObjectStreams:false,updateFieldAppearances:false});
-    const signer=await makeForgeP12Signer(mods,st.certRecord.bytes,pass);
+    const signer=await makeForgeKeySigner(mods,keyMaterial.privateKey,keyMaterial.certificate);
     const engine=mods.signpdf.default?.sign?mods.signpdf.default:new mods.signpdf.SignPdf();
     api.setStatus('Đang tạo chữ ký CMS…',70);
     const signed=await engine.sign(prepared,signer);
-    await api.saveBlob(new Blob([signed],{type:'application/pdf'}),`${safeStem(st.file.name)}_SIGNED_PERSONAL.pdf`,'PDF đã ký');
-    api.endBusy('Đã ký cá nhân. Mở bằng Foxit/Adobe để kiểm tra chữ ký.');
+    await api.saveBlob(new Blob([signed],{type:'application/pdf'}),`${safeStem(st.file.name)}_BAN_SAO_KY_CA_NHAN.pdf`,'Bản sao PDF đã ký cá nhân');
+    api.endBusy('Đã tạo bản sao và ký cá nhân. File gốc không thay đổi.');
   }catch(e){
     const msg=String(e?.message||e);
-    const friendly=/PKCS#12 MAC|Invalid password|wrong password/i.test(msg)
-      ?'Mật khẩu certificate không đúng hoặc P12/PFX không tương thích.'
-      :msg;
+    const friendly=/password|decrypt|mật khẩu/i.test(msg)?'Mật khẩu certificate không đúng. Nếu quên mật khẩu, hãy xóa certificate và tạo lại.':msg;
     api.showError(new Error(`Ký cá nhân thất bại: ${friendly}`));
   }
 }
 async function signEnterprise(){
-  if(!st.agent.online){const ok=await checkAgent(true);if(!ok)return;}if(!st.enterprise.certThumbprint)return alert('Hãy đọc và chọn chứng thư Windows.');const pin=host.querySelector('#esPin')?.value||'';if(!pin)return alert('Nhập PIN USB Token.');
-  try{api.startBusy('Đang gửi yêu cầu ký tới Agent cục bộ…');const appearance=await createAppearancePng();const appearanceB64=await blobToBase64(appearance);const pdfB64=u8ToBase64(st.bytes);const payload={pdfBase64:pdfB64,fileName:st.file.name,page:st.page,rect:pdfRectBottomLeft(),appearancePngBase64:appearanceB64,thumbprint:st.enterprise.certThumbprint,pin,tsa:st.enterprise.tsa||'',company:st.enterprise.company||'',tax:st.enterprise.tax||''};const r=await fetch(`${AGENT_URL}/sign`,{method:'POST',headers:{'Content-Type':'application/json','X-KanBan-Agent':'linh-kanban-v1'},body:JSON.stringify(payload),targetAddressSpace:'loopback'});if(!r.ok){let msg=await r.text();try{msg=JSON.parse(msg).error||msg}catch{}throw new Error(msg)}const out=new Uint8Array(await r.arrayBuffer());await api.saveBlob(new Blob([out],{type:'application/pdf'}),`${safeStem(st.file.name)}_SIGNED.pdf`,'PDF đã ký');api.endBusy('Đã ký doanh nghiệp qua Windows Signing Agent.');}catch(e){api.showError(new Error(`Ký doanh nghiệp thất bại: ${e.message||e}`))}
+  if(!st.agent.online){const ok=await checkAgent(true);if(!ok)return;}
+  if(!st.enterprise.certThumbprint)return alert('Hãy đọc và chọn chứng thư Windows.');
+  const pinForm=await openSigningForm({
+    title:'Nhập PIN USB Token',
+    subtitle:`Chứng thư: ${st.enterprise.certLabel||'Chứng thư Windows đã chọn'}. PIN chỉ gửi tới Signing Agent trên chính máy và không được lưu.`,
+    confirm:'KÝ BẢN SAO PDF',
+    html:`<label class="office-field"><span>PIN USB Token</span><input name="pin" type="password" autocomplete="off" required placeholder="Nhập PIN"></label>`,
+    validate:v=>v.pin?'':'Vui lòng nhập PIN USB Token.'
+  });
+  if(!pinForm)return;const pin=pinForm.pin;
+  try{api.startBusy('Đang gửi yêu cầu ký tới Agent cục bộ…');const appearance=await createAppearancePng();const appearanceB64=await blobToBase64(appearance);const pdfB64=u8ToBase64(st.bytes);const payload={pdfBase64:pdfB64,fileName:st.file.name,page:st.page,rect:pdfRectBottomLeft(),appearancePngBase64:appearanceB64,thumbprint:st.enterprise.certThumbprint,pin,tsa:st.enterprise.tsa||'',company:st.enterprise.company||'',tax:st.enterprise.tax||''};const r=await fetch(`${AGENT_URL}/sign`,{method:'POST',headers:{'Content-Type':'application/json','X-KanBan-Agent':'linh-kanban-v1'},body:JSON.stringify(payload),targetAddressSpace:'loopback'});if(!r.ok){let msg=await r.text();try{msg=JSON.parse(msg).error||msg}catch{}throw new Error(msg)}const out=new Uint8Array(await r.arrayBuffer());await api.saveBlob(new Blob([out],{type:'application/pdf'}),`${safeStem(st.file.name)}_BAN_SAO_KY_DOANH_NGHIEP.pdf`,'Bản sao PDF đã ký doanh nghiệp');api.endBusy('Đã tạo bản sao và ký doanh nghiệp qua Windows Signing Agent.');}catch(e){api.showError(new Error(`Ký doanh nghiệp thất bại: ${e.message||e}`))}
 }
 function pdfRectBottomLeft(){const {x,y,w,h}=st.rect;return [x,st.pageSize.height-(y+h),x+w,st.pageSize.height-y];}
 
@@ -733,6 +864,7 @@ function randomHex(bytes){const a=new Uint8Array(bytes);crypto.getRandomValues(a
 
 function openDb(){return new Promise((resolve,reject)=>{const req=indexedDB.open(SIGN_DB_NAME,1);req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(SIGN_DB_STORE))db.createObjectStore(SIGN_DB_STORE)};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
 async function idbPut(key,value){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(SIGN_DB_STORE,'readwrite');tx.objectStore(SIGN_DB_STORE).put(value,key);tx.oncomplete=()=>{db.close();resolve()};tx.onerror=()=>{db.close();reject(tx.error)}})}
+async function idbDelete(key){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(SIGN_DB_STORE,'readwrite');tx.objectStore(SIGN_DB_STORE).delete(key);tx.oncomplete=()=>{db.close();resolve()};tx.onerror=()=>{db.close();reject(tx.error)}})}
 async function idbGet(key){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(SIGN_DB_STORE,'readonly');const req=tx.objectStore(SIGN_DB_STORE).get(key);req.onsuccess=()=>{db.close();resolve(req.result)};req.onerror=()=>{db.close();reject(req.error)}})}
 
 function loadImage(src){return new Promise((resolve,reject)=>{const i=new Image();i.onload=()=>resolve(i);i.onerror=()=>reject(new Error('Không đọc được logo.'));i.src=src;});}
