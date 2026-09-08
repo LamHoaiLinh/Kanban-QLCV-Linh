@@ -5,6 +5,7 @@
  * - Các thư viện PDF/Excel được tải lười khi người dùng mở đúng công cụ.
  */
 import {analyzeWorkbookForAI,createIntegrityTracker} from './excel-ai-analysis.mjs?v=1.0.0';
+import {renderPdfSigningTool} from './pdf-signing.js?v=1.0.0';
 const OFFICE_SETTINGS_KEY = 'linh_kanban_office_settings_v1';
 const PINNED_LIBS = {
   pdfLib: 'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js',
@@ -142,7 +143,8 @@ const PDF_SUB_TOOLTIPS={
   a5:'Lấy nửa trên của mỗi trang A4 dọc và tạo thành trang A5 ngang.',
   split:'Tách một PDF thành từng trang, trang lẻ/chẵn hoặc các khoảng trang tùy chọn.',
   png:'Chuyển các trang PDF thành ảnh PNG theo độ phân giải đã chọn.',
-  images:'Gộp nhiều ảnh JPG/PNG/WebP thành một file PDF.'
+  images:'Gộp nhiều ảnh JPG/PNG/WebP thành một file PDF.',
+  sign:'Ký PDF bằng certificate cá nhân tự tạo trong trình duyệt hoặc USB Token doanh nghiệp qua Signing Agent cục bộ.'
 };
 const PDF_CONTROL_TOOLTIPS={
   pdfMergeDrop:'Kéo thả hoặc chọn nhiều file PDF. Thứ tự đang hiển thị chính là thứ tự file sau khi gộp.',
@@ -200,10 +202,10 @@ function applyPdfTooltips(){
   });
 }
 function renderPdfTool(){
-  const tabs=[['merge','Gộp PDF'],['edit','Sắp xếp & xoay trang'],['a5','A4 → A5 ngang'],['split','Tách PDF'],['png','PDF → PNG'],['images','Ảnh → PDF']];
+  const tabs=[['merge','Gộp PDF'],['edit','Sắp xếp & xoay trang'],['a5','A4 → A5 ngang'],['split','Tách PDF'],['png','PDF → PNG'],['images','Ảnh → PDF'],['sign','Ký số']];
   mainHost.innerHTML=`<section class="office-tool-panel active"><div class="office-tool-head"><div><h3>PDF</h3><p>Gộp, chuẩn hóa bề ngang, sắp xếp, xoay riêng từng trang, tách trang và chuyển đổi PDF.</p></div></div>${subTabs('pdf',tabs)}<div id="pdfSubHost"></div><div class="office-warning">PDF có chữ ký số có thể mất hiệu lực sau khi chỉnh sửa. Phiên bản này không OCR, không chỉnh trực tiếp chữ có sẵn và không mở PDF được bảo vệ bằng mật khẩu.</div><div class="office-library-warning">Các thư viện PDF được tải theo phiên bản cố định khi mở công cụ lần đầu; tệp của bạn vẫn chỉ được xử lý trong trình duyệt.</div></section>`;
   bindSubtabs('pdf'); const h=mainHost.querySelector('#pdfSubHost');
-  if(state.sub.pdf==='merge')renderPdfMerge(h);if(state.sub.pdf==='edit')renderPdfEdit(h);if(state.sub.pdf==='a5')renderPdfA4ToA5(h);if(state.sub.pdf==='split')renderPdfSplit(h);if(state.sub.pdf==='png')renderPdfPng(h);if(state.sub.pdf==='images')renderPdfImages(h);
+  if(state.sub.pdf==='merge')renderPdfMerge(h);if(state.sub.pdf==='edit')renderPdfEdit(h);if(state.sub.pdf==='a5')renderPdfA4ToA5(h);if(state.sub.pdf==='split')renderPdfSplit(h);if(state.sub.pdf==='png')renderPdfPng(h);if(state.sub.pdf==='images')renderPdfImages(h);if(state.sub.pdf==='sign')renderPdfSigningTool(h,{ensurePdfJs,ensurePdfLib,saveBlob,fileInput,escapeHtml,startBusy,endBusy,showError,setStatus,safeName,formatBytes,bindDropzone});
   applyPdfTooltips();
 }
 function renderPdfMerge(h){h.innerHTML=`<div class="office-card"><h4>Gộp nhiều PDF</h4><p class="office-card-note">Chọn nhiều file, sắp xếp thứ tự rồi chọn cách chuẩn hóa kích thước trang. Chế độ đồng nhất bề ngang giữ đúng tỷ lệ, không làm méo nội dung.</p><div class="office-dropzone" id="pdfMergeDrop"><strong>Browse hoặc kéo thả nhiều file PDF</strong><span>Thứ tự trong danh sách là thứ tự gộp.</span><input type="file" accept="application/pdf,.pdf" multiple hidden></div><div class="office-toolbar"><button class="office-btn" id="pdfMergeAdd">Chọn thêm PDF</button><button class="office-btn" id="pdfMergeSort">Sắp xếp A–Z</button><button class="office-btn danger" id="pdfMergeClear">Xóa danh sách</button></div><div id="pdfMergeList"></div></div><div class="office-card"><div class="office-grid three"><label class="office-field" id="pdfNormalizeField"><span>Chuẩn hóa trang</span><select id="pdfNormalize"><option value="keep">Giữ nguyên từng trang</option><option value="first-width">Đồng nhất bề ngang theo trang đầu</option><option value="widest">Đồng nhất bề ngang theo trang rộng nhất</option><option value="a4p">Chuẩn A4 dọc</option><option value="a4l">Chuẩn A4 ngang</option></select><small id="pdfNormalizeHelp" class="office-field-help"></small></label><label class="office-field"><span>Lề A4</span><select id="pdfMargin"><option value="0">0 mm</option><option value="5">5 mm</option><option value="10">10 mm</option><option value="15">15 mm</option></select></label><label class="office-field"><span>Tên file đầu ra</span><input id="pdfMergeName" value="PDF_da_gop.pdf"></label></div><div class="office-toolbar"><span class="spacer"></span><button class="office-btn primary" id="pdfMergeRun" ${state.pdfMergeFiles.length?'':'disabled'}>Gộp PDF</button></div></div>`;

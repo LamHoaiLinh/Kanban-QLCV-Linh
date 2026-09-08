@@ -1,0 +1,4 @@
+cryptography>=45
+pyHanko[image-support,opentype]==0.37.0
+reportlab>=4.4
+pyinstaller>=6.15
