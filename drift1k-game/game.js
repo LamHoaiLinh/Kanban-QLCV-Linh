@@ -15,7 +15,8 @@ const centerStartWrap = document.getElementById('centerStartWrap');
 const pauseBtn = document.getElementById('pauseBtn');
 const resumeBtn = document.getElementById('resumeBtn');
 const restartBtn = document.getElementById('restartBtn');
-const modeButtons = [...document.querySelectorAll('.mode-btn')];
+const backKanbanBtn = document.getElementById('backKanbanBtn');
+const modeButtons = [...document.querySelectorAll('.mode-btn[data-count]')];
 
 const playerModalBackdrop = document.getElementById('playerModalBackdrop');
 const modalTitle = document.getElementById('modalTitle');
@@ -123,7 +124,7 @@ function showOverlay(mode) {
   centerStartWrap.classList.remove('hidden');
   if (mode === 'setup') {
     overlayCard.classList.remove('result-panel');
-    overlayTitle.textContent = 'DRIFT1K';
+    overlayTitle.textContent = 'DRIFT CAR';
     overlayTitle.style.display = '';
     menuBtn.style.display = 'none';
     startBtn.style.display = '';
@@ -374,7 +375,7 @@ function drawTypedResultBoard() {
   }
 }
 function drawWorldUiOverlays(){
-  if(screenMode===MODE.SETUP){rectfill(12,40,115,89,'rgba(5,10,20,0.78)');rect(12,40,115,89,'#d4e4ff');text('DRIFT1K',64,48,'#ffe082','center',11);return}
+  if(screenMode===MODE.SETUP){return}
   if(screenMode===MODE.PAUSED){rectfill(18,44,110,82,'rgba(6,12,25,0.82)');rect(18,44,110,82,'#fff7f1');text('TẠM DỪNG',64,56,'#fff7f1','center',10);return}
   if(screenMode===MODE.GAMEOVER){drawTypedResultBoard()}
 }
@@ -427,6 +428,15 @@ function openPlayerModal(index) {
 }
 function closePlayerModal() { playerModalBackdrop.classList.remove('show'); playerModalBackdrop.setAttribute('aria-hidden', 'true'); }
 
+function returnToKanban() {
+  closePlayerModal();
+  if (window.parent && window.parent !== window) {
+    window.parent.postMessage({ type: 'drift1k-game-close' }, '*');
+    return;
+  }
+  window.location.href = '../index.html';
+}
+
 function handleControlKey(key) { if (screenMode !== MODE.PLAYING) return false; const index = KEY_BINDINGS.findIndex(item => item.key === key); if (index < 0 || !players[index]) return false; toggleTurn(players[index]); return true; }
 
 window.addEventListener('keydown', e => {
@@ -444,6 +454,7 @@ menuBtn.addEventListener('click', backToSetup);
 pauseBtn.addEventListener('click', pauseGame);
 resumeBtn.addEventListener('click', resumeGame);
 restartBtn.addEventListener('click', restartGame);
+backKanbanBtn.addEventListener('click', returnToKanban);
 modalCloseBtn.addEventListener('click', closePlayerModal);
 modalContinueBtn.addEventListener('click', () => { applySetupToActivePlayers(); closePlayerModal(); if (screenMode === MODE.PAUSED) resumeGame(); });
 modalRestartBtn.addEventListener('click', () => { applySetupToActivePlayers(); closePlayerModal(); restartGame(); });

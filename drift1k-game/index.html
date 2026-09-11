@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>DRIFT1K DEV VERSION</title>
+<title>DRIFT CAR</title>
 <style>
   :root{
     --bg:#081225;
@@ -26,6 +26,7 @@
   .mode-btn:active,.mini-btn:active,.turn-btn:active,.overlay-main-btn:active,.player-card:active,.ui-btn:active,.swatch:active{transform:translateY(1px)}
   .mode-btn{padding:12px 18px;min-width:96px;font-size:16px;font-weight:800}
   .mode-btn.active{border-color:var(--accent);outline:2px solid rgba(56,189,248,.25)}
+  .back-kanban-btn{border-color:#63c49a;background:linear-gradient(180deg,#1d5d49,#10372c);min-width:154px}
   .hud{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
   .player-card{padding:12px;text-align:left;min-height:86px}
   .player-card.inactive{opacity:.38;cursor:not-allowed;filter:none}
@@ -83,8 +84,9 @@
 <body>
 <main class="app">
   <div class="topbar">
-    <h1>DRIFT1K DEV VERSION</h1>
+    <h1>DRIFT CAR</h1>
     <div class="top-actions" id="modeButtons">
+      <button class="mode-btn back-kanban-btn" id="backKanbanBtn">← Quay về KanBan</button>
       <button class="mode-btn active" data-count="1">1 người</button>
       <button class="mode-btn" data-count="2">2 người</button>
       <button class="mode-btn" data-count="3">3 người</button>
@@ -103,10 +105,10 @@
         <button class="mini-btn" id="restartBtn">Chơi lại</button>
       </div>
     </div>
-    <canvas id="game" width="512" height="512" tabindex="0" aria-label="DRIFT1K"></canvas>
+    <canvas id="game" width="512" height="512" tabindex="0" aria-label="DRIFT CAR"></canvas>
     <div class="overlay-center" id="centerStartWrap">
       <div class="start-card" id="overlayCard">
-        <h2 id="overlayTitle">DRIFT1K</h2>
+        <h2 id="overlayTitle">DRIFT CAR</h2>
         <div class="overlay-actions">
           <button class="overlay-secondary-btn" id="menuBtn" style="display:none">Về Menu</button>
           <button class="overlay-main-btn" id="startBtn">BẮT ĐẦU</button>
