@@ -1,4 +1,4 @@
-const CACHE_NAME='linh-kanban-static-v738-pdf-sign-personal-v7';
+const CACHE_NAME='linh-kanban-static-v739-drift1k-hub';
 const ASSETS=[
   './','./index.html','./styles.css?v=6.22','./dragdrop.js?v=3.3','./app.js?v=3.7','./music-player.js?v=3.3',
   './office-tools/office-tools.css?v=4.6.0','./office-tools/office-tools.js?v=4.9.0','./office-tools/pdf-signing.js?v=1.5.0','./office-tools/excel-ai-analysis.mjs?v=1.0.0','./office-tools/vendor/jszip.min.js',
@@ -9,7 +9,7 @@ const ASSETS=[
   './dice-game/assets/fighters/f01.svg','./dice-game/assets/fighters/f02.svg','./dice-game/assets/fighters/f03.svg','./dice-game/assets/fighters/f04.svg','./dice-game/assets/fighters/f05.svg','./dice-game/assets/fighters/f06.svg','./dice-game/assets/fighters/m01.svg','./dice-game/assets/fighters/m02.svg','./dice-game/assets/fighters/m03.svg','./dice-game/assets/fighters/m04.svg','./dice-game/assets/fighters/m05.svg','./dice-game/assets/fighters/m06.svg',
   './tarot-launcher.js?v=5.4','./tarot-game/index.html?v=5.4.0','./tarot-game/styles.css?v=5.4.0','./tarot-game/js/app.js?v=5.4.0','./tarot-game/js/tarot-data.js',
   './tetris-launcher.js?v=1.04','./tetris-game/index.html?v=1.0.4','./tetris-game/styles.css?v=1.0.4','./tetris-game/game.js?v=1.0.4','./tetris-game/LICENSE.txt',
-  './tarot-game/LICENSE_SOURCE.txt','./tinh-nhanh-game/index.html?v=3.3.0','./tinh-nhanh-game/styles.css?v=3.3.0','./tinh-nhanh-game/skills.js?v=3.3.0','./tinh-nhanh-game/core.js?v=3.3.0','./tinh-nhanh-game/app.js?v=3.3.0','./tinh-nhanh-game/assets/icon-256.png','./tinh-nhanh-game/LICENSE_SOURCE.txt','./tinh-nhanh-game/SOURCE_INFO.txt','./manifest.webmanifest?v=3.2','./assets/icon.svg',
+  './tarot-game/LICENSE_SOURCE.txt','./tinh-nhanh-game/index.html?v=3.3.0','./tinh-nhanh-game/styles.css?v=3.3.0','./tinh-nhanh-game/skills.js?v=3.3.0','./tinh-nhanh-game/core.js?v=3.3.0','./tinh-nhanh-game/app.js?v=3.3.0','./tinh-nhanh-game/assets/icon-256.png','./tinh-nhanh-game/LICENSE_SOURCE.txt','./tinh-nhanh-game/SOURCE_INFO.txt','./drift1k-game/index.html?v=1.0.0','./drift1k-game/game.js','./manifest.webmanifest?v=3.2','./assets/icon.svg',
   './assets/backgrounds/Beautiful Background6.png','./assets/backgrounds/Beautiful Background7.png',
   './assets/backgrounds/Beautiful Background8.png','./assets/backgrounds/Beautiful Background13.png',
   './assets/backgrounds/Beautiful Background15.png','./assets/backgrounds/Beautiful Background28.png',
@@ -21,7 +21,7 @@ self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys
 self.addEventListener('fetch',event=>{
   if(event.request.method!=='GET')return;
   const url=new URL(event.request.url);
-  const isTool=url.pathname.includes('/dice-game/')||url.pathname.includes('/tarot-game/')||url.pathname.includes('/tetris-game/')||url.pathname.includes('/farm-game/')||url.pathname.includes('/thuong-lo-viet/')||url.pathname.includes('/doi-lap-nghiep/')||url.pathname.includes('/vuong-quoc-so-lieu/')||url.pathname.includes('/bach-chieu-game/')||url.pathname.includes('/dai-luc-nghe-nghiep/')||url.pathname.includes('/tinh-nhanh-game/')||url.pathname.endsWith('/game-launcher.js')||url.pathname.endsWith('/tarot-launcher.js')||url.pathname.endsWith('/tetris-launcher.js');
+  const isTool=url.pathname.includes('/dice-game/')||url.pathname.includes('/tarot-game/')||url.pathname.includes('/tetris-game/')||url.pathname.includes('/farm-game/')||url.pathname.includes('/thuong-lo-viet/')||url.pathname.includes('/doi-lap-nghiep/')||url.pathname.includes('/vuong-quoc-so-lieu/')||url.pathname.includes('/bach-chieu-game/')||url.pathname.includes('/dai-luc-nghe-nghiep/')||url.pathname.includes('/tinh-nhanh-game/')||url.pathname.includes('/drift1k-game/')||url.pathname.endsWith('/game-launcher.js')||url.pathname.endsWith('/tarot-launcher.js')||url.pathname.endsWith('/tetris-launcher.js');
   if(url.pathname.endsWith('/office-tools/downloads/KanBan_Signing_Agent.exe')){event.respondWith(fetch(event.request));return;}
   const mustBeFresh=event.request.mode==='navigate'||isTool;
   if(mustBeFresh){
