@@ -1,5 +1,0 @@
-TÍNH NHANH - BẢN TÍCH HỢP KANBAN
-- Dữ liệu lộ trình 72 micro-skill và logic bài tập được chuyển từ Tính Nhanh VN Adaptive v3.0 Memory Curriculum.
-- Bản chạy trong Kanban được đóng gói thành web tĩnh HTML/CSS/JavaScript để chạy trực tiếp trên GitHub Pages, không cần Expo/Node trên máy người dùng.
-- Dữ liệu người học lưu localStorage với prefix riêng "tinh_nhanh_kanban_v3", không dùng hay thay đổi khóa dữ liệu Kanban.
-- Mã nguồn gốc phát triển từ Mental Math của Open Apps Studio theo giấy phép MIT; xem LICENSE_SOURCE.txt.
