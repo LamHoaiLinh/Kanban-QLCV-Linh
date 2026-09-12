@@ -6,6 +6,7 @@
  */
 import {analyzeWorkbookForAI,createIntegrityTracker} from './excel-ai-analysis.mjs?v=1.0.0';
 import {renderPdfSigningTool} from './pdf-signing.js?v=1.5.0';
+import {openWorksheetEditor,isWorksheetEditorOpen,closeWorksheetEditor} from './worksheet-editor.js?v=1.0.0';
 const OFFICE_SETTINGS_KEY = 'linh_kanban_office_settings_v1';
 const PINNED_LIBS = {
   pdfLib: 'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js',
@@ -58,6 +59,7 @@ function injectDialog(){
       <nav class="office-nav">
         ${navButton('pdf','PDF','Tách, ghép, xoay PDF')}
         ${navButton('image','IMG','Xử lý hình ảnh')}
+        ${navButton('worksheet','PDF/IMG','Nhập đề và làm bài trực tiếp','Nhập liệu PDF/IMG')}
         ${navButton('rename','Rename','Đổi tên hàng loạt')}
         ${navButton('excel','Excel','Đọc và gộp Excel')}
       </nav>
@@ -75,9 +77,10 @@ function injectDialog(){
   dialog.querySelector('#officeCancelBtn').addEventListener('click',()=>{state.abort=true;setStatus('Đang hủy tác vụ…');});
   dialog.querySelectorAll('[data-office-nav]').forEach(btn=>btn.addEventListener('click',()=>switchTool(btn.dataset.officeNav)));
   dialog.addEventListener('close',cleanupTransient);
+  dialog.addEventListener('cancel',event=>{if(isWorksheetEditorOpen()){event.preventDefault();closeWorksheetEditor();}});
 }
 
-function navButton(id,label,title){return `<button type="button" data-office-nav="${id}" title="${escapeHtml(title)}"><span class="office-btn-mark">${label}</span><span>${label}</span></button>`;}
+function navButton(id,label,title,displayLabel=label){return `<button type="button" data-office-nav="${id}" title="${escapeHtml(title)}"><span class="office-btn-mark">${label}</span><span>${displayLabel}</span></button>`;}
 
 function openOffice(tool='pdf'){
   state.tool=['pdf','image','rename','excel'].includes(tool)?tool:'pdf';
@@ -85,7 +88,7 @@ function openOffice(tool='pdf'){
   renderTool();
 }
 function closeOffice(){ if(state.busy){setStatus('Hãy hủy hoặc chờ tác vụ đang chạy hoàn tất.');return;} dialog.close(); }
-function switchTool(tool){ if(state.busy)return; state.tool=tool; renderTool(); }
+function switchTool(tool){ if(state.busy)return; if(tool==='worksheet'){openWorksheetEditor(dialog,{onClose:()=>{state.tool='pdf';renderTool();}});return;} state.tool=tool; renderTool(); }
 function renderTool(){
   dialog.querySelectorAll('[data-office-nav]').forEach(btn=>btn.classList.toggle('active',btn.dataset.officeNav===state.tool));
   const meta={pdf:['Công cụ PDF','Gộp, chuẩn hóa kích thước, sắp xếp, xoay, tách và chuyển trang PDF.'],image:['Công cụ hình ảnh','Chuyển đổi, ghép, đóng dấu và tạo ảnh dài từ nội dung dán.'],rename:['Đổi tên hàng loạt','Xem trước tên mới trước khi tạo bản sao hoặc đổi tên tại chỗ.'],excel:['Công cụ Excel','Đọc giá trị/công thức, xuất JSON và gộp sheet hoặc workbook.']}[state.tool];
@@ -93,7 +96,7 @@ function renderTool(){
   if(state.tool==='pdf')renderPdfTool(); if(state.tool==='image')renderImageTool(); if(state.tool==='rename')renderRenameTool(); if(state.tool==='excel')renderExcelTool();
   setStatus('Sẵn sàng.',0);
 }
-function cleanupTransient(){ state.abort=false; revokeAllPreviews(); }
+function cleanupTransient(){ state.abort=false; if(isWorksheetEditorOpen())closeWorksheetEditor(); revokeAllPreviews(); }
 function revokeAllPreviews(){ document.querySelectorAll('[data-object-url]').forEach(el=>{try{URL.revokeObjectURL(el.dataset.objectUrl)}catch{};}); }
 
 // ===== HẠ TẦNG CHUNG =====

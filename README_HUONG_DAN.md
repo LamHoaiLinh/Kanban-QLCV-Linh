@@ -241,3 +241,15 @@ Dice Arena vẫn giữ chế độ xúc xắc tự do. Nút **ĐẠI HỘI LINH 
 - Số nổi ưu tiên icon để trẻ nhỏ dễ nhìn: `🛡️ -3`, `❤️ -4`.
 - Toàn chẵn thì lượt bắn được bỏ qua tự động và chỉ giữ Khiên trong vòng hiện tại.
 - Có âm hiệu riêng cho tung, canh lực, khóa mục tiêu, bắn, khiên và trúng đạn. Nút `♪` ở đầu Dice Arena bật/tắt toàn bộ âm thanh.
+
+## Cập nhật v7.4.1 – LÂM GIA KHANG - LÀM BÀI TẬP
+- Trong **CÔNG CỤ** có tab mới **Nhập liệu PDF/IMG**.
+- Bấm tab sẽ mở giao diện làm bài toàn màn hình, không làm thay đổi dữ liệu Kanban.
+- Nhập nhiều PNG/JPG/WEBP/PDF; các trang mặc định nối liên tục theo chiều dọc để lăn chuột từ trang 1 sang trang 2, 3...
+- Sidebar bên trái có thumbnail và nút ↑ / ↓ để đổi thứ tự trang ngay trong bài.
+- Hỗ trợ gõ chữ màu, chế độ Chọn → Di chuyển / Sửa chữ, phím mũi tên để nắn vị trí, Bút, Highlight, Khoanh, Chữ nhật, Đường, Mũi tên, Gạch chân và Tẩy.
+- Có **Ctrl+Z / Ctrl+Y** và nút Undo/Redo trên thanh công cụ.
+- Tự lưu vào IndexedDB của trình duyệt: chỉ giữ **5 project gần nhất**; cùng một bộ file nguồn dùng cùng project ID nên bản mới nhất ghi đè bản cũ, không tạo bản trùng.
+- Xuất mặc định **PNG nối dài theo chiều dọc**, ngoài ra có PDF nhiều trang và PNG từng trang.
+- Ảnh/PDF gốc chỉ làm nền; phần bé làm được lưu riêng dưới dạng annotation.
+- Với PDF, lần đầu vẫn dùng PDF.js đã ghim phiên bản giống bộ Công cụ PDF nên cần Internet nếu thư viện chưa có trong cache.
