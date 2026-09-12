@@ -10,7 +10,7 @@ const MAX_RECENTS=5;
 const PDF_JS_URL='https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.min.mjs';
 const PDF_WORKER_URL='https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
 const PDF_LIB_URL='https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js';
-const DEFAULTS={tool:'select',selectMode:'move',color:'#166fc0',textBg:'#fff176',fontSize:28,strokeWidth:4,zoom:1};
+const DEFAULTS={tool:'select',color:'#166fc0',textBg:'#fff176',fontSize:28,strokeWidth:4,zoom:1};
 let activeEditor=null;
 let pdfjsLib=null;
 
@@ -34,7 +34,6 @@ class WorksheetEditor{
     this.createdAt=Date.now();
     this.currentPageId=null;
     this.tool=DEFAULTS.tool;
-    this.selectMode=DEFAULTS.selectMode;
     this.color=localStorage.getItem('gk_ws_color')||DEFAULTS.color;
     this.textBg=localStorage.getItem('gk_ws_text_bg')||DEFAULTS.textBg;
     this.fontSize=Number(localStorage.getItem('gk_ws_font')||DEFAULTS.fontSize);
@@ -45,7 +44,7 @@ class WorksheetEditor{
     this.dirty=false; this.saving=false; this.autosaveTimer=null; this.debounceTimer=null;
     this.objectUrls=new Set();
     this.pageDom=new Map();
-    this.drawing=null; this.draggingShape=null; this.textDrag=null; this.editingTextKey=null; this.savedTextSelection=null;
+    this.drawing=null; this.draggingShape=null; this.resizingShape=null; this.shapeEditKey=null; this.textDrag=null; this.editingTextKey=null; this.savedTextSelection=null;
     this.abortImport=false;
     this.boundKeydown=e=>this.onKeyDown(e);
     this.boundSelectionChange=()=>this.onSelectionChange();
@@ -91,7 +90,7 @@ class WorksheetEditor{
     <div class="ws-top">
       <div class="ws-titlebar">
         <div class="ws-brand"><div class="ws-brand-mark">GK</div><div class="ws-brand-text"><strong>LÂM GIA KHANG - LÀM BÀI TẬP</strong><span id="wsProjectName">Chưa mở bài</span></div></div>
-        <button class="ws-btn ws-icon-btn" id="wsBack" title="Quay lại bộ công cụ">←</button>
+        <button class="ws-btn ws-back-btn" id="wsBack" title="Trở về KanBan">← Trở về KanBan</button>
         <button class="ws-btn primary" id="wsOpen">＋ Nhập PDF/IMG</button>
         <button class="ws-btn" id="wsAdd">Thêm trang</button>
         <button class="ws-btn" id="wsRecent">🕘 Bài gần đây <span id="wsRecentCount"></span></button>
@@ -102,8 +101,7 @@ class WorksheetEditor{
         <button class="ws-btn primary" id="wsExport">Xuất bài ▾</button>
       </div>
       <div class="ws-toolbar">
-        <button class="ws-tool" data-ws-tool="select">Chọn</button>
-        <div class="ws-mode" id="wsSelectMode"><button class="ws-seg" data-select-mode="move">↔ Di chuyển</button><button class="ws-seg" data-select-mode="edit">✎ Sửa chữ</button></div>
+        <button class="ws-tool" data-ws-tool="select" title="Nhấp 1 lần để chọn/di chuyển; nhấp kép để sửa chữ hoặc đổi kích thước đối tượng">Chọn</button>
         <button class="ws-tool" data-ws-tool="text">Gõ chữ</button>
         <button class="ws-tool" data-ws-tool="pen">Bút</button>
         <button class="ws-tool" data-ws-tool="highlight">Highlight</button>
@@ -129,7 +127,7 @@ class WorksheetEditor{
       </aside>
       <main class="ws-workspace" id="wsWorkspace"><div id="wsCanvasHost"></div></main>
     </div>
-    <div class="ws-statusbar"><span id="wsStatus">Sẵn sàng.</span><span id="wsPageStatus">Trang 0 / 0</span><span id="wsToolStatus">Công cụ: Chọn</span><span id="wsZoomStatus">Zoom: 100%</span><div class="ws-shortcuts"><span><kbd>Ctrl+Z</kbd> Undo</span><span><kbd>Ctrl+Y</kbd> Redo</span><span><kbd>↑↓←→</kbd> Di chuyển</span></div><span class="ws-save-state saved" id="wsSaveState">Tự lưu: sẵn sàng</span></div>
+    <div class="ws-statusbar"><span id="wsStatus">Sẵn sàng.</span><span id="wsPageStatus">Trang 0 / 0</span><span id="wsToolStatus">Công cụ: Chọn</span><span id="wsZoomStatus">Zoom: 100%</span><div class="ws-shortcuts"><span><kbd>1 click</kbd> Chọn / di chuyển</span><span><kbd>2 click</kbd> Sửa chữ / đổi kích thước</span><span><kbd>Ctrl+Z</kbd> Undo</span><span><kbd>Ctrl+Y</kbd> Redo</span></div><span class="ws-save-state saved" id="wsSaveState">Tự lưu: sẵn sàng</span></div>
     <input id="wsFileInput" type="file" accept=".png,.jpg,.jpeg,.webp,.pdf,image/png,image/jpeg,image/webp,application/pdf" multiple hidden>
     <div class="ws-toast" id="wsToast"></div>`}
   bindUi(){
@@ -152,26 +150,16 @@ class WorksheetEditor{
     q('#wsZoomIn').onclick=()=>this.setZoom(this.zoom+.1);q('#wsZoomOut').onclick=()=>this.setZoom(this.zoom-.1);q('#wsFitWidth').onclick=()=>this.fitWidth();
     q('#wsClearPage').onclick=()=>this.clearCurrentPage();
     this.root.querySelectorAll('[data-ws-tool]').forEach(b=>b.onclick=()=>this.setTool(b.dataset.wsTool));
-    this.root.querySelectorAll('[data-select-mode]').forEach(b=>b.onclick=()=>{
-      const next=b.dataset.selectMode;
-      const selectedPage=this.pages.find(p=>p.id===this.selected.pageId);const selectedAnn=selectedPage&&findAnn(selectedPage,this.selected.annId);
-      if(next==='move')this.finishCurrentTextEdit();
-      this.selectMode=next;this.tool='select';this.applyToolState();
-      if(next==='edit'&&selectedAnn?.type==='text'){this.enterTextEdit(selectedPage,selectedAnn)}else this.renderAllTextLayers();
-      this.updateStatus();
-    });
     q('#wsFileInput').onchange=e=>{const files=[...e.target.files];e.target.value='';if(files.length)this.importFiles(files,this.pendingReplace)};
     q('#wsWorkspace').addEventListener('scroll',()=>this.updateCurrentPageFromScroll(),{passive:true});
     q('#wsWorkspace').addEventListener('dragover',e=>{if(hasFiles(e)){e.preventDefault();e.dataTransfer.dropEffect='copy'}});
     q('#wsWorkspace').addEventListener('drop',e=>{if(hasFiles(e)){e.preventDefault();const files=[...e.dataTransfer.files].filter(isAcceptedFile);if(files.length)this.importFiles(files,this.pages.length===0)}});
   }
   pickFiles(replace){this.pendingReplace=replace;this.root.querySelector('#wsFileInput').click()}
-  setTool(tool){if(this.editingTextKey&&!(tool==='select'&&this.selectMode==='edit'))this.finishCurrentTextEdit();this.tool=tool;this.selected={pageId:null,annId:null};this.applyToolState();this.renderAllAnnotations();this.renderAllTextLayers();this.updateStatus()}
+  setTool(tool){if(this.editingTextKey)this.finishCurrentTextEdit();this.shapeEditKey=null;this.resizingShape=null;this.tool=tool;this.selected={pageId:null,annId:null};this.applyToolState();this.renderAllAnnotations();this.renderAllTextLayers();this.updateStatus()}
   applyToolState(){
     if(!this.root)return;
     this.root.querySelectorAll('[data-ws-tool]').forEach(b=>b.classList.toggle('active',b.dataset.wsTool===this.tool));
-    this.root.querySelectorAll('[data-select-mode]').forEach(b=>b.classList.toggle('active',b.dataset.selectMode===this.selectMode));
-    this.root.querySelector('#wsSelectMode').style.display=this.tool==='select'?'flex':'none';
     const cursors={select:'default',text:'text',pen:'crosshair',highlight:'crosshair',ellipse:'crosshair',rect:'crosshair',line:'crosshair',arrow:'crosshair',underline:'crosshair',eraser:'cell'};
     this.root.querySelectorAll('.ws-anno').forEach(c=>c.style.cursor=cursors[this.tool]||'default');
   }
@@ -204,7 +192,7 @@ class WorksheetEditor{
     finally{this.setBusy('')}
   }
   resetProject(){
-    this.objectUrls.forEach(u=>URL.revokeObjectURL(u));this.objectUrls.clear();this.pages=[];this.pageDom.clear();this.projectId=null;this.projectTitle='Bài tập';this.createdAt=Date.now();this.currentPageId=null;this.selected={pageId:null,annId:null};this.undoStack=[];this.redoStack=[];this.dirty=false;this.renderPages();
+    this.objectUrls.forEach(u=>URL.revokeObjectURL(u));this.objectUrls.clear();this.pages=[];this.pageDom.clear();this.projectId=null;this.projectTitle='Bài tập';this.createdAt=Date.now();this.currentPageId=null;this.selected={pageId:null,annId:null};this.editingTextKey=null;this.shapeEditKey=null;this.undoStack=[];this.redoStack=[];this.dirty=false;this.renderPages();
   }
   async pageFromImage(file){
     const blob=file.slice(0,file.size,file.type||guessMime(file.name));
@@ -257,17 +245,43 @@ class WorksheetEditor{
   deletePage(index){const p=this.pages[index];if(!p||!confirm(`Xóa Trang ${index+1}? Bản tự lưu trước đó vẫn còn trong lịch sử gần đây cho đến lần tự lưu tiếp theo.`))return;this.pushHistory('page-delete');this.pages.splice(index,1);if(this.currentPageId===p.id)this.currentPageId=this.pages[Math.min(index,this.pages.length-1)]?.id||null;this.markDirty();this.renderPages()}
   async drawBackground(page,canvas){try{const bmp=await blobToBitmap(page.imageBlob);const ctx=canvas.getContext('2d',{alpha:false});ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(bmp,0,0,page.width,page.height);bmp.close?.()}catch(e){console.error(e)}}
   bindCanvas(page,canvas){
-    canvas.addEventListener('pointerdown',e=>this.canvasPointerDown(e,page,canvas));canvas.addEventListener('pointermove',e=>this.canvasPointerMove(e,page,canvas));canvas.addEventListener('pointerup',e=>this.canvasPointerUp(e,page,canvas));canvas.addEventListener('pointercancel',e=>this.canvasPointerUp(e,page,canvas));
+    canvas.addEventListener('pointerdown',e=>this.canvasPointerDown(e,page,canvas));canvas.addEventListener('pointermove',e=>this.canvasPointerMove(e,page,canvas));canvas.addEventListener('pointerup',e=>this.canvasPointerUp(e,page,canvas));canvas.addEventListener('pointercancel',e=>this.canvasPointerUp(e,page,canvas));canvas.addEventListener('dblclick',e=>this.canvasDoubleClick(e,page,canvas));
   }
   canvasPointerDown(e,page,canvas){
     if(e.button!==0)return;this.currentPageId=page.id;this.refreshSidebarActive();const pt=pointOnCanvas(e,canvas);canvas.setPointerCapture?.(e.pointerId);
     if(this.tool==='text'){e.preventDefault();this.createText(page,pt);return}
-    if(this.tool==='select'){const hit=this.hitTest(page,pt);this.selectAnnotation(page,hit?.id||null);if(hit&&this.selectMode==='move'){this.pushHistory('shape-move');this.draggingShape={pageId:page.id,annId:hit.id,start:pt,last:pt}}return}
+    if(this.tool==='select'){
+      if(this.editingTextKey)this.finishCurrentTextEdit();
+      // Click thứ hai của double-click không được khởi động một lượt kéo mới.
+      if((e.detail||0)>=2)return;
+      const handle=this.shapeEditKey?.startsWith(page.id+':')?this.hitResizeHandle(page,pt):null;
+      if(handle){const ann=findAnn(page,handle.annId);if(ann){e.preventDefault();this.pushHistory('shape-resize');this.resizingShape={pageId:page.id,annId:ann.id,handle:handle.handle,startBounds:annotationBounds(ann),original:deepClone(ann)};return}}
+      const hit=this.hitTest(page,pt);this.selectAnnotation(page,hit?.id||null);
+      if(hit){this.shapeEditKey=null;this.pushHistory('shape-move');this.draggingShape={pageId:page.id,annId:hit.id,start:pt,last:pt}}
+      else{this.shapeEditKey=null;this.renderAnnotations(page)}
+      return
+    }
     if(this.tool==='eraser'){this.pushHistory('erase');this.drawing={type:'erase',pageId:page.id};this.eraseAt(page,pt);return}
     if(['pen','highlight'].includes(this.tool)){this.pushHistory(this.tool);const ann={id:uid(),type:this.tool,points:[pt],color:this.tool==='highlight'?'#ffd32a':this.color,width:this.tool==='highlight'?Math.max(16,this.strokeWidth*5):this.strokeWidth,alpha:this.tool==='highlight'?.34:1};page.annotations.push(ann);this.drawing={type:this.tool,pageId:page.id,annId:ann.id};this.renderAnnotations(page);return}
     if(['ellipse','rect','line','arrow','underline'].includes(this.tool)){this.pushHistory(this.tool);const ann={id:uid(),type:this.tool,x1:pt.x,y1:pt.y,x2:pt.x,y2:pt.y,color:this.color,width:this.strokeWidth};page.annotations.push(ann);this.drawing={type:this.tool,pageId:page.id,annId:ann.id};this.renderAnnotations(page)}
   }
+  canvasDoubleClick(e,page,canvas){
+    if(this.tool!=='select'||e.button!==0)return;
+    const pt=pointOnCanvas(e,canvas);const hit=this.hitTest(page,pt);if(!hit)return;
+    e.preventDefault();e.stopPropagation();this.selected={pageId:page.id,annId:hit.id};this.shapeEditKey=`${page.id}:${hit.id}`;this.currentPageId=page.id;this.renderAnnotations(page);this.updateStatus();this.toast('Chế độ đổi kích thước: kéo các nút vuông ở góc. Nhấp 1 lần vào đối tượng để trở lại di chuyển.');
+  }
+  hitResizeHandle(page,pt){
+    if(!this.shapeEditKey)return null;const [pageId,annId]=this.shapeEditKey.split(':');if(pageId!==page.id)return null;const ann=findAnn(page,annId);if(!ann||ann.type==='text')return null;const b=annotationBounds(ann);const hs=14;const handles={nw:{x:b.x,y:b.y},ne:{x:b.x+b.w,y:b.y},sw:{x:b.x,y:b.y+b.h},se:{x:b.x+b.w,y:b.y+b.h}};for(const [handle,p] of Object.entries(handles)){if(Math.abs(pt.x-p.x)<=hs&&Math.abs(pt.y-p.y)<=hs)return{annId,handle}}return null
+  }
+  resizeAnnotationFromHandle(ann,original,startBounds,handle,pt,page){
+    let left=startBounds.x,top=startBounds.y,right=startBounds.x+startBounds.w,bottom=startBounds.y+startBounds.h;
+    if(handle.includes('w'))left=clamp(pt.x,0,right-2);if(handle.includes('e'))right=clamp(pt.x,left+2,page.width);if(handle.includes('n'))top=clamp(pt.y,0,bottom-2);if(handle.includes('s'))bottom=clamp(pt.y,top+2,page.height);
+    const nb={x:left,y:top,w:Math.max(2,right-left),h:Math.max(2,bottom-top)};
+    if(original.points){const ob=startBounds;const sx=ob.w?nb.w/ob.w:1,sy=ob.h?nb.h/ob.h:1;ann.points=original.points.map(p=>({x:clamp(nb.x+(p.x-ob.x)*sx,0,page.width),y:clamp(nb.y+(p.y-ob.y)*sy,0,page.height)}));return}
+    const ox1=original.x1,ox2=original.x2,oy1=original.y1,oy2=original.y2;const ob=startBounds;const mapX=x=>nb.x+((x-ob.x)/(ob.w||1))*nb.w;const mapY=y=>nb.y+((y-ob.y)/(ob.h||1))*nb.h;ann.x1=clamp(mapX(ox1),0,page.width);ann.x2=clamp(mapX(ox2),0,page.width);ann.y1=clamp(mapY(oy1),0,page.height);ann.y2=clamp(mapY(oy2),0,page.height)
+  }
   canvasPointerMove(e,page,canvas){const pt=pointOnCanvas(e,canvas);
+    if(this.resizingShape&&this.resizingShape.pageId===page.id){const ann=findAnn(page,this.resizingShape.annId);if(!ann)return;this.resizeAnnotationFromHandle(ann,this.resizingShape.original,this.resizingShape.startBounds,this.resizingShape.handle,pt,page);this.renderAnnotations(page);this.markDirty(false);return}
     if(this.draggingShape&&this.draggingShape.pageId===page.id){const ann=findAnn(page,this.draggingShape.annId);if(!ann)return;const dx=pt.x-this.draggingShape.last.x,dy=pt.y-this.draggingShape.last.y;moveAnnotation(ann,dx,dy,page);this.draggingShape.last=pt;this.renderAnnotations(page);this.markDirty(false);return}
     if(!this.drawing||this.drawing.pageId!==page.id)return;
     if(this.drawing.type==='erase'){this.eraseAt(page,pt);return}
@@ -275,10 +289,10 @@ class WorksheetEditor{
     if(ann.points){const last=ann.points[ann.points.length-1];if(distance(last,pt)>1.2)ann.points.push(pt)}else{ann.x2=pt.x;ann.y2=pt.y}
     this.renderAnnotations(page);this.markDirty(false);
   }
-  canvasPointerUp(e,page,canvas){if(this.draggingShape){this.draggingShape=null;this.markDirty();return}if(this.drawing){this.drawing=null;this.markDirty();this.renderAnnotations(page)}}
+  canvasPointerUp(e,page,canvas){if(this.resizingShape){this.resizingShape=null;this.markDirty();this.renderAnnotations(page);return}if(this.draggingShape){this.draggingShape=null;this.markDirty();return}if(this.drawing){this.drawing=null;this.markDirty();this.renderAnnotations(page)}}
   createText(page,pt){this.pushHistory('text-add');const ann={id:uid(),type:'text',x:pt.x,y:pt.y,text:'',color:this.color,fontSize:this.fontSize,bold:false,italic:false,runs:[]};page.annotations.push(ann);this.selected={pageId:page.id,annId:ann.id};this.renderTextLayer(page);this.markDirty(false);this.enterTextEdit(page,ann,true)}
-  renderTextLayer(page){const d=this.pageDom.get(page.id);if(!d)return;const layer=d.textLayer;layer.innerHTML='';page.annotations.filter(a=>a.type==='text').forEach(ann=>{const el=document.createElement('div');el.className='ws-text-item';el.dataset.annId=ann.id;el.tabIndex=0;renderRunsIntoElement(el,ann);this.positionTextEl(el,ann);const selected=this.selected.pageId===page.id&&this.selected.annId===ann.id;el.classList.toggle('selected',selected);el.classList.toggle('moveable',this.tool==='select'&&this.selectMode==='move');el.contentEditable='false';
-      el.onpointerdown=e=>this.textPointerDown(e,page,ann,el);el.ondblclick=e=>{e.stopPropagation();this.selected={pageId:page.id,annId:ann.id};this.enterTextEdit(page,ann)};el.onkeydown=e=>this.textKeyDown(e,page,ann,el);layer.appendChild(el)});
+  renderTextLayer(page){const d=this.pageDom.get(page.id);if(!d)return;const layer=d.textLayer;layer.innerHTML='';page.annotations.filter(a=>a.type==='text').forEach(ann=>{const el=document.createElement('div');el.className='ws-text-item';el.dataset.annId=ann.id;el.tabIndex=0;renderRunsIntoElement(el,ann);this.positionTextEl(el,ann);const selected=this.selected.pageId===page.id&&this.selected.annId===ann.id;el.classList.toggle('selected',selected);el.classList.toggle('moveable',this.tool==='select'&&this.editingTextKey!==`${page.id}:${ann.id}`);el.contentEditable='false';
+      el.onpointerdown=e=>this.textPointerDown(e,page,ann,el);el.ondblclick=e=>{e.preventDefault();e.stopPropagation();this.selected={pageId:page.id,annId:ann.id};this.enterTextEdit(page,ann,false,{x:e.clientX,y:e.clientY})};el.onkeydown=e=>this.textKeyDown(e,page,ann,el);layer.appendChild(el)});
   }
   renderAllTextLayers(){this.pages.forEach(p=>this.renderTextLayer(p))}
   positionTextEl(el,ann){el.style.left=`${ann.x}px`;el.style.top=`${ann.y}px`;el.style.color=ann.color||this.color;el.style.fontSize=`${ann.fontSize||this.fontSize}px`;el.style.fontWeight=ann.bold?'700':'400';el.style.fontStyle=ann.italic?'italic':'normal'}
@@ -286,22 +300,25 @@ class WorksheetEditor{
     if(this.tool!=='select')return;
     e.stopPropagation();
     const key=`${page.id}:${ann.id}`;
-    // Nếu đang sửa đúng khung chữ này thì để trình duyệt tự đặt caret/chọn chữ.
-    // Không gọi enterTextEdit() lần nữa vì render lại DOM giữa pointerdown sẽ làm mất focus/caret.
-    if(this.selectMode==='edit'&&this.editingTextKey===key&&el.isContentEditable){
+    // Khi đã double-click để sửa đúng khung này, click đơn tiếp theo chỉ đặt caret/chọn chữ như trình soạn thảo bình thường.
+    if(this.editingTextKey===key&&el.isContentEditable){
       this.currentPageId=page.id;this.selected={pageId:page.id,annId:ann.id};this.refreshSidebarActive();
       requestAnimationFrame(()=>{const sel=getSelectionOffsets(el);if(sel)this.savedTextSelection={pageId:page.id,annId:ann.id,...sel};});
       return;
     }
     if(this.editingTextKey&&this.editingTextKey!==key)this.finishCurrentTextEdit();
-    this.currentPageId=page.id;this.selected={pageId:page.id,annId:ann.id};this.refreshSidebarActive();this.syncToolbarFromText(ann,0);
-    if(this.selectMode==='edit'){this.enterTextEdit(page,ann);return}
-    this.pageDom.get(page.id)?.textLayer.querySelectorAll('.ws-text-item').forEach(node=>node.classList.toggle('selected',node===el));el.classList.add('selected','moveable');el.focus();this.pushHistory('text-move');const start={x:e.clientX,y:e.clientY,ax:ann.x,ay:ann.y};this.textDrag={pageId:page.id,annId:ann.id,start};const move=ev=>{if(!this.textDrag)return;ann.x=clamp(start.ax+(ev.clientX-start.x)/this.zoom,0,page.width-5);ann.y=clamp(start.ay+(ev.clientY-start.y)/this.zoom,0,page.height-5);this.positionTextEl(el,ann);this.markDirty(false)};const up=()=>{document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);this.textDrag=null;this.markDirty()};document.addEventListener('pointermove',move);document.addEventListener('pointerup',up,{once:true});
+    this.shapeEditKey=null;this.currentPageId=page.id;this.selected={pageId:page.id,annId:ann.id};this.refreshSidebarActive();this.syncToolbarFromText(ann,0);
+    if((e.detail||0)>=2)return;
+    this.pageDom.get(page.id)?.textLayer.querySelectorAll('.ws-text-item').forEach(node=>node.classList.toggle('selected',node===el));el.classList.add('selected','moveable');el.focus();
+    // Click đơn = chọn và kéo để di chuyển cả khung.
+    this.pushHistory('text-move');const start={x:e.clientX,y:e.clientY,ax:ann.x,ay:ann.y};this.textDrag={pageId:page.id,annId:ann.id,start};
+    const move=ev=>{if(!this.textDrag)return;ann.x=clamp(start.ax+(ev.clientX-start.x)/this.zoom,0,page.width-5);ann.y=clamp(start.ay+(ev.clientY-start.y)/this.zoom,0,page.height-5);this.positionTextEl(el,ann);this.markDirty(false)};
+    const up=()=>{document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);this.textDrag=null;this.markDirty()};document.addEventListener('pointermove',move);document.addEventListener('pointerup',up,{once:true});
   }
-  enterTextEdit(page,ann,selectAll=false){
+  enterTextEdit(page,ann,selectAll=false,clientPoint=null){
     const key=`${page.id}:${ann.id}`;
     if(this.editingTextKey&&this.editingTextKey!==key)this.finishCurrentTextEdit();
-    this.tool='select';this.selectMode='edit';this.applyToolState();this.selected={pageId:page.id,annId:ann.id};
+    this.tool='select';this.shapeEditKey=null;this.applyToolState();this.selected={pageId:page.id,annId:ann.id};
     // Nếu chính khung này đã contenteditable thì chỉ focus lại, tuyệt đối không render lại DOM.
     let el=this.pageDom.get(page.id)?.textLayer.querySelector(`[data-ann-id="${cssEscape(ann.id)}"]`);
     if(this.editingTextKey===key&&el?.isContentEditable){
@@ -314,7 +331,7 @@ class WorksheetEditor{
     this.renderTextLayer(page);
     el=this.pageDom.get(page.id)?.textLayer.querySelector(`[data-ann-id="${cssEscape(ann.id)}"]`);if(!el)return;
     this.pushHistory('text-edit');this.editingTextKey=key;el.contentEditable='true';el.classList.add('editing');el.focus({preventScroll:true});
-    if(selectAll){setSelectionOffsets(el,0,textLength(ann));this.savedTextSelection={pageId:page.id,annId:ann.id,start:0,end:textLength(ann)}}else{placeCaretEnd(el);const n=textLength(ann);this.savedTextSelection={pageId:page.id,annId:ann.id,start:n,end:n}}
+    if(selectAll){setSelectionOffsets(el,0,textLength(ann));this.savedTextSelection={pageId:page.id,annId:ann.id,start:0,end:textLength(ann)}}else if(clientPoint&&setCaretAtClientPoint(el,clientPoint.x,clientPoint.y)){const sel=getSelectionOffsets(el);if(sel)this.savedTextSelection={pageId:page.id,annId:ann.id,...sel}}else{placeCaretEnd(el);const n=textLength(ann);this.savedTextSelection={pageId:page.id,annId:ann.id,start:n,end:n}}
     el.oninput=()=>{syncAnnFromEditor(el,ann);const sel=getSelectionOffsets(el);if(sel)this.savedTextSelection={pageId:page.id,annId:ann.id,...sel};this.markDirty(false)};
     el.onblur=()=>{if(this.editingTextKey!==key)return;syncAnnFromEditor(el,ann);this.markDirty(false)};
   }
@@ -344,16 +361,16 @@ class WorksheetEditor{
     }else this.renderTextLayer(page);this.markDirty();return true;
   }
   textKeyDown(e,page,ann,el){
-    if(el.isContentEditable){if(e.key==='Escape'){e.preventDefault();syncAnnFromEditor(el,ann);this.finishCurrentTextEdit();this.selectMode='move';this.applyToolState();this.renderTextLayer(page)}return}
-    if(this.tool!=='select'||this.selectMode!=='move')return;
+    if(el.isContentEditable){if(e.key==='Escape'){e.preventDefault();syncAnnFromEditor(el,ann);this.finishCurrentTextEdit();this.applyToolState();this.renderTextLayer(page)}return}
+    if(this.tool!=='select')return;
     const arrows={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};if(arrows[e.key]){e.preventDefault();this.pushHistory('text-nudge',true);const step=e.shiftKey?10:1;ann.x=clamp(ann.x+arrows[e.key][0]*step,0,page.width-5);ann.y=clamp(ann.y+arrows[e.key][1]*step,0,page.height-5);this.positionTextEl(el,ann);this.markDirty();return}
-    if(e.key==='Enter'||e.key==='F2'){e.preventDefault();this.selectMode='edit';this.enterTextEdit(page,ann);return}
+    if(e.key==='Enter'||e.key==='F2'){e.preventDefault();this.enterTextEdit(page,ann);return}
     if(e.key==='Delete'){e.preventDefault();this.pushHistory('delete');page.annotations=page.annotations.filter(a=>a.id!==ann.id);this.selected={pageId:null,annId:null};this.renderTextLayer(page);this.markDirty()}
   }
-  selectAnnotation(page,annId){this.selected={pageId:annId?page.id:null,annId};this.renderAnnotations(page);this.renderTextLayer(page);this.updateStatus()}
+  selectAnnotation(page,annId){if(!annId||this.shapeEditKey!==`${page.id}:${annId}`)this.shapeEditKey=null;this.selected={pageId:annId?page.id:null,annId};this.renderAnnotations(page);this.renderTextLayer(page);this.updateStatus()}
   hitTest(page,pt){for(let i=page.annotations.length-1;i>=0;i--){const a=page.annotations[i];if(a.type==='text')continue;if(annotationHit(a,pt))return a}return null}
   eraseAt(page,pt){let changed=false;for(let i=page.annotations.length-1;i>=0;i--){const a=page.annotations[i];if(a.type==='text')continue;if(annotationHit(a,pt,Math.max(8,this.strokeWidth*2))){page.annotations.splice(i,1);changed=true;break}}if(changed){this.renderAnnotations(page);this.markDirty(false)}}
-  renderAnnotations(page){const d=this.pageDom.get(page.id);if(!d)return;const ctx=d.anno.getContext('2d');ctx.clearRect(0,0,d.anno.width,d.anno.height);for(const a of page.annotations){if(a.type==='text')continue;drawAnnotation(ctx,a)}const sel=this.selected.pageId===page.id&&findAnn(page,this.selected.annId);if(sel&&sel.type!=='text'){const b=annotationBounds(sel);ctx.save();ctx.setLineDash([7,5]);ctx.strokeStyle='#1684cf';ctx.lineWidth=2;ctx.strokeRect(b.x-4,b.y-4,b.w+8,b.h+8);ctx.restore()}}
+  renderAnnotations(page){const d=this.pageDom.get(page.id);if(!d)return;const ctx=d.anno.getContext('2d');ctx.clearRect(0,0,d.anno.width,d.anno.height);for(const a of page.annotations){if(a.type==='text')continue;drawAnnotation(ctx,a)}const sel=this.selected.pageId===page.id&&findAnn(page,this.selected.annId);if(sel&&sel.type!=='text'){const b=annotationBounds(sel);ctx.save();ctx.setLineDash([7,5]);ctx.strokeStyle='#1684cf';ctx.lineWidth=2;ctx.strokeRect(b.x-4,b.y-4,b.w+8,b.h+8);ctx.setLineDash([]);if(this.shapeEditKey===`${page.id}:${sel.id}`){const hs=12;ctx.fillStyle='#fff';ctx.strokeStyle='#1684cf';ctx.lineWidth=2;for(const p of [{x:b.x,y:b.y},{x:b.x+b.w,y:b.y},{x:b.x,y:b.y+b.h},{x:b.x+b.w,y:b.y+b.h}]){ctx.fillRect(p.x-hs/2,p.y-hs/2,hs,hs);ctx.strokeRect(p.x-hs/2,p.y-hs/2,hs,hs)}}ctx.restore()}}
   renderAllAnnotations(){this.pages.forEach(p=>this.renderAnnotations(p))}
   clearCurrentPage(){const p=this.getCurrentPage();if(!p||!p.annotations.length)return;if(!confirm('Bạn có chắc muốn xóa toàn bộ phần đã làm trên trang này?'))return;this.pushHistory('clear-page');p.annotations=[];this.selected={pageId:null,annId:null};this.renderAnnotations(p);this.renderTextLayer(p);this.markDirty()}
   getCurrentPage(){return this.pages.find(p=>p.id===this.currentPageId)||null}
@@ -364,7 +381,7 @@ class WorksheetEditor{
     const snap=this.captureState();this.undoStack.push(snap);if(this.undoStack.length>this.historyLimit)this.undoStack.shift();this.redoStack=[];this.lastHistory={key,time:now};this.updateUndoRedo();
   }
   captureState(){return {pages:this.pages.map(p=>({id:p.id,name:p.name,width:p.width,height:p.height,mime:p.mime,imageBlob:p.imageBlob,annotations:deepClone(p.annotations)})),currentPageId:this.currentPageId}}
-  restoreState(s){if(!s)return;const currentById=new Map(this.pages.map(p=>[p.id,p]));this.pages=(s.pages||[]).map(sp=>{const current=currentById.get(sp.id);return {id:sp.id,name:sp.name,width:sp.width,height:sp.height,mime:sp.mime,imageBlob:sp.imageBlob||current?.imageBlob,annotations:deepClone(sp.annotations||[]),_thumbUrl:current?._thumbUrl};});this.currentPageId=s.currentPageId&&this.pages.some(p=>p.id===s.currentPageId)?s.currentPageId:this.pages[0]?.id||null;this.selected={pageId:null,annId:null};this.renderPages();this.markDirty()}
+  restoreState(s){if(!s)return;const currentById=new Map(this.pages.map(p=>[p.id,p]));this.pages=(s.pages||[]).map(sp=>{const current=currentById.get(sp.id);return {id:sp.id,name:sp.name,width:sp.width,height:sp.height,mime:sp.mime,imageBlob:sp.imageBlob||current?.imageBlob,annotations:deepClone(sp.annotations||[]),_thumbUrl:current?._thumbUrl};});this.currentPageId=s.currentPageId&&this.pages.some(p=>p.id===s.currentPageId)?s.currentPageId:this.pages[0]?.id||null;this.selected={pageId:null,annId:null};this.editingTextKey=null;this.shapeEditKey=null;this.renderPages();this.markDirty()}
   undo(){if(!this.undoStack.length)return;const cur=this.captureState();const prev=this.undoStack.pop();this.redoStack.push(cur);this.restoreState(prev);this.updateUndoRedo();this.toast('Đã hoàn tác.')}
   redo(){if(!this.redoStack.length)return;const cur=this.captureState();const next=this.redoStack.pop();this.undoStack.push(cur);this.restoreState(next);this.updateUndoRedo();this.toast('Đã làm lại.')}
   updateUndoRedo(){if(!this.root)return;this.root.querySelector('#wsUndo').disabled=!this.undoStack.length;this.root.querySelector('#wsRedo').disabled=!this.redoStack.length}
@@ -373,6 +390,7 @@ class WorksheetEditor{
     if(mod&&e.key.toLowerCase()==='z'){e.preventDefault();e.stopImmediatePropagation();e.shiftKey?this.redo():this.undo();return}
     if(mod&&e.key.toLowerCase()==='y'){e.preventDefault();e.stopImmediatePropagation();this.redo();return}
     if(mod&&e.key.toLowerCase()==='s'){e.preventDefault();e.stopImmediatePropagation();this.autosaveNow(false,true);return}
+    if(e.key==='Escape'&&!typing&&this.shapeEditKey){e.preventDefault();e.stopImmediatePropagation();this.shapeEditKey=null;this.renderAllAnnotations();this.updateStatus();return}
     if(e.key==='Escape'&&!typing){e.preventDefault();e.stopImmediatePropagation();this.close();return}
     if(typing)return;
     const shortcuts={v:'select',t:'text',p:'pen',h:'highlight',e:'eraser'};if(shortcuts[e.key.toLowerCase()]&&!mod){e.preventDefault();this.setTool(shortcuts[e.key.toLowerCase()]);return}
@@ -414,7 +432,7 @@ class WorksheetEditor{
   async exportPages(progress){for(let i=0;i<this.pages.length;i++){progress(Math.round(i/this.pages.length*95),`Xuất trang ${i+1}/${this.pages.length}…`);const c=await this.composePage(this.pages[i]);const b=await canvasToBlob(c,'image/png',1);downloadBlob(b,safeFileName(`${this.projectTitle} - Trang ${String(i+1).padStart(2,'0')}.png`));await sleep(120)}progress(100,'Hoàn tất.')}
   setBusy(text){if(text)this.setStatus(text);this.root.querySelectorAll('#wsOpen,#wsAdd,#wsExport').forEach(b=>b.disabled=Boolean(text))}
   setStatus(text){if(this.root)this.root.querySelector('#wsStatus').textContent=text||'Sẵn sàng.'}
-  updateStatus(){if(!this.root)return;const idx=this.pages.findIndex(p=>p.id===this.currentPageId);this.root.querySelector('#wsPageStatus').textContent=`Trang ${idx>=0?idx+1:0} / ${this.pages.length}`;this.root.querySelector('#wsToolStatus').textContent=`Công cụ: ${toolLabel(this.tool)}${this.tool==='select'?` - ${this.selectMode==='move'?'Di chuyển':'Sửa chữ'}`:''}`;this.root.querySelector('#wsZoomStatus').textContent=`Zoom: ${Math.round(this.zoom*100)}%`;this.root.querySelector('#wsZoomLabel').textContent=`${Math.round(this.zoom*100)}%`;this.refreshSidebarActive()}
+  updateStatus(){if(!this.root)return;const idx=this.pages.findIndex(p=>p.id===this.currentPageId);this.root.querySelector('#wsPageStatus').textContent=`Trang ${idx>=0?idx+1:0} / ${this.pages.length}`;const mode=this.editingTextKey?' - Đang sửa chữ':this.shapeEditKey?' - Đang đổi kích thước':'';this.root.querySelector('#wsToolStatus').textContent=`Công cụ: ${toolLabel(this.tool)}${mode}`;this.root.querySelector('#wsZoomStatus').textContent=`Zoom: ${Math.round(this.zoom*100)}%`;this.root.querySelector('#wsZoomLabel').textContent=`${Math.round(this.zoom*100)}%`;this.refreshSidebarActive()}
   toast(text,type=''){if(!this.root)return;const t=this.root.querySelector('#wsToast');t.textContent=text;t.className=`ws-toast ${type}`;requestAnimationFrame(()=>t.classList.add('show'));clearTimeout(this.toastTimer);this.toastTimer=setTimeout(()=>t.classList.remove('show'),2600)}
   objectUrl(blob){const u=URL.createObjectURL(blob);this.objectUrls.add(u);return u}
 }
@@ -498,4 +516,12 @@ function cssEscape(v){return globalThis.CSS?.escape?CSS.escape(v):String(v).repl
 function formatDate(ts){try{return new Intl.DateTimeFormat('vi-VN',{dateStyle:'short',timeStyle:'short'}).format(new Date(ts))}catch{return new Date(ts).toLocaleString()}}
 function toolLabel(t){return({select:'Chọn',text:'Gõ chữ',pen:'Bút',highlight:'Highlight',ellipse:'Khoanh',rect:'Chữ nhật',line:'Đường',arrow:'Mũi tên',underline:'Gạch chân',eraser:'Tẩy'})[t]||t}
 function errorText(e){if(!e)return'Lỗi không xác định.';if(e.name==='QuotaExceededError')return'Bộ nhớ trình duyệt đã đầy. Hãy xóa bớt project cũ hoặc xuất bài ra file.';return e.message||String(e)}
+function setCaretAtClientPoint(el,x,y){
+  try{
+    let range=null;
+    if(document.caretPositionFromPoint){const pos=document.caretPositionFromPoint(x,y);if(pos&&el.contains(pos.offsetNode)){range=document.createRange();range.setStart(pos.offsetNode,pos.offset);range.collapse(true)}}
+    else if(document.caretRangeFromPoint){const r=document.caretRangeFromPoint(x,y);if(r&&el.contains(r.startContainer))range=r}
+    if(!range)return false;const sel=getSelection();sel.removeAllRanges();sel.addRange(range);return true
+  }catch{return false}
+}
 function placeCaretEnd(el){const range=document.createRange();range.selectNodeContents(el);range.collapse(false);const sel=getSelection();sel.removeAllRanges();sel.addRange(range)}

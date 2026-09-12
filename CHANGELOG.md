@@ -1,3 +1,11 @@
+# v7.4.4 – Gia Khang Worksheet direct edit (2026-09-12)
+- Đổi nút quay lại thành `← Trở về KanBan`, kích thước lớn hơn.
+- Bỏ hai nút `Di chuyển` và `Sửa chữ`; thao tác được suy ra trực tiếp từ click.
+- Khung chữ: single-click = chọn/kéo di chuyển; double-click = contentEditable, sửa chữ tại vị trí click.
+- Shape/nét: single-click = chọn/kéo di chuyển; double-click = bật resize và hiện 4 handle góc.
+- Giữ logic rich-text v7.4.3: Ctrl+A/khung chọn đổi toàn bộ cỡ chữ; selection riêng đổi riêng; màu/nền chữ theo selection; trả focus về text sau khi format.
+- Tăng cache version Service Worker và query version của worksheet editor lên 1.2.0.
+
 
 ## v7.4.2 - Rich text cho khung đáp án (2026-09-12)
 - Sửa lỗi mất khả năng gõ sau khi Ctrl+A rồi tăng/giảm cỡ chữ.

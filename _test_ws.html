@@ -1,0 +1,9 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="office-tools/worksheet-editor.css?v=1.2.0"><style>html,body,#host{margin:0;width:100%;height:100%}#host{position:fixed;inset:0}</style></head><body><div id="host"></div><script type="module">
+import {openWorksheetEditor} from './office-tools/worksheet-editor.js?v=1.2.0';
+const host=document.querySelector('#host');
+const ed=openWorksheetEditor(host,{}); window.ed=ed;
+const c=document.createElement('canvas');c.width=800;c.height=600;const ctx=c.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,800,600);const blob=await new Promise(r=>c.toBlob(r,'image/png'));
+const p={id:'p1',name:'test.png',width:800,height:600,mime:'image/png',imageBlob:blob,annotations:[]};ed.pages=[p];ed.currentPageId='p1';ed.projectId='test';ed.projectTitle='Test';ed.renderPages();
+const ann={id:'a1',type:'text',x:100,y:100,text:"didn't help",color:'#166fc0',fontSize:28,bold:false,italic:false,runs:[]};p.annotations.push(ann);ed.selected={pageId:'p1',annId:'a1'};ed.renderTextLayer(p);ed.enterTextEdit(p,ann,false);
+window.testReady=true;
+</script></body></html>

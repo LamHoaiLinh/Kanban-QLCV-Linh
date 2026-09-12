@@ -1,0 +1,14 @@
+LÂM GIA KHANG - LÀM BÀI TẬP v7.4.4 - TEST REPORT
+
+1. PASS - node --check office-tools/worksheet-editor.js
+2. PASS - node --check office-tools/office-tools.js
+3. PASS - node --check sw.js
+4. PASS - Không còn wsSelectMode / data-select-mode / selectMode trong worksheet-editor.js.
+5. PASS - Nút Back hiển thị chuỗi "Trở về KanBan".
+6. PASS - Single-click text dùng nhánh chọn/kéo; double-click gọi enterTextEdit.
+7. PASS - Double-click shape bật shapeEditKey; resize dùng 4 corner handles.
+8. PASS - applyTextToolbarStyle giữ cơ chế toàn khung / selection riêng từ v7.4.3.
+9. PASS - Màu nền chữ vẫn render trong DOM và khi export canvas/PDF.
+10. PASS - Service Worker cache đổi sang v744 và worksheet-editor query version 1.2.0.
+
+Lưu ý: kiểm tra syntax và kiểm tra logic source đã hoàn tất trong môi trường build. Nên Ctrl+F5 sau khi đẩy lên GitHub Pages để loại cache cũ.

@@ -1,10 +1,12 @@
-# Cập nhật v7.4.2 – sửa chữ nâng cao
+# Cập nhật v7.4.4 – thao tác trực tiếp bằng click / double-click
 
-- Khi đang **Sửa chữ**, `Ctrl+A` rồi tăng/giảm **Cỡ chữ** sẽ áp dụng cho toàn bộ khung và vẫn gõ tiếp được.
-- Khi chỉ bôi đen một từ/đoạn, thay đổi cỡ chữ hoặc màu chữ chỉ tác động phần được chọn.
-- Thêm **Nền chữ** để tô màu nền phần chữ đang bôi đen; nút **✕ nền** để bỏ nền.
-- Ở chế độ **Di chuyển**, chọn một khung chữ rồi đổi cỡ chữ sẽ áp dụng cho toàn bộ chữ trong khung.
-- Định dạng từng đoạn được lưu vào project và được render khi xuất PNG/PDF.
+- Nút quay lại đã đổi thành **← Trở về KanBan** và làm lớn, dễ thấy hơn.
+- Bỏ hai nút **Di chuyển** và **Sửa chữ** trên thanh công cụ.
+- Với khung chữ: **nhấp 1 lần** để chọn/kéo di chuyển; **nhấp kép** để sửa nội dung.
+- Với các đối tượng vẽ (khoanh, chữ nhật, đường, mũi tên, gạch chân, bút/highlight): **nhấp 1 lần** để chọn/kéo di chuyển; **nhấp kép** để hiện 4 nút góc và kéo đổi kích thước.
+- Cỡ chữ vẫn giữ đúng cơ chế rich-text: chọn cả khung hoặc `Ctrl+A` thì tăng/giảm toàn bộ; chỉ bôi đen một phần thì chỉ phần đó đổi cỡ.
+- Màu chữ và **Nền chữ** cũng áp dụng theo vùng chữ đang bôi đen; sau khi chỉnh cỡ/màu/nền vẫn tiếp tục gõ được.
+- `Ctrl+Z / Ctrl+Y` tiếp tục hoạt động cho thao tác làm bài.
 
 # KANBAN CÁ NHÂN STATIC v2.4
 
@@ -255,7 +257,7 @@ Dice Arena vẫn giữ chế độ xúc xắc tự do. Nút **ĐẠI HỘI LINH 
 - Bấm tab sẽ mở giao diện làm bài toàn màn hình, không làm thay đổi dữ liệu Kanban.
 - Nhập nhiều PNG/JPG/WEBP/PDF; các trang mặc định nối liên tục theo chiều dọc để lăn chuột từ trang 1 sang trang 2, 3...
 - Sidebar bên trái có thumbnail và nút ↑ / ↓ để đổi thứ tự trang ngay trong bài.
-- Hỗ trợ gõ chữ màu, chế độ Chọn → Di chuyển / Sửa chữ, phím mũi tên để nắn vị trí, Bút, Highlight, Khoanh, Chữ nhật, Đường, Mũi tên, Gạch chân và Tẩy.
+- Hỗ trợ gõ chữ màu; trong công cụ Chọn dùng nhấp 1 lần để chọn/di chuyển và nhấp kép để sửa chữ hoặc đổi kích thước đối tượng; phím mũi tên vẫn nắn vị trí được. Có Bút, Highlight, Khoanh, Chữ nhật, Đường, Mũi tên, Gạch chân và Tẩy.
 - Có **Ctrl+Z / Ctrl+Y** và nút Undo/Redo trên thanh công cụ.
 - Tự lưu vào IndexedDB của trình duyệt: chỉ giữ **5 project gần nhất**; cùng một bộ file nguồn dùng cùng project ID nên bản mới nhất ghi đè bản cũ, không tạo bản trùng.
 - Xuất mặc định **PNG nối dài theo chiều dọc**, ngoài ra có PDF nhiều trang và PNG từng trang.
