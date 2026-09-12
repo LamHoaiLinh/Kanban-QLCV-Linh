@@ -1,0 +1,72 @@
+DICE ARENA v7.2 - FINAL CHANGE & TEST REPORT
+Ngày kiểm tra: 25/08/2026
+
+PHẠM VI
+- Chỉ nâng cấp Dice Arena và các file launcher/cache cần thiết để Kanban gọi đúng bản Dice mới.
+- Không thay đổi dữ liệu Kanban, các game khác hoặc Office Tools.
+
+ĐÃ NÂNG CẤP
+1. Spacebar theo trạng thái:
+   - Ngoài Đấu Trường: Space = tung nhanh như cũ.
+   - timing: Space = dừng thanh canh lực.
+   - target: Space = bắn.
+   - rolling/firing/AI: Space bị bỏ qua.
+   - Chặn key repeat để giữ Space không kích hoạt lặp.
+2. Sửa tên/status đấu thủ trên cùng bị cắt: bán kính dọc arena giảm, status chuyển vào vùng an toàn.
+3. Bỏ combatDiceStage trung tâm. Mỗi đấu thủ có 2 D6 thật tung và nằm nguyên dưới chân trong cả vòng.
+4. Do không còn stage 12 xúc xắc tập trung, lỗi tràn/cắt hàng thứ 3 khi có 6 người được loại bỏ.
+5. Thêm combatSessionId + hủy timer/session. Đổi người/Chơi lại/Đóng giữa animation không còn tiếp tục ghi vào state cũ.
+6. Cân bằng:
+   - HP: 18; người gục trở lại vòng sau với 9 HP.
+   - 50% lực = 0.50x Công; 75% = 1.25x; gần 100% = xấp xỉ 1.50x; PERFECT = 1.75x.
+   - Giữ nguyên luật D6: số lẻ = Công, số chẵn = Khiên.
+7. Mobile:
+   - combat-shell dùng 100dvh + safe-area.
+   - arena khoảng 49-50dvh trên điện thoại.
+   - action box sticky ở đáy; nút có touch-action: manipulation.
+8. AI có 3 phong cách:
+   - Hiếu chiến: ưu tiên đối thủ HP thấp.
+   - Phá khiên: ưu tiên mục tiêu ít Khiên/có Công đáng chú ý.
+   - Cân bằng: chọn mục tiêu theo trọng số, vẫn có ngẫu nhiên.
+   - AI dùng cùng xúc xắc và cơ chế timing, không đọc trước kết quả.
+9. Dọn source:
+   - Loại CSS Đại Hội Linh Thú/Race không còn dùng.
+   - Loại hàm app/D10 không dùng và dice-launcher.js cũ.
+   - Game Hub chuyển Dice sang v7.2; Service Worker đổi cache name/version.
+   - D10 3D là enhancement khi CDN khả dụng. Khi mở local file/offline hoặc CDN lỗi, game tự dùng D10 CSS nội bộ; CDN không còn là điều kiện để chơi Dice.
+10. Nhận biết lượt/mục tiêu:
+   - Người đang tới lượt: viền xanh dương đậm #0757D9, desktop 7px.
+   - Mục tiêu đang quét: viền đỏ đậm #D71920, desktop 8px.
+
+KIỂM TRA HÀNH VI TRÊN CHROMIUM DEVTOOLS - PASS
+- 6 fighters: PASS.
+- 12 D6 dưới chân: PASS.
+- Không còn combatDiceStage: PASS.
+- Tên/status người trên cùng không bị clip: PASS.
+- Active turn: đúng 1 người, border 7px rgb(7,87,217): PASS.
+- Keyboard repeat Space: bị bỏ qua: PASS.
+- Space timing -> target: PASS.
+- Target: đúng 1 người, border 8px rgb(215,25,32): PASS.
+- Space target -> fire: PASS.
+- Restart giữa lúc dice đang roll: trở lại setup, arena rỗng, state cũ không tiếp tục: PASS.
+
+KIỂM TRA MOBILE 390x844 - PASS
+- 6 fighters / 12 foot dice: PASS.
+- combat-shell min/max height = 844px (100dvh): PASS.
+- arena render ~413.5px (~49% viewport): PASS.
+- action box position = sticky: PASS.
+- top fighter status vẫn nằm trong arena: PASS.
+
+KIỂM TRA TĨNH
+- node --check: dice-game/js/app.js PASS.
+- node --check: dice-game/js/d10-engine.js PASS.
+- node --check: game-launcher.js PASS.
+- node --check: sw.js PASS.
+- CSS ngoặc { } cân bằng: PASS.
+- Không còn combatDiceStage / race CSS / setStaticD6 / shuffle / các hàm D10 đã bỏ: PASS.
+
+GHI CHÚ CÂN BẰNG
+- Trung bình 2D6 theo luật hiện tại: Công = 3.0; Khiên = 4.0.
+- Sau hệ số timing mới, sát thương HP kỳ vọng khi đối đầu một Khiên 2D6 ngẫu nhiên:
+  50% ≈ 0.41 HP; 75% ≈ 1.72 HP; PERFECT ≈ 2.94 HP.
+- Mục tiêu là tăng phần thưởng cho kỹ năng canh lực mà vẫn giữ luật chẵn/lẻ dễ hiểu.

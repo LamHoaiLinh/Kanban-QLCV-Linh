@@ -1,0 +1,4 @@
+.farm-asset-icon{width:1.45em;height:1.45em;object-fit:contain;vertical-align:middle}
+.seed-icon .farm-asset-icon{width:100%;height:100%}
+.farm-npc-asset{float:right;width:52px;height:52px;object-fit:contain;margin:-4px -2px 5px 8px}
+.farm-building-asset{float:left;width:42px;height:42px;object-fit:contain;margin:0 8px 4px 0}

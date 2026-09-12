@@ -1,0 +1,11 @@
+V6 - SỬA ENGINE KÝ CÁ NHÂN
+============================
+1. Bỏ hoàn toàn forge.pkcs7.createSignedData() khỏi ký cá nhân.
+2. Tự dựng CMS SignedData DER tối giản cho /adbe.pkcs7.detached.
+3. Ký trực tiếp SHA-256/RSA PKCS#1 v1.5 trên ByteRange.
+4. Tự verify chữ ký RSA trước khi đóng gói CMS.
+5. Tự parse-roundtrip CMS DER trước khi nhúng PDF.
+6. Khi tạo certificate mới: serial luôn là ASN.1 INTEGER dương; DN Unicode dùng UTF8String.
+7. Nút “Kiểm tra certificate” nay ký thử CMS thật, không chỉ kiểm tra mật khẩu.
+8. Lỗi ký hiển thị rõ bước nào thất bại.
+9. Không cần xóa certificate cũ chỉ để dùng engine V6; engine mới dùng được record PEM-v2 hiện có.

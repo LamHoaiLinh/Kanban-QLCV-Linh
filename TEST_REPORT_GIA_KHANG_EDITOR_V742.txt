@@ -1,0 +1,12 @@
+KANBAN - GIA KHANG EDITOR v7.4.2
+Ngày kiểm tra: 2026-09-12
+
+PASS 1: Ctrl+A trong khung chữ -> tăng cỡ chữ 28 -> 29, toàn bộ chữ đổi cỡ.
+PASS 2: Sau khi thay đổi cỡ chữ bằng ô spinner, khung vẫn ở chế độ editing và tiếp tục gõ được.
+PASS 3: Bôi đen riêng từ "watch" -> đặt cỡ 40, phần còn lại giữ 29.
+PASS 4: Tô nền riêng từ "watch" -> #ffeb3b, phần còn lại không có nền.
+PASS 5: Chuyển sang chế độ Di chuyển, chọn khung -> đặt cỡ 31, toàn bộ các run trong khung đều đổi 31.
+PASS 6: composePage render thành canvas 800x1100 không phát sinh lỗi JavaScript.
+PASS 7: node --check worksheet-editor.js, office-tools.js, sw.js không có lỗi syntax.
+
+Ghi chú: Test giao diện được thực hiện bằng Chromium headless với mô phỏng thao tác selection/contenteditable thực tế.

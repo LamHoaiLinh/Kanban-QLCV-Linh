@@ -1,0 +1,6 @@
+PDF Ký cá nhân V5 - sửa lỗi "Too few bytes to parse DER"
+- Bỏ @signpdf/signpdf khỏi bước ký cá nhân trên trình duyệt.
+- Tự xử lý ByteRange + Contents trực tiếp trên Uint8Array.
+- CMS detached vẫn được tạo bởi node-forge với RSA/SHA-256.
+- Không thay đổi dữ liệu KanBan, công cụ PDF cũ hay Signing Agent doanh nghiệp.
+- Nếu trình duyệt đang giữ certificate cũ từ bản lỗi, có thể Xóa certificate và tạo lại một lần để thử sạch.

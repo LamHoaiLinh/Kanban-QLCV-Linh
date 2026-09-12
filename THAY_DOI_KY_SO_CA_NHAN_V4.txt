@@ -1,0 +1,10 @@
+KÝ SỐ PDF V4
+- Certificate cá nhân mới không còn phụ thuộc P12 trong lúc ký; lưu certificate PEM + private key mã hóa AES trong IndexedDB.
+- Thêm nút Xóa certificate để tạo lại nếu quên mật khẩu.
+- Nhập P12/PFX được chuyển sang định dạng nội bộ sau khi nhập.
+- Tải bản sao P12 được tạo theo yêu cầu từ certificate nội bộ.
+- Thêm nhiều dòng thông tin tùy ý cho cá nhân và doanh nghiệp: Nhãn + Giá trị, Thêm/Xóa.
+- Bỏ checkbox cảnh báo chữ ký cũ khỏi giao diện. Cảnh báo chỉ hiện popup khi thực sự bấm ký cá nhân trên PDF đã có chữ ký số.
+- Luôn xuất file mới *_BAN_SAO_KY_CA_NHAN.pdf hoặc *_BAN_SAO_KY_DOANH_NGHIEP.pdf; file gốc không thay đổi.
+- Lưu ý: tạo bản sao không tự bảo toàn hiệu lực chữ ký cũ nếu PDF bị dựng lại; popup vẫn thông báo đúng kỹ thuật.
+- Không sửa app.js, dragdrop.js hay dữ liệu KanBan cũ.

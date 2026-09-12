@@ -1,0 +1,10 @@
+PDF SIGNING PERSONAL V7
+=======================
+- Sửa lỗi Cannot read properties of undefined (reading replace) ở bước tạo placeholder PDF.
+- Bỏ hoàn toàn @signpdf/placeholder-pdf-lib qua esm.sh trong luồng ký cá nhân.
+- Dùng cùng PDFLib 1.17.1 đã được Office Tools tải thành công từ unpkg.
+- Tự tạo signature dictionary / ByteRange / Contents / AcroForm bằng PDFLib primitives.
+- Truyền toàn bộ giá trị bắt buộc rõ ràng; không còn default export/constants có thể undefined.
+- Tách thông báo lỗi theo từng bước: tạo ảnh, nạp PDFLib, đọc PDF, nhúng ảnh, tạo placeholder, lưu placeholder, tạo CMS, lưu file.
+- Không thay đổi dữ liệu KanBan, các tool PDF khác hay Signing Agent doanh nghiệp.
+- Giữ nguyên AcroForm/Fields có sẵn (kể cả ô chữ ký của bên khác) thay vì thay thế mảng Fields khi nó nằm qua PDFRef.

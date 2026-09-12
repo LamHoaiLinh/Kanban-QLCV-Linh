@@ -1,0 +1,65 @@
+BÁCH CHIÊU v2.1 - AI COMBO & FAST ONBOARDING
+
+- Run rút từ 10 xuống 9 Ante.
+- Ante 1-5: mỗi Ante 2 trận hướng dẫn trực tiếp + 1 Trùm tự thực hành.
+- Loại bỏ Phòng Đấu Luyện popup riêng để giảm nhịp chậm.
+- Ante 2 trở đi: AI dùng chuỗi 2-4 kỹ thuật, có vai trò combo và tổng Ý đồ hiển thị rõ.
+- AI được gate cơ chế theo tiến độ để không ném Khóa/Vật/Thế Võ quá sớm.
+- Tăng sức ép Ante 2: chuỗi cơ bản khoảng 20+ damage trước phòng thủ.
+- Thế Võ: Thế Công, Thế Thủ, Thế Linh.
+- Hư Thực: Hư Chiêu, Chấn Phá Thế, Dẫn Thế.
+- Khóa/Vật: Thoái Né, Bắt Khóa, Quật Ngã.
+- Tuyệt Kỹ điều kiện: Long Hành, Phản Chấn, Nhất Thức; chỉ xuất hiện tạm thời khi đạt điều kiện.
+- Trùm không hiện lời khuyên chiến thuật.
+- Hiệu ứng số/toast được rút ngắn để nhịp chơi nhanh hơn.
+- Bỏ Tĩnh Tâm/reward sau Trùm cuối để kết Run nhanh hơn.
+
+
+=== v2.2 Combat FX ===
+- Thêm hiệu ứng sát thương nảy mạnh hơn: số damage lớn bật to, combo hiển thị dạng ×1.69 / ×2.13.
+- Thêm tia chém xẹt, vòng chấn động và rung mục tiêu khi trúng đòn.
+- Đòn KẾT có callout Liên Kích/Hoàn Chiêu rõ hơn.
+- Đòn nhiều hit và đòn lớn tạo nhiều slash hơn để cảm giác đã tay hơn.
+
+
+=== v2.3 Combat FX Plus ===
+- Khi chọn kỹ thuật, hiện rõ hao phí dạng “-1 THỂ LỰC / -2 THỂ LỰC”.
+- Khi trúng đòn, số nổi giờ ghi rõ “-7 HP / -10 HP” thay vì chỉ hiện số đỏ.
+- Vết chém kéo dài và đậm hơn, nhìn rõ chiều sâu hơn.
+- 3 hit và 4 hit dùng 3 hoặc 4 nhát song song.
+- Đòn combo/đòn kết tạo thêm hai nhát chém cắt chéo nhau để tạo cảm giác bùng nổ.
+
+
+=== v2.4 Võ Đạo Queue & New Cards ===
+- Thông báo nổi chiến đấu chuyển sang dạng hàng đợi theo từng phía, hiện lần lượt và tồn tại lâu hơn.
+- Giảm hiện tượng 3-4 chỉ số đè lên nhau khi ra combo.
+- Bổ sung 10 thẻ kỹ thuật mới để tăng hướng build.
+- Viết lại đoạn giới thiệu trang chủ theo văn phong kiếm hiệp võ đạo.
+
+
+=== v2.5 Cửu Trùng Thiên ===
+- Toàn bộ lớp cốt truyện chuyển sang phong cách tu tiên.
+- 9 Ante hiển thị thành Cửu Trùng Thiên.
+- Mỗi Trùng có Tam Đại Sinh Tử Ải; ải cuối là Trấn Thiên Ải.
+- Run → Đăng Thiên; Hồ sơ → Đạo Ấn; Tutorial → Thiên Cơ; Tĩnh Tâm → Bế Quan; Kỹ thuật → Chiêu thức.
+- Viết lại lời dẫn, sự kiện, thắng/thua, thuần thục, cơ duyên, lộ trình và phần nhập môn theo giọng tu tiên.
+
+
+=== v2.6 Tu Tiên Chiêu Thức ===
+- Đổi 77 tên chiêu thức sang hệ tu tiên/pháp quyết/thần thông.
+- Liên Hoàn → Liên Pháp; Phản Đòn → Huyền Phản; Cương Công → Bá Thể; Khống Chế → Phong Cấm; Bộ Pháp → Ngự Phong; Tĩnh Công → Tĩnh Huyền.
+- Thế Công/Thủ/Linh chuyển thành Liệt Dương Chiến Thể, Huyền Quy Pháp Thể, Thanh Phong Linh Thể.
+- Giữ nguyên ID và logic kỹ năng.
+
+
+=== v2.7 Tiên Đạo Intro & Card Layout ===
+- Thêm màn hình đen mở đầu với hiệu ứng hiện chữ dần và nút Bỏ Qua Thiên Dụ.
+- Chỉnh lại bố cục thẻ: chia rõ khung vai trò, tên chiêu, mô tả và thẻ tag.
+- Căn giữa nội dung, tăng chiều cao thẻ và co chữ nhẹ khi nội dung dài.
+- Sửa RUN_GAME.bat theo kiểu mở riêng cửa sổ server để ổn định hơn.
+
+
+=== v2.8 Clarity & Action Guard ===
+- Dời nhẹ toàn bộ nội dung trong thẻ xuống dưới, chừa chỗ cho ô năng lượng để không che chữ.
+- Viết lại nhiều câu hướng dẫn theo văn phong rõ ý hơn: nêu rõ sát thương, số hit và gợi ý dùng Thể lực.
+- Thêm khóa thao tác tạm thời cho playCard/endTurn để giảm lỗi JavaScript khi bấm quá nhanh.
