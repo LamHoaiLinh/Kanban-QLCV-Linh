@@ -1,0 +1,10 @@
+CAP NHAT v7.4.3
+1. Chep de cac file trong PATCH dung cau truc vao Kanban hien tai.
+2. Day len GitHub Pages.
+3. Tren Chrome bam Ctrl+F5 mot lan.
+4. Neu van thay ban cu, mo DevTools > Application > Service Workers > Unregister, sau do Ctrl+F5.
+
+Test nhanh:
+- Chon khung chu > Sua chu > click vao giua chu > go them ky tu.
+- Ctrl+A trong khung > tang/giam co chu > go tiep.
+- Boi den mot tu > doi co/mau/nen > click lai vao khung > go tiep.

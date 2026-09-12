@@ -6,7 +6,7 @@
  */
 import {analyzeWorkbookForAI,createIntegrityTracker} from './excel-ai-analysis.mjs?v=1.0.0';
 import {renderPdfSigningTool} from './pdf-signing.js?v=1.5.0';
-import {openWorksheetEditor,isWorksheetEditorOpen,closeWorksheetEditor} from './worksheet-editor.js?v=1.1.0';
+import {openWorksheetEditor,isWorksheetEditorOpen,closeWorksheetEditor} from './worksheet-editor.js?v=1.1.1';
 const OFFICE_SETTINGS_KEY = 'linh_kanban_office_settings_v1';
 const PINNED_LIBS = {
   pdfLib: 'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js',

@@ -152,7 +152,14 @@ class WorksheetEditor{
     q('#wsZoomIn').onclick=()=>this.setZoom(this.zoom+.1);q('#wsZoomOut').onclick=()=>this.setZoom(this.zoom-.1);q('#wsFitWidth').onclick=()=>this.fitWidth();
     q('#wsClearPage').onclick=()=>this.clearCurrentPage();
     this.root.querySelectorAll('[data-ws-tool]').forEach(b=>b.onclick=()=>this.setTool(b.dataset.wsTool));
-    this.root.querySelectorAll('[data-select-mode]').forEach(b=>b.onclick=()=>{if(b.dataset.selectMode==='move')this.finishCurrentTextEdit();this.selectMode=b.dataset.selectMode;this.setTool('select');this.applyToolState();this.renderAllTextLayers()});
+    this.root.querySelectorAll('[data-select-mode]').forEach(b=>b.onclick=()=>{
+      const next=b.dataset.selectMode;
+      const selectedPage=this.pages.find(p=>p.id===this.selected.pageId);const selectedAnn=selectedPage&&findAnn(selectedPage,this.selected.annId);
+      if(next==='move')this.finishCurrentTextEdit();
+      this.selectMode=next;this.tool='select';this.applyToolState();
+      if(next==='edit'&&selectedAnn?.type==='text'){this.enterTextEdit(selectedPage,selectedAnn)}else this.renderAllTextLayers();
+      this.updateStatus();
+    });
     q('#wsFileInput').onchange=e=>{const files=[...e.target.files];e.target.value='';if(files.length)this.importFiles(files,this.pendingReplace)};
     q('#wsWorkspace').addEventListener('scroll',()=>this.updateCurrentPageFromScroll(),{passive:true});
     q('#wsWorkspace').addEventListener('dragover',e=>{if(hasFiles(e)){e.preventDefault();e.dataTransfer.dropEffect='copy'}});
@@ -276,13 +283,38 @@ class WorksheetEditor{
   renderAllTextLayers(){this.pages.forEach(p=>this.renderTextLayer(p))}
   positionTextEl(el,ann){el.style.left=`${ann.x}px`;el.style.top=`${ann.y}px`;el.style.color=ann.color||this.color;el.style.fontSize=`${ann.fontSize||this.fontSize}px`;el.style.fontWeight=ann.bold?'700':'400';el.style.fontStyle=ann.italic?'italic':'normal'}
   textPointerDown(e,page,ann,el){
-    if(this.tool!=='select')return;e.stopPropagation();if(this.editingTextKey&&this.editingTextKey!==`${page.id}:${ann.id}`)this.finishCurrentTextEdit();this.currentPageId=page.id;this.selected={pageId:page.id,annId:ann.id};this.refreshSidebarActive();this.syncToolbarFromText(ann,0);
+    if(this.tool!=='select')return;
+    e.stopPropagation();
+    const key=`${page.id}:${ann.id}`;
+    // Nếu đang sửa đúng khung chữ này thì để trình duyệt tự đặt caret/chọn chữ.
+    // Không gọi enterTextEdit() lần nữa vì render lại DOM giữa pointerdown sẽ làm mất focus/caret.
+    if(this.selectMode==='edit'&&this.editingTextKey===key&&el.isContentEditable){
+      this.currentPageId=page.id;this.selected={pageId:page.id,annId:ann.id};this.refreshSidebarActive();
+      requestAnimationFrame(()=>{const sel=getSelectionOffsets(el);if(sel)this.savedTextSelection={pageId:page.id,annId:ann.id,...sel};});
+      return;
+    }
+    if(this.editingTextKey&&this.editingTextKey!==key)this.finishCurrentTextEdit();
+    this.currentPageId=page.id;this.selected={pageId:page.id,annId:ann.id};this.refreshSidebarActive();this.syncToolbarFromText(ann,0);
     if(this.selectMode==='edit'){this.enterTextEdit(page,ann);return}
     this.pageDom.get(page.id)?.textLayer.querySelectorAll('.ws-text-item').forEach(node=>node.classList.toggle('selected',node===el));el.classList.add('selected','moveable');el.focus();this.pushHistory('text-move');const start={x:e.clientX,y:e.clientY,ax:ann.x,ay:ann.y};this.textDrag={pageId:page.id,annId:ann.id,start};const move=ev=>{if(!this.textDrag)return;ann.x=clamp(start.ax+(ev.clientX-start.x)/this.zoom,0,page.width-5);ann.y=clamp(start.ay+(ev.clientY-start.y)/this.zoom,0,page.height-5);this.positionTextEl(el,ann);this.markDirty(false)};const up=()=>{document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);this.textDrag=null;this.markDirty()};document.addEventListener('pointermove',move);document.addEventListener('pointerup',up,{once:true});
   }
   enterTextEdit(page,ann,selectAll=false){
-    const key=`${page.id}:${ann.id}`;if(this.editingTextKey&&this.editingTextKey!==key)this.finishCurrentTextEdit();
-    this.tool='select';this.selectMode='edit';this.applyToolState();this.selected={pageId:page.id,annId:ann.id};this.renderTextLayer(page);const el=this.pageDom.get(page.id)?.textLayer.querySelector(`[data-ann-id="${cssEscape(ann.id)}"]`);if(!el)return;this.pushHistory('text-edit');this.editingTextKey=key;el.contentEditable='true';el.classList.add('editing');el.focus();if(selectAll){setSelectionOffsets(el,0,textLength(ann));this.savedTextSelection={pageId:page.id,annId:ann.id,start:0,end:textLength(ann)}}else{placeCaretEnd(el);const n=textLength(ann);this.savedTextSelection={pageId:page.id,annId:ann.id,start:n,end:n}}
+    const key=`${page.id}:${ann.id}`;
+    if(this.editingTextKey&&this.editingTextKey!==key)this.finishCurrentTextEdit();
+    this.tool='select';this.selectMode='edit';this.applyToolState();this.selected={pageId:page.id,annId:ann.id};
+    // Nếu chính khung này đã contenteditable thì chỉ focus lại, tuyệt đối không render lại DOM.
+    let el=this.pageDom.get(page.id)?.textLayer.querySelector(`[data-ann-id="${cssEscape(ann.id)}"]`);
+    if(this.editingTextKey===key&&el?.isContentEditable){
+      el.focus({preventScroll:true});
+      const n=textLength(ann);
+      if(selectAll){setSelectionOffsets(el,0,n);this.savedTextSelection={pageId:page.id,annId:ann.id,start:0,end:n}}
+      else if(!getSelectionOffsets(el)){placeCaretEnd(el);this.savedTextSelection={pageId:page.id,annId:ann.id,start:n,end:n}}
+      return;
+    }
+    this.renderTextLayer(page);
+    el=this.pageDom.get(page.id)?.textLayer.querySelector(`[data-ann-id="${cssEscape(ann.id)}"]`);if(!el)return;
+    this.pushHistory('text-edit');this.editingTextKey=key;el.contentEditable='true';el.classList.add('editing');el.focus({preventScroll:true});
+    if(selectAll){setSelectionOffsets(el,0,textLength(ann));this.savedTextSelection={pageId:page.id,annId:ann.id,start:0,end:textLength(ann)}}else{placeCaretEnd(el);const n=textLength(ann);this.savedTextSelection={pageId:page.id,annId:ann.id,start:n,end:n}}
     el.oninput=()=>{syncAnnFromEditor(el,ann);const sel=getSelectionOffsets(el);if(sel)this.savedTextSelection={pageId:page.id,annId:ann.id,...sel};this.markDirty(false)};
     el.onblur=()=>{if(this.editingTextKey!==key)return;syncAnnFromEditor(el,ann);this.markDirty(false)};
   }
@@ -301,7 +333,15 @@ class WorksheetEditor{
   applyTextToolbarStyle(prop,value){
     const page=this.pages.find(p=>p.id===this.selected.pageId);const ann=page&&findAnn(page,this.selected.annId);if(!ann||ann.type!=='text')return false;const key=`${page.id}:${ann.id}`;let start=0,end=textLength(ann);let el=null;if(this.editingTextKey===key){el=this.pageDom.get(page.id)?.textLayer.querySelector(`[data-ann-id="${cssEscape(ann.id)}"]`);if(el)syncAnnFromEditor(el,ann);const saved=this.savedTextSelection;if(saved&&saved.pageId===page.id&&saved.annId===ann.id){start=clamp(saved.start,0,textLength(ann));end=clamp(saved.end,0,textLength(ann));if(start===end){start=0;end=textLength(ann)}}}
     this.pushHistory(`text-style-${prop}`,true);applyRunStyle(ann,start,end,prop,value);if(prop==='fontSize'&&start===0&&end>=textLength(ann))ann.fontSize=Number(value)||ann.fontSize;if(prop==='color'&&start===0&&end>=textLength(ann))ann.color=value||ann.color;
-    if(el&&this.editingTextKey===key){renderRunsIntoElement(el,ann);el.contentEditable='true';el.classList.add('editing');const s=this.savedTextSelection;if(s)setSelectionOffsets(el,clamp(s.start,0,textLength(ann)),clamp(s.end,0,textLength(ann)))}else this.renderTextLayer(page);this.markDirty();return true;
+    if(el&&this.editingTextKey===key){
+      renderRunsIntoElement(el,ann);el.contentEditable='true';el.classList.add('editing');
+      // Toolbar (cỡ/màu/nền) lấy focus khỏi contenteditable. Sau khi áp dụng phải trả focus/caret về khung chữ,
+      // nếu không người dùng thấy đang ở chế độ Sửa chữ nhưng bàn phím không nhập được.
+      el.focus({preventScroll:true});
+      const s=this.savedTextSelection;
+      if(s)setSelectionOffsets(el,clamp(s.start,0,textLength(ann)),clamp(s.end,0,textLength(ann)));
+      else placeCaretEnd(el);
+    }else this.renderTextLayer(page);this.markDirty();return true;
   }
   textKeyDown(e,page,ann,el){
     if(el.isContentEditable){if(e.key==='Escape'){e.preventDefault();syncAnnFromEditor(el,ann);this.finishCurrentTextEdit();this.selectMode='move';this.applyToolState();this.renderTextLayer(page)}return}
