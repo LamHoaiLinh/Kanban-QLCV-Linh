@@ -1,0 +1,47 @@
+KANBAN - NÂNG CẤP EXCEL JSON KÈM VBA / MACRO
+Ngày: 2026-09-14
+
+1. Mục Tool -> Excel -> Đọc & xuất JSON
+- Thêm tùy chọn: "Kèm VBA / Macro" (mặc định bật).
+- Hỗ trợ đọc VBA blob khi workbook được nạp bằng SheetJS bookVBA:true.
+- Có fallback đọc trực tiếp xl/vbaProject.bin đối với XLSM/XLSB.
+
+2. Xuất 1 JSON
+- Giữ nguyên dữ liệu sheet/cell hiện có.
+- Thêm khóa "vba" khi bật tùy chọn VBA.
+- VBA JSON gồm:
+  + Module chuẩn.
+  + Class Module.
+  + Code-behind của Worksheet/Document module.
+  + ThisWorkbook.
+  + UserForm code.
+  + Metadata UserForm designer streams.
+  + PROJECT descriptor/code page nếu đọc được.
+  + rawProject.base64: giữ nguyên toàn bộ vbaProject.bin để không mất binary UserForm/control/resource.
+  + legacyMacroSheets: phát hiện Excel 4.0 Macro Sheet (XLM) nếu có.
+
+3. Xuất JSON chia nhỏ
+- Tạo thêm vba_project.json.
+- manifest.json tự thêm file VBA, trạng thái phân tích và thứ tự đọc khuyến nghị.
+
+4. An toàn
+- Chỉ đọc/giải nén dữ liệu VBA, tuyệt đối không thực thi macro.
+- Nếu source VBA không giải mã hoàn toàn, rawProject.base64 vẫn giữ nguyên blob gốc để không mất dữ liệu.
+
+5. File thay đổi
+- office-tools/office-tools.js
+- office-tools/vba-extractor.mjs (mới)
+- index.html (bump cache-busting version)
+- sw.js (cache module mới)
+
+6. Kiểm thử kỹ thuật
+- node --check office-tools/office-tools.js: PASS
+- node --check office-tools/vba-extractor.mjs: PASS
+- node --check sw.js: PASS
+- Test VBA compressed-container literal: PASS
+- Test CFB regular streams: PASS
+- Test CFB mini streams: PASS
+- Test phân loại Module / Sheet / ThisWorkbook / UserForm: PASS
+
+LƯU Ý
+- Nên thử thêm ít nhất 1 file XLSM thực tế có UserForm và 1 file XLS đời cũ có VBA để đối chiếu 100% với VBA Editor của Excel trước khi coi là production-final.
