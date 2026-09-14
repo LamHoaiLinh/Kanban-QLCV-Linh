@@ -211,16 +211,76 @@ function sourceScore(text){
   const hits=text.match(/\b(Sub|Function|Property\s+(Get|Let|Set)|Private|Public|Dim|Const|End\s+(Sub|Function|Property))\b/gi);score+=Math.min(80,(hits?.length||0)*4);
   if(/\uFFFD/.test(text))score-=20;return score;
 }
-function extractSourceFromModuleStream(bytes,cp){
-  let best=null,tries=0;
-  for(let i=0;i<bytes.length&&tries<256;i++){
-    if(bytes[i]!==0x01)continue;tries++;
-    try{
-      const dec=decompressVbaContainer(bytes.subarray(i)),text=decodeAnsi(dec,cp),score=sourceScore(text);
-      if(!best||score>best.score)best={offset:i,text,score,decompressedBytes:dec.length};
-      if(score>=170)break;
-    }catch{}
+function readSizedRecord(bytes,offset){
+  if(offset<0||offset+6>bytes.length)return null;
+  const dv=new DataView(bytes.buffer,bytes.byteOffset+offset,bytes.length-offset),id=dv.getUint16(0,true),size=dv.getUint32(2,true),end=offset+6+size;
+  if(size>bytes.length||end>bytes.length)return null;
+  return {id,size,dataStart:offset+6,end};
+}
+function parseDirModuleMetadata(dirBytes,cp,descriptor){
+  const bytes=asU8(dirBytes)||new Uint8Array(),declared=[...descriptor.modules,...descriptor.documents,...descriptor.classes,...descriptor.forms],declaredSet=new Set(declared.map(x=>String(x).toLocaleLowerCase('en'))),out=[];
+  let i=0;
+  while(i+6<=bytes.length){
+    if(bytes[i]!==0x19||bytes[i+1]!==0x00){i++;continue}
+    const first=readSizedRecord(bytes,i);
+    if(!first||first.id!==0x0019||first.size<1||first.size>2048){i++;continue}
+    const ansiName=decodeAnsi(bytes.subarray(first.dataStart,first.end),cp).replace(/\u0000/g,'').trim();
+    if(!ansiName||(declaredSet.size&&!declaredSet.has(ansiName.toLocaleLowerCase('en')))){i++;continue}
+    const meta={name:ansiName,unicodeName:null,streamName:null,streamNameUnicode:null,textOffset:null,moduleType:null,dirRecordOffset:i};
+    let p=i,guard=0,terminated=false;
+    while(p+6<=bytes.length&&guard++<40){
+      const rec=readSizedRecord(bytes,p);if(!rec)break;
+      if(p!==i&&rec.id===0x0019)break;
+      const data=bytes.subarray(rec.dataStart,rec.end);
+      if(rec.id===0x0047)meta.unicodeName=decodeAnsi(data,1200).replace(/\u0000/g,'').trim()||null;
+      else if(rec.id===0x001A)meta.streamName=decodeAnsi(data,cp).replace(/\u0000/g,'').trim()||null;
+      else if(rec.id===0x0032)meta.streamNameUnicode=decodeAnsi(data,1200).replace(/\u0000/g,'').trim()||null;
+      else if(rec.id===0x0031&&rec.size===4){const dv=new DataView(data.buffer,data.byteOffset,data.byteLength);meta.textOffset=dv.getUint32(0,true)}
+      else if(rec.id===0x0021)meta.moduleType='procedural';
+      else if(rec.id===0x0022)meta.moduleType='document_or_class';
+      p=rec.end;
+      if(rec.id===0x002B){terminated=true;break}
+    }
+    meta.name=meta.unicodeName||meta.name;
+    meta.streamName=meta.streamNameUnicode||meta.streamName||ansiName;
+    meta.terminated=terminated;
+    if(Number.isInteger(meta.textOffset)&&meta.textOffset>=0&&meta.streamName)out.push(meta);
+    i=Math.max(i+1,p);
   }
+  const seen=new Set();
+  return out.filter(m=>{const k=`${m.name.toLocaleLowerCase('en')}|${m.streamName.toLocaleLowerCase('en')}`;if(seen.has(k))return false;seen.add(k);return true});
+}
+function sourceMetrics(text){
+  const lines=String(text||'').split(/\r?\n/),procedureRx=/^\s*(?:(?:Public|Private|Friend|Static)\s+)?(?:Sub|Function|Property\s+(?:Get|Let|Set))\b/i;
+  let procedureCount=0,meaningful=0;
+  for(const raw of lines){
+    const line=raw.trim();if(!line)continue;
+    if(procedureRx.test(line))procedureCount++;
+    if(/^Attribute\s+VB_/i.test(line)||/^Option\s+(?:Explicit|Compare|Base)\b/i.test(line)||/^'/i.test(line))continue;
+    meaningful++;
+  }
+  return {lineCount:lines.length,procedureCount,hasCode:meaningful>0};
+}
+function extractSourceFromModuleStream(bytes,cp,preferredOffset=null){
+  let best=null,attempts=0;
+  const tryAt=(offset,method)=>{
+    if(!Number.isInteger(offset)||offset<0||offset>=bytes.length||bytes[offset]!==0x01)return null;
+    if(offset+2<bytes.length){const header=bytes[offset+1]|(bytes[offset+2]<<8);if(((header>>12)&0x7)!==0x3)return null}
+    attempts++;
+    try{
+      const dec=decompressVbaContainer(bytes.subarray(offset)),text=decodeAnsi(dec,cp),score=sourceScore(text),candidate={offset,text,score,decompressedBytes:dec.length,extractionMethod:method,attempts};
+      if(!best||score>best.score)best=candidate;
+      return candidate;
+    }catch{return null}
+  };
+  const exact=tryAt(preferredOffset,'dir_module_offset');
+  if(exact&&exact.score>20)return exact;
+  for(let i=0;i<bytes.length;i++){
+    if(bytes[i]!==0x01||i===preferredOffset)continue;
+    const candidate=tryAt(i,'scan_fallback');
+    if(candidate&&candidate.score>=170)break;
+  }
+  if(best)best.attempts=attempts;
   return best&&best.score>20?best:null;
 }
 function classifyModule(name,descriptor){
@@ -251,17 +311,24 @@ export function extractVbaProject(raw,{includeRawBase64=true,includeFormStreams=
     const projectText=projectEntry?decodeAnsi(cfb.stream(projectEntry),codePage):'';
     const descriptor=parseProjectDescriptor(projectText);
 
+    const dirModules=parseDirModuleMetadata(dirDecompressed,codePage,descriptor);
+    const dirByStream=new Map(dirModules.map(m=>[m.streamName.toLocaleLowerCase('en'),m]));
+    const dirByName=new Map(dirModules.map(m=>[m.name.toLocaleLowerCase('en'),m]));
     const moduleStreams=cfb.entries.filter(e=>e.type===2&&/(^|\/)VBA\//i.test(e.path)&&!/(^|\/)(dir|_VBA_PROJECT|__SRP_\d+)$/i.test(e.path));
     const modules=[];
     for(const entry of moduleStreams){
-      const stream=cfb.stream(entry),found=extractSourceFromModuleStream(stream,codePage);
+      const key=entry.name.toLocaleLowerCase('en'),meta=dirByStream.get(key)||dirByName.get(key)||null;
+      const stream=cfb.stream(entry),found=extractSourceFromModuleStream(stream,codePage,meta?.textOffset??null);
       if(!found)continue;
-      const fallback=entry.name,name=moduleNameFromSource(found.text,fallback),type=classifyModule(name,descriptor);
-      modules.push({name,type,streamName:entry.name,streamPath:entry.path,sourceOffset:found.offset,source:found.text,sourceLength:found.text.length,decompressedBytes:found.decompressedBytes});
+      const fallback=meta?.name||entry.name,name=moduleNameFromSource(found.text,fallback),type=classifyModule(name,descriptor),metrics=sourceMetrics(found.text);
+      modules.push({name,type,streamName:entry.name,streamPath:entry.path,declaredTextOffset:meta?.textOffset??null,sourceOffset:found.offset,extractionMethod:found.extractionMethod,scanAttempts:found.attempts,source:found.text,sourceLength:found.text.length,lineCount:metrics.lineCount,procedureCount:metrics.procedureCount,hasCode:metrics.hasCode,decompressedBytes:found.decompressedBytes});
     }
-    const knownNames=new Set(modules.map(m=>m.name.toLocaleLowerCase('en')));
-    for(const name of [...descriptor.modules,...descriptor.documents,...descriptor.classes,...descriptor.forms]){
-      if(!knownNames.has(name.toLocaleLowerCase('en')))warnings.push(`Có khai báo module “${name}” nhưng chưa giải mã được source stream tương ứng.`);
+    const declaredComponents=[];
+    const addDeclared=(list,typeOrFn)=>{for(const name of list){const key=String(name).toLocaleLowerCase('en'),type=typeof typeOrFn==='function'?typeOrFn(name):typeOrFn;if(!declaredComponents.some(x=>x.key===key))declaredComponents.push({key,name,type})}};
+    addDeclared(descriptor.modules,'standard');addDeclared(descriptor.documents,name=>/^thisworkbook$/i.test(name)?'thisworkbook':'document');addDeclared(descriptor.classes,'class');addDeclared(descriptor.forms,'userform');
+    const knownNames=new Set(modules.map(m=>m.name.toLocaleLowerCase('en'))),missing=[];
+    for(const item of declaredComponents){
+      if(!knownNames.has(item.key)){missing.push(item.name);warnings.push(`Có khai báo module “${item.name}” nhưng chưa giải mã được source stream tương ứng.`)}
     }
 
     const storages=cfb.entries.filter(e=>e.type===1&&e.path&&!/(^|\/)VBA($|\/)/i.test(e.path));
@@ -278,10 +345,24 @@ export function extractVbaProject(raw,{includeRawBase64=true,includeFormStreams=
     }
     for(const name of descriptor.forms){if(!forms.some(f=>f.name.toLocaleLowerCase('en')===name.toLocaleLowerCase('en')))forms.push({name,storagePath:null,codeModule:modules.find(m=>m.name.toLocaleLowerCase('en')===name.toLocaleLowerCase('en'))?.name||null,source:modules.find(m=>m.name.toLocaleLowerCase('en')===name.toLocaleLowerCase('en'))?.source||null,binaryStreams:[]})}
 
+    const declaredCount=declaredComponents.length,extractedCount=modules.length;
+    const declaredByType=type=>declaredComponents.filter(x=>x.type===type).length;
+    const extractedByType=type=>modules.filter(m=>m.type===type).length;
+    let status='ok';
+    if(!modules.length)status='raw_only';
+    else if(missing.length||(declaredCount===0&&warnings.some(w=>/VBA\/dir/i.test(w))))status='partial';
     const result={
-      present:true,status:modules.length?'ok':'partial',
-      project:{codePage,encoding:codePageLabel(codePage),descriptor,projectText},
-      summary:{moduleCount:modules.length,standardModules:modules.filter(m=>m.type==='standard').length,classModules:modules.filter(m=>m.type==='class').length,documentModules:modules.filter(m=>m.type==='document').length,thisWorkbookModules:modules.filter(m=>m.type==='thisworkbook').length,userFormModules:modules.filter(m=>m.type==='userform').length,userForms:forms.length},
+      present:true,status,
+      project:{codePage,encoding:codePageLabel(codePage),descriptor,projectText,dirModuleMetadata:dirModules.map(m=>({name:m.name,streamName:m.streamName,textOffset:m.textOffset,moduleType:m.moduleType}))},
+      summary:{
+        declaredComponents:declaredCount,extractedComponents:extractedCount,missingComponents:missing.length,missing,
+        moduleCount:modules.length,modulesWithCode:modules.filter(m=>m.hasCode).length,stubModules:modules.filter(m=>!m.hasCode).length,
+        standardModules:extractedByType('standard'),standardModulesDeclared:declaredByType('standard'),
+        classModules:extractedByType('class'),classModulesDeclared:declaredByType('class'),
+        documentModules:extractedByType('document'),documentModulesDeclared:declaredByType('document'),
+        thisWorkbookModules:extractedByType('thisworkbook'),thisWorkbookModulesDeclared:declaredByType('thisworkbook'),
+        userFormModules:extractedByType('userform'),userFormModulesDeclared:declaredByType('userform'),userForms:forms.length
+      },
       modules,userForms:forms,warnings,
       rawProject:{byteLength:bytes.length,format:'MS-CFB vbaProject.bin',preserved:true}
     };

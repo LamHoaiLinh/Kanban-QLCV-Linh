@@ -7,7 +7,7 @@
 import {analyzeWorkbookForAI,createIntegrityTracker} from './excel-ai-analysis.mjs?v=1.0.0';
 import {renderPdfSigningTool} from './pdf-signing.js?v=1.5.0';
 import {openWorksheetEditor,isWorksheetEditorOpen,closeWorksheetEditor} from './worksheet-editor.js?v=1.2.0';
-import {extractVbaProject,vbaRawByteLength} from './vba-extractor.mjs?v=1.0.0';
+import {extractVbaProject,vbaRawByteLength} from './vba-extractor.mjs?v=2.0.0';
 const OFFICE_SETTINGS_KEY = 'linh_kanban_office_settings_v1';
 const PINNED_LIBS = {
   pdfLib: 'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js',
@@ -521,7 +521,7 @@ async function runRenameInPlace(){try{if(!state.renameRootHandle)throw new Error
 function renderExcelTool(){const tabs=[['inspect','Đọc & xuất JSON'],['values','Break Links / Value'],['manage','Quản lý sheet'],['combine','Gộp sheet'],['workbooks','Gộp nhiều file'],['split','Tách sheet']];mainHost.innerHTML=`<section class="office-tool-panel active"><div class="office-tool-head"><div><h3>Excel</h3><p>Đọc XLSX, XLSB, XLS, XLSM và CSV; phân biệt ô giá trị với ô công thức.</p></div></div>${subTabs('excel',tabs)}<div id="excelSubHost"></div><div class="office-warning">Ứng dụng đọc công thức và giá trị cached được lưu trong file. Không tự tính lại toàn bộ công thức như Microsoft Excel; không chạy VBA hoặc macro.</div><div class="office-library-warning">Thư viện SheetJS được tải theo phiên bản cố định khi công cụ Excel được mở lần đầu.</div></section>`;bindSubtabs('excel');const h=mainHost.querySelector('#excelSubHost');if(state.sub.excel==='inspect')renderExcelInspect(h);if(state.sub.excel==='values')renderExcelValues(h);if(state.sub.excel==='manage')renderExcelManage(h);if(state.sub.excel==='combine')renderExcelCombine(h);if(state.sub.excel==='workbooks')renderExcelWorkbooks(h);if(state.sub.excel==='split')renderExcelSplit(h)}
 function excelBrowseCard(extra=''){return `<div class="office-card"><div class="office-dropzone" id="excelDrop"><strong>Browse hoặc kéo thả file Excel/CSV</strong><span>XLSX, XLSB, XLS, XLSM và CSV.</span><input type="file" accept=".xlsx,.xlsb,.xls,.xlsm,.csv" multiple hidden></div><div class="office-toolbar"><button class="office-btn" id="excelAdd">Chọn thêm file</button><button class="office-btn danger" id="excelClear">Xóa danh sách</button></div><div id="excelFileList"></div></div>${extra}`}
 function bindExcelLibrary(){const add=async files=>{try{startBusy('Đang đọc workbook…');const XLSX=await ensureXlsx();for(let i=0;i<files.length;i++){const file=files[i];if(!/\.(xlsx|xlsb|xls|xlsm|csv)$/i.test(file.name))continue;const data=await file.arrayBuffer();const wb=XLSX.read(data,{type:'array',cellFormula:true,cellDates:true,cellNF:true,cellText:true,cellStyles:true,bookVBA:true});state.excelFiles.push({id:uid(),file,wb});setStatus(`Đang đọc ${i+1}/${files.length}`,Math.round((i+1)/files.length*100));}endBusy(`Đã đọc ${state.excelFiles.length} file.`);renderExcelTool()}catch(e){showError(e)}};const drop=mainHost.querySelector('#excelDrop');bindDropzone(drop,f=>/\.(xlsx|xlsb|xls|xlsm|csv)$/i.test(f.name),add);drop.querySelector('input').onchange=e=>add([...e.target.files]);mainHost.querySelector('#excelAdd').onclick=async()=>add(await fileInput('.xlsx,.xlsb,.xls,.xlsm,.csv',true));mainHost.querySelector('#excelClear').onclick=()=>{state.excelFiles=[];renderExcelTool()};const l=mainHost.querySelector('#excelFileList');l.innerHTML=listRows(state.excelFiles,it=>`${formatBytes(it.file.size)} · ${it.wb.SheetNames.length} sheet`);bindListActions(l,state.excelFiles,renderExcelTool)}
-function renderExcelInspect(h){h.innerHTML=excelBrowseCard(`<div class="office-card"><h4>Cấu trúc workbook</h4><div id="excelOverview"></div><div class="office-toolbar"><label class="office-check"><input id="excelFormatted" type="checkbox" checked> Xuất formattedValue</label><label class="office-check"><input id="excelHyperlinks" type="checkbox" checked> Hyperlink/comment</label><label class="office-check" title="Chỉ nên bật với workbook nhỏ. Với vùng dùng rất lớn, việc xuất cả ô trống có thể tạo hàng triệu hoặc hàng tỷ ô JSON."><input id="excelEmpty" type="checkbox"> Cả ô trống trong vùng dùng</label><label class="office-check" title="Nếu workbook có VBA/macro, xuất source Module/Class/Sheet/ThisWorkbook/UserForm và giữ bản raw Base64 để không mất dữ liệu UserForm."><input id="excelVba" type="checkbox" checked> Kèm VBA / Macro</label><span class="spacer"></span><button class="office-btn" id="excelPreviewJson" ${state.excelFiles.length?'':'disabled'}>Xem trước JSON</button><button class="office-btn primary" id="excelExportJson" ${state.excelFiles.length?'':'disabled'}>Xuất 1 JSON</button></div><div class="office-card-note" style="margin-top:8px">Khi bật “Kèm VBA / Macro”, JSON sẽ chứa source code đọc được và raw <code>vbaProject.bin</code> dạng Base64. Nhờ vậy code trong Module, Class, Sheet, ThisWorkbook và phần binary của UserForm không bị bỏ sót. File Excel lớn vẫn được xuất tuần tự theo sheet/ô để hạn chế RAM.</div><pre id="excelJsonPreview" class="office-json-preview" hidden></pre></div>
+function renderExcelInspect(h){h.innerHTML=excelBrowseCard(`<div class="office-card"><h4>Cấu trúc workbook</h4><div id="excelOverview"></div><div class="office-toolbar"><label class="office-check"><input id="excelFormatted" type="checkbox" checked> Xuất formattedValue</label><label class="office-check"><input id="excelHyperlinks" type="checkbox" checked> Hyperlink/comment</label><label class="office-check" title="Chỉ nên bật với workbook nhỏ. Với vùng dùng rất lớn, việc xuất cả ô trống có thể tạo hàng triệu hoặc hàng tỷ ô JSON."><input id="excelEmpty" type="checkbox"> Cả ô trống trong vùng dùng</label><label class="office-check" title="Nếu workbook có VBA/macro, xuất source Module/Class/Sheet/ThisWorkbook. UserForm sẽ hoàn thiện ở bản sau; raw VBA vẫn được giữ để dự phòng."><input id="excelVba" type="checkbox" checked> Kèm VBA / Macro</label><span class="spacer"></span><button class="office-btn" id="excelPreviewJson" ${state.excelFiles.length?'':'disabled'}>Xem trước JSON</button><button class="office-btn primary" id="excelExportJson" ${state.excelFiles.length?'':'disabled'}>Xuất 1 JSON</button></div><div class="office-card-note" style="margin-top:8px">Khi bật “Kèm VBA / Macro”, JSON sẽ chứa source Module/Class/Sheet/ThisWorkbook, trạng thái giải mã từng component, mapping CodeName ↔ tên sheet và raw <code>vbaProject.bin</code> dạng Base64 để dự phòng. UserForm sẽ hoàn thiện ở bản sau. File Excel lớn vẫn được xuất tuần tự theo sheet/ô để hạn chế RAM.</div><pre id="excelJsonPreview" class="office-json-preview" hidden></pre></div>
   <div class="office-card excel-chatgpt-split"><div class="office-card-title-row"><div><h4>Chia JSON để gửi ChatGPT</h4><p class="office-card-note">Mỗi phần là một file JSON độc lập. Khi xuất sẽ kèm manifest, structure, formula_map và anomalies để AI hiểu toàn workbook trước khi đọc PART.</p></div><span class="office-recommend-badge">ChatGPT · 5 MB khuyến nghị</span></div><div class="office-grid three"><label class="office-field"><span>Dung lượng mỗi phần</span><select id="excelSplitMb"><option value="5" selected>5 MB — khuyến nghị</option><option value="8">8 MB — ít file hơn</option><option value="10">10 MB</option><option value="20">20 MB</option><option value="50">50 MB</option></select><small>5 MB là mức bảo thủ để giảm nguy cơ chạm giới hạn token của file văn bản.</small></label><label class="office-field"><span>Cách lưu</span><select id="excelSplitSave"><option value="folder" selected>Thư mục gồm nhiều JSON</option></select><small>Chrome/Edge sẽ hỏi chọn thư mục rồi tạo một thư mục con chứa các phần.</small></label><label class="office-field"><span>Ước tính đầu ra</span><div id="excelSplitEstimate" class="office-estimate-box">${state.excelFiles.length?'Đang chờ ước tính…':'Chưa chọn workbook.'}</div><small id="excelSplitAdvice">Nếu JSON lớn hơn khoảng 5 MB, nên dùng chế độ chia nhỏ.</small></label></div><div class="office-chatgpt-note"><strong>Thứ tự AI nên đọc:</strong> manifest → structure → formula_map → anomalies → chỉ các PART liên quan. Cơ chế chia PART theo dung lượng vẫn giữ nguyên.</div><div class="office-toolbar"><span class="spacer"></span><button class="office-btn primary" id="excelExportSplit" ${state.excelFiles.length?'':'disabled'}>Xuất JSON chia nhỏ</button></div></div>`);
   bindExcelLibrary();renderExcelOverview();
   mainHost.querySelector('#excelPreviewJson').onclick=()=>{
@@ -575,18 +575,34 @@ async function buildExcelVbaJson(item){
   const result=extractVbaProject(raw,{includeRawBase64:true,includeFormStreams:false});
   result.legacyMacroSheets=legacyMacroSheets;
   const workbookCodeName=item?.wb?.Workbook?.WBProps?.CodeName||'';
-  const sheetCodeNames=(item?.wb?.Workbook?.Sheets||[]).map(s=>s?.CodeName).filter(Boolean);
+  const workbookSheets=item?.wb?.Workbook?.Sheets||[];
+  const sheetCodeMap=(item?.wb?.SheetNames||[]).map((sheetName,index)=>({sheetName,codeName:workbookSheets[index]?.CodeName||null}));
+  if(result.project){
+    result.project.workbookCodeName=workbookCodeName||null;
+    result.project.sheetCodeMap=sheetCodeMap;
+  }
   for(const mod of result.modules||[]){
-    if(mod.type!=='unknown')continue;
-    if(workbookCodeName&&mod.name.toLocaleLowerCase('en')===String(workbookCodeName).toLocaleLowerCase('en'))mod.type='thisworkbook';
-    else if(sheetCodeNames.some(n=>String(n).toLocaleLowerCase('en')===mod.name.toLocaleLowerCase('en')))mod.type='document';
+    const modKey=String(mod.name||'').toLocaleLowerCase('en');
+    if(mod.type==='unknown'){
+      if(workbookCodeName&&modKey===String(workbookCodeName).toLocaleLowerCase('en'))mod.type='thisworkbook';
+      else if(sheetCodeMap.some(x=>x.codeName&&String(x.codeName).toLocaleLowerCase('en')===modKey))mod.type='document';
+    }
+    if(mod.type==='thisworkbook')mod.workbookCodeName=workbookCodeName||mod.name;
+    if(mod.type==='document'){
+      const mapped=sheetCodeMap.find(x=>x.codeName&&String(x.codeName).toLocaleLowerCase('en')===modKey);
+      mod.codeName=mapped?.codeName||mod.name;
+      mod.sheetName=mapped?.sheetName||null;
+    }
   }
   if(result.summary){
+    result.summary.extractedComponents=result.modules.length;
     result.summary.standardModules=result.modules.filter(m=>m.type==='standard').length;
     result.summary.classModules=result.modules.filter(m=>m.type==='class').length;
     result.summary.documentModules=result.modules.filter(m=>m.type==='document').length;
     result.summary.thisWorkbookModules=result.modules.filter(m=>m.type==='thisworkbook').length;
     result.summary.userFormModules=result.modules.filter(m=>m.type==='userform').length;
+    result.summary.modulesWithCode=result.modules.filter(m=>m.hasCode).length;
+    result.summary.stubModules=result.modules.filter(m=>!m.hasCode).length;
     result.summary.legacyMacroSheets=legacyMacroSheets.length;
   }
   return result;
@@ -644,7 +660,7 @@ function buildWorkbookJsonPreview(item,maxCells=1200){
     sourceFile:{name:item.file.name,size:item.file.size,exportedAt:new Date().toISOString()},
     workbook:{sheetOrder:[...item.wb.SheetNames]},
     sheets,
-    ...(includeVba?{vbaPreview:{includedInFullExport:true,rawDetectedBytes:vbaRawByteLength(item.wb?.vbaraw),note:'Preview không giải mã toàn bộ VBA để giữ giao diện nhanh; bản Xuất 1 JSON/JSON chia nhỏ sẽ chứa source VBA và raw project Base64.'}}:{})
+    ...(includeVba?{vbaPreview:{includedInFullExport:true,rawDetectedBytes:vbaRawByteLength(item.wb?.vbaraw),note:'Preview không giải mã toàn bộ VBA để giữ giao diện nhanh; bản Xuất 1 JSON/JSON chia nhỏ sẽ chứa source VBA, kiểm tra đủ component và raw project Base64.'}}:{})
   };
 }
 function estimateWorkbookJsonSize(item,sampleLimit=5000){
@@ -836,7 +852,7 @@ async function exportWorkbookJsonSplit(item){
       split:{targetSizeMB:targetMb,totalParts:outputs.length,totalBytes,createdAt:new Date().toISOString()},
       parts:outputs,
       integrity:{...integrityResult,by_sheet:perSheetIntegrity},
-      instructions:['Đọc manifest trước để hiểu workbook và xác định file metadata.','Đọc structure để hiểu sheet/cột/kiểu dữ liệu.','Đọc formula_map để hiểu pattern công thức và ngoại lệ.','Đọc anomalies để xác định vùng cần kiểm tra.',...(vbaFile?['Đọc vba_project.json để xem Module/Class/Sheet/ThisWorkbook/UserForm; rawProject.base64 giữ nguyên vbaProject.bin để không mất dữ liệu form/macro.']:[]),'Chỉ tải/đọc DATA PART chứa sheet và range liên quan khi cần xác minh chi tiết.']
+      instructions:['Đọc manifest trước để hiểu workbook và xác định file metadata.','Đọc structure để hiểu sheet/cột/kiểu dữ liệu.','Đọc formula_map để hiểu pattern công thức và ngoại lệ.','Đọc anomalies để xác định vùng cần kiểm tra.',...(vbaFile?['Đọc vba_project.json để xem Module/Class/Sheet/ThisWorkbook, trạng thái đủ/thiếu component và mapping CodeName ↔ tên sheet; rawProject.base64 giữ nguyên vbaProject.bin để dự phòng.']:[]),'Chỉ tải/đọc DATA PART chứa sheet và range liên quan khi cần xác minh chi tiết.']
     };
     await destination.writeFile(manifestFile,JSON.stringify(manifest,null,2));
     setStatus('Đang hoàn tất…',100);

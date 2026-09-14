@@ -1,0 +1,39 @@
+KANBAN - EXCEL VBA JSON V2
+Ngày: 14/09/2026
+
+MỤC TIÊU
+- Hoàn thiện việc xuất source VBA từ XLSM/XLS/XLSB sang JSON.
+- Ưu tiên Module, Class, Sheet code và ThisWorkbook.
+- UserForm để bản sau; raw vbaProject.bin vẫn được giữ Base64 để dự phòng.
+
+THAY ĐỔI CHÍNH
+1. Đọc VBA/dir và lấy MODULEOFFSET chính xác cho từng module.
+2. Không còn giới hạn dò 256 byte 0x01 như V1.
+3. Fallback scan toàn stream chỉ dùng khi MODULEOFFSET không dùng được.
+4. status="ok" chỉ khi toàn bộ component được khai báo đã được giải mã.
+5. Nếu thiếu component: status="partial"; không đọc được source nào: "raw_only".
+6. summary thêm:
+   - declaredComponents / extractedComponents / missingComponents / missing
+   - standardModulesDeclared, documentModulesDeclared, thisWorkbookModulesDeclared, classModulesDeclared, userFormModulesDeclared
+   - modulesWithCode / stubModules
+7. Mỗi module thêm:
+   - declaredTextOffset, sourceOffset, extractionMethod, scanAttempts
+   - lineCount, procedureCount, hasCode
+8. Project thêm dirModuleMetadata.
+9. JSON Excel thêm sheetCodeMap để ánh xạ CodeName (Sheet1...) với tên tab workbook khi SheetJS cung cấp CodeName.
+10. Service Worker/cache version được tăng để trình duyệt không giữ parser V1.
+
+REGRESSION TEST THỰC TẾ
+Workbook: Tonghop.xlsm (từ JSON người dùng xuất)
+- Project khai báo: 11 component.
+- V2 giải mã: 11/11 component.
+- Missing: 0.
+- Status: ok.
+- Standard module MB_Statement_Importer:
+  + MODULEOFFSET: 107533.
+  + extractionMethod: dir_module_offset.
+  + 52 Sub/Function/Property.
+  + Source sau khi bỏ Attribute VB_* khớp 100% với file VBA đối chứng: 47.650 ký tự.
+- ThisWorkbook: có code.
+- Sheet1: có code.
+- 8 document module còn lại: stub, chỉ metadata Attribute VB_*.
