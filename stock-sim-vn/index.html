@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#11151f">
   <title>StockSim VN Web</title>
-  <link rel="stylesheet" href="styles.css?v=2.0.0">
+  <link rel="stylesheet" href="styles.css?v=2.1.0">
 </head>
 <body>
   <div id="app" class="app-shell" aria-busy="true">
@@ -66,13 +66,13 @@
 
       <aside class="right-panel">
         <section class="panel watch-panel">
-          <div class="panel-title">WATCHLIST</div>
+          <div class="panel-title watch-title-row"><span>WATCHLIST</span><small>Nhấp kép mã → BCTC</small></div>
           <div class="exchange-tabs">
             <button class="mini-tab active" data-exchange="HOSE">HOSE</button>
             <button class="mini-tab" data-exchange="HNX">HNX</button>
             <button class="mini-tab" data-exchange="UPCOM">UPCOM</button>
           </div>
-          <div class="watch-head"><span>Mã</span><span>Ngành</span><span>Giá</span><span>%</span></div>
+          <div class="watch-head"><span>Mã</span><span>Ngành</span><span>Giá</span><span>%</span><span></span></div>
           <div id="watchlist" class="watchlist"></div>
         </section>
 
@@ -156,6 +156,21 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=2.0.0"></script>
+  <div id="financialModal" class="modal-overlay financial-overlay" hidden>
+    <div class="financial-card" role="dialog" aria-modal="true" aria-labelledby="financialTitle">
+      <div class="financial-head">
+        <div><h2 id="financialTitle">BCTC</h2><div id="financialMeta" class="financial-meta"></div></div>
+        <button id="financialCloseBtn" class="secondary-btn" type="button">Đóng</button>
+      </div>
+      <p class="small-note">Số liệu doanh nghiệp hoàn toàn mô phỏng để luyện phân tích. Engine không hiển thị fair value/biến ẩn.</p>
+      <div id="financialGrid" class="financial-grid"></div>
+      <h3>4 quý gần nhất</h3>
+      <div class="financial-table-wrap"><table class="data-table financial-table"><thead><tr><th>Quý</th><th>Doanh thu</th><th>LNST</th><th>Biên LN</th><th>EPS</th><th>ROE</th></tr></thead><tbody id="financialTableBody"></tbody></table></div>
+      <h3>Tin doanh nghiệp gần đây</h3>
+      <div id="financialNews" class="financial-news"></div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js?v=2.1.0"></script>
 </body>
 </html>

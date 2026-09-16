@@ -264,11 +264,15 @@ Dice Arena vẫn giữ chế độ xúc xắc tự do. Nút **ĐẠI HỘI LINH 
 - Ảnh/PDF gốc chỉ làm nền; phần bé làm được lưu riêng dưới dạng annotation.
 - Với PDF, lần đầu vẫn dùng PDF.js đã ghim phiên bản giống bộ Công cụ PDF nên cần Internet nếu thư viện chưa có trong cache.
 
-## GAME — StockSim VN Web 2.0
+## GAME — StockSim VN Web 2.1
 
 - Mở KanBan → bấm **GAME** → chọn **StockSim VN**. Game chạy trực tiếp trong trình duyệt, không cần cài Python/Pygame và không mở EXE riêng.
 - Khi chạy local: double click `BAT_CHAY_THU.bat`, sau đó mở Game Hub như bình thường.
 - Khi chạy trên GitHub Pages: StockSim VN cũng chạy trực tiếp như các game web khác.
 - Save StockSim dùng **IndexedDB** của trình duyệt. Mỗi máy/profile trình duyệt có save riêng.
+- StockSim 2.1 có **vòng đời doanh nghiệp**: BCTC quý, cảnh báo/hạn chế/tạm ngừng, phá sản/hủy niêm yết/M&A; mã chết có nút × để ẩn khỏi Watchlist nhưng vẫn giữ lịch sử.
+- **IPO động**: mã mới có nhãn `NEW` trong khoảng 60 phiên đầu; nhấp kép một mã để mở BCTC 4 quý gần nhất và tin doanh nghiệp.
+- Engine bổ sung truyền dẫn sự kiện vĩ mô theo ngành, tin đồn/xác nhận, thanh khoản co rút trong khủng hoảng, dòng tiền Retail/Institutional/Foreign/ETF, cổ tức/tách cổ phiếu/phát hành thêm và biến thiên dài hạn giữa các doanh nghiệp.
+
 - `Chơi lại` tạo thị trường mới theo seed mới; có thể nhập lại cùng seed để tái tạo nền tảng thị trường ban đầu.
 - Giá, volume, tin tức và diễn biến đều là dữ liệu mô phỏng để học tập, không phải dữ liệu thị trường thật hay khuyến nghị đầu tư.

@@ -1,3 +1,24 @@
+# GHI CHÚ THAY ĐỔI TỔNG HỢP
+
+## StockSim VN Web 2.1 — Market Ecosystem — 16/09/2026
+
+- Giữ nguyên thao tác chart/trading hiện có; nâng Market Engine thành thị trường có vòng đời doanh nghiệp.
+- (1) Fundamental/lifecycle: doanh thu, LNST, EPS, ROE, biên lợi nhuận, nợ, tiền mặt, khả năng trả lãi, credit health; trạng thái ACTIVE/WATCH/RESTRICTED/SUSPENDED/BANKRUPT/DELISTED/MERGED.
+- (2) Event transmission: cú sốc năng lượng/lãi suất/ngân hàng/tỷ giá/tín dụng/xuất khẩu truyền dẫn khác nhau theo ngành thay vì cộng trừ giá trực tiếp.
+- (3) Distress/phá sản/hủy niêm yết: chỉ xảy ra sau nhiều quý xấu và sức khỏe tín dụng suy giảm; vị thế/lệnh liên quan được xử lý theo sự kiện.
+- (4) IPO động: 0–4 mã/năm tùy chu kỳ; mã mới sinh có `NEW`, exchange/sector/fundamental riêng.
+- (5) M&A: doanh nghiệp khó khăn có thể bị mua lại với mức giá mô phỏng và chuyển trạng thái MERGED.
+- (6) Corporate actions: cổ tức tiền mặt, tách cổ phiếu, phát hành thêm/pha loãng.
+- (7) BCTC quý: sinh định kỳ; Actual vs Expectation tạo earnings surprise. Nhấp kép ticker để xem BCTC mini.
+- (8) Tin đồn/thông tin bất cân xứng: tin có credibility và được xác nhận/phủ nhận sau đó.
+- (9) Systemic crisis: sự kiện lớn có thể đẩy regime sang PANIC, tăng volatility/correlation và kéo thanh khoản xuống.
+- (10) Liquidity risk: spread/slippage tăng khi thanh khoản suy yếu; Market Order có thể partial/blocked rồi tiếp tục khớp ở các phút sau.
+- (11) Limit-up/down: mô phỏng trường hợp giá kịch biên và thiếu đối ứng khiến lệnh Market không khớp ngay.
+- (12) Dòng tiền đa tác nhân: Retail, Institutional, Foreign, ETF cùng tác động giá/volume nhưng theo hành vi khác nhau.
+- (13) Long-term divergence: company quality/compounder/business cycle tạo mã tăng trưởng dài hạn, mã suy yếu, sideway, hồi phục hoặc biến mất; giảm survivorship bias.
+- UI Watchlist: mã mới có badge NEW + hover; mã chết có nút × để người chơi xóa khỏi Watchlist; dữ liệu lịch sử không bị xóa.
+- Save v8; tương thích và tự nâng save v7 khi đọc.
+
 # GHI CHÚ THAY ĐỔI / KIỂM THỬ TỔNG HỢP
 
 File này gom các CHANGELOG, TEST_REPORT, ghi chú THAY_ĐỔI và hướng dẫn cập nhật rời rạc trước đây để thư mục KanBan gọn hơn. Các file giấy phép, nguồn tham khảo và hướng dẫn sử dụng chính vẫn được giữ riêng vì cần cho vận hành/ghi nhận nguồn.
