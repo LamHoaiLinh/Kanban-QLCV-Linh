@@ -1,3 +1,10 @@
+## StockSim VN Web 2.1.1 — Sửa đồng bộ đường vị thế sau khi đóng — 16/09/2026
+- Sửa lỗi đường BUY/SHORT lịch sử vẫn còn trên chart sau khi vị thế đã được đóng bởi Stop Loss / Take Profit / đóng tay / thanh lý.
+- Chart giờ chỉ hiển thị đường entry của **phần khối lượng còn mở thực sự** (`filledQty - closedQty > 0`) và bắt buộc phải còn Position cùng chiều.
+- Nếu đóng một phần, đường entry vẫn giữ và hiển thị số lượng còn mở; khi đóng hết, đường entry biến mất ngay.
+- Không xóa lịch sử lệnh/giao dịch: tab LỆNH và GIAO DỊCH vẫn giữ dữ liệu để đối chiếu P/L đã chốt.
+- Bump cache/version lên 2.1.1 để GitHub Pages không giữ nhầm app.js 2.1.0 cũ qua Service Worker.
+
 # GHI CHÚ THAY ĐỔI TỔNG HỢP
 
 ## StockSim VN Web 2.1 — Market Ecosystem — 16/09/2026
