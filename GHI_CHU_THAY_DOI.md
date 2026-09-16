@@ -1,3 +1,19 @@
+## StockSim VN Web 2.1.3 — Tổng quan 3 sàn / 1W / dọn bảng LỆNH — 16/09/2026
+- Thêm 3 đồ thị tổng quan HOSE, HNX, UPCOM ở vùng trên của chart chính; đây là chỉ số thị trường mô phỏng dạng equal-weight từ các cổ phiếu đang có dữ liệu.
+- Thêm VNINDEX mô phỏng dạng benchmark HOSE có trọng số thanh khoản ở Top Bar để gọn và không chiếm thêm một ô lớn.
+- Thêm timeframe 1W, tổng hợp trực tiếp từ nến 1D theo tuần; mặc định vẫn là 1D.
+- Tab LỆNH có nút `XÓA LỆNH ĐÃ XONG`: chỉ ẩn các lệnh đã kết thúc/không còn exposure khỏi bảng LỆNH; lịch sử khớp lệnh trong tab GIAO DỊCH giữ nguyên. Entry còn vị thế hoặc lệnh đang chờ không bị xóa.
+- Giữ nguyên nút X từng dòng = đóng riêng entry; X đầu cột = đóng toàn bộ; SL/TP vẫn áp dụng toàn vị thế cùng mã.
+- Bump StockSim lên 2.1.3, Game Hub 1.71 và Service Worker cache v213.
+
+## StockSim VN Web 2.1.2 — Đóng riêng từng entry / Đóng tất cả — 16/09/2026
+- Nút **X ở tiêu đề cột** tab LỆNH nay là **ĐÓNG TẤT CẢ**: đóng toàn bộ vị thế đang mở ở mọi mã và hủy phần lệnh mở còn chờ, có bước xác nhận để tránh bấm nhầm.
+- Nút **X trên từng dòng entry đã khớp** chỉ đóng phần khối lượng còn mở của chính entry đó; các entry khác cùng mã vẫn giữ nguyên.
+- Nếu thanh khoản không đủ, lệnh đóng riêng/đóng tất cả có thể khớp một phần và tiếp tục khớp theo Market Engine thay vì thoát vị thế tức thời.
+- Stop Loss / Take Profit **giữ nguyên cơ chế chung theo Position của từng mã**: khi chạm mức sẽ đóng toàn bộ khối lượng còn mở của mã đó.
+- Bổ sung bảo vệ chống tạo nhiều lệnh đóng trùng cho cùng vị thế/entry trong khi lệnh đóng cũ còn chờ khớp.
+- Bump cache/version lên 2.1.2 / Game Hub 1.70 để GitHub Pages nhận đúng bản mới.
+
 ## StockSim VN Web 2.1.1 — Sửa đồng bộ đường vị thế sau khi đóng — 16/09/2026
 - Sửa lỗi đường BUY/SHORT lịch sử vẫn còn trên chart sau khi vị thế đã được đóng bởi Stop Loss / Take Profit / đóng tay / thanh lý.
 - Chart giờ chỉ hiển thị đường entry của **phần khối lượng còn mở thực sự** (`filledQty - closedQty > 0`) và bắt buộc phải còn Position cùng chiều.

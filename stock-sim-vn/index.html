@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#11151f">
   <title>StockSim VN Web</title>
-  <link rel="stylesheet" href="styles.css?v=2.1.1">
+  <link rel="stylesheet" href="styles.css?v=2.1.3">
 </head>
 <body>
   <div id="app" class="app-shell" aria-busy="true">
@@ -13,6 +13,7 @@
       <div class="brand">STOCKSIM VN <span class="web-badge">WEB</span></div>
       <div id="symbolTitle" class="symbol-title">FPT HOSE 1D</div>
       <div id="quoteTop" class="quote-top">--</div>
+      <div id="vnindexTop" class="vnindex-top" title="VNINDEX mô phỏng · benchmark thanh khoản HOSE">VNINDEX --</div>
       <div class="chart-switch" role="group" aria-label="Kiểu biểu đồ">
         <button class="top-btn active" data-chart-mode="CANDLE">NẾN</button>
         <button class="top-btn" data-chart-mode="LINE">LINE</button>
@@ -23,6 +24,7 @@
         <button class="top-btn" data-timeframe="15M">15M</button>
         <button class="top-btn" data-timeframe="1H">1H</button>
         <button class="top-btn active" data-timeframe="1D">1D</button>
+        <button class="top-btn" data-timeframe="1W">1W</button>
       </div>
       <div class="top-spacer"></div>
       <div id="gameClock" class="game-clock">--</div>
@@ -58,6 +60,11 @@
       </aside>
 
       <section id="chartShell" class="chart-shell">
+        <div id="marketIndexStrip" class="market-index-strip" aria-label="Tổng quan ba sàn">
+          <article class="market-index-card" data-market-card="HOSE"><div class="market-index-head"><b>HOSE</b><span id="idxHOSEValue">--</span><em id="idxHOSEChange">--</em></div><canvas id="idxHOSE" aria-label="Đồ thị HOSE mô phỏng"></canvas></article>
+          <article class="market-index-card" data-market-card="HNX"><div class="market-index-head"><b>HNX</b><span id="idxHNXValue">--</span><em id="idxHNXChange">--</em></div><canvas id="idxHNX" aria-label="Đồ thị HNX mô phỏng"></canvas></article>
+          <article class="market-index-card" data-market-card="UPCOM"><div class="market-index-head"><b>UPCOM</b><span id="idxUPCOMValue">--</span><em id="idxUPCOMChange">--</em></div><canvas id="idxUPCOM" aria-label="Đồ thị UPCOM mô phỏng"></canvas></article>
+        </div>
         <canvas id="chartCanvas" aria-label="Biểu đồ chứng khoán"></canvas>
         <div id="chartHint" class="chart-hint"></div>
         <div id="ohlcTooltip" class="ohlc-tooltip" hidden></div>
@@ -171,6 +178,6 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=2.1.1"></script>
+  <script type="module" src="app.js?v=2.1.3"></script>
 </body>
 </html>
