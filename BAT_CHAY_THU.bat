@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 >nul
-title Kanban Ca Nhan - Chay Thu
+title Kanban Ca Nhan - Local Web
 cd /d "%~dp0"
 echo.
 echo ===============================================
-echo   KANBAN CA NHAN - MAY CHU CHAY THU
+echo   KANBAN CA NHAN - LOCAL WEB
 echo ===============================================
 echo.
 where python >nul 2>nul
@@ -12,7 +12,7 @@ if errorlevel 1 (
   where py >nul 2>nul
   if errorlevel 1 (
     echo Khong tim thay Python tren may.
-    echo Ban co the upload bo web len GitHub Pages, nhung StockSim VN chi mo truc tiep khi chay local tren Windows.
+    echo Anh van co the upload bo web nay len GitHub Pages va chay truc tiep.
     pause
     exit /b 1
   )

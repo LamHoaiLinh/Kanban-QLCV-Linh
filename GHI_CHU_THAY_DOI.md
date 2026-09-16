@@ -2,15 +2,18 @@
 
 File này gom các CHANGELOG, TEST_REPORT, ghi chú THAY_ĐỔI và hướng dẫn cập nhật rời rạc trước đây để thư mục KanBan gọn hơn. Các file giấy phép, nguồn tham khảo và hướng dẫn sử dụng chính vẫn được giữ riêng vì cần cho vận hành/ghi nhận nguồn.
 
-## Tích hợp StockSim VN v1.9 vào Game Hub
+## StockSim VN Web 2.0 trong Game Hub — 16/09/2026
 
-- Giữ nguyên `stock-sim-vn/main.py` của StockSim VN v1.9; không chuyển đổi gameplay sang JavaScript và không sửa cơ chế game.
-- Game Hub thêm mục **StockSim VN**. Khi KanBan chạy local trên Windows bằng `BAT_CHAY_THU.bat`, mục này gọi endpoint localhost để mở ứng dụng Python desktop.
-- Lần đầu, `stock-sim-vn/LAUNCH_FROM_KANBAN.bat` tự tạo `.venv`, cài thư viện rồi mở game; các lần sau mở trực tiếp. Nếu đã build `stock-sim-vn/dist/StockSimVN.exe`, launcher ưu tiên EXE one-file.
-- Trên GitHub Pages, StockSim VN không thể được trình duyệt khởi chạy như EXE/Python vì giới hạn bảo mật của trình duyệt; Game Hub sẽ hướng dẫn chạy bản local. Các game web khác không thay đổi.
-- KanBan dùng `kanban_local_server.py` thay cho `python -m http.server` khi chạy qua BAT; hành vi phục vụ file tĩnh giữ nguyên, chỉ bổ sung `POST /api/launch-stocksim`.
+- StockSim VN đã được chuyển sang **web hoàn toàn**: HTML5 Canvas + JavaScript + IndexedDB; không cần Python, Pygame, `.venv` hay EXE để chơi.
+- Game Hub mở trực tiếp `stock-sim-vn/index.html` trong iframe, hoạt động giống nhau khi chạy `BAT_CHAY_THU.bat` local web và khi deploy GitHub Pages.
+- Mỗi New Game sinh `seed` riêng; cùng seed cho cùng nền tảng thị trường ban đầu, seed khác tạo chu kỳ/sector/doanh nghiệp khác. Save nằm trong IndexedDB của trình duyệt theo máy/profile.
+- Giữ các cơ chế chính từ v1.9: 30 mã/3 sàn/10 ngành, lịch sử mô phỏng 2 năm, Candle/Line, 1M/5M/15M/1H/1D, Long/Short, Market/Limit/Stop, SL/TP, leverage 100–500%, margin-call mô phỏng, P/L từng lệnh và NET P/L, chart tools, Fibonacci, Rectangle, Undo/Redo, kéo trục X/Y, kéo trực tiếp lệnh chờ/SL/TP.
+- Market engine vẫn dùng market regime + sector rotation + fair value + business cycle + institutional flow + momentum + mean reversion + volatility clustering + news + order-flow + noise; không dùng random walk đơn giản.
+- `kanban_local_server.py` trở lại đúng vai trò máy chủ file tĩnh, không còn API launch desktop.
+- Service worker cache thêm `stock-sim-vn/index.html`, `styles.css`, `app.js`; Game Hub được cache-bust lên phiên bản mới.
+- Kiểm tra lõi Web: tạo đủ 504 nến Daily, 30 mã; mở/đóng LONG, SHORT, STOP, sửa giá lệnh chờ; JavaScript syntax PASS.
 
-## Ghi chú StockSim VN v1.9
+## Lịch sử StockSim VN Python v1.9 (tham chiếu cũ, không còn đóng gói trong KanBan Web)
 
 ```text
 STOCKSIM VN V1.9 - KÉO TRỰC TIẾP LỆNH / SL / TP TRÊN CHART
@@ -1423,7 +1426,7 @@ THAY_DOI_V5.3
 - Không thay đổi Kanban, Office, Excel, PDF, Dice hoặc Tarot.
 ```
 
-## Kiểm tra tích hợp StockSim VN v1.9 - 16/09/2026
+## Kiểm tra tích hợp StockSim VN Python v1.9 trước khi chuyển Web - 16/09/2026
 
 - `stock-sim-vn/main.py` có SHA-256 giống hệt bản StockSim VN v1.9 trước khi tích hợp: `6038bb7e281e7a5df43d95e0fb28f0b926f501df2b6653bde6d959ca21c0ba49`.
 - `python -m py_compile kanban_local_server.py stock-sim-vn/main.py`: PASS.

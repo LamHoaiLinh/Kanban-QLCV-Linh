@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#11151f">
+  <title>StockSim VN Web</title>
+  <link rel="stylesheet" href="styles.css?v=2.0.0">
+</head>
+<body>
+  <div id="app" class="app-shell" aria-busy="true">
+    <header class="topbar">
+      <div class="brand">STOCKSIM VN <span class="web-badge">WEB</span></div>
+      <div id="symbolTitle" class="symbol-title">FPT HOSE 1D</div>
+      <div id="quoteTop" class="quote-top">--</div>
+      <div class="chart-switch" role="group" aria-label="Kiểu biểu đồ">
+        <button class="top-btn active" data-chart-mode="CANDLE">NẾN</button>
+        <button class="top-btn" data-chart-mode="LINE">LINE</button>
+      </div>
+      <div class="timeframe-switch" role="group" aria-label="Khung thời gian">
+        <button class="top-btn" data-timeframe="1M">1M</button>
+        <button class="top-btn" data-timeframe="5M">5M</button>
+        <button class="top-btn" data-timeframe="15M">15M</button>
+        <button class="top-btn" data-timeframe="1H">1H</button>
+        <button class="top-btn active" data-timeframe="1D">1D</button>
+      </div>
+      <div class="top-spacer"></div>
+      <div id="gameClock" class="game-clock">--</div>
+      <button id="pauseBtn" class="top-btn">⏸ Dừng</button>
+      <div class="speed-switch" role="group" aria-label="Tốc độ">
+        <button class="top-btn active" data-speed="1">x1</button>
+        <button class="top-btn" data-speed="2">x2</button>
+        <button class="top-btn" data-speed="5">x5</button>
+        <button class="top-btn" data-speed="10">x10</button>
+        <button class="top-btn" data-speed="20">x20</button>
+      </div>
+      <button id="saveBtn" class="top-btn">Lưu</button>
+      <button id="backKanbanBtn" class="top-btn back-btn">← KanBan</button>
+    </header>
+
+    <main class="workspace">
+      <aside class="tool-rail" aria-label="Công cụ biểu đồ">
+        <button class="tool-btn active" data-tool="CURSOR" title="Con trỏ / kéo biểu đồ (V)">↖</button>
+        <button class="tool-btn" data-tool="TREND" title="Đường xu hướng (T)">╱</button>
+        <button class="tool-btn" data-tool="HLINE" title="Đường ngang (H)">━</button>
+        <button class="tool-btn" data-tool="RECT" title="Hình chữ nhật (R)">□</button>
+        <button class="tool-btn" data-tool="FIB" title="Fibonacci (F)">F</button>
+        <div class="tool-sep"></div>
+        <button id="zoomXInBtn" class="tool-btn" title="Zoom X vào">⊕</button>
+        <button id="zoomXOutBtn" class="tool-btn" title="Zoom X ra">⊖</button>
+        <button id="zoomYInBtn" class="tool-btn" title="Thu trục giá Y">↕+</button>
+        <button id="zoomYOutBtn" class="tool-btn" title="Mở rộng trục giá Y">↕−</button>
+        <button id="resetViewBtn" class="tool-btn" title="Reset X/Y">⟳</button>
+        <div class="tool-sep"></div>
+        <button id="undoBtn" class="tool-btn" title="Undo Ctrl+Z">↶</button>
+        <button id="redoBtn" class="tool-btn" title="Redo Ctrl+Y">↷</button>
+        <button id="deleteDrawingBtn" class="tool-btn danger" title="Xóa hình vẽ cuối">⌫</button>
+      </aside>
+
+      <section id="chartShell" class="chart-shell">
+        <canvas id="chartCanvas" aria-label="Biểu đồ chứng khoán"></canvas>
+        <div id="chartHint" class="chart-hint"></div>
+        <div id="ohlcTooltip" class="ohlc-tooltip" hidden></div>
+        <div id="contextMenu" class="context-menu" hidden></div>
+      </section>
+
+      <aside class="right-panel">
+        <section class="panel watch-panel">
+          <div class="panel-title">WATCHLIST</div>
+          <div class="exchange-tabs">
+            <button class="mini-tab active" data-exchange="HOSE">HOSE</button>
+            <button class="mini-tab" data-exchange="HNX">HNX</button>
+            <button class="mini-tab" data-exchange="UPCOM">UPCOM</button>
+          </div>
+          <div class="watch-head"><span>Mã</span><span>Ngành</span><span>Giá</span><span>%</span></div>
+          <div id="watchlist" class="watchlist"></div>
+        </section>
+
+        <section class="panel trade-panel">
+          <div class="panel-tabs">
+            <button class="panel-tab active" data-side-tab="TRADE">GIAO DỊCH</button>
+            <button class="panel-tab" data-side-tab="PORTFOLIO">DANH MỤC</button>
+            <button class="panel-tab" data-side-tab="MISSION">NHIỆM VỤ</button>
+          </div>
+          <div id="tradeTab" class="side-tab-content">
+            <div class="panel-title order-title">Đặt lệnh <span id="orderSymbol">FPT</span></div>
+            <div class="toggle-row two">
+              <button id="buySideBtn" class="trade-toggle buy active">MUA / LONG</button>
+              <button id="sellSideBtn" class="trade-toggle sell">BÁN / SHORT</button>
+            </div>
+            <div class="toggle-row three">
+              <button class="trade-toggle active" data-order-type="MARKET">MARKET</button>
+              <button class="trade-toggle" data-order-type="LIMIT">LIMIT</button>
+              <button class="trade-toggle" data-order-type="STOP">STOP</button>
+            </div>
+            <label class="field-row"><span>Khối lượng</span><input id="qtyInput" type="number" min="100" step="100" value="100"><small>Lô 100</small></label>
+            <label class="field-row"><span>Giá</span><input id="priceInput" type="number" min="10" step="10" placeholder="Theo TT" disabled></label>
+            <div class="field-row leverage-row"><span>Đòn bẩy</span><button id="levDown" class="arrow-btn">◀</button><output id="levOutput">100% x1.0</output><button id="levUp" class="arrow-btn">▶</button></div>
+            <div id="orderEstimate" class="estimate"></div>
+            <button id="submitOrderBtn" class="submit-order">MỞ LONG - MARKET</button>
+            <div class="quick-help">Chuột phải chart: Limit / Stop / SL / TP<br>Rê gần đường lệnh rồi kéo ↑↓ để sửa giá.</div>
+          </div>
+          <div id="portfolioTab" class="side-tab-content" hidden></div>
+          <div id="missionTab" class="side-tab-content" hidden></div>
+        </section>
+
+        <section class="panel account-panel">
+          <div class="panel-title account-title"><span>TÀI KHOẢN</span><button id="restartBtn" class="link-btn">Chơi lại</button></div>
+          <div id="accountStats" class="stats-grid"></div>
+          <div class="panel-title depth-title">SỔ LỆNH MÔ PHỎNG</div>
+          <div id="orderBook" class="order-book"></div>
+        </section>
+      </aside>
+
+      <section class="bottom-panel">
+        <div class="bottom-tabs">
+          <button class="bottom-tab active" data-bottom-tab="NEWS">TIN TỨC</button>
+          <button class="bottom-tab" data-bottom-tab="ORDERS">LỆNH</button>
+          <button class="bottom-tab" data-bottom-tab="TRADES">GIAO DỊCH</button>
+          <button class="bottom-tab" data-bottom-tab="MISSIONS">NHIỆM VỤ</button>
+          <div id="bottomSummary" class="bottom-summary"></div>
+        </div>
+        <div id="bottomContent" class="bottom-content"></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toastHost" class="toast-host" aria-live="polite"></div>
+  <div id="loadingOverlay" class="modal-overlay">
+    <div class="loading-card">
+      <div class="spinner"></div>
+      <h2 id="loadingTitle">Đang khởi động StockSim VN Web</h2>
+      <p id="loadingText">Đang kiểm tra dữ liệu đã lưu…</p>
+      <div class="progress-track"><div id="loadingProgress" class="progress-bar"></div></div>
+    </div>
+  </div>
+
+  <div id="newGameModal" class="modal-overlay" hidden>
+    <div class="newgame-card">
+      <h2>STOCKSIM VN WEB</h2>
+      <p class="muted-copy">Chọn vốn khởi đầu. Mỗi New Game tạo một thị trường mô phỏng riêng theo seed; dữ liệu lưu trong trình duyệt máy này.</p>
+      <div class="difficulty-grid">
+        <button class="difficulty-card" data-difficulty="EASY"><b>DỄ</b><strong>200 triệu</strong><span>Vốn rộng, dễ thử nhiều mã và chiến lược.</span></button>
+        <button class="difficulty-card active" data-difficulty="MEDIUM"><b>TRUNG BÌNH</b><strong>100 triệu</strong><span>Cân bằng giữa cơ hội và quản trị vốn.</span></button>
+        <button class="difficulty-card" data-difficulty="HARD"><b>KHÓ</b><strong>50 triệu</strong><span>Vốn nhỏ hơn, cần chọn lệnh và đòn bẩy cẩn thận.</span></button>
+      </div>
+      <div class="seed-row">
+        <label><span>Seed</span><input id="seedInput" inputmode="numeric" placeholder="Để trống = ngẫu nhiên"></label>
+        <button id="randomSeedBtn" class="secondary-btn">Tạo seed</button>
+      </div>
+      <div class="modal-actions">
+        <button id="cancelNewGameBtn" class="secondary-btn">Hủy</button>
+        <button id="startNewGameBtn" class="primary-btn">BẮT ĐẦU</button>
+      </div>
+      <p class="small-note">Game mô phỏng để học tập; không dùng dữ liệu giá thật và không phải khuyến nghị đầu tư.</p>
+    </div>
+  </div>
+
+  <script type="module" src="app.js?v=2.0.0"></script>
+</body>
+</html>

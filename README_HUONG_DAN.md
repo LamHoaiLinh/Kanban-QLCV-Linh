@@ -263,3 +263,12 @@ Dice Arena vẫn giữ chế độ xúc xắc tự do. Nút **ĐẠI HỘI LINH 
 - Xuất mặc định **PNG nối dài theo chiều dọc**, ngoài ra có PDF nhiều trang và PNG từng trang.
 - Ảnh/PDF gốc chỉ làm nền; phần bé làm được lưu riêng dưới dạng annotation.
 - Với PDF, lần đầu vẫn dùng PDF.js đã ghim phiên bản giống bộ Công cụ PDF nên cần Internet nếu thư viện chưa có trong cache.
+
+## GAME — StockSim VN Web 2.0
+
+- Mở KanBan → bấm **GAME** → chọn **StockSim VN**. Game chạy trực tiếp trong trình duyệt, không cần cài Python/Pygame và không mở EXE riêng.
+- Khi chạy local: double click `BAT_CHAY_THU.bat`, sau đó mở Game Hub như bình thường.
+- Khi chạy trên GitHub Pages: StockSim VN cũng chạy trực tiếp như các game web khác.
+- Save StockSim dùng **IndexedDB** của trình duyệt. Mỗi máy/profile trình duyệt có save riêng.
+- `Chơi lại` tạo thị trường mới theo seed mới; có thể nhập lại cùng seed để tái tạo nền tảng thị trường ban đầu.
+- Giá, volume, tin tức và diễn biến đều là dữ liệu mô phỏng để học tập, không phải dữ liệu thị trường thật hay khuyến nghị đầu tư.
