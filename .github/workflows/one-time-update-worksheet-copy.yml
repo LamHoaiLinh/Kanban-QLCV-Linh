@@ -1,0 +1,43 @@
+name: One-time update worksheet copy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/one-time-update-worksheet-copy.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update-copy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Replace worksheet description
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('office-tools/worksheet-editor.js')
+          old = 'Nhập 1 hoặc nhiều PNG, JPG, WEBP hoặc PDF. Các trang sẽ nối liền theo chiều dọc; bé có thể gõ chữ màu, khoanh, highlight, vẽ rồi xuất ảnh dài hoặc PDF.'
+          new = 'Nhập 1 hoặc nhiều file PNG, JPG, PDF hoặc WEBP để chỉnh sửa. Các trang sau chỉnh sửa sẽ xuất ra ở dạng nối liền theo chiều dọc.'
+          text = p.read_text(encoding='utf-8')
+          count = text.count(old)
+          if count != 1:
+              raise SystemExit(f'Expected exactly 1 occurrence, found {count}')
+          p.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+      - name: Commit and push
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo 'No changes to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add office-tools/worksheet-editor.js
+          git commit -m 'Đổi mô tả nhập file trong trình làm bài'
+          git push
