@@ -20,7 +20,8 @@ jobs:
 
           PATCH_DIR=".kanban_v04"
           JAVA_DIR="KANBAN_RUN/app/src/main/java/vn/kanban/run"
-          base64 -d "$PATCH_DIR/MainActivity.java.gz.b64" | gzip -dc > "$JAVA_DIR/MainActivity.java"
+          cat "$PATCH_DIR/main/part01.txt" "$PATCH_DIR/main/part02a.txt" "$PATCH_DIR/main/part02b.txt" "$PATCH_DIR/main/part02c1.txt" "$PATCH_DIR/main/part02c2.txt" "$PATCH_DIR/main/part02c3.txt" "$PATCH_DIR/main/part02c4.txt" "$PATCH_DIR/main/part03.txt" "$PATCH_DIR/main/part04.txt" "$PATCH_DIR/main/part05.txt" "$PATCH_DIR/main/part06.txt" > /tmp/MainActivity.b64
+          base64 -d /tmp/MainActivity.b64 | gzip -dc > "$JAVA_DIR/MainActivity.java"
           base64 -d "$PATCH_DIR/OfflineMapActivity.java.gz.b64" | gzip -dc > "$JAVA_DIR/OfflineMapActivity.java"
           base64 -d "$PATCH_DIR/RoutePlanner.java.gz.b64" | gzip -dc > "$JAVA_DIR/RoutePlanner.java"
           base64 -d "$PATCH_DIR/UiKit.java.gz.b64" | gzip -dc > "$JAVA_DIR/UiKit.java"
