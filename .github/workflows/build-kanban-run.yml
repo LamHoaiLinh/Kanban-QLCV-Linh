@@ -26,8 +26,8 @@ jobs:
           base64 -d "$PATCH_DIR/RoutePlanner.java.gz.b64" | gzip -dc > "$JAVA_DIR/RoutePlanner.java"
           base64 -d "$PATCH_DIR/UiKit.java.gz.b64" | gzip -dc > "$JAVA_DIR/UiKit.java"
 
-          sed -i 's/versionCode 3/versionCode 4/g' KANBAN_RUN/app/build.gradle
-          sed -i 's/versionName "0.3.0"/versionName "0.4.0"/g' KANBAN_RUN/app/build.gradle
+          sed -i 's/versionCode 3/versionCode 5/g' KANBAN_RUN/app/build.gradle
+          sed -i 's/versionName "0.3.0"/versionName "0.4.1"/g' KANBAN_RUN/app/build.gradle
           sed -i 's/0.30.0/0.25.0/g' KANBAN_RUN/app/build.gradle
           sed -i "/com.caverock:androidsvg-aar/d" KANBAN_RUN/app/build.gradle
 
@@ -51,10 +51,10 @@ jobs:
         run: |
           cd KANBAN_RUN
           gradle :app:assembleDebug --stacktrace
-          cp app/build/outputs/apk/debug/app-debug.apk KANBAN_RUN_v0.4.0.apk
+          cp app/build/outputs/apk/debug/app-debug.apk KANBAN_RUN_v0.4.1.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: KANBAN_RUN_APK_v0.4.0
+          name: KANBAN_RUN_APK_v0.4.1
           path: KANBAN_RUN/KANBAN_RUN_v0.4.0.apk
           if-no-files-found: error
