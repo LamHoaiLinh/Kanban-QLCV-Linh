@@ -805,3 +805,17 @@ body.drag-active .music-player{
 .capture-launch-btn .office-btn-mark{font-size:8px;letter-spacing:-.02em}
 @media(max-width:900px){.capture-launch-btn{width:46px!important}}
 @media(max-width:700px){.capture-launch-btn{width:54px!important;min-width:54px!important}}
+
+
+/* v6.24 - trạng thái/cài đặt Capture Agent */
+.capture-launch-btn.capture-agent-ready{border-color:color-mix(in srgb,var(--green) 72%,var(--border));box-shadow:0 0 0 2px color-mix(in srgb,var(--green) 14%,transparent)}
+.capture-setup-backdrop{position:fixed;inset:0;z-index:26000;display:grid;place-items:center;padding:20px;background:rgba(10,24,19,.58);backdrop-filter:blur(5px)}
+.capture-setup-backdrop[hidden]{display:none}
+.capture-setup-card{position:relative;width:min(520px,calc(100vw - 28px));padding:22px;border:1px solid var(--border);border-radius:20px;background:var(--panel);box-shadow:var(--shadow);color:var(--text)}
+.capture-setup-close{position:absolute;right:12px;top:12px;width:34px;height:34px;border:1px solid var(--border);border-radius:10px;background:var(--panel-soft);cursor:pointer;font-size:20px}
+.capture-setup-mark{display:grid;place-items:center;width:48px;height:48px;border-radius:15px;background:var(--green-soft);color:var(--green-dark);font-size:24px;font-weight:900}
+.capture-setup-card h3{margin:12px 0 6px;font-size:20px}.capture-setup-card p{margin:0;color:var(--muted);font-size:13px;line-height:1.6}
+.capture-setup-steps{display:grid;grid-template-columns:28px 1fr;gap:8px 10px;align-items:center;margin-top:16px;padding:13px;border-radius:14px;background:var(--panel-soft);font-size:12px}
+.capture-setup-steps span{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--green);color:#fff;font-weight:900}
+.capture-setup-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:16px}.capture-setup-actions button{min-height:40px;padding:0 13px;border:1px solid var(--border);border-radius:11px;background:var(--panel);cursor:pointer;font-weight:800}.capture-setup-actions button.primary{border-color:var(--green);background:var(--green);color:#fff}
+@media(max-width:560px){.capture-setup-actions{flex-direction:column}.capture-setup-actions button{width:100%}}
