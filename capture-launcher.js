@@ -7,9 +7,11 @@
 
   function setReady(ready){
     button.classList.toggle('capture-agent-ready',ready);
-    button.dataset.tooltip=ready
+    const tip=ready
       ? 'Chụp nhanh toàn Windows (Alt+C) · Chuột phải: Cài đặt JPG/PNG'
       : 'Chụp nhanh (Alt+C) · Chuột phải: Cài đặt JPG/PNG · cần cài/chạy Capture Agent';
+    button.dataset.tooltip=tip;
+    button.title=tip;
   }
 
   async function request(action,timeout=1100){

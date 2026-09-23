@@ -31,7 +31,11 @@ Sử dụng
 - Khi chọn Bút/Khung/Mũi tên, thanh dọc hiện nút −/+ để chỉnh độ dày nét ngay trong lúc chụp.
 - Khi chọn Chữ, thanh dọc hiện nút −/+ để chỉnh cỡ chữ ngay trong lúc chụp.
 - Khi nhập chữ, Enter dùng để xuống dòng; Ctrl+Enter xác nhận nội dung.
-- Sau khi tạo chữ, giữ chế độ Chữ rồi kéo trực tiếp dòng chữ để đổi vị trí; nhấp đúp để sửa lại nội dung.
+- Sau khi tạo chữ, khi rê chuột lên chữ con trỏ đổi sang hình bàn tay; giữ chuột trái để kéo cả khung chữ sang vị trí khác.
+- Nhấp đúp chữ để vào chế độ sửa.
+- Trong chế độ sửa, bôi đen một phần chữ sẽ hiện thanh định dạng riêng cho vùng đang chọn: A−/A+ đổi cỡ, B in đậm, U gạch dưới và bảng màu.
+- Định dạng áp dụng theo đúng phần ký tự đang bôi đen, vì vậy trong cùng một khung chữ có thể có nhiều cỡ, đậm/gạch dưới và màu khác nhau.
+- Enter trong ô sửa chữ dùng để xuống dòng; Ctrl+Enter xác nhận nội dung.
 - Thanh ngang: Hủy, Hoàn tác, Lưu file, Copy/Xong.
 - Ctrl + C hoặc Enter (khi không đang gõ chữ): Copy/Xong.
 - Ctrl + S: lưu thủ công.
