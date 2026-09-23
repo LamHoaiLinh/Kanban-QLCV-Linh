@@ -317,7 +317,7 @@ body.has-background .music-player{background:linear-gradient(160deg,color-mix(in
 .music-volume-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:6px;color:var(--muted);font-size:9px}
 .music-status{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:8px;text-align:center}
 
-.music-playlist-modal{display:flex;flex-direction:column;width:min(920px,calc(100vw - 32px));height:min(88vh,860px);max-height:min(88vh,860px);overflow:hidden}
+.music-playlist-modal{display:flex;flex-direction:column;width:min(1242px,calc(100vw - 32px));height:min(88vh,860px);max-height:min(88vh,860px);overflow:hidden}
 .music-playlist-folder{margin-top:4px;color:var(--music-accent-dark);font-size:11px;font-weight:750}
 .music-playlist-search-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:9px;align-items:center;min-height:42px;padding-top:14px}
 .music-playlist-search{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:9px;height:42px;padding:0 11px;border:1px solid var(--border);border-radius:12px;background:var(--panel-soft);transition:border-color .14s ease,box-shadow .14s ease}
@@ -798,3 +798,10 @@ body.drag-active .music-player{
 .office-launcher .office-suite-launch-btn,.office-launcher .game-suite-launch-btn{width:62px!important;min-width:62px!important;height:40px;min-height:40px;padding:0 6px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;overflow:hidden;line-height:1}
 .office-launcher .office-suite-launch-btn .office-btn-mark,.office-launcher .game-suite-launch-btn .office-btn-mark{display:block;width:100%;margin:0;text-align:center;font-size:8px!important;font-weight:900;line-height:1!important;letter-spacing:0!important;white-space:nowrap;transform:none!important}
 @media(max-width:700px){.office-launcher .office-suite-launch-btn,.office-launcher .game-suite-launch-btn{width:60px!important;min-width:60px!important;height:44px;min-height:44px}.office-launcher .office-suite-launch-btn .office-btn-mark,.office-launcher .game-suite-launch-btn .office-btn-mark{font-size:8px!important}}
+
+
+/* v6.23 - nút chụp nhanh Windows */
+.capture-launch-btn{width:50px!important}
+.capture-launch-btn .office-btn-mark{font-size:8px;letter-spacing:-.02em}
+@media(max-width:900px){.capture-launch-btn{width:46px!important}}
+@media(max-width:700px){.capture-launch-btn{width:54px!important;min-width:54px!important}}
