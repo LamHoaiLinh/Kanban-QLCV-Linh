@@ -73,6 +73,7 @@ def clipboard(image,path):
         u.EmptyClipboard(); b=io.BytesIO(); image.convert('RGB').save(b,'BMP'); hglobal(8,b.getvalue()[14:])
         p=io.BytesIO(); image.save(p,'PNG'); u.RegisterClipboardFormatW.argtypes=[wintypes.LPCWSTR]; u.RegisterClipboardFormatW.restype=wintypes.UINT; hglobal(u.RegisterClipboardFormatW('PNG'),p.getvalue())
         hglobal(15,struct.pack('<IiiII',20,0,0,0,1)+(str(path)+'\0\0').encode('utf-16le'))
+        hglobal(u.RegisterClipboardFormatW('Preferred DropEffect'),struct.pack('<I',1))
     finally:u.CloseClipboard()
 
 def cleanup():
