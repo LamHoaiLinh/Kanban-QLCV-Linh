@@ -23,7 +23,3 @@ Cài đặt mặc định
 - Có thể đổi sang PNG trong cửa sổ Cài đặt.
 - File tạm lưu ở %LOCALAPPDATA%\KanbanCapture\Clipboard và tự dọn file cũ.
 
-Gỡ đăng ký nếu cần
-Mở Command Prompt tại thư mục đã cài và chạy:
-  py "%LOCALAPPDATA%\KanbanCapture\capture_agent.py" --uninstall
-Sau đó có thể xóa thư mục %LOCALAPPDATA%\KanbanCapture nếu không cần giữ ảnh tạm.
