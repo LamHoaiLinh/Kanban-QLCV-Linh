@@ -28,8 +28,12 @@ Sử dụng
 - Kéo chuột tạo vùng chụp; ngoài vùng chọn được làm tối.
 - Khung chọn có 8 điểm resize và có thể kéo cả khung sang vị trí khác.
 - Thanh dọc: Chọn/di chuyển, Chữ, Bút, Khung, Mũi tên, Mosaic, đổi màu, Hoàn tác.
+- Khi chọn Bút/Khung/Mũi tên, thanh dọc hiện nút −/+ để chỉnh độ dày nét ngay trong lúc chụp.
+- Khi chọn Chữ, thanh dọc hiện nút −/+ để chỉnh cỡ chữ ngay trong lúc chụp.
+- Khi nhập chữ, Enter dùng để xuống dòng; Ctrl+Enter xác nhận nội dung.
+- Sau khi tạo chữ, giữ chế độ Chữ rồi kéo trực tiếp dòng chữ để đổi vị trí; nhấp đúp để sửa lại nội dung.
 - Thanh ngang: Hủy, Hoàn tác, Lưu file, Copy/Xong.
-- Ctrl + C hoặc Enter: Copy/Xong.
+- Ctrl + C hoặc Enter (khi không đang gõ chữ): Copy/Xong.
 - Ctrl + S: lưu thủ công.
 - Ctrl + V trong Zalo/Messenger/Word: dán ảnh.
 - Ctrl + V trong Desktop/Explorer: tạo file JPG/PNG.
