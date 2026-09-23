@@ -4,7 +4,7 @@ from ctypes import wintypes
 from datetime import datetime, timedelta
 from pathlib import Path
 import tkinter as tk
-from tkinter import filedialog, messagebox, simpledialog, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk, font as tkfont
 
 APP='KanbanCapture'; PORT=47631; HOTKEY_ID=0x4B43
 DIR=Path(os.environ.get('LOCALAPPDATA',tempfile.gettempdir()))/APP; CFG=DIR/'settings.json'; CLIP=DIR/'Clipboard'
@@ -96,6 +96,7 @@ def cleanup():
 class Overlay:
     COLORS=['#ff3b30','#ff9500','#34c759','#007aff','#af52de','#ffffff','#111111']
     HANDLES=('nw','n','ne','e','se','s','sw','w')
+    STYLE_PREFIX='rt_'
     def __init__(self,agent,img,x0,y0):
         from PIL import ImageTk
         self.a=agent; self.img=img; self.x0=x0; self.y0=y0; self.w,self.h=img.size
@@ -103,8 +104,9 @@ class Overlay:
         self.mode='select'; self.color=self.COLORS[0]; self.color_index=0; self.ops=[]; self.live=[]; self.points=[]
         self.pen_width=max(1,min(20,int(self.a.cfg.get('pen_width',4))))
         self.text_size=max(12,min(72,int(self.a.cfg.get('text_size',26))))
-        self.selected_text_index=None; self.original_text_pos=None; self.text_items={}
+        self.selected_text_index=None; self.original_text_pos=None; self.text_boxes={}; self._font_cache={}
         self.text_editor_frame=None; self.text_editor_win=None; self.text_editor_widget=None; self.text_editor_index=None; self.text_editor_pos=None
+        self.text_format_bar=None; self.text_format_size_label=None
         self.top=tk.Toplevel(agent.root); self.top.overrideredirect(True); self.top.attributes('-topmost',True); self.top.configure(bg='black')
         self.top.geometry(f'{self.w}x{self.h}+0+0'); self.top.update_idletasks()
         u=ctypes.windll.user32
@@ -122,13 +124,11 @@ class Overlay:
             b=self.dark_button(self.tool,label,lambda m=key:self.setmode(m),width=3); b.pack(pady=2); self.tool_buttons[key]=b
         self.color_btn=self.dark_button(self.tool,'●',self.cycle_color,width=3,fg=self.color); self.color_btn.pack(pady=2)
         self.size_frame=tk.Frame(self.tool,bg='#1f282d',padx=2,pady=2)
-        self.size_title=tk.Label(self.size_frame,text='Nét',bg='#1f282d',fg='#dbe4e8',font=('Segoe UI',8,'bold'))
-        self.size_title.pack()
-        row=tk.Frame(self.size_frame,bg='#1f282d'); row.pack()
-        self.small_button(row,'−',lambda:self.adjust_size(-1)).pack(side='left')
-        self.size_value=tk.Label(row,text=str(self.pen_width),width=3,bg='#1f282d',fg='#fff',font=('Segoe UI',9,'bold'))
-        self.size_value.pack(side='left',padx=1)
-        self.small_button(row,'+',lambda:self.adjust_size(1)).pack(side='left')
+        self.size_title=tk.Label(self.size_frame,text='Nét',bg='#1f282d',fg='#dbe4e8',font=('Segoe UI',8,'bold')); self.size_title.pack()
+        size_row=tk.Frame(self.size_frame,bg='#1f282d'); size_row.pack()
+        self.small_button(size_row,'−',lambda:self.adjust_size(-1)).pack(side='left')
+        self.size_value=tk.Label(size_row,text=str(self.pen_width),width=3,bg='#1f282d',fg='#fff',font=('Segoe UI',9,'bold')); self.size_value.pack(side='left',padx=1)
+        self.small_button(size_row,'+',lambda:self.adjust_size(1)).pack(side='left')
         self.undo_btn=self.dark_button(self.tool,'↶',self.undo,width=3); self.undo_btn.pack(pady=2)
         self.dark_button(self.action,'✕',self.close,width=3).pack(side='left',padx=2)
         self.dark_button(self.action,'↶',self.undo,width=3).pack(side='left',padx=2)
@@ -136,7 +136,7 @@ class Overlay:
         self.dark_button(self.action,'⧉',self.finish,width=3).pack(side='left',padx=2)
         self.dark_button(self.action,'✓',self.finish,width=3,fg='#39d98a').pack(side='left',padx=2)
         self.c.bind('<ButtonPress-1>',self.down); self.c.bind('<B1-Motion>',self.move); self.c.bind('<ButtonRelease-1>',self.up)
-        self.c.bind('<Double-Button-1>',self.double_click)
+        self.c.bind('<Double-Button-1>',self.double_click); self.c.bind('<Motion>',self.hover)
         self.top.bind('<Escape>',lambda e:self.close()); self.top.bind('<Control-c>',self.copy_shortcut); self.top.bind('<Control-C>',self.copy_shortcut)
         self.top.bind('<Control-s>',lambda e:(self.save_as(),'break')[1]); self.top.bind('<Return>',self.finish_shortcut)
         self.top.focus_force(); self.setmode('select'); self.redraw()
@@ -146,6 +146,24 @@ class Overlay:
 
     def small_button(self,parent,text,cmd):
         return tk.Button(parent,text=text,command=cmd,width=2,height=1,bg='#344148',fg='#fff',activebackground='#4b5d66',activeforeground='#fff',relief='flat',bd=0,font=('Segoe UI',9,'bold'),cursor='hand2')
+
+    def default_text_style(self):
+        return {'size':self.text_size,'bold':False,'underline':False,'color':self.color}
+
+    def normalize_style(self,style=None):
+        base=self.default_text_style(); base.update(style or {})
+        base['size']=max(10,min(96,int(base.get('size',self.text_size))))
+        base['bold']=bool(base.get('bold',False)); base['underline']=bool(base.get('underline',False))
+        color=str(base.get('color',self.color))
+        base['color']=color if color.startswith('#') and len(color)==7 else self.color
+        return base
+
+    def make_text_op(self,pos,text,styles=None):
+        styles=styles or [self.default_text_style() for _ in text]
+        normalized=[self.normalize_style(styles[i] if i<len(styles) else None) for i in range(len(text))]
+        return {'kind':'text','pos':(float(pos[0]),float(pos[1])),'text':text,'styles':normalized}
+
+    def is_text_op(self,op): return isinstance(op,dict) and op.get('kind')=='text'
 
     def setmode(self,m):
         if self.text_editor_frame and m!='text': self.commit_text_editor()
@@ -159,22 +177,18 @@ class Overlay:
     def refresh_size_controls(self):
         self.size_frame.pack_forget()
         if self.mode in ('pen','rect','arrow'):
-            self.size_title.config(text='Nét'); self.size_value.config(text=str(self.pen_width))
-            self.size_frame.pack(before=self.undo_btn,pady=2,fill='x')
+            self.size_title.config(text='Nét'); self.size_value.config(text=str(self.pen_width)); self.size_frame.pack(before=self.undo_btn,pady=2,fill='x')
         elif self.mode=='text':
-            self.size_title.config(text='Chữ'); self.size_value.config(text=str(self.text_size))
-            self.size_frame.pack(before=self.undo_btn,pady=2,fill='x')
+            self.size_title.config(text='Chữ'); self.size_value.config(text=str(self.text_size)); self.size_frame.pack(before=self.undo_btn,pady=2,fill='x')
 
     def adjust_size(self,delta):
         if self.mode=='text':
-            self.text_size=max(12,min(72,self.text_size+delta*2))
-            self.a.cfg['text_size']=self.text_size
-            if self.selected_text_index is not None and 0<=self.selected_text_index<len(self.ops):
+            self.text_size=max(12,min(72,self.text_size+delta*2)); self.a.cfg['text_size']=self.text_size
+            if self.selected_text_index is not None and 0<=self.selected_text_index<len(self.ops) and self.is_text_op(self.ops[self.selected_text_index]):
                 op=self.ops[self.selected_text_index]
-                if op[0]=='text': self.ops[self.selected_text_index]=('text',op[1],op[2],op[3],self.text_size)
+                for style in op['styles']: style['size']=self.text_size
         else:
-            self.pen_width=max(1,min(20,self.pen_width+delta))
-            self.a.cfg['pen_width']=self.pen_width
+            self.pen_width=max(1,min(20,self.pen_width+delta)); self.a.cfg['pen_width']=self.pen_width
         save_cfg(self.a.cfg); self.refresh_size_controls(); self.redraw()
 
     def cycle_color(self):
@@ -182,13 +196,11 @@ class Overlay:
 
     def copy_shortcut(self,event=None):
         if isinstance(self.top.focus_get(),tk.Text): return None
-        self.finish()
-        return 'break'
+        self.finish(); return 'break'
 
     def finish_shortcut(self,event=None):
         if isinstance(self.top.focus_get(),tk.Text): return None
-        self.finish()
-        return 'break'
+        self.finish(); return 'break'
 
     def clamp_point(self,x,y,to_selection=False):
         if to_selection and self.sel:
@@ -218,9 +230,16 @@ class Overlay:
 
     def hit_text(self,p):
         x,y=p
-        for item in reversed(self.c.find_overlapping(x-4,y-4,x+4,y+4)):
-            if item in self.text_items:return self.text_items[item]
+        for index in sorted(self.text_boxes.keys(),reverse=True):
+            box=self.text_boxes[index]
+            if box[0]-5<=x<=box[2]+5 and box[1]-5<=y<=box[3]+5:return index
         return None
+
+    def hover(self,e):
+        if self.text_editor_frame:return
+        if self.mode=='text' and self.hit_text(self.p(e)) is not None:self.c.config(cursor='hand2')
+        elif self.mode=='select':self.c.config(cursor='cross')
+        else:self.c.config(cursor='crosshair')
 
     def draw_dim(self):
         if not self.sel:
@@ -233,23 +252,42 @@ class Overlay:
         if not self.sel:return
         x1,y1,x2,y2=self.sel; blue='#168cff'
         self.c.create_rectangle(x1,y1,x2,y2,outline=blue,width=2,tags='selection')
-        for x,y in self.handle_points().values():
-            self.c.create_oval(x-5,y-5,x+5,y+5,fill=blue,outline='white',width=1,tags='selection')
+        for x,y in self.handle_points().values(): self.c.create_oval(x-5,y-5,x+5,y+5,fill=blue,outline='white',width=1,tags='selection')
         self.c.create_text(x1+8,max(12,y1-13),text=f'{int(x2-x1)} × {int(y2-y1)}',anchor='sw',fill='white',font=('Segoe UI',10,'bold'),tags='selection')
 
+    def canvas_font(self,style):
+        style=self.normalize_style(style); key=(style['size'],style['bold'],style['underline'])
+        if key not in self._font_cache:
+            self._font_cache[key]=tkfont.Font(family='Segoe UI',size=style['size'],weight='bold' if style['bold'] else 'normal',underline=1 if style['underline'] else 0)
+        return self._font_cache[key]
+
+    def draw_rich_text_canvas(self,index,op):
+        text=op.get('text',''); styles=op.get('styles',[]); x0,y0=op.get('pos',(0,0)); x=x0; y=y0
+        minx=x0; miny=y0; maxx=x0; maxy=y0; line_height=max(18,self.text_size+6)
+        for i,ch in enumerate(text):
+            style=self.normalize_style(styles[i] if i<len(styles) else None); font=self.canvas_font(style)
+            if ch=='\n':
+                x=x0; y+=line_height; line_height=max(18,self.text_size+6); maxy=max(maxy,y); continue
+            h=max(1,font.metrics('linespace')); line_height=max(line_height,h)
+            width=max(1,font.measure(ch))
+            if ch!=' ':
+                item=self.c.create_text(x,y,text=ch,fill=style['color'],font=font,anchor='nw',tags='ann')
+                bbox=self.c.bbox(item)
+                if bbox:
+                    minx=min(minx,bbox[0]); miny=min(miny,bbox[1]); maxx=max(maxx,bbox[2]); maxy=max(maxy,bbox[3])
+            x+=width; maxx=max(maxx,x); maxy=max(maxy,y+h)
+        self.text_boxes[index]=(minx,miny,maxx,maxy)
+        if index==self.selected_text_index:
+            self.c.create_rectangle(minx-4,miny-4,maxx+4,maxy+4,outline='#33a1ff',dash=(4,3),width=1,tags='ann')
+
     def draw_annotations(self):
-        self.text_items={}
+        self.text_boxes={}
         for index,op in enumerate(self.ops):
+            if self.is_text_op(op): self.draw_rich_text_canvas(index,op); continue
             k=op[0]
             if k=='pen': self.c.create_line(*op[1],fill=op[2],width=op[3],smooth=True,tags='ann')
             elif k=='rect': self.c.create_rectangle(*op[1],outline=op[2],width=op[3],tags='ann')
             elif k=='arrow': self.c.create_line(*op[1],fill=op[2],width=op[3],arrow='last',arrowshape=(16,20,7),tags='ann')
-            elif k=='text':
-                item=self.c.create_text(op[1][0],op[1][1],text=op[2],fill=op[3],font=('Segoe UI',op[4],'bold'),anchor='nw',tags='ann',justify='left')
-                self.text_items[item]=index
-                if index==self.selected_text_index:
-                    bbox=self.c.bbox(item)
-                    if bbox:self.c.create_rectangle(bbox[0]-4,bbox[1]-4,bbox[2]+4,bbox[3]+4,outline='#33a1ff',dash=(4,3),width=1,tags='ann')
             elif k=='mosaic': self.c.create_rectangle(*op[1],outline='#8f9ba1',fill='#8f9ba1',stipple='gray50',tags='ann')
 
     def place_toolbars(self):
@@ -261,8 +299,7 @@ class Overlay:
         tx=x2+9 if x2+9+tw<self.w-6 else max(6,x1-tw-9); ty=max(6,min(self.h-th-6,(y1+y2-th)/2))
         ax=max(6,min(self.w-aw-6,x2-aw)); ay=y2+9 if y2+9+ah<self.h-6 else max(6,y1-ah-9)
         self.c.coords(self.tool_win,tx,ty); self.c.coords(self.action_win,ax,ay)
-        self.c.itemconfigure(self.tool_win,state='normal'); self.c.itemconfigure(self.action_win,state='normal')
-        self.c.tag_raise('ui')
+        self.c.itemconfigure(self.tool_win,state='normal'); self.c.itemconfigure(self.action_win,state='normal'); self.c.tag_raise('ui')
         if self.text_editor_win:self.c.tag_raise(self.text_editor_win)
 
     def redraw(self):
@@ -270,44 +307,152 @@ class Overlay:
         self.draw_dim(); self.draw_annotations(); self.draw_selection(); self.place_toolbars()
 
     def begin_select_drag(self,p):
-        handle=self.hit_handle(p)
-        self.original_sel=tuple(self.sel) if self.sel else None
+        handle=self.hit_handle(p); self.original_sel=tuple(self.sel) if self.sel else None
         if handle:self.drag_kind='resize'; self.drag_handle=handle
         elif self.inside(p):self.drag_kind='move'
         else:self.drag_kind='new'; self.sel=(p[0],p[1],p[0],p[1]); self.ops=[]; self.selected_text_index=None
 
+    def style_tag_name(self,style):
+        s=self.normalize_style(style); color=s['color'].replace('#','')
+        return f"{self.STYLE_PREFIX}{s['size']}_{1 if s['bold'] else 0}_{1 if s['underline'] else 0}_{color}"
+
+    def style_from_tag(self,tag):
+        try:
+            body=tag[len(self.STYLE_PREFIX):]; size,bold,underline,color=body.split('_',3)
+            return self.normalize_style({'size':int(size),'bold':bold=='1','underline':underline=='1','color':'#'+color})
+        except:return self.default_text_style()
+
+    def ensure_style_tag(self,editor,style):
+        style=self.normalize_style(style); tag=self.style_tag_name(style)
+        editor.tag_configure(tag,font=('Segoe UI',style['size'],'bold' if style['bold'] else 'normal'),foreground=style['color'],underline=1 if style['underline'] else 0)
+        return tag
+
+    def editor_style_at(self,index):
+        editor=self.text_editor_widget
+        for tag in reversed(editor.tag_names(index)):
+            if tag.startswith(self.STYLE_PREFIX):return self.style_from_tag(tag)
+        return self.default_text_style()
+
+    def remove_style_tags(self,start,end):
+        editor=self.text_editor_widget
+        for tag in editor.tag_names():
+            if tag.startswith(self.STYLE_PREFIX):editor.tag_remove(tag,start,end)
+
+    def ensure_editor_styles(self):
+        editor=self.text_editor_widget
+        if not editor:return
+        text=editor.get('1.0','end-1c')
+        for offset,ch in enumerate(text):
+            if ch=='\n':continue
+            idx=editor.index(f'1.0+{offset}c')
+            if not any(t.startswith(self.STYLE_PREFIX) for t in editor.tag_names(idx)):
+                end=editor.index(f'{idx}+1c'); editor.tag_add(self.ensure_style_tag(editor,self.default_text_style()),idx,end)
+
+    def selection_indices(self):
+        editor=self.text_editor_widget
+        try:return editor.index('sel.first'),editor.index('sel.last')
+        except tk.TclError:return None
+
+    def selected_offsets(self):
+        pair=self.selection_indices()
+        if not pair:return None
+        editor=self.text_editor_widget
+        start=int(editor.count('1.0',pair[0],'chars')[0]); end=int(editor.count('1.0',pair[1],'chars')[0])
+        return start,end
+
+    def update_format_bar(self,event=None):
+        if not self.text_format_bar:return
+        self.ensure_editor_styles()
+        sel=self.selection_indices()
+        if not sel:
+            self.text_format_bar.pack_forget(); return
+        self.text_format_bar.pack(fill='x',before=self.text_editor_actions,pady=(0,6))
+        style=self.editor_style_at(sel[0])
+        if self.text_format_size_label:self.text_format_size_label.config(text=str(style['size']))
+
+    def apply_selection_transform(self,transform):
+        editor=self.text_editor_widget; offsets=self.selected_offsets()
+        if not editor or not offsets:return
+        self.ensure_editor_styles(); start_off,end_off=offsets; text=editor.get('1.0','end-1c')
+        for offset in range(start_off,min(end_off,len(text))):
+            if text[offset]=='\n':continue
+            idx=editor.index(f'1.0+{offset}c'); nxt=editor.index(f'{idx}+1c')
+            style=transform(dict(self.editor_style_at(idx)))
+            self.remove_style_tags(idx,nxt); editor.tag_add(self.ensure_style_tag(editor,style),idx,nxt)
+        editor.tag_add('sel',editor.index(f'1.0+{start_off}c'),editor.index(f'1.0+{end_off}c')); self.update_format_bar()
+
+    def format_size(self,delta):
+        def change(style): style['size']=max(10,min(96,int(style.get('size',self.text_size))+delta*2)); return style
+        self.apply_selection_transform(change)
+
+    def format_toggle(self,key):
+        offsets=self.selected_offsets()
+        if not offsets:return
+        start,end=offsets; text=self.text_editor_widget.get('1.0','end-1c'); states=[]
+        for offset in range(start,min(end,len(text))):
+            if text[offset]=='\n':continue
+            idx=self.text_editor_widget.index(f'1.0+{offset}c'); states.append(bool(self.editor_style_at(idx).get(key,False)))
+        target=not (states and all(states))
+        self.apply_selection_transform(lambda style:{**style,key:target})
+
+    def format_color(self,color): self.apply_selection_transform(lambda style:{**style,'color':color})
+
+    def build_format_bar(self,parent):
+        bar=tk.Frame(parent,bg='#28343a',padx=5,pady=4)
+        tk.Label(bar,text='Đang chọn:',bg='#28343a',fg='#cfd8dc',font=('Segoe UI',8)).pack(side='left',padx=(0,4))
+        tk.Button(bar,text='A−',command=lambda:self.format_size(-1),bg='#344148',fg='#fff',relief='flat',bd=0,padx=6).pack(side='left',padx=1)
+        self.text_format_size_label=tk.Label(bar,text=str(self.text_size),width=3,bg='#28343a',fg='#fff',font=('Segoe UI',9,'bold')); self.text_format_size_label.pack(side='left')
+        tk.Button(bar,text='A+',command=lambda:self.format_size(1),bg='#344148',fg='#fff',relief='flat',bd=0,padx=6).pack(side='left',padx=1)
+        tk.Button(bar,text='B',command=lambda:self.format_toggle('bold'),bg='#344148',fg='#fff',relief='flat',bd=0,padx=8,font=('Segoe UI',9,'bold')).pack(side='left',padx=(5,1))
+        tk.Button(bar,text='U',command=lambda:self.format_toggle('underline'),bg='#344148',fg='#fff',relief='flat',bd=0,padx=8,font=('Segoe UI',9,'underline')).pack(side='left',padx=1)
+        for color in self.COLORS:
+            tk.Button(bar,text=' ',command=lambda c=color:self.format_color(c),bg=color,activebackground=color,width=1,relief='flat',bd=1).pack(side='left',padx=1)
+        return bar
+
     def open_text_editor(self,pos,edit_index=None):
-        self.cancel_text_editor()
-        self.text_editor_index=edit_index; self.text_editor_pos=pos
-        existing=''
-        if edit_index is not None and 0<=edit_index<len(self.ops): existing=self.ops[edit_index][2]
+        self.cancel_text_editor(); self.text_editor_index=edit_index; self.text_editor_pos=pos
+        op=self.ops[edit_index] if edit_index is not None and 0<=edit_index<len(self.ops) and self.is_text_op(self.ops[edit_index]) else None
+        existing=op.get('text','') if op else ''
+        styles=op.get('styles',[]) if op else []
         frame=tk.Frame(self.top,bg='#1f282d',padx=8,pady=8,bd=0)
-        tk.Label(frame,text='Nhập chữ · Enter để xuống dòng',bg='#1f282d',fg='#e8eef1',font=('Segoe UI',9,'bold')).pack(anchor='w')
-        editor=tk.Text(frame,width=32,height=5,wrap='word',undo=True,font=('Segoe UI',max(10,int(self.text_size*.55))))
+        tk.Label(frame,text='Nhập chữ · Enter xuống dòng · Ctrl+Enter xác nhận',bg='#1f282d',fg='#e8eef1',font=('Segoe UI',9,'bold')).pack(anchor='w')
+        editor=tk.Text(frame,width=38,height=6,wrap='word',undo=True,font=('Segoe UI',self.text_size),bg='#fff',fg='#111',insertbackground='#111',selectbackground='#2f89ff',selectforeground='#fff')
         editor.pack(fill='both',expand=True,pady=(6,6)); editor.insert('1.0',existing)
-        actions=tk.Frame(frame,bg='#1f282d'); actions.pack(fill='x')
-        tk.Button(actions,text='Hủy',command=self.cancel_text_editor,bg='#344148',fg='#fff',relief='flat',bd=0,padx=10,pady=4).pack(side='left')
-        tk.Button(actions,text='Xong (Ctrl+Enter)',command=self.commit_text_editor,bg='#2e8b67',fg='#fff',relief='flat',bd=0,padx=10,pady=4).pack(side='right')
-        x,y=pos; ew,eh=330,150
-        if self.sel:
-            sx1,sy1,sx2,sy2=self.sel; x=max(sx1,min(sx2-ew,x)); y=max(sy1,min(sy2-eh,y))
-        x=max(6,min(self.w-ew-6,x)); y=max(6,min(self.h-eh-6,y))
         self.text_editor_frame=frame; self.text_editor_widget=editor
+        for i,ch in enumerate(existing):
+            if ch=='\n':continue
+            style=styles[i] if i<len(styles) else self.default_text_style()
+            a=editor.index(f'1.0+{i}c'); b=editor.index(f'{a}+1c'); editor.tag_add(self.ensure_style_tag(editor,style),a,b)
+        self.text_format_bar=self.build_format_bar(frame)
+        self.text_editor_actions=tk.Frame(frame,bg='#1f282d'); self.text_editor_actions.pack(fill='x')
+        tk.Button(self.text_editor_actions,text='Hủy',command=self.cancel_text_editor,bg='#344148',fg='#fff',relief='flat',bd=0,padx=10,pady=4).pack(side='left')
+        tk.Button(self.text_editor_actions,text='Xong (Ctrl+Enter)',command=self.commit_text_editor,bg='#2e8b67',fg='#fff',relief='flat',bd=0,padx=10,pady=4).pack(side='right')
+        x,y=pos; ew,eh=430,210
+        if self.sel:
+            sx1,sy1,sx2,sy2=self.sel; x=max(sx1,min(max(sx1,sx2-ew),x)); y=max(sy1,min(max(sy1,sy2-eh),y))
+        x=max(6,min(self.w-ew-6,x)); y=max(6,min(self.h-eh-6,y))
         self.text_editor_win=self.c.create_window(x,y,window=frame,anchor='nw',tags='ui')
         editor.bind('<Control-Return>',lambda e:(self.commit_text_editor(),'break')[1])
         editor.bind('<Escape>',lambda e:(self.cancel_text_editor(),'break')[1])
-        editor.focus_set(); editor.mark_set('insert','end-1c')
-        self.c.tag_raise(self.text_editor_win)
+        editor.bind('<KeyRelease>',self.update_format_bar); editor.bind('<ButtonRelease-1>',self.update_format_bar); editor.bind('<<Selection>>',self.update_format_bar)
+        editor.focus_set(); editor.mark_set('insert','end-1c'); self.ensure_editor_styles(); self.update_format_bar(); self.c.tag_raise(self.text_editor_win)
+
+    def collect_editor_styles(self,text):
+        editor=self.text_editor_widget; result=[]
+        for i,ch in enumerate(text):
+            if ch=='\n': result.append(self.default_text_style()); continue
+            idx=editor.index(f'1.0+{i}c'); result.append(self.normalize_style(self.editor_style_at(idx)))
+        return result
 
     def commit_text_editor(self):
         if not self.text_editor_frame:return
-        text=self.text_editor_widget.get('1.0','end-1c')
+        self.ensure_editor_styles(); text=self.text_editor_widget.get('1.0','end-1c'); styles=self.collect_editor_styles(text)
         index=self.text_editor_index; pos=self.text_editor_pos
         if text.strip():
-            if index is not None and 0<=index<len(self.ops):
-                old=self.ops[index]; self.ops[index]=('text',old[1],text,old[3],old[4]); self.selected_text_index=index
+            if index is not None and 0<=index<len(self.ops) and self.is_text_op(self.ops[index]):
+                old=self.ops[index]; self.ops[index]=self.make_text_op(old.get('pos',pos),text,styles); self.selected_text_index=index
             else:
-                self.ops.append(('text',pos,text,self.color,self.text_size)); self.selected_text_index=len(self.ops)-1
+                self.ops.append(self.make_text_op(pos,text,styles)); self.selected_text_index=len(self.ops)-1
         self.destroy_text_editor(); self.redraw()
 
     def cancel_text_editor(self):
@@ -321,15 +466,15 @@ class Overlay:
             if self.text_editor_frame:self.text_editor_frame.destroy()
         except:pass
         self.text_editor_frame=None; self.text_editor_win=None; self.text_editor_widget=None; self.text_editor_index=None; self.text_editor_pos=None
+        self.text_format_bar=None; self.text_format_size_label=None; self.text_editor_actions=None
         try:self.top.focus_force()
         except:pass
 
     def double_click(self,e):
         if self.mode!='text' or not self.sel:return
         idx=self.hit_text(self.p(e))
-        if idx is not None:
-            self.selected_text_index=idx; self.open_text_editor(self.ops[idx][1],idx)
-            return 'break'
+        if idx is not None and self.is_text_op(self.ops[idx]):
+            self.selected_text_index=idx; self.open_text_editor(self.ops[idx]['pos'],idx); return 'break'
 
     def down(self,e):
         if e.widget is not self.c:return
@@ -340,8 +485,8 @@ class Overlay:
         if not self.sel:return
         if self.mode=='text':
             idx=self.hit_text(raw)
-            if idx is not None:
-                self.selected_text_index=idx; self.start=raw; self.drag_kind='textmove'; self.original_text_pos=self.ops[idx][1]; self.redraw(); return
+            if idx is not None and self.is_text_op(self.ops[idx]):
+                self.selected_text_index=idx; self.start=raw; self.drag_kind='textmove'; self.original_text_pos=self.ops[idx]['pos']; self.c.config(cursor='hand2'); self.redraw(); return
             self.selected_text_index=None; self.open_text_editor(self.p(e,True)); self.start=None; return
         self.selected_text_index=None; self.start=self.p(e,True); self.drag_kind='draw'; self.clear_live()
         if self.mode=='pen':self.points=[*self.start]
@@ -370,10 +515,9 @@ class Overlay:
 
     def move_text(self,p):
         idx=self.selected_text_index
-        if idx is None or self.original_text_pos is None or not self.start:return
-        dx=p[0]-self.start[0]; dy=p[1]-self.start[1]
-        ox,oy=self.original_text_pos; nx,ny=self.clamp_point(ox+dx,oy+dy,True)
-        op=self.ops[idx]; self.ops[idx]=('text',(nx,ny),op[2],op[3],op[4])
+        if idx is None or self.original_text_pos is None or not self.start or not self.is_text_op(self.ops[idx]):return
+        dx=p[0]-self.start[0]; dy=p[1]-self.start[1]; ox,oy=self.original_text_pos; nx,ny=self.clamp_point(ox+dx,oy+dy,True)
+        self.ops[idx]['pos']=(nx,ny)
 
     def move(self,e):
         if not self.start:return
@@ -384,7 +528,7 @@ class Overlay:
             elif self.drag_kind=='resize':self.resize_selection(p)
             self.redraw(); return
         if self.mode=='text' and self.drag_kind=='textmove':
-            self.move_text(self.p(e,True)); self.redraw(); return
+            self.move_text(self.p(e,True)); self.c.config(cursor='hand2'); self.redraw(); return
         q=self.p(e,True); x,y=self.start; self.clear_live()
         if self.mode=='pen':
             self.points.extend(q); self.live=[self.c.create_line(*self.points,fill=self.color,width=self.pen_width,smooth=True,tags='live')]
@@ -415,11 +559,36 @@ class Overlay:
         elif self.sel:self.sel=None
         self.redraw()
 
+    def pil_font(self,style):
+        from PIL import ImageFont
+        style=self.normalize_style(style); names=['arialbd.ttf','segoeuib.ttf','DejaVuSans-Bold.ttf'] if style['bold'] else ['arial.ttf','segoeui.ttf','DejaVuSans.ttf']
+        for name in names:
+            try:return ImageFont.truetype(name,style['size'])
+            except:pass
+        return ImageFont.load_default()
+
+    def draw_rich_text_pil(self,d,op,x1,y1):
+        text=op.get('text',''); styles=op.get('styles',[]); base_x=op.get('pos',(0,0))[0]-x1; x=base_x; y=op.get('pos',(0,0))[1]-y1; line_height=max(18,self.text_size+6)
+        for i,ch in enumerate(text):
+            style=self.normalize_style(styles[i] if i<len(styles) else None); font=self.pil_font(style)
+            if ch=='\n':
+                x=base_x; y+=line_height; line_height=max(18,self.text_size+6); continue
+            try:
+                bbox=d.textbbox((0,0),ch,font=font,stroke_width=1); width=max(1,bbox[2]-bbox[0]); height=max(1,bbox[3]-bbox[1])
+            except:
+                width=max(1,int(style['size']*.6)); height=max(1,style['size'])
+            line_height=max(line_height,height+5)
+            d.text((x,y),ch,fill=style['color'],font=font,stroke_width=1,stroke_fill='#000000')
+            if style['underline'] and ch!=' ':
+                uy=y+height+2; d.line((x,uy,x+width,uy),fill=style['color'],width=max(1,style['size']//14))
+            x+=width
+
     def render_output(self):
         if not self.sel:raise ValueError('Hãy kéo chọn vùng cần chụp.')
-        from PIL import ImageDraw, ImageFont
+        from PIL import ImageDraw
         x1,y1,x2,y2=map(int,self.sel); out=self.img.crop((x1,y1,x2,y2)); d=ImageDraw.Draw(out)
         for op in self.ops:
+            if self.is_text_op(op): self.draw_rich_text_pil(d,op,x1,y1); continue
             k=op[0]
             if k=='pen':
                 pts=[(op[1][i]-x1,op[1][i+1]-y1) for i in range(0,len(op[1]),2)]; d.line(pts,fill=op[2],width=op[3],joint='curve')
@@ -427,10 +596,6 @@ class Overlay:
             elif k=='arrow':
                 ax,ay,bx,by=op[1]; ax-=x1; ay-=y1; bx-=x1; by-=y1; d.line((ax,ay,bx,by),fill=op[2],width=op[3]); ang=math.atan2(by-ay,bx-ax); L=16+op[3]*2
                 d.polygon([(bx,by),(bx-L*math.cos(ang-.5),by-L*math.sin(ang-.5)),(bx-L*math.cos(ang+.5),by-L*math.sin(ang+.5))],fill=op[2])
-            elif k=='text':
-                try:font=ImageFont.truetype('arial.ttf',op[4])
-                except:font=ImageFont.load_default()
-                d.multiline_text((op[1][0]-x1,op[1][1]-y1),op[2],fill=op[3],font=font,spacing=max(2,int(op[4]*.18)),stroke_width=1,stroke_fill='#000000')
             elif k=='mosaic':
                 a,b,c,e=op[1]; box=(max(0,int(a-x1)),max(0,int(b-y1)),min(out.width,int(c-x1)),min(out.height,int(e-y1)))
                 if box[2]>box[0] and box[3]>box[1]:
@@ -447,8 +612,7 @@ class Overlay:
         if self.text_editor_frame:self.commit_text_editor()
         try:out=self.render_output()
         except ValueError as error:messagebox.showinfo('Kanban Capture',str(error),parent=self.top); return
-        ext='.png' if self.a.cfg['format']=='png' else '.jpg'
-        name=datetime.now().strftime('Screenshot_%Y-%m-%d_%H-%M-%S')+ext
+        ext='.png' if self.a.cfg['format']=='png' else '.jpg'; name=datetime.now().strftime('Screenshot_%Y-%m-%d_%H-%M-%S')+ext
         path=filedialog.asksaveasfilename(parent=self.top,title='Lưu ảnh chụp',initialfile=name,defaultextension=ext,filetypes=[('PNG','*.png'),('JPEG','*.jpg;*.jpeg')])
         if not path:return
         if str(path).lower().endswith('.png'):out.save(path,'PNG')
