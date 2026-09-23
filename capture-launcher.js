@@ -66,8 +66,22 @@
     panel.hidden=false;
   }
 
+  function protocolFallback(action){
+    return new Promise(resolve=>{
+      let settled=false;
+      const done=value=>{if(settled)return;settled=true;window.removeEventListener('blur',onBlur,true);clearTimeout(timer);resolve(value)};
+      const onBlur=()=>done(true);
+      window.addEventListener('blur',onBlur,true);
+      const iframe=document.createElement('iframe');
+      iframe.hidden=true; iframe.src=`kanbancapture://${action}`; document.body.appendChild(iframe);
+      setTimeout(()=>iframe.remove(),1600);
+      const timer=setTimeout(()=>done(false),900);
+    });
+  }
+
   async function invoke(action){
     if(await request(action,1800))return;
+    if(await protocolFallback(action)){setReady(true);return}
     showSetup();
   }
 
