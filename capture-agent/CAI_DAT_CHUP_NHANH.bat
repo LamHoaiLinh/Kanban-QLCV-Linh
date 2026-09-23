@@ -1,44 +1,70 @@
 @echo off
-setlocal EnableExtensions
+setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
 title Kanban Capture Agent - Cai dat / cap nhat
 
 set "APPDIR=%LOCALAPPDATA%\KanbanCapture"
 set "EXE=%APPDIR%\KanbanCapture.exe"
-set "TMP=%TEMP%\KanbanCapture_download.exe"
-set "SHA=%TEMP%\KanbanCapture_download.sha256"
+set "TOKEN=%RANDOM%%RANDOM%%RANDOM%"
+set "PKG=%APPDIR%\KanbanCapture_package_%TOKEN%.zip"
+set "SHA=%APPDIR%\KanbanCapture_package_%TOKEN%.sha256"
+set "STAGE=%APPDIR%\install_%TOKEN%"
 set "BASE=https://raw.githubusercontent.com/LamHoaiLinh/Kanban-QLCV-Linh/main/capture-agent/bin"
 
 echo ==========================================
-echo   KANBAN CAPTURE AGENT v3 - CAI / CAP NHAT
+echo   KANBAN CAPTURE AGENT v4 - CAI / CAP NHAT
 echo ==========================================
 echo.
 echo Ban khong can cai Python.
-echo Bo cai se tai ban KanbanCapture.exe da dong goi san ve may.
+echo Bo cai tai goi ZIP da dong goi san, kiem tra SHA256 roi moi giai nen.
 echo.
 
-echo [1/5] Dung Agent cu neu dang chay...
+echo [1/6] Dung Agent cu neu dang chay...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:47631/quit' -TimeoutSec 1 | Out-Null } catch {}" >nul 2>nul
 timeout /t 1 /nobreak >nul
 taskkill /IM KanbanCapture.exe /F >nul 2>nul
 
-echo [2/5] Tai Kanban Capture Agent...
+echo [2/6] Chuan bi thu muc cai dat...
 if not exist "%APPDIR%" mkdir "%APPDIR%"
-del /q "%TMP%" "%SHA%" >nul 2>nul
+if exist "%STAGE%" rmdir /s /q "%STAGE%" >nul 2>nul
+mkdir "%STAGE%" >nul 2>nul
+del /q "%PKG%" "%SHA%" >nul 2>nul
+
+echo [3/6] Tai goi Kanban Capture...
+where curl.exe >nul 2>nul
+if not errorlevel 1 (
+  curl.exe -L --fail --silent --show-error --retry 2 -o "%PKG%" "%BASE%/KanbanCapture-package.zip?ts=%TOKEN%"
+  if errorlevel 1 goto :try_powershell
+  curl.exe -L --fail --silent --show-error --retry 2 -o "%SHA%" "%BASE%/KanbanCapture-package.sha256?ts=%TOKEN%"
+  if errorlevel 1 goto :try_powershell
+  goto :verify
+)
+
+:try_powershell
+echo Dang thu cach tai du phong...
+del /q "%PKG%" "%SHA%" >nul 2>nul
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue';" ^
-  "Invoke-WebRequest -UseBasicParsing -Uri '%BASE%/KanbanCapture.exe?ts=%RANDOM%%RANDOM%' -OutFile '%TMP%';" ^
-  "Invoke-WebRequest -UseBasicParsing -Uri '%BASE%/KanbanCapture.sha256?ts=%RANDOM%%RANDOM%' -OutFile '%SHA%';" ^
-  "$expected=(Get-Content -Raw '%SHA%').Trim().ToLowerInvariant();" ^
-  "$actual=(Get-FileHash -Algorithm SHA256 '%TMP%').Hash.ToLowerInvariant();" ^
-  "if($expected -ne $actual){throw 'SHA256 khong khop';}" ^
-  "if((Get-Item '%TMP%').Length -lt 1000000){throw 'File Agent tai ve khong hop le';}"
+  "Invoke-WebRequest -UseBasicParsing -Uri '%BASE%/KanbanCapture-package.zip?ts=%TOKEN%' -OutFile '%PKG%';" ^
+  "Invoke-WebRequest -UseBasicParsing -Uri '%BASE%/KanbanCapture-package.sha256?ts=%TOKEN%' -OutFile '%SHA%';"
 if errorlevel 1 goto :download_fail
 
-move /y "%TMP%" "%EXE%" >nul
-if errorlevel 1 goto :fail
+:verify
+echo [4/6] Kiem tra SHA256 va giai nen...
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$ErrorActionPreference='Stop';" ^
+  "$expected=(Get-Content -Raw '%SHA%').Trim().ToLowerInvariant();" ^
+  "$actual=(Get-FileHash -Algorithm SHA256 '%PKG%').Hash.ToLowerInvariant();" ^
+  "if($expected -ne $actual){throw 'SHA256 khong khop';}" ^
+  "if((Get-Item '%PKG%').Length -lt 1000000){throw 'Goi cai dat tai ve khong hop le';}" ^
+  "Expand-Archive -LiteralPath '%PKG%' -DestinationPath '%STAGE%' -Force;" ^
+  "$built=Join-Path '%STAGE%' 'KanbanCapture.exe';" ^
+  "if(-not (Test-Path -LiteralPath $built)){throw 'Khong tim thay KanbanCapture.exe trong goi ZIP';}" ^
+  "Copy-Item -LiteralPath $built -Destination '%EXE%' -Force;"
+if errorlevel 1 goto :extract_fail
+if not exist "%EXE%" goto :extract_fail
 
-echo [3/5] Dang ky nut CHUP va khoi dong cung Windows...
+echo [5/6] Dang ky nut CHUP va khoi dong cung Windows...
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$ErrorActionPreference='Stop';" ^
   "$exe='%EXE%';" ^
@@ -52,13 +78,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "New-ItemProperty -Path $run -Name 'KanbanCapture' -Value ('"'+$exe+'" --background') -PropertyType String -Force | Out-Null;"
 if errorlevel 1 goto :fail
 
-echo [4/5] Khoi dong Agent...
 start "" "%EXE%" --background
 
-echo [5/5] Kiem tra Agent...
+echo [6/6] Kiem tra Agent...
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$ok=$false; for($i=0;$i -lt 30;$i++){ try { $r=Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:47631/ping' -TimeoutSec 1; if($r.StatusCode -eq 200){$ok=$true;break} } catch {}; Start-Sleep -Milliseconds 200 }; if(-not $ok){exit 1}"
+  "$ok=$false; for($i=0;$i -lt 35;$i++){ try { $r=Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:47631/ping' -TimeoutSec 1; if($r.StatusCode -eq 200){$ok=$true;break} } catch {}; Start-Sleep -Milliseconds 200 }; if(-not $ok){exit 1}"
 if errorlevel 1 goto :start_fail
+
+rmdir /s /q "%STAGE%" >nul 2>nul
+del /q "%PKG%" "%SHA%" >nul 2>nul
 
 echo.
 echo ==========================================
@@ -71,36 +99,43 @@ echo   - Chuot phai nut CHUP: mo cai dat JPG/PNG.
 echo   - Ctrl + C trong khung chup: Copy/Xong.
 echo   - Ctrl + V: dan vao Zalo/Messenger/Word hoac dan thanh file trong Explorer/Desktop.
 echo.
-echo Luu y: neu Windows SmartScreen hien canh bao lan dau, ban co the chon
-echo "More info" ^> "Run anyway" neu file duoc tai tu repo Kanban cua ban.
-echo.
 pause
 exit /b 0
 
 :download_fail
 echo.
-echo KHONG TAI DUOC KANBAN CAPTURE AGENT.
-echo Ban khong can cai Python. Loi nay thuong do file EXE tren GitHub chua san sang,
-echo mang dang chan raw.githubusercontent.com, hoac Windows Security chan tai file.
-echo Hay doi vai phut, tai lai bo cai moi nhat va chay lai.
+echo KHONG TAI DUOC GOI KANBAN CAPTURE.
+echo Bo cai v4 khong tai truc tiep file EXE nua; no tai file ZIP ten ngau nhien de tranh
+echo loi Access denied tai thu muc Temp. Neu van loi, thuong la do mang/Windows Security
+echo chan ket noi raw.githubusercontent.com.
 echo.
-pause
-exit /b 1
+goto :cleanup_fail
+
+:extract_fail
+echo.
+echo TAI GOI THANH CONG NHUNG KHONG GIAI NEN/CHEP DUOC AGENT.
+echo Windows Security co the dang cach ly KanbanCapture.exe sau khi giai nen.
+echo Ban hay mo Windows Security ^> Protection history de xem co muc bi chan hay khong.
+echo.
+goto :cleanup_fail
 
 :start_fail
 echo.
 echo DA CAI FILE NHUNG AGENT CHUA KHOI DONG DUOC.
-echo Ban hay kiem tra Windows Security / SmartScreen, sau do chay lai bo cai.
+echo Ban hay kiem tra Windows Security / SmartScreen va chay lai bo cai.
 echo File Agent nam tai:
 echo   %EXE%
 echo.
-pause
-exit /b 1
+goto :cleanup_fail
 
 :fail
 echo.
 echo CAI DAT / CAP NHAT THAT BAI.
 echo Ban hay chup lai noi dung loi trong cua so nay de kiem tra.
 echo.
+
+:cleanup_fail
+rmdir /s /q "%STAGE%" >nul 2>nul
+del /q "%PKG%" "%SHA%" >nul 2>nul
 pause
 exit /b 1
