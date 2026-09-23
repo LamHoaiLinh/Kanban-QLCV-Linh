@@ -20,6 +20,12 @@ def config():
 
 def save_cfg(c): DIR.mkdir(parents=True,exist_ok=True); CFG.write_text(json.dumps(c,ensure_ascii=False,indent=2),encoding='utf-8')
 
+def enable_dpi_awareness():
+    try: ctypes.windll.shcore.SetProcessDpiAwareness(2)
+    except Exception:
+        try: ctypes.windll.user32.SetProcessDPIAware()
+        except Exception: pass
+
 def install():
     import winreg
     DIR.mkdir(parents=True,exist_ok=True); target=DIR/'capture_agent.py'; src=Path(__file__).resolve()
@@ -50,8 +56,14 @@ def send(cmd):
 def hglobal(fmt,data):
     k=ctypes.windll.kernel32; u=ctypes.windll.user32
     k.GlobalAlloc.argtypes=[wintypes.UINT,ctypes.c_size_t]; k.GlobalAlloc.restype=wintypes.HGLOBAL
-    k.GlobalLock.argtypes=[wintypes.HGLOBAL]; k.GlobalLock.restype=ctypes.c_void_p; u.SetClipboardData.argtypes=[wintypes.UINT,wintypes.HANDLE]
-    h=k.GlobalAlloc(0x42,len(data)); p=k.GlobalLock(h); ctypes.memmove(p,data,len(data)); k.GlobalUnlock(h)
+    k.GlobalLock.argtypes=[wintypes.HGLOBAL]; k.GlobalLock.restype=ctypes.c_void_p
+    k.GlobalUnlock.argtypes=[wintypes.HGLOBAL]; k.GlobalFree.argtypes=[wintypes.HGLOBAL]
+    u.SetClipboardData.argtypes=[wintypes.UINT,wintypes.HANDLE]; u.SetClipboardData.restype=wintypes.HANDLE
+    h=k.GlobalAlloc(0x42,len(data))
+    if not h: raise OSError('Không cấp phát được Clipboard')
+    p=k.GlobalLock(h)
+    if not p: k.GlobalFree(h); raise OSError('Không khóa được Clipboard')
+    ctypes.memmove(p,data,len(data)); k.GlobalUnlock(h)
     if not u.SetClipboardData(fmt,h): k.GlobalFree(h); raise OSError('Không ghi được Clipboard')
 
 def clipboard(image,path):
@@ -59,7 +71,7 @@ def clipboard(image,path):
     if not u.OpenClipboard(None): raise OSError('Không mở được Clipboard')
     try:
         u.EmptyClipboard(); b=io.BytesIO(); image.convert('RGB').save(b,'BMP'); hglobal(8,b.getvalue()[14:])
-        p=io.BytesIO(); image.save(p,'PNG'); hglobal(u.RegisterClipboardFormatW('PNG'),p.getvalue())
+        p=io.BytesIO(); image.save(p,'PNG'); u.RegisterClipboardFormatW.argtypes=[wintypes.LPCWSTR]; u.RegisterClipboardFormatW.restype=wintypes.UINT; hglobal(u.RegisterClipboardFormatW('PNG'),p.getvalue())
         hglobal(15,struct.pack('<IiiII',20,0,0,0,1)+(str(path)+'\0\0').encode('utf-16le'))
     finally:u.CloseClipboard()
 
@@ -77,7 +89,9 @@ class Overlay:
         from PIL import ImageTk
         self.a=agent; self.img=img; self.x0=x0; self.y0=y0; self.w,self.h=img.size; self.sel=None; self.start=None; self.mode='select'; self.color=self.COLORS[0]; self.ops=[]; self.live=[]
         self.top=tk.Toplevel(agent.root); self.top.overrideredirect(True); self.top.attributes('-topmost',True); self.top.configure(bg='black'); self.top.geometry(f'{self.w}x{self.h}+0+0'); self.top.update_idletasks()
-        u=ctypes.windll.user32; u.SetWindowPos(self.top.winfo_id(),-1,x0,y0,self.w,self.h,0x40)
+        u=ctypes.windll.user32
+        u.SetWindowPos.argtypes=[wintypes.HWND,wintypes.HWND,ctypes.c_int,ctypes.c_int,ctypes.c_int,ctypes.c_int,wintypes.UINT]; u.SetWindowPos.restype=wintypes.BOOL
+        u.SetWindowPos(self.top.winfo_id(),wintypes.HWND(-1),x0,y0,self.w,self.h,0x40)
         self.photo=ImageTk.PhotoImage(img); self.c=tk.Canvas(self.top,width=self.w,height=self.h,highlightthickness=0,cursor='crosshair'); self.c.pack(fill='both',expand=True); self.c.create_image(0,0,image=self.photo,anchor='nw')
         self.c.bind('<ButtonPress-1>',self.down); self.c.bind('<B1-Motion>',self.move); self.c.bind('<ButtonRelease-1>',self.up); self.top.bind('<Escape>',lambda e:self.close()); self.top.focus_force()
         self.bar=tk.Frame(self.top,bg='#18251f',padx=6,pady=5); self.win=self.c.create_window(18,18,window=self.bar,anchor='nw'); self.buttons={}
@@ -118,15 +132,16 @@ class Overlay:
     def up(self,e):
         if not self.start:return
         q=self.p(e); x,y=self.start; self.clear_live()
+        if self.mode=='text':
+            t=simpledialog.askstring('Chữ','Nhập nội dung:',parent=self.top)
+            if t:self.ops.append(('text',(x,y),t,self.color,self.a.cfg['text_size']))
+            self.start=None; self.redraw(); return
         if abs(q[0]-x)<3 or abs(q[1]-y)<3:self.start=None;return
         if self.mode=='select': self.sel=(min(x,q[0]),min(y,q[1]),max(x,q[0]),max(y,q[1])); self.ops=[]
         elif self.mode=='pen': self.ops.append(('pen',tuple(self.points),self.color,self.a.cfg['pen_width']))
         elif self.mode=='rect':self.ops.append(('rect',(x,y,*q),self.color,self.a.cfg['pen_width']))
         elif self.mode=='arrow':self.ops.append(('arrow',(x,y,*q),self.color,self.a.cfg['pen_width']))
         elif self.mode=='mosaic':self.ops.append(('mosaic',(min(x,q[0]),min(y,q[1]),max(x,q[0]),max(y,q[1]))))
-        elif self.mode=='text':
-            t=simpledialog.askstring('Chữ','Nhập nội dung:',parent=self.top)
-            if t:self.ops.append(('text',(x,y),t,self.color,self.a.cfg['text_size']))
         self.start=None; self.redraw()
     def undo(self):
         if self.ops:self.ops.pop()
@@ -209,6 +224,7 @@ class Agent:
 def main():
     if os.name!='nt':raise RuntimeError('Kanban Capture Agent chỉ hỗ trợ Windows.')
     if '--install' in sys.argv:return install()
+    enable_dpi_awareness()
     cmd=command(sys.argv[1:])
     if cmd and send(cmd):return 0
     if not cmd and send('ping'):return 0
