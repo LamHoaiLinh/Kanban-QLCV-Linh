@@ -31,23 +31,26 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install Pillow pyinstaller
 
-      - name: Build standalone EXE
+      - name: Build standalone EXE and ZIP package
         shell: pwsh
         run: |
           pyinstaller --noconfirm --clean --onefile --windowed --name KanbanCapture capture-agent/capture_agent.py
           New-Item -ItemType Directory -Force -Path capture-agent/bin | Out-Null
           Copy-Item dist/KanbanCapture.exe capture-agent/bin/KanbanCapture.exe -Force
           (Get-FileHash capture-agent/bin/KanbanCapture.exe -Algorithm SHA256).Hash.ToLowerInvariant() | Set-Content -NoNewline capture-agent/bin/KanbanCapture.sha256
+          Remove-Item capture-agent/bin/KanbanCapture-package.zip -Force -ErrorAction SilentlyContinue
+          Compress-Archive -LiteralPath capture-agent/bin/KanbanCapture.exe -DestinationPath capture-agent/bin/KanbanCapture-package.zip -CompressionLevel Optimal
+          (Get-FileHash capture-agent/bin/KanbanCapture-package.zip -Algorithm SHA256).Hash.ToLowerInvariant() | Set-Content -NoNewline capture-agent/bin/KanbanCapture-package.sha256
 
       - name: Commit compiled agent
         shell: pwsh
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add capture-agent/bin/KanbanCapture.exe capture-agent/bin/KanbanCapture.sha256
+          git add capture-agent/bin/KanbanCapture.exe capture-agent/bin/KanbanCapture.sha256 capture-agent/bin/KanbanCapture-package.zip capture-agent/bin/KanbanCapture-package.sha256
           if (git diff --cached --quiet) {
             Write-Host "Compiled agent is unchanged."
             exit 0
           }
-          git commit -m "Build Kanban Capture standalone EXE"
+          git commit -m "Build Kanban Capture standalone package"
           git push origin HEAD:main
