@@ -1,25 +1,40 @@
-KANBAN CAPTURE AGENT
-====================
-Mục đích: bổ sung chụp màn hình toàn Windows cho bản Kanban chạy trên GitHub Pages.
-Lý do cần Agent: trình duyệt web không thể đăng ký phím nóng toàn hệ thống hoặc đưa một file ảnh thật (CF_HDROP) vào Clipboard để Ctrl+V trong Windows Explorer tạo file.
+KANBAN CAPTURE AGENT v2
+=======================
+Mục đích: chụp màn hình nhanh toàn Windows cho Kanban chạy trên GitHub Pages.
 
-Cài một lần
-1. Mở thư mục capture-agent.
-2. Chạy CAI_DAT_CHUP_NHANH.bat.
-3. Agent tự chạy nền và tự khởi động cùng Windows.
+Vì sao cần Agent
+- Trang web không thể tự đăng ký Alt+C cho toàn Windows.
+- Trang web cũng không thể tự tạo một file ảnh thật trong Clipboard để Ctrl+V vào Windows Explorer.
+- Agent chạy cục bộ trên 127.0.0.1:47631; ảnh không tải lên máy chủ.
+
+Cài / cập nhật một lần
+1. Pull bản mới từ GitHub.
+2. Mở thư mục capture-agent.
+3. Chạy CAI_DAT_CHUP_NHANH.bat.
+4. Nếu đã từng cài bản cũ, vẫn chạy lại file BAT này. Bản v2 sẽ dừng Agent cũ, chép bản mới và khởi động lại.
+5. Cuối quá trình phải thấy thông báo Agent đã được cài và khởi động.
 
 Sử dụng
-- Alt + C ở bất kỳ cửa sổ nào: chụp nhanh.
-- Kéo chọn vùng cần chụp.
-- Công cụ: Chọn, Bút, Khung, Mũi tên, Chữ, Mosaic, Hoàn tác, màu vẽ, Hủy, Xong.
-- Sau khi Xong: ảnh đồng thời nằm trong Clipboard dạng ảnh và dạng file.
-- Ctrl + V trong Word/Zalo/ứng dụng hỗ trợ ảnh: dán hình.
-- Ctrl + V trong Desktop/Windows Explorer: tạo file JPG/PNG ngay, không cần Paint.
-- Nút CHỤP trong Kanban gọi cùng công cụ; chuột phải nút CHỤP để mở cài đặt.
+- Alt + C ở bất kỳ cửa sổ Windows nào: chụp nhanh.
+- Hoặc bấm nút CHỤP trong Kanban.
+- Kéo chuột tạo vùng chụp. Ngoài vùng chọn sẽ được làm tối.
+- Khung chọn có các điểm kéo để thay đổi kích thước và có thể kéo cả khung sang vị trí khác.
+- Thanh dọc bên phải: Chọn/di chuyển, Chữ, Bút, Khung, Mũi tên, Mosaic, đổi màu, Hoàn tác.
+- Thanh ngang dưới khung: Hủy, Hoàn tác, Lưu file, Copy/Xong.
+- Ctrl + C: tương đương Copy/Xong.
+- Enter: tương đương Copy/Xong.
+- Ctrl + S: lưu file thủ công.
+- Sau Copy/Xong, Ctrl + V trong Zalo/Messenger/Word sẽ dán ảnh.
+- Ctrl + V trong Desktop/Windows Explorer sẽ tạo file JPG/PNG ngay.
 
-Cài đặt mặc định
-- Định dạng file: JPG.
-- Chất lượng JPG: 100, subsampling 0.
-- Có thể đổi sang PNG trong cửa sổ Cài đặt.
-- File tạm lưu ở %LOCALAPPDATA%\KanbanCapture\Clipboard và tự dọn file cũ.
+Cài đặt
+- Chuột phải nút CHỤP trong Kanban để mở cài đặt Agent.
+- Mặc định JPG chất lượng 100, subsampling 0.
+- Có thể đổi sang PNG.
+- File Clipboard tạm nằm trong %LOCALAPPDATA%\KanbanCapture\Clipboard và tự dọn file cũ.
 
+Nếu bấm CHỤP không phản ứng
+- Bản web v2 sẽ tự kiểm tra Agent.
+- Nếu Agent chưa chạy hoặc là bản cũ, Kanban hiện hộp hướng dẫn và nút Tải bộ cài.
+- Chạy lại CAI_DAT_CHUP_NHANH.bat rồi bấm “Thử lại”.
+- Nếu Alt+C không đăng ký được vì ứng dụng khác chiếm phím, Agent sẽ báo rõ; nút CHỤP trong Kanban vẫn dùng được.
