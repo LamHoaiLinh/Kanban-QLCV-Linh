@@ -32,7 +32,7 @@
 
   function downloadInstaller(){
     const a=document.createElement('a');
-    a.href='capture-agent/CAI_DAT_CHUP_NHANH.bat?v=2.0.0';
+    a.href='capture-agent/CAI_DAT_CHUP_NHANH.bat?v=3.0.0';
     a.download='CAI_DAT_CHUP_NHANH.bat';
     document.body.appendChild(a); a.click(); a.remove();
   }
@@ -49,8 +49,8 @@
         <button class="capture-setup-close" type="button" aria-label="Đóng">×</button>
         <div class="capture-setup-mark">✂</div>
         <h3 id="captureSetupTitle">Chụp nhanh chưa chạy</h3>
-        <p>Kanban trên trình duyệt không thể tự đăng ký <strong>Alt+C toàn Windows</strong>. Máy cần chạy Capture Agent một lần. Nếu anh đã cài bản trước, hãy chạy lại bộ cài để nâng lên bản v2.</p>
-        <div class="capture-setup-steps"><span>1</span><b>Tải bộ cài</b><span>2</span><b>Chạy CAI_DAT_CHUP_NHANH.bat</b><span>3</span><b>Quay lại bấm Thử lại</b></div>
+        <p>Kanban trên trình duyệt không thể tự đăng ký <strong>Alt+C toàn Windows</strong>. Máy cần chạy Capture Agent một lần. Nếu bạn đã cài bản trước, hãy chạy lại bộ cài để nâng lên bản v3.</p>
+        <div class="capture-setup-steps"><span>1</span><b>Tải bộ cài</b><span>2</span><b>Chạy CAI_DAT_CHUP_NHANH.bat (không cần Python)</b><span>3</span><b>Quay lại bấm Thử lại</b></div>
         <div class="capture-setup-actions">
           <button type="button" data-capture-download>Tải bộ cài</button>
           <button type="button" data-capture-retry class="primary">Thử lại</button>
