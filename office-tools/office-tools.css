@@ -269,3 +269,15 @@
 .office-sign-modal-note{padding:9px 10px;border:1px solid var(--border);border-radius:10px;background:var(--panel-soft);color:var(--muted);font-size:11px;line-height:1.45}
 .office-sign-confirm-risk{display:flex;align-items:flex-start;gap:8px;margin-top:10px;padding:10px 11px;border:1px solid var(--border);border-radius:10px;background:var(--panel-soft);font-size:12px;font-weight:700}.office-sign-confirm-risk input{margin-top:2px;accent-color:var(--green)}
 @media(max-width:760px){.office-sign-extra-row{grid-template-columns:1fr}.office-sign-extra-remove{width:100%}}
+
+
+/* v4.8 - crop ảnh thủ công theo tỷ lệ */
+.image-crop-card{overflow:hidden}
+.image-crop-preview-wrap{display:grid;place-items:center;gap:9px;min-height:240px;margin-top:14px;padding:14px;border:1px dashed var(--border);border-radius:15px;background:var(--panel-soft);overflow:auto}
+.image-crop-stage{position:relative;flex:0 0 auto;overflow:hidden;border-radius:10px;background:#111;cursor:crosshair;touch-action:none;user-select:none;box-shadow:0 8px 28px rgba(0,0,0,.18)}
+.image-crop-stage canvas{display:block;width:100%;height:100%;pointer-events:none}
+.image-crop-selection{position:absolute;box-sizing:border-box;border:2px solid #fff;box-shadow:0 0 0 9999px rgba(0,0,0,.52),0 0 0 1px rgba(0,0,0,.35) inset;pointer-events:none}
+.image-crop-selection i{position:absolute;width:9px;height:9px;border:2px solid #fff;background:var(--green);border-radius:2px}
+.image-crop-selection i:nth-child(1){left:-5px;top:-5px}.image-crop-selection i:nth-child(2){right:-5px;top:-5px}.image-crop-selection i:nth-child(3){right:-5px;bottom:-5px}.image-crop-selection i:nth-child(4){left:-5px;bottom:-5px}
+.image-crop-hint{color:var(--muted);font-size:11px;text-align:center}
+@media(max-width:760px){.image-crop-preview-wrap{padding:9px}.image-crop-stage{max-width:100%}}
