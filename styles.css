@@ -835,3 +835,65 @@ body.drag-active .music-player{
 .capture-control-actions button.subtle{background:var(--panel-soft);font-weight:700}
 .capture-security-note{margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--panel-soft);color:var(--muted);font-size:11px;line-height:1.5}
 @media(max-width:560px){.capture-control-actions{grid-template-columns:1fr}}
+
+
+/* v6.26 - Kalo chat launcher */
+.kalo-launch-btn{
+  width:50px!important;
+  border-color:color-mix(in srgb,#6fbd96 58%,var(--border))!important;
+  background:color-mix(in srgb,#e7f7ef 88%,var(--panel))!important;
+  color:#245e45!important
+}
+.kalo-launch-btn .office-btn-mark{font-size:8px;letter-spacing:.01em;font-weight:950}
+.kalo-launch-btn:hover,.kalo-launch-btn.kalo-active{
+  border-color:#62ad85!important;
+  background:#dff3e8!important;
+  box-shadow:0 0 0 2px rgba(98,173,133,.13)
+}
+body.kalo-open{overflow:hidden!important}
+.kalo-overlay{
+  position:fixed;inset:0;z-index:29000;
+  background:#eef8f2;
+  color:#173b2d
+}
+.kalo-overlay[hidden]{display:none!important}
+.kalo-shell{display:flex;flex-direction:column;width:100%;height:100dvh;min-height:100vh;background:#f4fbf7}
+.kalo-shell-bar{
+  flex:0 0 48px;min-height:48px;display:flex;align-items:center;justify-content:space-between;
+  gap:14px;padding:0 12px 0 14px;border-bottom:1px solid #cfe7da;background:#f8fdf9;
+  box-shadow:0 2px 10px rgba(33,86,62,.07)
+}
+.kalo-shell-brand{display:flex;align-items:center;gap:9px;min-width:0}
+.kalo-shell-logo{
+  display:grid;place-items:center;width:31px;height:31px;border-radius:10px;
+  background:linear-gradient(145deg,#a9e6c5,#62b98c);color:#fff;font:900 18px/1 "Segoe UI",sans-serif;
+  box-shadow:0 3px 10px rgba(63,139,101,.18)
+}
+.kalo-shell-brand div{display:flex;align-items:baseline;gap:8px;min-width:0}
+.kalo-shell-brand strong{font-size:15px;letter-spacing:.01em}
+.kalo-shell-brand small{color:#6b8176;font-size:11px;white-space:nowrap}
+.kalo-shell-actions{display:flex;align-items:center;gap:7px}
+.kalo-shell-actions a,.kalo-shell-actions button{
+  width:34px;height:34px;display:grid;place-items:center;border:1px solid #cee5d8;border-radius:10px;
+  background:#fff;color:#315e49;text-decoration:none;cursor:pointer;font:800 18px/1 "Segoe UI",sans-serif
+}
+.kalo-shell-actions a:hover,.kalo-shell-actions button:hover{background:#e4f5ec;border-color:#9ed1b6}
+.kalo-frame-wrap{position:relative;flex:1;min-height:0;background:#f4fbf7}
+.kalo-frame{display:block;width:100%;height:100%;border:0;background:#f4fbf7}
+.kalo-loading{
+  position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:7px;background:#f4fbf7;color:#315e49;text-align:center
+}
+.kalo-loading[hidden]{display:none}
+.kalo-loading small{color:#779087;font-size:11px}
+.kalo-loading-dot{
+  width:28px;height:28px;border:3px solid #cce9da;border-top-color:#55aa7d;border-radius:50%;
+  animation:kalo-spin .8s linear infinite
+}
+@keyframes kalo-spin{to{transform:rotate(360deg)}}
+@media(max-width:900px){.kalo-launch-btn{width:46px!important}}
+@media(max-width:700px){
+  .kalo-launch-btn{width:54px!important;min-width:54px!important}
+  .kalo-shell-brand small{display:none}
+  .kalo-shell-bar{padding-left:10px}
+}
