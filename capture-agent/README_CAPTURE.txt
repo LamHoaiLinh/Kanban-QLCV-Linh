@@ -1,25 +1,28 @@
-KANBAN CAPTURE AGENT v4
+KANBAN CAPTURE AGENT v5
 =======================
 Mục đích: chụp màn hình nhanh toàn Windows cho Kanban chạy trên GitHub Pages.
 
 Điểm quan trọng
 - Bạn KHÔNG cần cài Python.
-- Bộ cài v4 không tải trực tiếp file EXE vào thư mục Temp.
-- Bộ cài tải một gói ZIP với tên ngẫu nhiên vào %LOCALAPPDATA%\KanbanCapture, kiểm tra SHA256 rồi mới giải nén.
+- Có thêm bộ cài một chạm CAI_DAT_CHUP_NHANH.exe tải trực tiếp từ giao diện Kanban.
+- File EXE tự dừng Agent cũ, tải gói mới, kiểm tra SHA256, ghi đè và khởi động lại.
+- Vẫn giữ CAI_DAT_CHUP_NHANH.bat làm phương án dự phòng.
+- Bộ cài tải một gói ZIP, kiểm tra SHA256 rồi mới giải nén.
 - Cách này tránh lỗi Access denied đã gặp khi PowerShell cố tạo KanbanCapture_download.exe trong %TEMP%.
 - Agent chạy cục bộ trên 127.0.0.1:47631; ảnh không được tải lên máy chủ.
 - Cài đặt dùng HKCU và %LOCALAPPDATA%, thông thường không cần quyền Administrator.
 
 Cài / cập nhật
-1. Trong Kanban bấm CHỤP và chọn “Tải bộ cài”.
-2. Chạy CAI_DAT_CHUP_NHANH.bat.
-3. Bộ cài tự dừng Agent cũ.
-4. Bộ cài tải KanbanCapture-package.zip, kiểm tra SHA256, giải nén và cài KanbanCapture.exe.
+1. Trong Kanban nhấp chuột phải nút CHỤP.
+2. Chọn “Tải / cập nhật .EXE”.
+3. Mở CAI_DAT_CHUP_NHANH.exe vừa tải.
+4. Bộ cài tự dừng Agent cũ, tải KanbanCapture-package.zip, kiểm tra SHA256, giải nén và ghi đè KanbanCapture.exe.
 5. Bộ cài đăng ký Alt+C, nút CHỤP và tự khởi động cùng Windows.
-6. Khi thấy “CAI DAT / CAP NHAT THANH CONG”, quay lại Kanban và bấm “Thử lại”.
+6. Quay lại Kanban, nhấp chuột phải nút CHỤP và bấm “Kiểm tra lại”.
 
 Nếu bạn từng cài bản cũ
-- Chỉ cần chạy lại BAT v4; không cần gỡ bản cũ.
+- Chỉ cần chạy CAI_DAT_CHUP_NHANH.exe mới; không cần gỡ hoặc xóa bản cũ.
+- Nếu EXE bị Windows chặn, có thể dùng BAT dự phòng ngay trong cùng bảng cài đặt.
 - Python không còn là điều kiện sử dụng.
 
 Sử dụng
