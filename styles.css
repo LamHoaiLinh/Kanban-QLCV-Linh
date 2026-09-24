@@ -819,3 +819,19 @@ body.drag-active .music-player{
 .capture-setup-steps span{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--green);color:#fff;font-weight:900}
 .capture-setup-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:16px}.capture-setup-actions button{min-height:40px;padding:0 13px;border:1px solid var(--border);border-radius:11px;background:var(--panel);cursor:pointer;font-weight:800}.capture-setup-actions button.primary{border-color:var(--green);background:var(--green);color:#fff}
 @media(max-width:560px){.capture-setup-actions{flex-direction:column}.capture-setup-actions button{width:100%}}
+
+
+/* v6.25 - bảng cài đặt/cập nhật Capture Agent */
+.capture-control-card{width:min(560px,calc(100vw - 28px))}
+.capture-agent-status{display:inline-flex;align-items:center;gap:7px;margin:2px 0 8px;padding:6px 10px;border-radius:999px;background:#fff3cd;color:#7a5a00;font-size:12px;font-weight:800}
+.capture-agent-status::before{content:'';width:8px;height:8px;border-radius:50%;background:#e0a800;box-shadow:0 0 0 3px rgba(224,168,0,.12)}
+.capture-agent-status.ready{background:var(--green-soft);color:var(--green-dark)}
+.capture-agent-status.ready::before{background:var(--green);box-shadow:0 0 0 3px color-mix(in srgb,var(--green) 14%,transparent)}
+.capture-control-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:16px}
+.capture-control-actions button{min-height:42px;padding:0 13px;border:1px solid var(--border);border-radius:11px;background:var(--panel);color:var(--text);cursor:pointer;font-weight:800}
+.capture-control-actions button:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 4px 12px rgba(10,24,19,.08)}
+.capture-control-actions button:disabled{opacity:.45;cursor:not-allowed}
+.capture-control-actions button.primary{border-color:var(--green);background:var(--green);color:#fff}
+.capture-control-actions button.subtle{background:var(--panel-soft);font-weight:700}
+.capture-security-note{margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--panel-soft);color:var(--muted);font-size:11px;line-height:1.5}
+@media(max-width:560px){.capture-control-actions{grid-template-columns:1fr}}
