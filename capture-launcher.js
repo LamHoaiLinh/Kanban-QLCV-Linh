@@ -36,27 +36,13 @@
     }
   }
 
-  function downloadFile(href,name){
+  function downloadInstallerBat(){
     const a=document.createElement('a');
-    a.href=href;
-    a.download=name;
+    a.href=`capture-agent/CAI_DAT_CHUP_NHANH.bat?t=${Date.now()}`;
+    a.download='CAI_DAT_CHUP_NHANH.bat';
     document.body.appendChild(a);
     a.click();
     a.remove();
-  }
-
-  function downloadInstallerExe(){
-    downloadFile(
-      `capture-agent/bin/CAI_DAT_CHUP_NHANH.exe?t=${Date.now()}`,
-      'CAI_DAT_CHUP_NHANH.exe'
-    );
-  }
-
-  function downloadInstallerBat(){
-    downloadFile(
-      `capture-agent/CAI_DAT_CHUP_NHANH.bat?t=${Date.now()}`,
-      'CAI_DAT_CHUP_NHANH.bat'
-    );
   }
 
   function hidePanel(){
@@ -74,8 +60,8 @@
     }
     if(desc){
       desc.innerHTML=agentReady
-        ? 'Bạn có thể mở cài đặt JPG/PNG hoặc tải bộ cập nhật mới nhất. File <strong>CAI_DAT_CHUP_NHANH.exe</strong> sẽ tự dừng bản cũ, ghi đè bản mới và khởi động lại.'
-        : 'Tải <strong>CAI_DAT_CHUP_NHANH.exe</strong>, mở file vừa tải. Bộ cài sẽ tự ghi đè bản cũ; không cần gỡ thủ công.';
+        ? 'Bạn có thể mở cài đặt JPG/PNG hoặc tải <strong>CAI_DAT_CHUP_NHANH.bat</strong> để cập nhật lên bản mới nhất. BAT sẽ tự dừng bản cũ, tải Agent đã đóng gói sẵn, kiểm tra SHA256, ghi đè và khởi động lại.'
+        : 'Tải <strong>CAI_DAT_CHUP_NHANH.bat</strong> rồi mở file vừa tải. <strong>Không cần cài Python</strong>; bộ cài tự tải Agent đã đóng gói sẵn và tự ghi đè bản cũ.';
     }
     if(settingsBtn)settingsBtn.disabled=!agentReady;
   }
@@ -92,24 +78,22 @@
       <div class="capture-agent-status" data-capture-status>Đang kiểm tra Capture Agent...</div>
       <p data-capture-description>Đang kiểm tra trạng thái...</p>
       <div class="capture-setup-steps">
-        <span>1</span><b>Tải CAI_DAT_CHUP_NHANH.exe</b>
-        <span>2</span><b>Mở file vừa tải — bộ cài tự ghi đè bản cũ</b>
+        <span>1</span><b>Tải CAI_DAT_CHUP_NHANH.bat</b>
+        <span>2</span><b>Mở file BAT — không cần Python, tự ghi đè bản cũ</b>
         <span>3</span><b>Quay lại Kanban và dùng Alt+C hoặc nút CHỤP</b>
       </div>
       <div class="capture-control-actions">
         <button type="button" data-capture-agent-settings>Mở cài đặt JPG/PNG</button>
-        <button type="button" data-capture-download-exe class="primary">⬇ Tải / cập nhật .EXE</button>
+        <button type="button" data-capture-download-bat class="primary">⬇ Tải / cập nhật .BAT</button>
         <button type="button" data-capture-retry>↻ Kiểm tra lại</button>
-        <button type="button" data-capture-download-bat class="subtle">BAT dự phòng</button>
       </div>
-      <div class="capture-security-note">Windows có thể hỏi xác nhận khi mở file tải từ Internet. Bộ cài dùng thư mục người dùng và không yêu cầu gỡ bản cũ trước.</div>
+      <div class="capture-security-note">Bộ cài BAT dùng PowerShell/curl có sẵn trong Windows để tải gói Agent đã biên dịch sẵn. Máy người dùng không cần Python và không cần xóa bản cũ thủ công.</div>
     </section>`;
     document.body.appendChild(panel);
 
     panel.addEventListener('click',event=>{
       if(event.target===panel||event.target.closest('.capture-setup-close'))hidePanel();
     });
-    panel.querySelector('[data-capture-download-exe]').addEventListener('click',downloadInstallerExe);
     panel.querySelector('[data-capture-download-bat]').addEventListener('click',downloadInstallerBat);
     panel.querySelector('[data-capture-agent-settings]').addEventListener('click',async()=>{
       if(await request('settings',1600))hidePanel();
