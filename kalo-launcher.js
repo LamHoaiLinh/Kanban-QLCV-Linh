@@ -5,7 +5,9 @@
   if(!button)return;
 
   const KALO_URL='https://lamhoailinh.github.io/Kalo/';
-  const SAME_ORIGIN=window.location.origin;
+  const KALO_FALLBACK='https://raw.githack.com/LamHoaiLinh/Kalo/gh-pages/index.html';
+  const ALLOWED_ORIGINS=new Set([window.location.origin,'https://raw.githack.com']);
+  let resolvedUrl=null;
   let overlay=null;
   let frame=null;
   let loaded=false;
@@ -57,14 +59,29 @@
     return overlay;
   }
 
-  function openKalo(){
+  async function resolveKaloUrl(){
+    if(resolvedUrl)return resolvedUrl;
+    try{
+      const response=await fetch(KALO_URL,{method:'GET',cache:'no-store'});
+      if(response.ok){
+        resolvedUrl=KALO_URL;
+        return resolvedUrl;
+      }
+    }catch(_){/* GitHub Pages may not be enabled yet. */}
+    resolvedUrl=KALO_FALLBACK;
+    return resolvedUrl;
+  }
+
+  async function openKalo(){
     ensureOverlay();
     overlay.hidden=false;
     document.body.classList.add('kalo-open');
     button.classList.add('kalo-active');
     button.setAttribute('aria-pressed','true');
-    if(!frame.src){
-      frame.src=KALO_URL;
+    if(!frame.getAttribute('src')){
+      frame.src=await resolveKaloUrl();
+      const popout=overlay.querySelector('.kalo-popout');
+      if(popout)popout.href=frame.src;
     }else if(loaded){
       frame.focus();
     }
@@ -101,7 +118,8 @@
   },true);
 
   window.addEventListener('message',event=>{
-    if(event.origin!==SAME_ORIGIN)return;
+    if(!ALLOWED_ORIGINS.has(event.origin))return;
+    if(!frame||event.source!==frame.contentWindow)return;
     const data=event.data;
     if(!data||data.source!=='kalo')return;
     if(data.type==='close') closeKalo();
