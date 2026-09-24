@@ -105,7 +105,7 @@ class Overlay:
         self.undo_stack=[]; self.redo_stack=[]; self._tooltip_after=None; self._tooltip_win=None
         self.pen_width=max(1,min(20,int(self.a.cfg.get('pen_width',4))))
         self.text_size=max(12,min(72,int(self.a.cfg.get('text_size',26))))
-        self.selected_text_index=None; self.original_text_pos=None; self.text_boxes={}; self._font_cache={}
+        self.selected_text_index=None; self.hover_text_index=None; self.original_text_pos=None; self.text_boxes={}; self._font_cache={}
         self.text_editor_frame=None; self.text_editor_win=None; self.text_editor_widget=None; self.text_editor_index=None; self.text_editor_pos=None
         self.text_format_bar=None; self.text_format_size_label=None
         self.top=tk.Toplevel(agent.root); self.top.overrideredirect(True); self.top.attributes('-topmost',True); self.top.configure(bg='black')
@@ -296,7 +296,8 @@ class Overlay:
 
     def hover(self,e):
         if self.text_editor_frame:return
-        if self.mode=='text' and self.hit_text(self.p(e)) is not None:self.c.config(cursor='hand2')
+        idx=self.hit_text(self.p(e)) if self.mode=='text' else None; self.hover_text_index=idx
+        if idx is not None:self.c.config(cursor='hand2')
         elif self.mode=='select':self.c.config(cursor='cross')
         else:self.c.config(cursor='crosshair')
 
@@ -667,9 +668,9 @@ class Overlay:
 
     def delete_selected_text(self,event=None):
         if self.text_editor_frame and isinstance(self.top.focus_get(),tk.Text):return None
-        idx=self.selected_text_index
+        idx=self.selected_text_index if self.selected_text_index is not None else self.hover_text_index
         if idx is not None and 0<=idx<len(self.ops) and self.is_text_op(self.ops[idx]):
-            self.push_history(); self.ops.pop(idx); self.selected_text_index=None; self.redraw(); return 'break'
+            self.push_history(); self.ops.pop(idx); self.selected_text_index=None; self.hover_text_index=None; self.redraw(); return 'break'
         return None
 
     def pil_font(self,style):
