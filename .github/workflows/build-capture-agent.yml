@@ -5,6 +5,7 @@ on:
     branches: [ main ]
     paths:
       - 'capture-agent/capture_agent.py'
+      - 'capture-agent/capture_installer.py'
       - '.github/workflows/build-capture-agent.yml'
   workflow_dispatch:
 
@@ -31,13 +32,16 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install Pillow pyinstaller
 
-      - name: Build standalone EXE and ZIP package
+      - name: Build standalone Agent, updater EXE and ZIP package
         shell: pwsh
         run: |
           pyinstaller --noconfirm --clean --onefile --windowed --name KanbanCapture capture-agent/capture_agent.py
+          pyinstaller --noconfirm --clean --onefile --windowed --name CAI_DAT_CHUP_NHANH capture-agent/capture_installer.py
           New-Item -ItemType Directory -Force -Path capture-agent/bin | Out-Null
           Copy-Item dist/KanbanCapture.exe capture-agent/bin/KanbanCapture.exe -Force
+          Copy-Item dist/CAI_DAT_CHUP_NHANH.exe capture-agent/bin/CAI_DAT_CHUP_NHANH.exe -Force
           (Get-FileHash capture-agent/bin/KanbanCapture.exe -Algorithm SHA256).Hash.ToLowerInvariant() | Set-Content -NoNewline capture-agent/bin/KanbanCapture.sha256
+          (Get-FileHash capture-agent/bin/CAI_DAT_CHUP_NHANH.exe -Algorithm SHA256).Hash.ToLowerInvariant() | Set-Content -NoNewline capture-agent/bin/CAI_DAT_CHUP_NHANH.sha256
           Remove-Item capture-agent/bin/KanbanCapture-package.zip -Force -ErrorAction SilentlyContinue
           Compress-Archive -LiteralPath capture-agent/bin/KanbanCapture.exe -DestinationPath capture-agent/bin/KanbanCapture-package.zip -CompressionLevel Optimal
           (Get-FileHash capture-agent/bin/KanbanCapture-package.zip -Algorithm SHA256).Hash.ToLowerInvariant() | Set-Content -NoNewline capture-agent/bin/KanbanCapture-package.sha256
@@ -47,7 +51,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add capture-agent/bin/KanbanCapture.exe capture-agent/bin/KanbanCapture.sha256 capture-agent/bin/KanbanCapture-package.zip capture-agent/bin/KanbanCapture-package.sha256
+          git add capture-agent/bin/KanbanCapture.exe capture-agent/bin/KanbanCapture.sha256 capture-agent/bin/CAI_DAT_CHUP_NHANH.exe capture-agent/bin/CAI_DAT_CHUP_NHANH.sha256 capture-agent/bin/KanbanCapture-package.zip capture-agent/bin/KanbanCapture-package.sha256
           if (git diff --cached --quiet) {
             Write-Host "Compiled agent is unchanged."
             exit 0
