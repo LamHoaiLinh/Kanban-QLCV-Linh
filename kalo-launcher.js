@@ -12,7 +12,74 @@
   let frame=null;
   let loaded=false;
   let lastHotkeyAt=0;
+  let unreadCount=Number(sessionStorage.getItem('kanban-kalo-unread')||0) || 0;
+  let noticeTimer=null;
+  const baseTitle=document.title;
+  const seenMessageIds=new Set();
   const boundWindows=new WeakSet();
+
+  const badge=document.createElement('span');
+  badge.className='kalo-unread-badge';
+  badge.hidden=true;
+  badge.setAttribute('aria-label','Tin nhắn Kalo chưa xem');
+  button.appendChild(badge);
+
+  const notice=document.createElement('button');
+  notice.type='button';
+  notice.className='kalo-message-notice';
+  notice.hidden=true;
+  notice.innerHTML='<strong>KANBAN CÓ TIN NHẮN MỚI</strong><span data-kalo-notice-detail>Kalo vừa nhận tin nhắn mới.</span>';
+  document.body.appendChild(notice);
+
+  function updateUnreadUi(){
+    badge.hidden=unreadCount<=0;
+    badge.textContent=unreadCount>99?'99+':String(unreadCount);
+    button.classList.toggle('kalo-has-unread',unreadCount>0);
+    sessionStorage.setItem('kanban-kalo-unread',String(unreadCount));
+    document.title=unreadCount>0?`(${unreadCount}) ${baseTitle}`:baseTitle;
+  }
+
+  function clearUnread(){
+    unreadCount=0;
+    updateUnreadUi();
+    notice.hidden=true;
+    clearTimeout(noticeTimer);
+  }
+
+  function showMessageNotice(data){
+    const detail=notice.querySelector('[data-kalo-notice-detail]');
+    const sender=String(data?.senderName||'Kalo').trim();
+    const conversation=String(data?.conversationName||'').trim();
+    detail.textContent=conversation && conversation!==sender
+      ? `${sender} · ${conversation}`
+      : `Tin nhắn mới từ ${sender}`;
+    notice.hidden=false;
+    notice.classList.remove('show');
+    requestAnimationFrame(()=>notice.classList.add('show'));
+    clearTimeout(noticeTimer);
+    noticeTimer=setTimeout(()=>{
+      notice.classList.remove('show');
+      setTimeout(()=>{ notice.hidden=true; },180);
+    },5200);
+  }
+
+  function registerIncomingMessage(data){
+    const id=String(data?.messageId||'');
+    if(id && seenMessageIds.has(id))return;
+    if(id){
+      seenMessageIds.add(id);
+      if(seenMessageIds.size>120) seenMessageIds.delete(seenMessageIds.values().next().value);
+    }
+    if(overlay && !overlay.hidden)return;
+    unreadCount+=1;
+    updateUnreadUi();
+    showMessageNotice(data);
+  }
+
+  notice.addEventListener('click',()=>{
+    openKalo();
+  });
+  updateUnreadUi();
 
   function ensureOverlay(){
     if(overlay)return overlay;
@@ -55,7 +122,7 @@
     frame.addEventListener('load',()=>{
       loaded=true;
       loading.hidden=true;
-      frame.focus();
+      if(overlay && !overlay.hidden) frame.focus();
     });
 
     return overlay;
@@ -76,6 +143,7 @@
 
   async function openKalo(){
     ensureOverlay();
+    clearUnread();
     overlay.hidden=false;
     document.body.classList.add('kalo-open');
     button.classList.add('kalo-active');
@@ -148,6 +216,16 @@
   button.setAttribute('aria-pressed','false');
   button.addEventListener('click',toggleKalo);
 
+  async function startBackgroundKalo(){
+    ensureOverlay();
+    if(frame.getAttribute('src'))return;
+    frame.src=await resolveKaloUrl();
+    const popout=overlay.querySelector('.kalo-popout');
+    if(popout)popout.href=frame.src;
+  }
+
+  startBackgroundKalo().catch(()=>{});
+
   bindWindowHotkey(window);
   bindAllIframeHotkeys();
   new MutationObserver(records=>{
@@ -166,6 +244,10 @@
     const data=event.data;
     if(!data||data.source!=='kalo')return;
     if(data.type==='close') closeKalo();
+    if(data.type==='new-message'){
+      registerIncomingMessage(data);
+      return;
+    }
     if(data.type==='toggle'){
       const now=performance.now();
       if(now-lastHotkeyAt<260)return;
