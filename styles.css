@@ -897,3 +897,19 @@ body.kalo-open{overflow:hidden!important}
   .kalo-shell-brand small{display:none}
   .kalo-shell-bar{padding-left:10px}
 }
+
+
+/* Kalo return icon supplied by user */
+.kalo-close{overflow:visible;padding:3px}
+.kalo-close-icon{
+  width:25px;
+  height:25px;
+  object-fit:contain;
+  display:block;
+  pointer-events:none;
+  transition:transform .16s ease,filter .16s ease;
+}
+.kalo-close:hover .kalo-close-icon{
+  transform:translateX(-2px) scale(1.10);
+  filter:drop-shadow(0 3px 4px rgba(28,82,55,.24));
+}
