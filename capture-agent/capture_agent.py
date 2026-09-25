@@ -422,7 +422,12 @@ class Overlay:
         pair=self.selection_indices()
         if not pair:return None
         editor=self.text_editor_widget
-        start=int(editor.count('1.0',pair[0],'chars')[0]); end=int(editor.count('1.0',pair[1],'chars')[0])
+        # Tk Text.count() returns None when both indexes are identical.
+        # Ctrl+A always starts at 1.0, so counting 1.0 -> 1.0 must be treated as offset 0.
+        start_count=editor.count('1.0',pair[0],'chars')
+        end_count=editor.count('1.0',pair[1],'chars')
+        start=int(start_count[0]) if start_count else 0
+        end=int(end_count[0]) if end_count else 0
         return start,end
 
     def update_format_bar(self,event=None):
