@@ -913,3 +913,81 @@ body.kalo-open{overflow:hidden!important}
   transform:translateX(-2px) scale(1.10);
   filter:drop-shadow(0 3px 4px rgba(28,82,55,.24));
 }
+
+
+/* v6.28 - Kalo unread badge + Kanban incoming-message popup */
+.kalo-launch-btn{position:relative!important;overflow:visible!important}
+.kalo-unread-badge{
+  position:absolute;
+  top:-7px;
+  right:-7px;
+  min-width:20px;
+  height:20px;
+  padding:0 5px;
+  display:grid;
+  place-items:center;
+  border:2px solid var(--panel);
+  border-radius:999px;
+  background:#e53935;
+  color:#fff;
+  font:900 10px/1 "Segoe UI",sans-serif;
+  box-shadow:0 3px 9px rgba(130,20,20,.28);
+  z-index:5;
+}
+.kalo-unread-badge[hidden]{display:none!important}
+.kalo-launch-btn.kalo-has-unread{
+  animation:kalo-unread-pulse 1.4s ease-in-out infinite;
+}
+@keyframes kalo-unread-pulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(229,57,53,0)}
+  50%{box-shadow:0 0 0 4px rgba(229,57,53,.16)}
+}
+.kalo-message-notice{
+  position:fixed;
+  top:18px;
+  right:18px;
+  z-index:30050;
+  width:min(340px,calc(100vw - 28px));
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:4px;
+  padding:13px 15px;
+  border:1px solid #a8d8bf;
+  border-left:5px solid #57b684;
+  border-radius:13px;
+  background:rgba(250,255,252,.98);
+  color:#173b2d;
+  box-shadow:0 14px 36px rgba(24,75,49,.20);
+  text-align:left;
+  cursor:pointer;
+  opacity:0;
+  transform:translateY(-10px) scale(.98);
+  transition:opacity .18s ease,transform .18s ease;
+}
+.kalo-message-notice[hidden]{display:none!important}
+.kalo-message-notice.show{
+  opacity:1;
+  transform:translateY(0) scale(1);
+}
+.kalo-message-notice strong{
+  font-size:12px;
+  letter-spacing:.035em;
+  color:#245e45;
+}
+.kalo-message-notice span{
+  max-width:100%;
+  font-size:12px;
+  color:#667f72;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.kalo-message-notice:hover{
+  background:#effaf4;
+  border-color:#78c49c;
+}
+@media(max-width:700px){
+  .kalo-message-notice{top:10px;right:10px}
+  .kalo-unread-badge{top:-5px;right:-5px}
+}
