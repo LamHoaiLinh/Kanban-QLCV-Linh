@@ -444,7 +444,8 @@ class Overlay:
             idx=editor.index(f'1.0+{offset}c'); nxt=editor.index(f'{idx}+1c')
             style=transform(dict(self.editor_style_at(idx)))
             self.remove_style_tags(idx,nxt); editor.tag_add(self.ensure_style_tag(editor,style),idx,nxt)
-        editor.tag_add('sel',editor.index(f'1.0+{start_off}c'),editor.index(f'1.0+{end_off}c')); self.update_format_bar()
+        editor.tag_add('sel',editor.index(f'1.0+{start_off}c'),editor.index(f'1.0+{end_off}c'))
+        editor.focus_set(); self.update_format_bar()
 
     def format_size(self,delta):
         def change(style): style['size']=max(10,min(96,int(style.get('size',self.text_size))+delta*2)); return style
@@ -482,7 +483,7 @@ class Overlay:
         styles=op.get('styles',[]) if op else []
         lines=existing.split('\n') if existing else ['']; cols=max(12,min(52,max([len(line) for line in lines]+[12])+2)); rows=max(1,min(8,len(lines)))
         frame=tk.Frame(self.top,bg='#1f282d',padx=3,pady=3,bd=0,highlightthickness=1,highlightbackground='#2f89ff')
-        editor=tk.Text(frame,width=cols,height=rows,wrap='none',undo=True,maxundo=100,font=('Segoe UI',self.text_size),bg='#ffffff',fg='#111111',insertbackground='#111111',selectbackground='#2f89ff',selectforeground='#ffffff',relief='flat',bd=0,padx=2,pady=2)
+        editor=tk.Text(frame,width=cols,height=rows,wrap='none',undo=True,maxundo=100,font=('Segoe UI',self.text_size),bg='#ffffff',fg='#111111',insertbackground='#111111',selectbackground='#2f89ff',selectforeground='#ffffff',exportselection=False,relief='flat',bd=0,padx=2,pady=2)
         editor.pack(fill='both',expand=True); editor.insert('1.0',existing)
         self.text_editor_frame=frame; self.text_editor_widget=editor
         for i,ch in enumerate(existing):
@@ -505,11 +506,19 @@ class Overlay:
         editor.bind('<Control-b>',lambda e:(self.format_toggle('bold'),'break')[1]); editor.bind('<Control-B>',lambda e:(self.format_toggle('bold'),'break')[1])
         editor.bind('<Control-i>',lambda e:(self.format_toggle('italic'),'break')[1]); editor.bind('<Control-I>',lambda e:(self.format_toggle('italic'),'break')[1])
         editor.bind('<Control-u>',lambda e:(self.format_toggle('underline'),'break')[1]); editor.bind('<Control-U>',lambda e:(self.format_toggle('underline'),'break')[1])
+        editor.bind('<Control-a>',self.select_all_text_editor); editor.bind('<Control-A>',self.select_all_text_editor)
         editor.bind('<KeyRelease>',self.update_format_bar); editor.bind('<ButtonRelease-1>',self.update_format_bar); editor.bind('<<Selection>>',self.update_format_bar)
         editor.focus_set()
         offset=self.text_offset_at_point(op,click_pos) if op and click_pos else len(existing)
         editor.mark_set('insert',f'1.0+{offset}c'); editor.see('insert')
         self.ensure_editor_styles(); self.update_format_bar(); self.c.tag_raise(self.text_editor_win)
+
+    def select_all_text_editor(self,event=None):
+        editor=self.text_editor_widget
+        if not editor:return 'break'
+        editor.tag_add('sel','1.0','end-1c'); editor.mark_set('insert','end-1c')
+        self.update_format_bar()
+        return 'break'
 
     def collect_editor_styles(self,text):
         editor=self.text_editor_widget; result=[]
