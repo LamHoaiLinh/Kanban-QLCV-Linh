@@ -11,6 +11,8 @@
   let overlay=null;
   let frame=null;
   let loaded=false;
+  let lastHotkeyAt=0;
+  const boundWindows=new WeakSet();
 
   function ensureOverlay(){
     if(overlay)return overlay;
@@ -101,21 +103,62 @@
     else openKalo();
   }
 
+  function runAltK(event){
+    if(!event?.altKey || String(event.key||'').toLowerCase()!=='k')return false;
+    event.preventDefault?.();
+    event.stopImmediatePropagation?.();
+    event.stopPropagation?.();
+    const now=performance.now();
+    if(now-lastHotkeyAt<260)return true;
+    lastHotkeyAt=now;
+    toggleKalo();
+    return true;
+  }
+
+  function bindWindowHotkey(targetWindow){
+    if(!targetWindow || boundWindows.has(targetWindow))return;
+    try{
+      targetWindow.addEventListener('keydown',event=>{
+        if(runAltK(event))return;
+        if(targetWindow===window && event.key==='Escape' && overlay && !overlay.hidden){
+          event.preventDefault();
+          closeKalo();
+        }
+      },true);
+      boundWindows.add(targetWindow);
+    }catch(_){/* Cross-origin iframe: Kalo tự chuyển Alt+K bằng postMessage. */}
+  }
+
+  function bindIframeHotkey(iframe){
+    if(!iframe || iframe.dataset.kaloHotkeyWatcher==='1')return;
+    iframe.dataset.kaloHotkeyWatcher='1';
+    const bind=()=>{
+      try{bindWindowHotkey(iframe.contentWindow);}catch(_){}
+    };
+    iframe.addEventListener('load',bind);
+    bind();
+  }
+
+  function bindAllIframeHotkeys(root=document){
+    try{
+      root.querySelectorAll?.('iframe').forEach(bindIframeHotkey);
+    }catch(_){}
+  }
+
   button.setAttribute('aria-pressed','false');
   button.addEventListener('click',toggleKalo);
 
-  window.addEventListener('keydown',event=>{
-    if(event.altKey && event.key.toLowerCase()==='k'){
-      event.preventDefault();
-      event.stopPropagation();
-      toggleKalo();
-      return;
+  bindWindowHotkey(window);
+  bindAllIframeHotkeys();
+  new MutationObserver(records=>{
+    for(const record of records){
+      for(const node of record.addedNodes){
+        if(!(node instanceof Element))continue;
+        if(node.tagName==='IFRAME')bindIframeHotkey(node);
+        bindAllIframeHotkeys(node);
+      }
     }
-    if(event.key==='Escape' && overlay && !overlay.hidden){
-      event.preventDefault();
-      closeKalo();
-    }
-  },true);
+  }).observe(document.documentElement,{childList:true,subtree:true});
 
   window.addEventListener('message',event=>{
     if(!ALLOWED_ORIGINS.has(event.origin))return;
@@ -123,6 +166,11 @@
     const data=event.data;
     if(!data||data.source!=='kalo')return;
     if(data.type==='close') closeKalo();
-    if(data.type==='toggle') toggleKalo();
+    if(data.type==='toggle'){
+      const now=performance.now();
+      if(now-lastHotkeyAt<260)return;
+      lastHotkeyAt=now;
+      toggleKalo();
+    }
   });
 })();
