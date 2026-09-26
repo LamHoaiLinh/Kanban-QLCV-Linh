@@ -9,6 +9,7 @@ import {renderPdfSigningTool} from './pdf-signing.js?v=1.5.0';
 import {openWorksheetEditor,isWorksheetEditorOpen,closeWorksheetEditor} from './worksheet-editor.js?v=1.2.0';
 import {extractVbaProject,vbaRawByteLength} from './vba-extractor.mjs?v=2.0.0';
 const OFFICE_SETTINGS_KEY = 'linh_kanban_office_settings_v1';
+const KANPAINT_URL = 'https://lamhoailinh.github.io/KanPaint/';
 const PINNED_LIBS = {
   pdfLib: 'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js',
   pdfJs: 'https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.min.mjs',
@@ -63,6 +64,7 @@ function injectDialog(){
         ${navButton('worksheet','PDF/IMG','Nhập đề và làm bài trực tiếp','Nhập liệu PDF/IMG')}
         ${navButton('rename','Rename','Đổi tên hàng loạt')}
         ${navButton('excel','Excel','Đọc và gộp Excel')}
+        ${navButton('kanpaint','KP','Chỉnh ảnh chuyên sâu bằng KanPaint','KanPaint')}
       </nav>
       <main class="office-main" id="officeMain"></main>
     </div>
@@ -84,7 +86,7 @@ function injectDialog(){
 function navButton(id,label,title,displayLabel=label){return `<button type="button" data-office-nav="${id}" title="${escapeHtml(title)}"><span class="office-btn-mark">${label}</span><span>${displayLabel}</span></button>`;}
 
 function openOffice(tool='pdf'){
-  state.tool=['pdf','image','rename','excel'].includes(tool)?tool:'pdf';
+  state.tool=['pdf','image','rename','excel','kanpaint'].includes(tool)?tool:'pdf';
   if(!dialog.open) dialog.showModal();
   renderTool();
 }
@@ -92,13 +94,60 @@ function closeOffice(){ if(state.busy){setStatus('Hãy hủy hoặc chờ tác v
 function switchTool(tool){ if(state.busy)return; if(tool==='worksheet'){openWorksheetEditor(dialog,{onClose:()=>{state.tool='pdf';renderTool();}});return;} state.tool=tool; renderTool(); }
 function renderTool(){
   dialog.querySelectorAll('[data-office-nav]').forEach(btn=>btn.classList.toggle('active',btn.dataset.officeNav===state.tool));
-  const meta={pdf:['Công cụ PDF','Gộp, chuẩn hóa kích thước, sắp xếp, xoay, tách và chuyển trang PDF.'],image:['Công cụ hình ảnh','Chuyển đổi, crop, ghép, đóng dấu và tạo ảnh dài từ nội dung dán.'],rename:['Đổi tên hàng loạt','Xem trước tên mới trước khi tạo bản sao hoặc đổi tên tại chỗ.'],excel:['Công cụ Excel','Đọc giá trị/công thức, xuất JSON và gộp sheet hoặc workbook.']}[state.tool];
+  dialog.classList.toggle('kanpaint-mode',state.tool==='kanpaint');
+  const meta={
+    pdf:['Công cụ PDF','Gộp, chuẩn hóa kích thước, sắp xếp, xoay, tách và chuyển trang PDF.'],
+    image:['Công cụ hình ảnh','Chuyển đổi, crop, ghép, đóng dấu và tạo ảnh dài từ nội dung dán.'],
+    rename:['Đổi tên hàng loạt','Xem trước tên mới trước khi tạo bản sao hoặc đổi tên tại chỗ.'],
+    excel:['Công cụ Excel','Đọc giá trị/công thức, xuất JSON và gộp sheet hoặc workbook.'],
+    kanpaint:['KanPaint','Chỉnh ảnh chuyên sâu, layer, mask, Skin Retouch, script và xuất asset ngay trong KanBan.']
+  }[state.tool];
   dialog.querySelector('#officeDialogTitle').textContent=meta[0];dialog.querySelector('#officeDialogDesc').textContent=meta[1];
-  if(state.tool==='pdf')renderPdfTool(); if(state.tool==='image')renderImageTool(); if(state.tool==='rename')renderRenameTool(); if(state.tool==='excel')renderExcelTool();
-  setStatus('Sẵn sàng.',0);
+  if(state.tool==='pdf')renderPdfTool();
+  if(state.tool==='image')renderImageTool();
+  if(state.tool==='rename')renderRenameTool();
+  if(state.tool==='excel')renderExcelTool();
+  if(state.tool==='kanpaint')renderKanPaintTool();
+  setStatus(state.tool==='kanpaint'?'KanPaint đang chạy trực tiếp trong KanBan.':'Sẵn sàng.',0);
 }
 function cleanupTransient(){ state.abort=false; if(isWorksheetEditorOpen())closeWorksheetEditor(); revokeAllPreviews(); }
 function revokeAllPreviews(){ document.querySelectorAll('[data-object-url]').forEach(el=>{try{URL.revokeObjectURL(el.dataset.objectUrl)}catch{};}); }
+
+function renderKanPaintTool(){
+  mainHost.innerHTML=`<section class="office-tool-panel active office-kanpaint-panel">
+    <div class="office-kanpaint-toolbar">
+      <div class="office-kanpaint-info">
+        <strong>KanPaint</strong>
+        <span>Trình chỉnh ảnh chuyên sâu · xử lý ảnh ngay trên trình duyệt</span>
+      </div>
+      <div class="office-kanpaint-actions">
+        <button class="office-btn" id="kanPaintReloadBtn" type="button" title="Tải lại KanPaint">↻ Tải lại</button>
+        <button class="office-btn" id="kanPaintOpenBtn" type="button" title="Mở KanPaint ở tab riêng">↗ Mở tab riêng</button>
+      </div>
+    </div>
+    <div class="office-kanpaint-frame-wrap">
+      <div class="office-kanpaint-loading" id="kanPaintLoading"><span></span><strong>Đang mở KanPaint…</strong></div>
+      <iframe
+        id="kanPaintFrame"
+        class="office-kanpaint-frame"
+        src="${KANPAINT_URL}?embed=kanban"
+        title="KanPaint - Trình chỉnh ảnh"
+        allow="clipboard-read; clipboard-write; fullscreen"
+        loading="eager"
+        referrerpolicy="strict-origin-when-cross-origin"></iframe>
+    </div>
+  </section>`;
+  const frame=mainHost.querySelector('#kanPaintFrame');
+  const loading=mainHost.querySelector('#kanPaintLoading');
+  frame?.addEventListener('load',()=>loading?.classList.add('done'));
+  mainHost.querySelector('#kanPaintReloadBtn')?.addEventListener('click',()=>{
+    loading?.classList.remove('done');
+    if(frame)frame.src=KANPAINT_URL+'?embed=kanban&t='+Date.now();
+  });
+  mainHost.querySelector('#kanPaintOpenBtn')?.addEventListener('click',()=>{
+    window.open(KANPAINT_URL,'_blank','noopener,noreferrer');
+  });
+}
 
 // ===== HẠ TẦNG CHUNG =====
 function loadSettings(){try{return {...{pdfNormalize:'keep',imageQuality:90,imageCropFormat:'image/jpeg',imageCropQuality:100},...JSON.parse(localStorage.getItem(OFFICE_SETTINGS_KEY)||'{}')}}catch{return {pdfNormalize:'keep',imageQuality:90,imageCropFormat:'image/jpeg',imageCropQuality:100}}}
