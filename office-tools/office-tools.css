@@ -281,3 +281,115 @@
 .image-crop-selection i:nth-child(1){left:-5px;top:-5px}.image-crop-selection i:nth-child(2){right:-5px;top:-5px}.image-crop-selection i:nth-child(3){right:-5px;bottom:-5px}.image-crop-selection i:nth-child(4){left:-5px;bottom:-5px}
 .image-crop-hint{color:var(--muted);font-size:11px;text-align:center}
 @media(max-width:760px){.image-crop-preview-wrap{padding:9px}.image-crop-stage{max-width:100%}}
+
+
+/* ===== KanPaint embedded tool ===== */
+.office-tools-dialog.kanpaint-mode{
+  width:min(1540px,98vw);
+  height:min(940px,96vh);
+}
+.office-tools-dialog.kanpaint-mode .office-shell{
+  grid-template-rows:auto 1fr;
+}
+.office-tools-dialog.kanpaint-mode .office-status-bar{
+  display:none;
+}
+.office-tools-dialog.kanpaint-mode .office-main{
+  padding:0;
+  overflow:hidden;
+  min-height:0;
+}
+.office-tools-dialog.kanpaint-mode .office-body{
+  min-height:0;
+}
+.office-kanpaint-panel{
+  height:100%;
+  min-height:0;
+  display:grid!important;
+  grid-template-rows:auto minmax(0,1fr);
+  background:var(--panel);
+}
+.office-kanpaint-toolbar{
+  min-height:48px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:8px 12px;
+  border-bottom:1px solid var(--border);
+  background:color-mix(in srgb,var(--panel) 92%,var(--green-soft));
+}
+.office-kanpaint-info{
+  min-width:0;
+  display:flex;
+  align-items:baseline;
+  gap:10px;
+}
+.office-kanpaint-info strong{
+  color:var(--green-dark);
+  font-size:14px;
+}
+.office-kanpaint-info span{
+  color:var(--muted);
+  font-size:11px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.office-kanpaint-actions{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  flex:0 0 auto;
+}
+.office-kanpaint-frame-wrap{
+  position:relative;
+  min-width:0;
+  min-height:0;
+  overflow:hidden;
+  background:#dfeee3;
+}
+.office-kanpaint-frame{
+  width:100%;
+  height:100%;
+  min-height:0;
+  display:block;
+  border:0;
+  background:#edf8ef;
+}
+.office-kanpaint-loading{
+  position:absolute;
+  inset:0;
+  z-index:2;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  color:var(--green-dark);
+  background:var(--panel-soft);
+  transition:opacity .18s ease,visibility .18s ease;
+  pointer-events:none;
+}
+.office-kanpaint-loading.done{
+  opacity:0;
+  visibility:hidden;
+}
+.office-kanpaint-loading span{
+  width:18px;
+  height:18px;
+  border:2px solid color-mix(in srgb,var(--green) 28%,transparent);
+  border-top-color:var(--green);
+  border-radius:50%;
+  animation:office-kanpaint-spin .8s linear infinite;
+}
+@keyframes office-kanpaint-spin{to{transform:rotate(360deg)}}
+
+@media(max-width:1050px){
+  .office-tools-dialog.kanpaint-mode{width:99vw;height:97vh}
+  .office-kanpaint-info span{display:none}
+}
+@media(max-width:760px){
+  .office-tools-dialog.kanpaint-mode{width:100vw;height:100vh}
+  .office-kanpaint-toolbar{padding:7px 8px}
+  .office-kanpaint-actions .office-btn{padding:7px 8px;font-size:11px}
+}
