@@ -10,6 +10,7 @@ import {openWorksheetEditor,isWorksheetEditorOpen,closeWorksheetEditor} from './
 import {extractVbaProject,vbaRawByteLength} from './vba-extractor.mjs?v=2.0.0';
 const OFFICE_SETTINGS_KEY = 'linh_kanban_office_settings_v1';
 const KANPAINT_URL = 'https://lamhoailinh.github.io/KanPaint/';
+const KANPAINT_BUILD_ID = '20260927-csp-hotfix';
 const PINNED_LIBS = {
   pdfLib: 'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js',
   pdfJs: 'https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.min.mjs',
@@ -113,6 +114,45 @@ function renderTool(){
 function cleanupTransient(){ state.abort=false; if(isWorksheetEditorOpen())closeWorksheetEditor(); revokeAllPreviews(); }
 function revokeAllPreviews(){ document.querySelectorAll('[data-object-url]').forEach(el=>{try{URL.revokeObjectURL(el.dataset.objectUrl)}catch{};}); }
 
+async function resetKanPaintLegacyRuntime(){
+  try{
+    // KanBan và KanPaint cùng origin (lamhoailinh.github.io), nên KanBan có thể
+    // chủ động gỡ Service Worker cũ của /KanPaint/. Bản OpenShop cũ luôn trả
+    // index.html từ cache cho mọi navigation nên Ctrl+F5/query string vẫn có
+    // thể bị mắc ở "Preparing the editing engine..." mãi.
+    if('serviceWorker' in navigator){
+      const registrations=await navigator.serviceWorker.getRegistrations();
+      const kanPaintRegs=registrations.filter(registration=>{
+        try{
+          const scope=new URL(registration.scope);
+          return scope.origin===location.origin && scope.pathname.startsWith('/KanPaint/');
+        }catch{return false;}
+      });
+      await Promise.all(kanPaintRegs.map(registration=>registration.unregister()));
+    }
+    if('caches' in globalThis){
+      const names=await caches.keys();
+      await Promise.all(names
+        .filter(name=>name.startsWith('openshop-')||name.startsWith('kanpaint-'))
+        .map(name=>caches.delete(name)));
+    }
+    return true;
+  }catch(error){
+    console.warn('Không thể dọn cache KanPaint cũ:',error);
+    return false;
+  }
+}
+async function launchKanPaintFrame(frame,loading){
+  if(!frame)return;
+  loading?.classList.remove('done');
+  const label=loading?.querySelector('strong');
+  if(label)label.textContent='Đang làm mới lõi KanPaint…';
+  await resetKanPaintLegacyRuntime();
+  if(!frame.isConnected)return;
+  frame.dataset.kanpaintStarted='1';
+  if(label)label.textContent='Đang mở KanPaint…';
+  frame.src=`${KANPAINT_URL}?embed=kanban&build=${encodeURIComponent(KANPAINT_BUILD_ID)}&t=${Date.now()}`;
+}
 function renderKanPaintTool(){
   mainHost.innerHTML=`<section class="office-tool-panel active office-kanpaint-panel">
     <div class="office-kanpaint-toolbar">
@@ -121,16 +161,15 @@ function renderKanPaintTool(){
         <span>Trình chỉnh ảnh chuyên sâu · xử lý ảnh ngay trên trình duyệt</span>
       </div>
       <div class="office-kanpaint-actions">
-        <button class="office-btn" id="kanPaintReloadBtn" type="button" title="Tải lại KanPaint">↻ Tải lại</button>
+        <button class="office-btn" id="kanPaintReloadBtn" type="button" title="Làm sạch cache cũ và tải lại KanPaint">↻ Tải lại</button>
         <button class="office-btn" id="kanPaintOpenBtn" type="button" title="Mở KanPaint ở tab riêng">↗ Mở tab riêng</button>
       </div>
     </div>
     <div class="office-kanpaint-frame-wrap">
-      <div class="office-kanpaint-loading" id="kanPaintLoading"><span></span><strong>Đang mở KanPaint…</strong></div>
+      <div class="office-kanpaint-loading" id="kanPaintLoading"><span></span><strong>Đang làm mới lõi KanPaint…</strong></div>
       <iframe
         id="kanPaintFrame"
         class="office-kanpaint-frame"
-        src="${KANPAINT_URL}?embed=kanban"
         title="KanPaint - Trình chỉnh ảnh"
         allow="clipboard-read; clipboard-write; fullscreen"
         loading="eager"
@@ -139,13 +178,13 @@ function renderKanPaintTool(){
   </section>`;
   const frame=mainHost.querySelector('#kanPaintFrame');
   const loading=mainHost.querySelector('#kanPaintLoading');
-  frame?.addEventListener('load',()=>loading?.classList.add('done'));
-  mainHost.querySelector('#kanPaintReloadBtn')?.addEventListener('click',()=>{
-    loading?.classList.remove('done');
-    if(frame)frame.src=KANPAINT_URL+'?embed=kanban&t='+Date.now();
+  frame?.addEventListener('load',()=>{
+    if(frame.dataset.kanpaintStarted==='1')loading?.classList.add('done');
   });
+  void launchKanPaintFrame(frame,loading);
+  mainHost.querySelector('#kanPaintReloadBtn')?.addEventListener('click',()=>void launchKanPaintFrame(frame,loading));
   mainHost.querySelector('#kanPaintOpenBtn')?.addEventListener('click',()=>{
-    window.open(KANPAINT_URL,'_blank','noopener,noreferrer');
+    window.open(`${KANPAINT_URL}?build=${encodeURIComponent(KANPAINT_BUILD_ID)}&t=${Date.now()}`,'_blank','noopener,noreferrer');
   });
 }
 
