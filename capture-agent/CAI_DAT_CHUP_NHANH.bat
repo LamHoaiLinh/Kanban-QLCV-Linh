@@ -94,7 +94,9 @@ echo   CAI DAT / CAP NHAT THANH CONG
 echo ==========================================
 echo Ban co the dung:
 echo   - Alt + C: chup nhanh o bat ky man hinh nao tren Windows.
-echo   - Nut CHUP trong Kanban: mo cong cu chup.
+echo   - Alt + X: chup dai theo khung co dinh; nhan X de chot tung doan.
+echo   - Cuon chuot de doi noi dung; Ctrl+C de ghep chuoi va copy anh dai.
+echo   - Nut CHUP trong Kanban: mo cong cu chup nhanh.
 echo   - Chuot phai nut CHUP: mo cai dat JPG/PNG.
 echo   - Ctrl + C trong khung chup: Copy/Xong.
 echo   - Ctrl + V: dan vao Zalo/Messenger/Word hoac dan thanh file trong Explorer/Desktop.
