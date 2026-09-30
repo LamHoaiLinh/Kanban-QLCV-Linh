@@ -11,8 +11,8 @@
     agentReady=!!ready;
     button.classList.toggle('capture-agent-ready',agentReady);
     const tip=agentReady
-      ? 'Chụp nhanh toàn Windows (Alt+C) · Chuột phải: Cài đặt / cập nhật Capture Agent'
-      : 'Chụp nhanh (Alt+C) · Chuột phải: Cài đặt / tải Capture Agent';
+      ? 'Chụp nhanh Alt+C · Chụp dài Alt+X · Chuột phải: Cài đặt / cập nhật Capture Agent'
+      : 'Chụp nhanh Alt+C · Chụp dài Alt+X · Chuột phải: Cài đặt / tải Capture Agent';
     button.dataset.tooltip=tip;
     button.title=tip;
     refreshPanel();
@@ -80,7 +80,7 @@
       <div class="capture-setup-steps">
         <span>1</span><b>Tải CAI_DAT_CHUP_NHANH.bat</b>
         <span>2</span><b>Mở file BAT — không cần Python, tự ghi đè bản cũ</b>
-        <span>3</span><b>Quay lại Kanban và dùng Alt+C hoặc nút CHỤP</b>
+        <span>3</span><b>Alt+C chụp nhanh · Alt+X chụp dài theo khung cố định</b>
       </div>
       <div class="capture-control-actions">
         <button type="button" data-capture-agent-settings>Mở cài đặt JPG/PNG</button>
