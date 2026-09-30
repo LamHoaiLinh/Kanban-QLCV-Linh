@@ -28,7 +28,13 @@ Nếu bạn từng cài bản cũ
 
 Sử dụng
 - Alt + C ở bất kỳ cửa sổ Windows nào: chụp nhanh.
-- Hoặc bấm nút CHỤP trong Kanban.
+- Alt + X: bắt đầu chụp dài theo khung cố định.
+- Trong Alt+X: chọn/chỉnh vùng và chú thích như Alt+C, nhấn X để chốt từng đoạn; sau đoạn đầu khung (x, y, width, height) được khóa.
+- Cuộn chuột để chuyển nội dung phía dưới; Agent tự làm mới ảnh nền trong đúng khung đã khóa.
+- Ctrl+Z / Ctrl+Y: Undo / Redo thao tác hiện tại; khi không còn thao tác edit, có thể hoàn tác/làm lại đoạn đã chốt.
+- Ctrl+C: tự chốt đoạn cuối nếu cần, dò phần overlap theo chiều dọc, ghép chuỗi và copy ảnh dài; Ctrl+V ra Desktop/Explorer để tạo một file ảnh.
+- Nếu hai đoạn không có overlap đủ tin cậy, Agent giữ nguyên cả đoạn thay vì tự cắt, ưu tiên không làm mất nội dung.
+- Hoặc bấm nút CHỤP trong Kanban để dùng chế độ Alt+C.
 - Kéo chuột tạo vùng chụp; ngoài vùng chọn được làm tối.
 - Khung chọn có 8 điểm resize và có thể kéo cả khung sang vị trí khác.
 - Thanh dọc: Chọn/di chuyển, Chữ, Bút, Khung, Mũi tên, Mosaic, đổi màu, Hoàn tác/Làm lại.
