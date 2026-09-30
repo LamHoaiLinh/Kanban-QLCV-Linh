@@ -840,7 +840,7 @@ class Overlay:
             row=pb[y*width:(y+1)*width]; ph.append(zlib.crc32(row)); pi.append((max(row)-min(row))>18)
         for y in range(q.height):
             row=qb[y*width:(y+1)*width]; qh.append(zlib.crc32(row)); qi.append((max(row)-min(row))>18)
-        best_ratio=0.0; best_info=0; best_overlap=0
+        best_ratio=0.0; best_info=0; best_overlap=0; strong=[]
         for overlap in range(min_overlap,max_overlap+1):
             start=p.height-overlap; info=0; matched=0
             for j in range(overlap):
@@ -848,10 +848,14 @@ class Overlay:
                     info+=1
                     if ph[start+j]==qh[j]:matched+=1
             ratio=(matched/info) if info else 0.0
+            required=max(10,int(overlap*.035))
+            if info>=required and ratio>=.965:strong.append((ratio,overlap))
             if ratio>best_ratio or (ratio==best_ratio and info>best_info):
                 best_ratio=ratio; best_info=info; best_overlap=overlap
         required=max(10,int(best_overlap*.035))
         if best_info<required or best_ratio<.965:return 0
+        ambiguous=[item for item in strong if abs(item[1]-best_overlap)>3 and item[0]>=best_ratio-.01]
+        if ambiguous:return 0
         return best_overlap
 
     def stitch_long_frames(self,frames):
