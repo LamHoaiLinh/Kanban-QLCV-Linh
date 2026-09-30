@@ -980,8 +980,8 @@ class Overlay:
     def render_output(self):
         if not self.sel:raise ValueError('Hãy kéo chọn vùng cần chụp.')
         from PIL import Image, ImageDraw
-        x1,y1,x2,y2=self.sel; width=max(1,int(round(x2-x1))); height=max(1,int(round(y2-y1)))
-        if self.long_mode or abs(self.sel_angle)<.01:
+        x1,y1,x2,y2=self.sel
+        if self.long_mode or (abs(self.sel_angle)<.01 and not self.has_perspective()):
             x1i,y1i,x2i,y2i=map(int,(x1,y1,x2,y2)); out=self.img.crop((x1i,y1i,x2i,y2i)); d=ImageDraw.Draw(out)
             for op in self.ops:
                 if self.is_text_op(op): self.draw_rich_text_pil(d,op,x1i,y1i); continue
@@ -997,14 +997,17 @@ class Overlay:
                     if box[2]>box[0] and box[3]>box[1]:
                         reg=out.crop(box); small=reg.resize((max(1,reg.width//14),max(1,reg.height//14))); out.paste(small.resize(reg.size),box)
             return out
-        source=self.render_source_with_annotations(); cx=(x1+x2)/2; cy=(y1+y2)/2; r=math.radians(self.sel_angle); co=math.cos(r); si=math.sin(r)
-        # Pillow AFFINE maps each output pixel back to its source coordinate.
-        data=(co,-si,cx-co*width/2+si*height/2,si,co,cy-si*width/2-co*height/2)
-        try:affine=Image.Transform.AFFINE
-        except AttributeError:affine=Image.AFFINE
+        source=self.render_source_with_annotations(); nw,ne,se,sw=self.selection_corners()
+        top=math.hypot(ne[0]-nw[0],ne[1]-nw[1]); bottom=math.hypot(se[0]-sw[0],se[1]-sw[1])
+        left=math.hypot(sw[0]-nw[0],sw[1]-nw[1]); right=math.hypot(se[0]-ne[0],se[1]-ne[1])
+        width=max(1,int(round((top+bottom)/2))); height=max(1,int(round((left+right)/2)))
+        # QUAD maps the selected source quadrilateral to a perfectly rectangular output.
+        data=(nw[0],nw[1],sw[0],sw[1],se[0],se[1],ne[0],ne[1])
+        try:quad=Image.Transform.QUAD
+        except AttributeError:quad=Image.QUAD
         try:resample=Image.Resampling.BICUBIC
         except AttributeError:resample=Image.BICUBIC
-        return source.transform((width,height),affine,data,resample=resample)
+        return source.transform((width,height),quad,data,resample=resample)
 
     def find_vertical_overlap(self,previous,current):
         import zlib
