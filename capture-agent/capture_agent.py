@@ -753,7 +753,7 @@ class Overlay:
         if self.undo_stack:
             self.redo_stack.append(self.snapshot_state()); self.restore_state(self.undo_stack.pop()); return
         if self.long_mode and self.long_frames:
-            self.long_redo_frames.append(self.long_frames.pop()); self.long_current_dirty=True; self.update_long_status('Dài · hoàn tác 1 đoạn'); self.redraw()
+            self.long_redo_frames.append(self.long_frames.pop()); self.long_current_dirty=False; self.update_long_status('Dài · hoàn tác 1 đoạn'); self.redraw()
 
     def redo(self):
         if self.text_editor_frame:
