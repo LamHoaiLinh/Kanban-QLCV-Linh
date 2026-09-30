@@ -6,7 +6,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk, font as tkfont
 
-APP='KanbanCapture'; PORT=47631; HOTKEY_ID=0x4B43
+APP='KanbanCapture'; PORT=47631; HOTKEY_ID=0x4B43; HOTKEY_LONG_ID=0x4B58
 DIR=Path(os.environ.get('LOCALAPPDATA',tempfile.gettempdir()))/APP; CFG=DIR/'settings.json'; CLIP=DIR/'Clipboard'
 DEFAULT={'format':'jpg','jpeg_quality':100,'pen_width':4,'text_size':26}
 
@@ -41,7 +41,7 @@ def install():
     for _ in range(30):
         time.sleep(.12)
         if send('ping',expect_reply=True):
-            print('Đã cài và khởi động Kanban Capture Agent v3. Alt+C để chụp toàn Windows.')
+            print('Đã cài và khởi động Kanban Capture Agent. Alt+C chụp nhanh, Alt+X chụp dài.')
             return 0
     raise RuntimeError('Đã chép Agent nhưng chưa khởi động được. Hãy thử chạy lại file cài đặt hoặc khởi động Windows.')
 
@@ -97,9 +97,11 @@ class Overlay:
     COLORS=['#ff3b30','#ff9500','#34c759','#007aff','#af52de','#ffffff','#111111']
     HANDLES=('nw','n','ne','e','se','s','sw','w')
     STYLE_PREFIX='rt_'
-    def __init__(self,agent,img,x0,y0):
+    def __init__(self,agent,img,x0,y0,long_mode=False):
         from PIL import ImageTk
         self.a=agent; self.img=img; self.x0=x0; self.y0=y0; self.w,self.h=img.size
+        self.long_mode=bool(long_mode); self.long_locked=False; self.fixed_sel=None
+        self.long_frames=[]; self.long_redo_frames=[]; self.long_revision=0; self.long_committed_revision=-1; self.long_current_dirty=True; self._scroll_after=None
         self.sel=None; self.start=None; self.drag_kind=None; self.drag_handle=None; self.original_sel=None
         self.mode='select'; self.color=self.COLORS[0]; self.color_index=0; self.ops=[]; self.live=[]; self.points=[]
         self.undo_stack=[]; self.redo_stack=[]; self._tooltip_after=None; self._tooltip_win=None
@@ -145,14 +147,21 @@ class Overlay:
         undo_action=self.dark_button(self.action,'↶',self.undo,width=3); undo_action.pack(side='left',padx=2); self.add_tooltip(undo_action,'Hoàn tác (Ctrl+Z)')
         redo_action=self.dark_button(self.action,'↷',self.redo,width=3); redo_action.pack(side='left',padx=2); self.add_tooltip(redo_action,'Làm lại (Ctrl+Y)')
         save_btn=self.dark_button(self.action,'💾',self.save_as,width=3); save_btn.pack(side='left',padx=2); self.add_tooltip(save_btn,'Lưu ảnh ra file (Ctrl+S)')
-        copy_btn=self.dark_button(self.action,'⧉',self.finish,width=3); copy_btn.pack(side='left',padx=2); self.add_tooltip(copy_btn,'Chép ảnh vào Clipboard và đóng')
-        done_btn=self.dark_button(self.action,'✓',self.finish,width=3,fg='#39d98a'); done_btn.pack(side='left',padx=2); self.add_tooltip(done_btn,'Hoàn tất và chép ảnh vào Clipboard')
+        self.long_status=None
+        if self.long_mode:
+            self.long_status=tk.Label(self.action,text='Dài · 0 ảnh',bg='#1f282d',fg='#a9e6c4',font=('Segoe UI',9,'bold')); self.long_status.pack(side='left',padx=(5,3))
+            next_btn=self.dark_button(self.action,'X',self.commit_long_frame,width=3,fg='#6ee7a8'); next_btn.pack(side='left',padx=2); self.add_tooltip(next_btn,'Chốt đoạn hiện tại (X), giữ nguyên khung rồi cuộn để chụp đoạn tiếp')
+        copy_btn=self.dark_button(self.action,'⧉',self.finish,width=3); copy_btn.pack(side='left',padx=2); self.add_tooltip(copy_btn,'Ghép toàn bộ và chép vào Clipboard' if self.long_mode else 'Chép ảnh vào Clipboard và đóng')
+        done_btn=self.dark_button(self.action,'✓',self.finish,width=3,fg='#39d98a'); done_btn.pack(side='left',padx=2); self.add_tooltip(done_btn,'Hoàn tất chuỗi ảnh dài và chép vào Clipboard' if self.long_mode else 'Hoàn tất và chép ảnh vào Clipboard')
         self.c.bind('<ButtonPress-1>',self.down); self.c.bind('<B1-Motion>',self.move); self.c.bind('<ButtonRelease-1>',self.up)
         self.c.bind('<Double-Button-1>',self.double_click); self.c.bind('<Motion>',self.hover)
         self.top.bind('<Escape>',lambda e:self.close()); self.top.bind('<Control-c>',self.copy_shortcut); self.top.bind('<Control-C>',self.copy_shortcut)
         self.top.bind('<Control-s>',lambda e:(self.save_as(),'break')[1]); self.top.bind('<Return>',self.finish_shortcut)
         self.top.bind('<Delete>',self.delete_selected_text); self.top.bind('<Control-z>',self.undo_shortcut); self.top.bind('<Control-Z>',self.undo_shortcut)
         self.top.bind('<Control-y>',self.redo_shortcut); self.top.bind('<Control-Y>',self.redo_shortcut)
+        if self.long_mode:
+            self.top.bind('<KeyPress-x>',self.long_capture_shortcut); self.top.bind('<KeyPress-X>',self.long_capture_shortcut)
+            self.top.bind('<MouseWheel>',self.long_scroll)
         self.top.focus_force(); self.setmode('select'); self.redraw()
 
     def dark_button(self,parent,text,cmd,width=3,fg='#f6f8f9'):
@@ -237,6 +246,78 @@ class Overlay:
     def cycle_color(self):
         self.color_index=(self.color_index+1)%len(self.COLORS); self.color=self.COLORS[self.color_index]; self.color_btn.config(fg=self.color)
 
+    def update_long_status(self,note=None):
+        if not self.long_status:return
+        state='Khóa' if self.long_locked else 'Chọn khung'
+        text=note or f'Dài · {len(self.long_frames)} ảnh · {state}'
+        try:self.long_status.config(text=text)
+        except:pass
+
+    def reset_frame_editor(self):
+        try:self.destroy_text_editor()
+        except:pass
+        self.ops=[]; self.live=[]; self.points=[]; self.undo_stack=[]; self.redo_stack=[]
+        self.selected_text_index=None; self.hover_text_index=None; self.start=None; self.drag_kind=None; self.drag_handle=None; self.original_sel=None; self.original_text_pos=None
+        self.clear_live()
+
+    def _append_long_current(self,reset=True):
+        if self.text_editor_frame:self.commit_text_editor()
+        if not self.long_current_dirty and self.long_frames:return False
+        out=self.render_output()
+        if not self.long_locked:
+            x1,y1,x2,y2=map(int,self.sel); self.fixed_sel=(x1,y1,x2,y2); self.sel=self.fixed_sel; self.long_locked=True
+        self.long_frames.append(out); self.long_redo_frames.clear(); self.long_committed_revision=self.long_revision; self.long_current_dirty=False
+        if reset:self.reset_frame_editor()
+        self.update_long_status(); self.redraw(); return True
+
+    def commit_long_frame(self,event=None):
+        if not self.long_mode:return self.finish()
+        if isinstance(self.top.focus_get(),tk.Text):return None
+        try:self._append_long_current(reset=True)
+        except ValueError as error:messagebox.showinfo('Kanban Capture',str(error),parent=self.top)
+        return 'break'
+
+    def long_capture_shortcut(self,event=None):
+        if isinstance(self.top.focus_get(),tk.Text):return None
+        return self.commit_long_frame(event)
+
+    def refresh_long_background(self):
+        if not self.long_mode or not self.long_locked:return
+        self._scroll_after=None
+        try:
+            from PIL import ImageGrab, ImageTk
+            img=ImageGrab.grab(all_screens=True)
+            self.img=img; self.w,self.h=img.size; self.photo=ImageTk.PhotoImage(img)
+            self.c.itemconfigure('shot',image=self.photo)
+            self.long_revision+=1; self.long_current_dirty=True
+            self.reset_frame_editor(); self.sel=self.fixed_sel
+        except Exception:
+            pass
+        finally:
+            try:
+                self.top.deiconify(); self.top.lift(); self.top.focus_force(); self.redraw()
+            except:pass
+
+    def long_scroll(self,event=None):
+        if not self.long_mode or not self.long_locked:return None
+        if self.text_editor_frame:return 'break'
+        delta=int(getattr(event,'delta',0) or 0)
+        if not delta:return 'break'
+        try:
+            if self._scroll_after:self.a.root.after_cancel(self._scroll_after)
+        except:pass
+        try:
+            self.top.withdraw(); self.top.update_idletasks()
+            u=ctypes.windll.user32
+            hwnd=getattr(self.a,'capture_target_hwnd',None)
+            if hwnd:
+                try:u.SetForegroundWindow(hwnd)
+                except:pass
+            u.mouse_event(0x0800,0,0,ctypes.c_ulong(delta & 0xffffffff).value,0)
+        except:pass
+        self._scroll_after=self.a.root.after(360,self.refresh_long_background)
+        return 'break'
+
     def copy_shortcut(self,event=None):
         if isinstance(self.top.focus_get(),tk.Text): return None
         self.finish(); return 'break'
@@ -298,7 +379,7 @@ class Overlay:
         if self.text_editor_frame:return
         idx=self.hit_text(self.p(e)) if self.mode=='text' else None; self.hover_text_index=idx
         if idx is not None:self.c.config(cursor='hand2')
-        elif self.mode=='select':self.c.config(cursor='cross')
+        elif self.mode=='select':self.c.config(cursor='arrow' if self.long_mode and self.long_locked else 'cross')
         else:self.c.config(cursor='crosshair')
 
     def draw_dim(self):
@@ -312,8 +393,11 @@ class Overlay:
         if not self.sel:return
         x1,y1,x2,y2=self.sel; blue='#168cff'
         self.c.create_rectangle(x1,y1,x2,y2,outline=blue,width=2,tags='selection')
-        for x,y in self.handle_points().values(): self.c.create_oval(x-5,y-5,x+5,y+5,fill=blue,outline='white',width=1,tags='selection')
-        self.c.create_text(x1+8,max(12,y1-13),text=f'{int(x2-x1)} × {int(y2-y1)}',anchor='sw',fill='white',font=('Segoe UI',10,'bold'),tags='selection')
+        if not (self.long_mode and self.long_locked):
+            for x,y in self.handle_points().values(): self.c.create_oval(x-5,y-5,x+5,y+5,fill=blue,outline='white',width=1,tags='selection')
+        label=f'{int(x2-x1)} × {int(y2-y1)}'
+        if self.long_mode and self.long_locked:label+=' · KHÓA'
+        self.c.create_text(x1+8,max(12,y1-13),text=label,anchor='sw',fill='white',font=('Segoe UI',10,'bold'),tags='selection')
 
     def canvas_font(self,style):
         style=self.normalize_style(style); key=(style['size'],style['bold'],style['italic'],style['underline'])
@@ -367,6 +451,8 @@ class Overlay:
         self.draw_dim(); self.draw_annotations(); self.draw_selection(); self.place_toolbars()
 
     def begin_select_drag(self,p):
+        if self.long_mode and self.long_locked:
+            self.start=None; self.drag_kind=None; self.drag_handle=None; return
         self.push_history()
         handle=self.hit_handle(p); self.original_sel=tuple(self.sel) if self.sel else None
         if handle:self.drag_kind='resize'; self.drag_handle=handle
@@ -652,6 +738,7 @@ class Overlay:
         self.start=None; self.drag_kind=None; self.drag_handle=None; self.original_sel=None; self.original_text_pos=None; self.clear_live(); self.redraw()
 
     def push_history(self):
+        if self.long_mode:self.long_current_dirty=True
         snap=self.snapshot_state()
         if self.undo_stack and self.undo_stack[-1]==snap:return
         self.undo_stack.append(snap)
@@ -663,16 +750,20 @@ class Overlay:
             try:self.text_editor_widget.edit_undo()
             except tk.TclError:pass
             self.update_format_bar(); return
-        if not self.undo_stack:return
-        self.redo_stack.append(self.snapshot_state()); self.restore_state(self.undo_stack.pop())
+        if self.undo_stack:
+            self.redo_stack.append(self.snapshot_state()); self.restore_state(self.undo_stack.pop()); return
+        if self.long_mode and self.long_frames:
+            self.long_redo_frames.append(self.long_frames.pop()); self.long_current_dirty=True; self.update_long_status('Dài · hoàn tác 1 đoạn'); self.redraw()
 
     def redo(self):
         if self.text_editor_frame:
             try:self.text_editor_widget.edit_redo()
             except tk.TclError:pass
             self.update_format_bar(); return
-        if not self.redo_stack:return
-        self.undo_stack.append(self.snapshot_state()); self.restore_state(self.redo_stack.pop())
+        if self.redo_stack:
+            self.undo_stack.append(self.snapshot_state()); self.restore_state(self.redo_stack.pop()); return
+        if self.long_mode and self.long_redo_frames:
+            self.long_frames.append(self.long_redo_frames.pop()); self.long_current_dirty=False; self.update_long_status('Dài · làm lại 1 đoạn'); self.redraw()
 
     def undo_shortcut(self,event=None):
         self.undo(); return 'break'
@@ -734,15 +825,63 @@ class Overlay:
                     reg=out.crop(box); small=reg.resize((max(1,reg.width//14),max(1,reg.height//14))); out.paste(small.resize(reg.size),box)
         return out
 
+    def find_vertical_overlap(self,previous,current):
+        from PIL import ImageChops, ImageStat
+        if previous.width!=current.width or previous.width<8:return 0
+        h=min(previous.height,current.height)
+        min_overlap=max(28,int(h*.08)); max_overlap=min(h-1,int(h*.82))
+        if max_overlap<=min_overlap:return 0
+        sample_w=min(160,previous.width); scale=sample_w/float(previous.width)
+        ph=max(1,int(round(previous.height*scale))); ch=max(1,int(round(current.height*scale)))
+        p=previous.convert('L').resize((sample_w,ph)); q=current.convert('L').resize((sample_w,ch))
+        lo=max(4,int(round(min_overlap*scale))); hi=min(ph-1,ch-1,max(lo+1,int(round(max_overlap*scale))))
+        margin=max(1,sample_w//24); step=max(1,(hi-lo)//90)
+        scores=[]
+        for overlap in range(lo,hi+1,step):
+            a=p.crop((margin,ph-overlap,sample_w-margin,ph)); b=q.crop((margin,0,sample_w-margin,overlap))
+            score=ImageStat.Stat(ImageChops.difference(a,b)).mean[0]; scores.append((score,overlap))
+        if not scores:return 0
+        best_score,best_overlap=min(scores,key=lambda z:z[0])
+        r0=max(lo,best_overlap-step); r1=min(hi,best_overlap+step)
+        for overlap in range(r0,r1+1):
+            a=p.crop((margin,ph-overlap,sample_w-margin,ph)); b=q.crop((margin,0,sample_w-margin,overlap))
+            score=ImageStat.Stat(ImageChops.difference(a,b)).mean[0]
+            if score<best_score:best_score,best_overlap=score,overlap
+        if best_score>14.0:return 0
+        original=int(round(best_overlap/scale)); return max(0,min(h-1,original))
+
+    def stitch_long_frames(self,frames):
+        from PIL import Image
+        if not frames:raise ValueError('Chưa có đoạn nào để ghép.')
+        out=frames[0].convert('RGB')
+        for current in frames[1:]:
+            cur=current.convert('RGB')
+            if cur.width!=out.width:
+                width=min(cur.width,out.width); out=out.crop((0,0,width,out.height)); cur=cur.crop((0,0,width,cur.height))
+            overlap=self.find_vertical_overlap(out,cur)
+            piece=cur.crop((0,overlap,cur.width,cur.height)) if overlap>0 else cur
+            if piece.height<=0:continue
+            merged=Image.new('RGB',(out.width,out.height+piece.height),'white'); merged.paste(out,(0,0)); merged.paste(piece,(0,out.height)); out=merged
+        return out
+
+    def long_output_preview(self):
+        frames=list(self.long_frames)
+        if self.long_current_dirty or not frames:frames.append(self.render_output())
+        return self.stitch_long_frames(frames)
+
     def finish(self):
         if self.text_editor_frame:self.commit_text_editor()
-        try:out=self.render_output()
+        try:
+            if self.long_mode:
+                if self.long_current_dirty or not self.long_frames:self._append_long_current(reset=False)
+                out=self.stitch_long_frames(self.long_frames)
+            else:out=self.render_output()
         except ValueError as error:messagebox.showinfo('Kanban Capture',str(error),parent=self.top); return
         self.a.complete(out); self.close()
 
     def save_as(self):
         if self.text_editor_frame:self.commit_text_editor()
-        try:out=self.render_output()
+        try:out=self.long_output_preview() if self.long_mode else self.render_output()
         except ValueError as error:messagebox.showinfo('Kanban Capture',str(error),parent=self.top); return
         ext='.png' if self.a.cfg['format']=='png' else '.jpg'; name=datetime.now().strftime('Screenshot_%Y-%m-%d_%H-%M-%S')+ext
         path=filedialog.asksaveasfilename(parent=self.top,title='Lưu ảnh chụp',initialfile=name,defaultextension=ext,filetypes=[('PNG','*.png'),('JPEG','*.jpg;*.jpeg')])
@@ -751,6 +890,9 @@ class Overlay:
         else:out.convert('RGB').save(path,'JPEG',quality=self.a.cfg['jpeg_quality'],subsampling=0,optimize=True)
 
     def close(self):
+        try:
+            if self._scroll_after:self.a.root.after_cancel(self._scroll_after); self._scroll_after=None
+        except:pass
         try:self.destroy_text_editor()
         except:pass
         try:self.top.destroy()
@@ -759,7 +901,7 @@ class Overlay:
 
 class Agent:
     def __init__(self,first=None):
-        self.cfg=config(); self.root=tk.Tk(); self.root.withdraw(); self.overlay=None; self.alive=True; self.settings=None
+        self.cfg=config(); self.root=tk.Tk(); self.root.withdraw(); self.overlay=None; self.alive=True; self.settings=None; self.capture_target_hwnd=None
         self.sock=socket.socket(); self.sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1); self.sock.bind(('127.0.0.1',PORT)); self.sock.listen(3)
         threading.Thread(target=self.listen,daemon=True).start(); threading.Thread(target=self.hotkey,daemon=True).start(); cleanup()
         if first:self.root.after(150,lambda:self.handle(first))
@@ -782,27 +924,32 @@ class Agent:
             except (OSError,socket.timeout):continue
     def hotkey(self):
         u=ctypes.windll.user32
-        if not u.RegisterHotKey(None,HOTKEY_ID,0x0001|0x4000,0x43):
-            self.root.after(0,lambda:messagebox.showwarning('Kanban Capture','Không đăng ký được Alt+C. Có thể phím này đang bị ứng dụng khác chiếm. Nút CHỤP trong Kanban vẫn dùng được.'))
-            return
+        ok_c=bool(u.RegisterHotKey(None,HOTKEY_ID,0x0001|0x4000,0x43))
+        ok_x=bool(u.RegisterHotKey(None,HOTKEY_LONG_ID,0x0001|0x4000,0x58))
+        if not ok_c:self.root.after(0,lambda:messagebox.showwarning('Kanban Capture','Không đăng ký được Alt+C. Có thể phím này đang bị ứng dụng khác chiếm. Nút CHỤP trong Kanban vẫn dùng được.'))
+        if not ok_x:self.root.after(0,lambda:messagebox.showwarning('Kanban Capture','Không đăng ký được Alt+X cho chụp dài. Có thể phím này đang bị ứng dụng khác chiếm.'))
         m=wintypes.MSG()
         while self.alive and u.GetMessageW(ctypes.byref(m),None,0,0):
-            if m.message==0x0312 and m.wParam==HOTKEY_ID:self.root.after(0,self.capture)
-        u.UnregisterHotKey(None,HOTKEY_ID)
+            if m.message==0x0312 and m.wParam==HOTKEY_ID:self.root.after(0,lambda:self.capture(False))
+            elif m.message==0x0312 and m.wParam==HOTKEY_LONG_ID:self.root.after(0,lambda:self.capture(True))
+        if ok_c:u.UnregisterHotKey(None,HOTKEY_ID)
+        if ok_x:u.UnregisterHotKey(None,HOTKEY_LONG_ID)
     def handle(self,q):
         q=q.split('?',1)[0].strip('/ ').lower()
-        if q=='capture':self.capture()
+        if q=='capture':self.capture(False)
+        elif q in ('capture-long','long-capture'):self.capture(True)
         elif q=='settings':self.show_settings()
         elif q=='quit':self.quit()
         elif q=='ping':pass
-    def capture(self):
+    def capture(self,long_mode=False):
         if self.overlay:
             try:self.overlay.top.lift(); self.overlay.top.focus_force()
             except:pass
             return
         try:
             from PIL import ImageGrab
-            img=ImageGrab.grab(all_screens=True); u=ctypes.windll.user32; self.overlay=Overlay(self,img,u.GetSystemMetrics(76),u.GetSystemMetrics(77))
+            u=ctypes.windll.user32; self.capture_target_hwnd=u.GetForegroundWindow()
+            img=ImageGrab.grab(all_screens=True); self.overlay=Overlay(self,img,u.GetSystemMetrics(76),u.GetSystemMetrics(77),long_mode=long_mode)
         except Exception as error:
             self.overlay=None; messagebox.showerror('Kanban Capture',f'Không chụp được màn hình: {error}')
     def complete(self,img):
@@ -818,7 +965,7 @@ class Agent:
         ttk.Radiobutton(f,text='JPG (mặc định)',variable=fmt,value='jpg').grid(row=1,column=0,sticky='w'); ttk.Radiobutton(f,text='PNG',variable=fmt,value='png').grid(row=1,column=1,sticky='w')
         ttk.Label(f,text='Chất lượng JPG').grid(row=2,column=0,sticky='w',pady=6); ttk.Spinbox(f,from_=70,to=100,textvariable=q,width=8).grid(row=2,column=1,sticky='e')
         ttk.Label(f,text='Độ dày nét và cỡ chữ được chỉnh trực tiếp trong lúc chụp.',foreground='#53645c').grid(row=3,column=0,columnspan=2,sticky='w',pady=(8,4))
-        ttk.Label(f,text='Alt + C: chụp ở bất kỳ màn hình Windows nào.').grid(row=4,column=0,columnspan=2,sticky='w',pady=(6,6))
+        ttk.Label(f,text='Alt + C: chụp nhanh · Alt + X: chụp dài theo khung cố định.').grid(row=4,column=0,columnspan=2,sticky='w',pady=(6,6))
         def ok():
             self.cfg['format']='png' if fmt.get()=='png' else 'jpg'; self.cfg['jpeg_quality']=max(70,min(100,int(q.get()))); save_cfg(self.cfg); w.destroy()
         ttk.Button(f,text='Hủy',command=w.destroy).grid(row=5,column=0,pady=(8,0)); ttk.Button(f,text='Lưu',command=ok).grid(row=5,column=1,pady=(8,0)); w.focus_force()
