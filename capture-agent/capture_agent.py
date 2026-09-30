@@ -102,7 +102,8 @@ class Overlay:
         self.a=agent; self.img=img; self.x0=x0; self.y0=y0; self.w,self.h=img.size
         self.long_mode=bool(long_mode); self.long_locked=False; self.fixed_sel=None
         self.long_frames=[]; self.long_redo_frames=[]; self.long_revision=0; self.long_committed_revision=-1; self.long_current_dirty=True; self._scroll_after=None
-        self.sel=None; self.start=None; self.drag_kind=None; self.drag_handle=None; self.original_sel=None
+        self.sel=None; self.sel_angle=0.0; self.start=None; self.drag_kind=None; self.drag_handle=None; self.original_sel=None
+        self.original_angle=0.0; self.rotation_start_mouse_angle=None
         self.mode='select'; self.color=self.COLORS[0]; self.color_index=0; self.ops=[]; self.live=[]; self.points=[]
         self.undo_stack=[]; self.redo_stack=[]; self._tooltip_after=None; self._tooltip_win=None
         self.pen_width=max(1,min(20,int(self.a.cfg.get('pen_width',4))))
@@ -337,20 +338,45 @@ class Overlay:
         for item in self.live:self.c.delete(item)
         self.live=[]
 
+    def rotate_point(self,p,cx,cy,angle=None):
+        angle=self.sel_angle if angle is None else angle
+        if abs(angle)<1e-9:return p
+        x,y=p; r=math.radians(angle); co=math.cos(r); si=math.sin(r); dx=x-cx; dy=y-cy
+        return (cx+dx*co-dy*si,cy+dx*si+dy*co)
+
+    def unrotate_point(self,p,cx,cy,angle=None):
+        angle=self.sel_angle if angle is None else angle
+        return self.rotate_point(p,cx,cy,-angle)
+
     def handle_points(self):
         if not self.sel:return {}
         x1,y1,x2,y2=self.sel; mx=(x1+x2)/2; my=(y1+y2)/2
-        return {'nw':(x1,y1),'n':(mx,y1),'ne':(x2,y1),'e':(x2,my),'se':(x2,y2),'s':(mx,y2),'sw':(x1,y2),'w':(x1,my)}
+        pts={'nw':(x1,y1),'n':(mx,y1),'ne':(x2,y1),'e':(x2,my),'se':(x2,y2),'s':(mx,y2),'sw':(x1,y2),'w':(x1,my)}
+        if self.long_mode or abs(self.sel_angle)<1e-9:return pts
+        return {name:self.rotate_point(point,mx,my) for name,point in pts.items()}
+
+    def selection_corners(self):
+        if not self.sel:return []
+        h=self.handle_points()
+        return [h['nw'],h['ne'],h['se'],h['sw']]
+
+    def selection_bbox(self):
+        corners=self.selection_corners()
+        if not corners:return self.sel
+        xs=[p[0] for p in corners]; ys=[p[1] for p in corners]
+        return (min(xs),min(ys),max(xs),max(ys))
 
     def hit_handle(self,p):
         px,py=p
         for name,(x,y) in self.handle_points().items():
-            if abs(px-x)<=10 and abs(py-y)<=10:return name
+            if abs(px-x)<=11 and abs(py-y)<=11:return name
         return None
 
     def inside(self,p):
         if not self.sel:return False
-        x,y=p; x1,y1,x2,y2=self.sel; return x1<=x<=x2 and y1<=y<=y2
+        x1,y1,x2,y2=self.sel; cx=(x1+x2)/2; cy=(y1+y2)/2
+        x,y=self.unrotate_point(p,cx,cy) if not self.long_mode else p
+        return x1<=x<=x2 and y1<=y<=y2
 
     def hit_text(self,p):
         x,y=p
@@ -377,27 +403,48 @@ class Overlay:
 
     def hover(self,e):
         if self.text_editor_frame:return
-        idx=self.hit_text(self.p(e)) if self.mode=='text' else None; self.hover_text_index=idx
+        point=self.p(e); idx=self.hit_text(point) if self.mode=='text' else None; self.hover_text_index=idx
         if idx is not None:self.c.config(cursor='hand2')
-        elif self.mode=='select':self.c.config(cursor='arrow' if self.long_mode and self.long_locked else 'cross')
+        elif self.mode=='select':
+            if self.long_mode and self.long_locked:self.c.config(cursor='arrow')
+            else:
+                handle=self.hit_handle(point)
+                if not self.long_mode and handle in ('nw','ne','se','sw'):self.c.config(cursor='hand2')
+                elif handle:self.c.config(cursor='sizing')
+                elif self.inside(point):self.c.config(cursor='fleur')
+                else:self.c.config(cursor='cross')
         else:self.c.config(cursor='crosshair')
 
     def draw_dim(self):
         if not self.sel:
             self.c.create_rectangle(0,0,self.w,self.h,fill='black',stipple='gray25',outline='',tags='dim'); return
+        if not self.long_mode and abs(self.sel_angle)>.01:
+            nw,ne,se,sw=self.selection_corners()
+            polys=[[(0,0),(self.w,0),ne,nw],[(self.w,0),(self.w,self.h),se,ne],[(self.w,self.h),(0,self.h),sw,se],[(0,self.h),(0,0),nw,sw]]
+            for poly in polys:self.c.create_polygon(*[v for p in poly for v in p],fill='black',stipple='gray50',outline='',tags='dim')
+            return
         x1,y1,x2,y2=self.sel
         for box in [(0,0,self.w,y1),(0,y2,self.w,self.h),(0,y1,x1,y2),(x2,y1,self.w,y2)]:
             self.c.create_rectangle(*box,fill='black',stipple='gray50',outline='',tags='dim')
 
     def draw_selection(self):
         if not self.sel:return
-        x1,y1,x2,y2=self.sel; blue='#168cff'
-        self.c.create_rectangle(x1,y1,x2,y2,outline=blue,width=2,tags='selection')
+        x1,y1,x2,y2=self.sel; blue='#168cff'; orange='#ff9f0a'
+        points=self.handle_points()
+        if not self.long_mode and abs(self.sel_angle)>.01:
+            corners=self.selection_corners(); flat=[v for p in corners for v in p]
+            self.c.create_polygon(*flat,outline=blue,fill='',width=2,tags='selection')
+        else:self.c.create_rectangle(x1,y1,x2,y2,outline=blue,width=2,tags='selection')
         if not (self.long_mode and self.long_locked):
-            for x,y in self.handle_points().values(): self.c.create_oval(x-5,y-5,x+5,y+5,fill=blue,outline='white',width=1,tags='selection')
+            for name,(x,y) in points.items():
+                is_rotate=(not self.long_mode and name in ('nw','ne','se','sw'))
+                fill=orange if is_rotate else blue; radius=6 if is_rotate else 5
+                self.c.create_oval(x-radius,y-radius,x+radius,y+radius,fill=fill,outline='white',width=1,tags='selection')
         label=f'{int(x2-x1)} × {int(y2-y1)}'
+        if not self.long_mode and abs(self.sel_angle)>.01:label+=f' · {self.sel_angle:+.1f}°'
         if self.long_mode and self.long_locked:label+=' · KHÓA'
-        self.c.create_text(x1+8,max(12,y1-13),text=label,anchor='sw',fill='white',font=('Segoe UI',10,'bold'),tags='selection')
+        bx1,by1,bx2,by2=self.selection_bbox()
+        self.c.create_text(bx1+8,max(12,by1-13),text=label,anchor='sw',fill='white',font=('Segoe UI',10,'bold'),tags='selection')
 
     def canvas_font(self,style):
         style=self.normalize_style(style); key=(style['size'],style['bold'],style['italic'],style['underline'])
@@ -437,7 +484,7 @@ class Overlay:
     def place_toolbars(self):
         if not self.sel:
             self.c.itemconfigure(self.tool_win,state='hidden'); self.c.itemconfigure(self.action_win,state='hidden'); return
-        self.top.update_idletasks(); x1,y1,x2,y2=self.sel
+        self.top.update_idletasks(); x1,y1,x2,y2=self.selection_bbox()
         tw=max(42,self.tool.winfo_reqwidth()); th=max(180,self.tool.winfo_reqheight())
         aw=max(230,self.action.winfo_reqwidth()); ah=max(44,self.action.winfo_reqheight())
         tx=x2+9 if x2+9+tw<self.w-6 else max(6,x1-tw-9); ty=max(6,min(self.h-th-6,(y1+y2-th)/2))
@@ -454,10 +501,14 @@ class Overlay:
         if self.long_mode and self.long_locked:
             self.start=None; self.drag_kind=None; self.drag_handle=None; return
         self.push_history()
-        handle=self.hit_handle(p); self.original_sel=tuple(self.sel) if self.sel else None
-        if handle:self.drag_kind='resize'; self.drag_handle=handle
+        handle=self.hit_handle(p); self.original_sel=tuple(self.sel) if self.sel else None; self.original_angle=self.sel_angle
+        if handle and not self.long_mode and handle in ('nw','ne','se','sw') and self.sel:
+            x1,y1,x2,y2=self.sel; cx=(x1+x2)/2; cy=(y1+y2)/2
+            self.drag_kind='rotate'; self.drag_handle=handle; self.rotation_start_mouse_angle=math.atan2(p[1]-cy,p[0]-cx)
+        elif handle:self.drag_kind='resize'; self.drag_handle=handle
         elif self.inside(p):self.drag_kind='move'
-        else:self.drag_kind='new'; self.sel=(p[0],p[1],p[0],p[1]); self.ops=[]; self.selected_text_index=None
+        else:
+            self.drag_kind='new'; self.sel=(p[0],p[1],p[0],p[1]); self.sel_angle=0.0; self.ops=[]; self.selected_text_index=None
 
     def style_tag_name(self,style):
         s=self.normalize_style(style); color=s['color'].replace('#','')
@@ -671,20 +722,42 @@ class Overlay:
 
     def resize_selection(self,p):
         if not self.original_sel:return
-        x1,y1,x2,y2=self.original_sel; x,y=p; h=self.drag_handle
-        if 'w' in h:x1=x
-        if 'e' in h:x2=x
-        if 'n' in h:y1=y
-        if 's' in h:y2=y
-        if x2<x1:x1,x2=x2,x1
-        if y2<y1:y1,y2=y2,y1
-        if x2-x1<12:
-            if 'w' in h:x1=x2-12
-            else:x2=x1+12
-        if y2-y1<12:
-            if 'n' in h:y1=y2-12
-            else:y2=y1+12
-        self.sel=(max(0,x1),max(0,y1),min(self.w,x2),min(self.h,y2))
+        if self.long_mode or abs(self.original_angle)<.01:
+            x1,y1,x2,y2=self.original_sel; x,y=p; h=self.drag_handle
+            if 'w' in h:x1=x
+            if 'e' in h:x2=x
+            if 'n' in h:y1=y
+            if 's' in h:y2=y
+            if x2<x1:x1,x2=x2,x1
+            if y2<y1:y1,y2=y2,y1
+            if x2-x1<12:
+                if 'w' in h:x1=x2-12
+                else:x2=x1+12
+            if y2-y1<12:
+                if 'n' in h:y1=y2-12
+                else:y2=y1+12
+            self.sel=(max(0,x1),max(0,y1),min(self.w,x2),min(self.h,y2)); return
+        ox1,oy1,ox2,oy2=self.original_sel; ocx=(ox1+ox2)/2; ocy=(oy1+oy2)/2
+        local=self.unrotate_point(p,ocx,ocy,self.original_angle); lx=local[0]-ocx; ly=local[1]-ocy
+        left=-(ox2-ox1)/2; right=(ox2-ox1)/2; top=-(oy2-oy1)/2; bottom=(oy2-oy1)/2; h=self.drag_handle
+        if h=='w':left=min(lx,right-12)
+        elif h=='e':right=max(lx,left+12)
+        elif h=='n':top=min(ly,bottom-12)
+        elif h=='s':bottom=max(ly,top+12)
+        offx=(left+right)/2; offy=(top+bottom)/2; width=right-left; height=bottom-top
+        r=math.radians(self.original_angle); co=math.cos(r); si=math.sin(r)
+        ncx=ocx+offx*co-offy*si; ncy=ocy+offx*si+offy*co
+        self.sel=(ncx-width/2,ncy-height/2,ncx+width/2,ncy+height/2)
+
+    def rotate_selection(self,p):
+        if not self.original_sel or self.rotation_start_mouse_angle is None:return
+        x1,y1,x2,y2=self.original_sel; cx=(x1+x2)/2; cy=(y1+y2)/2
+        now=math.atan2(p[1]-cy,p[0]-cx); delta=math.degrees(now-self.rotation_start_mouse_angle)
+        while delta>180:delta-=360
+        while delta<-180:delta+=360
+        angle=self.original_angle+delta
+        if abs(angle)<.35:angle=0.0
+        self.sel_angle=max(-45.0,min(45.0,angle))
 
     def move_selection(self,p):
         if not self.original_sel or not self.start:return
@@ -704,6 +777,7 @@ class Overlay:
             if self.drag_kind=='new':self.sel=(min(self.start[0],p[0]),min(self.start[1],p[1]),max(self.start[0],p[0]),max(self.start[1],p[1]))
             elif self.drag_kind=='move':self.move_selection(p)
             elif self.drag_kind=='resize':self.resize_selection(p)
+            elif self.drag_kind=='rotate':self.rotate_selection(p)
             self.redraw(); return
         if self.mode=='text' and self.drag_kind=='textmove':
             self.move_text(self.p(e,True)); self.c.config(cursor='hand2'); self.redraw(); return
@@ -718,7 +792,7 @@ class Overlay:
         if not self.start:return
         if self.mode=='select':
             if self.sel and (self.sel[2]-self.sel[0]<8 or self.sel[3]-self.sel[1]<8):self.sel=self.original_sel
-            self.start=None; self.drag_kind=None; self.drag_handle=None; self.original_sel=None; self.redraw(); return
+            self.start=None; self.drag_kind=None; self.drag_handle=None; self.original_sel=None; self.rotation_start_mouse_angle=None; self.redraw(); return
         if self.mode=='text' and self.drag_kind=='textmove':
             self.start=None; self.drag_kind=None; self.original_text_pos=None; self.redraw(); return
         q=self.p(e,True); x,y=self.start; self.clear_live()
@@ -731,11 +805,11 @@ class Overlay:
         self.start=None; self.redraw()
 
     def snapshot_state(self):
-        return {'sel':copy.deepcopy(self.sel),'ops':copy.deepcopy(self.ops)}
+        return {'sel':copy.deepcopy(self.sel),'sel_angle':float(self.sel_angle),'ops':copy.deepcopy(self.ops)}
 
     def restore_state(self,state):
-        self.sel=copy.deepcopy(state.get('sel')); self.ops=copy.deepcopy(state.get('ops',[])); self.selected_text_index=None
-        self.start=None; self.drag_kind=None; self.drag_handle=None; self.original_sel=None; self.original_text_pos=None; self.clear_live(); self.redraw()
+        self.sel=copy.deepcopy(state.get('sel')); self.sel_angle=float(state.get('sel_angle',0.0)); self.ops=copy.deepcopy(state.get('ops',[])); self.selected_text_index=None
+        self.start=None; self.drag_kind=None; self.drag_handle=None; self.original_sel=None; self.original_text_pos=None; self.rotation_start_mouse_angle=None; self.clear_live(); self.redraw()
 
     def push_history(self):
         if self.long_mode:self.long_current_dirty=True
