@@ -826,29 +826,33 @@ class Overlay:
         return out
 
     def find_vertical_overlap(self,previous,current):
-        from PIL import ImageChops, ImageStat
+        import zlib
         if previous.width!=current.width or previous.width<8:return 0
         h=min(previous.height,current.height)
         min_overlap=max(28,int(h*.08)); max_overlap=min(h-1,int(h*.82))
         if max_overlap<=min_overlap:return 0
-        sample_w=min(160,previous.width); scale=sample_w/float(previous.width)
-        ph=max(1,int(round(previous.height*scale))); ch=max(1,int(round(current.height*scale)))
-        p=previous.convert('L').resize((sample_w,ph)); q=current.convert('L').resize((sample_w,ch))
-        lo=max(4,int(round(min_overlap*scale))); hi=min(ph-1,ch-1,max(lo+1,int(round(max_overlap*scale))))
-        margin=max(1,sample_w//24); step=max(1,(hi-lo)//90)
-        scores=[]
-        for overlap in range(lo,hi+1,step):
-            a=p.crop((margin,ph-overlap,sample_w-margin,ph)); b=q.crop((margin,0,sample_w-margin,overlap))
-            score=ImageStat.Stat(ImageChops.difference(a,b)).mean[0]; scores.append((score,overlap))
-        if not scores:return 0
-        best_score,best_overlap=min(scores,key=lambda z:z[0])
-        r0=max(lo,best_overlap-step); r1=min(hi,best_overlap+step)
-        for overlap in range(r0,r1+1):
-            a=p.crop((margin,ph-overlap,sample_w-margin,ph)); b=q.crop((margin,0,sample_w-margin,overlap))
-            score=ImageStat.Stat(ImageChops.difference(a,b)).mean[0]
-            if score<best_score:best_score,best_overlap=score,overlap
-        if best_score>14.0:return 0
-        original=int(round(best_overlap/scale)); return max(0,min(h-1,original))
+        margin=max(1,previous.width//40)
+        p=previous.convert('L').crop((margin,0,previous.width-margin,previous.height))
+        q=current.convert('L').crop((margin,0,current.width-margin,current.height))
+        width=p.width; pb=p.tobytes(); qb=q.tobytes()
+        ph=[]; pi=[]; qh=[]; qi=[]
+        for y in range(p.height):
+            row=pb[y*width:(y+1)*width]; ph.append(zlib.crc32(row)); pi.append((max(row)-min(row))>18)
+        for y in range(q.height):
+            row=qb[y*width:(y+1)*width]; qh.append(zlib.crc32(row)); qi.append((max(row)-min(row))>18)
+        best_ratio=0.0; best_info=0; best_overlap=0
+        for overlap in range(min_overlap,max_overlap+1):
+            start=p.height-overlap; info=0; matched=0
+            for j in range(overlap):
+                if pi[start+j] or qi[j]:
+                    info+=1
+                    if ph[start+j]==qh[j]:matched+=1
+            ratio=(matched/info) if info else 0.0
+            if ratio>best_ratio or (ratio==best_ratio and info>best_info):
+                best_ratio=ratio; best_info=info; best_overlap=overlap
+        required=max(10,int(best_overlap*.035))
+        if best_info<required or best_ratio<.965:return 0
+        return best_overlap
 
     def stitch_long_frames(self,frames):
         from PIL import Image
