@@ -880,24 +880,52 @@ class Overlay:
                 uy=y+height+2; d.line((x,uy,x+width,uy),fill=style['color'],width=max(1,style['size']//14))
             x+=width
 
-    def render_output(self):
-        if not self.sel:raise ValueError('Hãy kéo chọn vùng cần chụp.')
+    def render_source_with_annotations(self):
         from PIL import ImageDraw
-        x1,y1,x2,y2=map(int,self.sel); out=self.img.crop((x1,y1,x2,y2)); d=ImageDraw.Draw(out)
+        out=self.img.copy(); d=ImageDraw.Draw(out)
         for op in self.ops:
-            if self.is_text_op(op): self.draw_rich_text_pil(d,op,x1,y1); continue
+            if self.is_text_op(op):self.draw_rich_text_pil(d,op,0,0); continue
             k=op[0]
             if k=='pen':
-                pts=[(op[1][i]-x1,op[1][i+1]-y1) for i in range(0,len(op[1]),2)]; d.line(pts,fill=op[2],width=op[3],joint='curve')
-            elif k=='rect':d.rectangle((op[1][0]-x1,op[1][1]-y1,op[1][2]-x1,op[1][3]-y1),outline=op[2],width=op[3])
+                pts=[(op[1][i],op[1][i+1]) for i in range(0,len(op[1]),2)]; d.line(pts,fill=op[2],width=op[3],joint='curve')
+            elif k=='rect':d.rectangle(op[1],outline=op[2],width=op[3])
             elif k=='arrow':
-                ax,ay,bx,by=op[1]; ax-=x1; ay-=y1; bx-=x1; by-=y1; d.line((ax,ay,bx,by),fill=op[2],width=op[3]); ang=math.atan2(by-ay,bx-ax); L=16+op[3]*2
+                ax,ay,bx,by=op[1]; d.line((ax,ay,bx,by),fill=op[2],width=op[3]); ang=math.atan2(by-ay,bx-ax); L=16+op[3]*2
                 d.polygon([(bx,by),(bx-L*math.cos(ang-.5),by-L*math.sin(ang-.5)),(bx-L*math.cos(ang+.5),by-L*math.sin(ang+.5))],fill=op[2])
             elif k=='mosaic':
-                a,b,c,e=op[1]; box=(max(0,int(a-x1)),max(0,int(b-y1)),min(out.width,int(c-x1)),min(out.height,int(e-y1)))
+                a,b,c,e=map(int,op[1]); box=(max(0,a),max(0,b),min(out.width,c),min(out.height,e))
                 if box[2]>box[0] and box[3]>box[1]:
                     reg=out.crop(box); small=reg.resize((max(1,reg.width//14),max(1,reg.height//14))); out.paste(small.resize(reg.size),box)
         return out
+
+    def render_output(self):
+        if not self.sel:raise ValueError('Hãy kéo chọn vùng cần chụp.')
+        from PIL import Image, ImageDraw
+        x1,y1,x2,y2=self.sel; width=max(1,int(round(x2-x1))); height=max(1,int(round(y2-y1)))
+        if self.long_mode or abs(self.sel_angle)<.01:
+            x1i,y1i,x2i,y2i=map(int,(x1,y1,x2,y2)); out=self.img.crop((x1i,y1i,x2i,y2i)); d=ImageDraw.Draw(out)
+            for op in self.ops:
+                if self.is_text_op(op): self.draw_rich_text_pil(d,op,x1i,y1i); continue
+                k=op[0]
+                if k=='pen':
+                    pts=[(op[1][i]-x1i,op[1][i+1]-y1i) for i in range(0,len(op[1]),2)]; d.line(pts,fill=op[2],width=op[3],joint='curve')
+                elif k=='rect':d.rectangle((op[1][0]-x1i,op[1][1]-y1i,op[1][2]-x1i,op[1][3]-y1i),outline=op[2],width=op[3])
+                elif k=='arrow':
+                    ax,ay,bx,by=op[1]; ax-=x1i; ay-=y1i; bx-=x1i; by-=y1i; d.line((ax,ay,bx,by),fill=op[2],width=op[3]); ang=math.atan2(by-ay,bx-ax); L=16+op[3]*2
+                    d.polygon([(bx,by),(bx-L*math.cos(ang-.5),by-L*math.sin(ang-.5)),(bx-L*math.cos(ang+.5),by-L*math.sin(ang+.5))],fill=op[2])
+                elif k=='mosaic':
+                    a,b,c,e=op[1]; box=(max(0,int(a-x1i)),max(0,int(b-y1i)),min(out.width,int(c-x1i)),min(out.height,int(e-y1i)))
+                    if box[2]>box[0] and box[3]>box[1]:
+                        reg=out.crop(box); small=reg.resize((max(1,reg.width//14),max(1,reg.height//14))); out.paste(small.resize(reg.size),box)
+            return out
+        source=self.render_source_with_annotations(); cx=(x1+x2)/2; cy=(y1+y2)/2; r=math.radians(self.sel_angle); co=math.cos(r); si=math.sin(r)
+        # Pillow AFFINE maps each output pixel back to its source coordinate.
+        data=(co,-si,cx-co*width/2+si*height/2,si,co,cy-si*width/2-co*height/2)
+        try:affine=Image.Transform.AFFINE
+        except AttributeError:affine=Image.AFFINE
+        try:resample=Image.Resampling.BICUBIC
+        except AttributeError:resample=Image.BICUBIC
+        return source.transform((width,height),affine,data,resample=resample)
 
     def find_vertical_overlap(self,previous,current):
         import zlib
