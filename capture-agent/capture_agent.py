@@ -977,6 +977,29 @@ class Overlay:
                     reg=out.crop(box); small=reg.resize((max(1,reg.width//14),max(1,reg.height//14))); out.paste(small.resize(reg.size),box)
         return out
 
+    def solve_linear_system(self,matrix,values):
+        n=len(values); a=[list(map(float,matrix[i]))+[float(values[i])] for i in range(n)]
+        for col in range(n):
+            pivot=max(range(col,n),key=lambda r:abs(a[r][col]))
+            if abs(a[pivot][col])<1e-10:raise ValueError('Khung phối cảnh không hợp lệ. Hãy chỉnh lại 4 góc.')
+            if pivot!=col:a[col],a[pivot]=a[pivot],a[col]
+            div=a[col][col]
+            for j in range(col,n+1):a[col][j]/=div
+            for row in range(n):
+                if row==col:continue
+                factor=a[row][col]
+                if abs(factor)<1e-15:continue
+                for j in range(col,n+1):a[row][j]-=factor*a[col][j]
+        return [a[i][n] for i in range(n)]
+
+    def perspective_coefficients(self,dst_points,src_points):
+        # Pillow PERSPECTIVE needs the inverse map: each output point -> source point.
+        matrix=[]; values=[]
+        for (x,y),(u,v) in zip(dst_points,src_points):
+            matrix.append([x,y,1,0,0,0,-u*x,-u*y]); values.append(u)
+            matrix.append([0,0,0,x,y,1,-v*x,-v*y]); values.append(v)
+        return tuple(self.solve_linear_system(matrix,values))
+
     def render_output(self):
         if not self.sel:raise ValueError('Hãy kéo chọn vùng cần chụp.')
         from PIL import Image, ImageDraw
@@ -1000,14 +1023,16 @@ class Overlay:
         source=self.render_source_with_annotations(); nw,ne,se,sw=self.selection_corners()
         top=math.hypot(ne[0]-nw[0],ne[1]-nw[1]); bottom=math.hypot(se[0]-sw[0],se[1]-sw[1])
         left=math.hypot(sw[0]-nw[0],sw[1]-nw[1]); right=math.hypot(se[0]-ne[0],se[1]-ne[1])
-        width=max(1,int(round((top+bottom)/2))); height=max(1,int(round((left+right)/2)))
-        # QUAD maps the selected source quadrilateral to a perfectly rectangular output.
-        data=(nw[0],nw[1],sw[0],sw[1],se[0],se[1],ne[0],ne[1])
-        try:quad=Image.Transform.QUAD
-        except AttributeError:quad=Image.QUAD
+        width=max(2,int(round(max(top,bottom)))); height=max(2,int(round(max(left,right))))
+        coeffs=self.perspective_coefficients(
+            [(0.0,0.0),(float(width-1),0.0),(float(width-1),float(height-1)),(0.0,float(height-1))],
+            [nw,ne,se,sw]
+        )
+        try:perspective=Image.Transform.PERSPECTIVE
+        except AttributeError:perspective=Image.PERSPECTIVE
         try:resample=Image.Resampling.BICUBIC
         except AttributeError:resample=Image.BICUBIC
-        return source.transform((width,height),quad,data,resample=resample)
+        return source.transform((width,height),perspective,coeffs,resample=resample)
 
     def find_vertical_overlap(self,previous,current):
         import zlib
