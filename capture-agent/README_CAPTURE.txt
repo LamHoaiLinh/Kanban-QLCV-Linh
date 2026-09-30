@@ -36,7 +36,9 @@ Sử dụng
 - Nếu hai đoạn không có overlap đủ tin cậy, Agent giữ nguyên cả đoạn thay vì tự cắt, ưu tiên không làm mất nội dung.
 - Hoặc bấm nút CHỤP trong Kanban để dùng chế độ Alt+C.
 - Kéo chuột tạo vùng chụp; ngoài vùng chọn được làm tối.
-- Khung chọn có 8 điểm resize và có thể kéo cả khung sang vị trí khác.
+- Alt+C: 4 nút màu cam ở bốn góc là tay xoay; kéo một góc để xoay khung theo mép tài liệu scan bị lệch. 4 nút giữa cạnh vẫn dùng để thay đổi kích thước.
+- Ctrl+C / Lưu file sẽ deskew vùng đã xoay thành ảnh chữ nhật thẳng trước khi xuất; góc xoay có Undo/Redo như các thao tác khác.
+- Khung chọn có thể kéo cả khung sang vị trí khác.
 - Thanh dọc: Chọn/di chuyển, Chữ, Bút, Khung, Mũi tên, Mosaic, đổi màu, Hoàn tác/Làm lại.
 - Khi chọn Bút/Khung/Mũi tên, thanh dọc hiện nút −/+ để chỉnh độ dày nét.
 - Khi chọn Chữ, thanh dọc hiện nút −/+ để chỉnh cỡ chữ.
