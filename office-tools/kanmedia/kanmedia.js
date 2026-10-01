@@ -72,7 +72,13 @@ async function kmApi(path,opt){
   let body=opt.body;if(Object.prototype.hasOwnProperty.call(opt,'json')){headers['Content-Type']='application/json';body=JSON.stringify(opt.json);}
   const ctl=new AbortController();const tm=setTimeout(function(){ctl.abort();},opt.timeout||5000);
   try{
-    const r=await fetch(KANMEDIA_AGENT+path,{method:opt.method||'GET',headers:headers,body:body,cache:'no-store',signal:ctl.signal,targetAddressSpace:'loopback'});
+    let r;
+    try{
+      r=await fetch(KANMEDIA_AGENT+path,{method:opt.method||'GET',headers:headers,body:body,cache:'no-store',signal:ctl.signal,targetAddressSpace:'loopback'});
+    }catch(e){
+      if(e&&e.name==='AbortError')throw new Error('KanMedia phản hồi quá chậm. Hãy kiểm tra KanBan Tools.');
+      throw new Error('Không kết nối được KanMedia trên máy. Hãy chạy lại KanTool.bat rồi bấm Kiểm tra lại.');
+    }
     if(!r.ok){let m='Lỗi '+r.status;try{const j=await r.json();m=j.error||m;}catch(e){}throw new Error(m);}
     return opt.raw?r:await r.json();
   }finally{clearTimeout(tm);}
@@ -184,7 +190,7 @@ async function startDownload(){
   try{
     const r=await kmApi('/media/download',{method:'POST',json:{urls:kmState.urls,kind:kmState.kind,format:kmState.format,quality:kmState.quality},timeout:5000});
     startPolling(r.jobId);
-  }catch(e){setBusy(false);notice(e.message,'warn');}
+  }catch(e){setBusy(false);setProgress(0,'KanMedia chưa kết nối.','');notice(e.message,'warn');}
 }
 function renderConvert(h){
   h.innerHTML=[
