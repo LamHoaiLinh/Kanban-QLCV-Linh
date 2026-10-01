@@ -288,6 +288,10 @@
         <div><strong>10. Ghi chú nhanh:</strong> bấm dấu ＋ dưới tên dự án để tạo ghi chú; bấm tên ghi chú để mở và chỉnh sửa.</div>
         <div><strong>11. Nhập nhanh công việc:</strong> nhấn Ctrl + Enter khi trang Kanban đang được focus, nhập tên rồi nhấn Enter để lưu.</div>
         <div><strong>12. Chọn nhiều công việc:</strong> Ctrl + click để chọn rời rạc, Shift + click để chọn liên tục, Ctrl + A để chọn toàn bộ thẻ trong cột đang chọn; kéo một thẻ đã chọn để di chuyển cả nhóm hoặc nhấn Delete để chuyển toàn bộ thẻ đã chọn vào Nội dung đã xóa.</div>
+        <div><strong>13. Đồng hồ & báo thức:</strong> bấm trực tiếp vào đồng hồ để mở cửa sổ. Có thể đặt phút/giây, chọn thời gian mẫu, thử chuông và dùng nút TẮT cạnh đồng hồ khi báo thức đang reo.</div>
+        <div><strong>14. Sinh nhật / Ngày giỗ:</strong> trong cửa sổ Đồng hồ, mở tab “Sinh nhật / Ngày giỗ”. Sinh nhật nhập ngày dương lịch; ngày giỗ nhập ngày âm theo dạng dd/mm/yyyy. Có thể tìm theo tên hoặc lọc theo tháng.</div>
+        <div><strong>15. Dải nhắc ngày đặc biệt:</strong> KanBan nhắc trước 2 ngày, ngày mai và hôm nay. Có thể bỏ tick “Nhắc” ngay trên dải để ẩn chữ chạy.</div>
+        <div><strong>16. Sao lưu ngày đặc biệt:</strong> danh sách sinh nhật/ngày giỗ được lưu chung trong “Xuất bản sao JSON” và được khôi phục khi nhập lại file backup.</div>
       </div>
       <div class="modal-actions right-actions"><button class="primary-btn" value="close">Đã hiểu</button></div>
     </form>
@@ -463,11 +467,8 @@
             <label class="field"><span>Ngày sinh dương lịch</span><input id="specialBirthdayDateInput" type="date"></label>
           </div>
 
-          <div id="specialMemorialFields" class="special-date-fields special-lunar-fields" hidden>
-            <label class="field"><span>Ngày âm</span><input id="specialLunarDayInput" type="number" min="1" max="30" step="1" placeholder="15"></label>
-            <label class="field"><span>Tháng âm</span><input id="specialLunarMonthInput" type="number" min="1" max="12" step="1" placeholder="7"></label>
-            <label class="field"><span>Năm tham chiếu</span><input id="specialLunarYearInput" type="number" min="1800" max="2200" step="1" placeholder="Không bắt buộc"></label>
-            <label class="special-leap-check"><input id="specialLunarLeapInput" type="checkbox"><span>Tháng nhuận</span></label>
+          <div id="specialMemorialFields" class="special-date-fields" hidden>
+            <label class="field"><span>Ngày giỗ âm lịch</span><input id="specialLunarDateInput" class="special-lunar-date-input" type="text" inputmode="numeric" maxlength="10" placeholder="dd/mm/yyyy" autocomplete="off"></label>
           </div>
 
           <div class="special-date-form-actions">
@@ -476,6 +477,22 @@
           </div>
         </div>
 
+        <div class="special-date-filterbar">
+          <label class="special-date-search">
+            <span>⌕</span>
+            <input id="specialDateSearchInput" type="search" placeholder="Tìm theo tên..." autocomplete="off">
+          </label>
+          <label class="special-date-month-filter">
+            <span>Tháng</span>
+            <select id="specialDateMonthFilter">
+              <option value="all">Tất cả</option>
+              <option value="1">Tháng 1</option><option value="2">Tháng 2</option><option value="3">Tháng 3</option>
+              <option value="4">Tháng 4</option><option value="5">Tháng 5</option><option value="6">Tháng 6</option>
+              <option value="7">Tháng 7</option><option value="8">Tháng 8</option><option value="9">Tháng 9</option>
+              <option value="10">Tháng 10</option><option value="11">Tháng 11</option><option value="12">Tháng 12</option>
+            </select>
+          </label>
+        </div>
         <div class="special-date-list-head">
           <strong>Danh sách đã lưu</strong>
           <span id="specialDateCount">0 ngày</span>
