@@ -61,6 +61,8 @@ def status(state: str, percent: float, message: str, current: str = "", index: i
         "speed": speed,
         "eta": eta,
         "stage": stage,
+        "updatedAt": time.time(),
+        "workerVersion": "1.5.0",
         "workerPid": os.getpid(),
         "childPid": child_pid,
     })
@@ -373,6 +375,7 @@ def ffmpeg_run(src: Path, options: list[str], dst: Path, dur: float,
     args = [str(FFMPEG), "-hide_banner", "-y", "-i", str(src)] + options + [
         "-progress", "pipe:1", "-nostats", str(dst)
     ]
+    status("running", base, label, current, index, total, stage="ffmpeg")
     started = time.time()
     def cb(line: str, pid: int):
         m = re.match(r"out_time_(?:us|ms)=([0-9]+)", line)
@@ -459,7 +462,10 @@ def convert_one(meta: dict, fmt: str, quality: str,
 
 def edit_one(meta: dict, p: dict) -> str:
     src = Path(meta["path"])
+    display_name = str(meta.get("name") or src.name)
+    status("running", 2, "Đang đọc thời lượng file…", display_name, 1, 1, stage="inspect")
     dur = duration(src)
+    status("running", 3, "Đang nhận dạng audio/video…", display_name, 1, 1, stage="inspect")
     types = stream_types(src)
     has_video = "video" in types
     has_audio = "audio" in types
@@ -604,8 +610,9 @@ def edit_one(meta: dict, p: dict) -> str:
         else:
             opts += ["-c:a", "aac", "-b:a", "160k"]
 
-    label = f"Đang chỉnh “{meta.get('name', src.name)}”"
-    ffmpeg_run(src, opts, dst, out_dur, 5, 94, label, str(meta.get("name", src.name)), 1, 1)
+    status("running", 4, "Đang dựng thao tác chỉnh sửa…", display_name, 1, 1, stage="prepare")
+    label = f"Đang xử lý “{display_name}”"
+    ffmpeg_run(src, opts, dst, out_dur, 5, 94, label, display_name, 1, 1)
     return str(rename_from_metadata(dst))
 
 def main():
@@ -617,7 +624,7 @@ def main():
     global DOWNLOADS
     DOWNLOADS = Path(str(p.get("downloadDir") or DOWNLOADS))
     DOWNLOADS.mkdir(parents=True, exist_ok=True)
-    status("running", 1, "Đang chuẩn bị…")
+    status("running", 1, "Worker đã khởi động…", stage="startup")
 
     if mode == "download":
         urls = list(p.get("urls") or [])
