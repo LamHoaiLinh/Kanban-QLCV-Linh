@@ -72,7 +72,7 @@ async function kmApi(path,opt){
   let body=opt.body;if(Object.prototype.hasOwnProperty.call(opt,'json')){headers['Content-Type']='application/json';body=JSON.stringify(opt.json);}
   const ctl=new AbortController();const tm=setTimeout(function(){ctl.abort();},opt.timeout||5000);
   try{
-    const r=await fetch(KANMEDIA_AGENT+path,{method:opt.method||'GET',headers:headers,body:body,cache:'no-store',signal:ctl.signal});
+    const r=await fetch(KANMEDIA_AGENT+path,{method:opt.method||'GET',headers:headers,body:body,cache:'no-store',signal:ctl.signal,targetAddressSpace:'loopback'});
     if(!r.ok){let m='Lỗi '+r.status;try{const j=await r.json();m=j.error||m;}catch(e){}throw new Error(m);}
     return opt.raw?r:await r.json();
   }finally{clearTimeout(tm);}
