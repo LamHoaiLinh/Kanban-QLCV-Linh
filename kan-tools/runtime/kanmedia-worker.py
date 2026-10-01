@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 if len(sys.argv) < 2:
@@ -45,7 +46,8 @@ def save_json(path: Path, data: dict) -> None:
     tmp.replace(path)
 
 def status(state: str, percent: float, message: str, current: str = "", index: int = 0,
-           total: int = 0, output: str = "", error: str = "", child_pid: int = 0) -> None:
+           total: int = 0, output: str = "", error: str = "", child_pid: int = 0,
+           speed: str = "", eta: str = "", stage: str = "") -> None:
     save_json(STATUS, {
         "ok": state != "error",
         "state": state,
@@ -56,6 +58,9 @@ def status(state: str, percent: float, message: str, current: str = "", index: i
         "total": total,
         "output": output,
         "error": error,
+        "speed": speed,
+        "eta": eta,
+        "stage": stage,
         "workerPid": os.getpid(),
         "childPid": child_pid,
     })
@@ -238,26 +243,34 @@ def download_one(url: str, kind: str, fmt: str, quality: str,
     else:
         status("running", base, f"Đang chuẩn bị playlist {index}/{total}…", "", index, total)
     status("running", base, f"Đang tải “{title}” — 0%", title, index, total)
-    tmpl = str(DOWNLOADS / "%(title).180B [%(id)s].%(ext)s")
+    if all_playlist:
+        tmpl = str(DOWNLOADS / "%(playlist_title)s" / "%(playlist_index)03d - %(title).180B [%(id)s].%(ext)s")
+    else:
+        tmpl = str(DOWNLOADS / "%(title).180B [%(id)s].%(ext)s")
     args = [
         sys.executable, "-m", "yt_dlp",
         "--js-runtimes", "node", "--newline", "--progress", "--no-overwrites",
         "--embed-metadata", "--ffmpeg-location", str(BIN), "-o", tmpl,
-        "--progress-template", "download:KM_PROGRESS:%(progress._percent_str)s",
+        "--progress-template", "download:KM_PROGRESS:%(progress._percent_str)s|%(progress._speed_str)s|%(progress._eta_str)s",
         "--print", "before_dl:KM_ITEM:%(playlist_index)s/%(playlist_count)s:%(title)s",
         "--print", "after_move:KM_FILE:%(filepath)s",
     ]
     args.append("--yes-playlist" if all_playlist else "--no-playlist")
+    if all_playlist:
+        args += ["--download-archive", str(DOWNLOADS / ".kanmedia-playlist-archive.txt")]
     if kind == "audio":
         codec = fmt if fmt in {"mp3", "m4a", "opus", "flac", "wav"} else "mp3"
         args += ["-f", "bestaudio/best", "-x", "--audio-format", codec]
         if codec == "mp3":
-            aq = "0"
-            if quality == "medium":
-                aq = "4"
-            elif quality == "low":
-                aq = "7"
-            args += ["--audio-quality", aq]
+            qmap = {"ultra": "0", "high": "2", "medium": "4", "low": "7"}
+            args += ["--audio-quality", qmap.get(quality, "2")]
+        elif codec == "m4a":
+            qmap = {"ultra": "256K", "high": "192K", "medium": "128K", "low": "96K"}
+            args += ["--audio-quality", qmap.get(quality, "192K")]
+        elif codec == "opus":
+            qmap = {"ultra": "192K", "high": "160K", "medium": "128K", "low": "96K"}
+            args += ["--audio-quality", qmap.get(quality, "160K")]
+        # FLAC/WAV không tạo thêm chất lượng từ nguồn nén; luôn dùng nguồn tốt nhất.
     else:
         if all_playlist:
             cap = {"high": 1080, "medium": 720, "low": 480}.get(quality)
@@ -305,18 +318,37 @@ def download_one(url: str, kind: str, fmt: str, quality: str,
             else:
                 status("running", base, f"Đang xử lý “{shown}”", shown, index, total, child_pid=pid)
             return
-        m = re.search(r"KM_PROGRESS:\s*([0-9.]+)%", line)
+        m = re.search(r"KM_PROGRESS:\s*([0-9.]+)%\|([^|]*)\|(.*)$", line)
         if m:
             p = float(m.group(1))
+            speed = m.group(2).strip()
+            eta = m.group(3).strip()
             shown = playlist_state["title"] or title
             if all_playlist and playlist_state["item"] and playlist_state["count"]:
                 overall = ((playlist_state["item"] - 1) + p / 100.0) / playlist_state["count"]
                 pct = base + slice_pct * overall
                 msg = f"Đang tải bài {playlist_state['item']}/{playlist_state['count']} “{shown}” — {round(p)}%"
-                status("running", pct, msg, shown, playlist_state["item"], playlist_state["count"], child_pid=pid)
+                status("running", pct, msg, shown, playlist_state["item"], playlist_state["count"],
+                       child_pid=pid, speed=speed, eta=eta, stage="download")
             else:
                 status("running", base + slice_pct * p / 100.0,
-                       f"Đang tải “{shown}” — {round(p)}%", shown, index, total, child_pid=pid)
+                       f"Đang tải “{shown}” — {round(p)}%", shown, index, total,
+                       child_pid=pid, speed=speed, eta=eta, stage="download")
+        elif line.startswith("[Merger]"):
+            shown = playlist_state["title"] or title
+            status("running", base + slice_pct * 0.985, f"Đang ghép hình và tiếng “{shown}”",
+                   shown, playlist_state["item"] or index, playlist_state["count"] or total,
+                   child_pid=pid, stage="merge")
+        elif line.startswith("[Metadata]") or line.startswith("[EmbedSubtitle]"):
+            shown = playlist_state["title"] or title
+            status("running", base + slice_pct * 0.99, f"Đang ghi thông tin file “{shown}”",
+                   shown, playlist_state["item"] or index, playlist_state["count"] or total,
+                   child_pid=pid, stage="metadata")
+        elif line.startswith("[ExtractAudio]") or line.startswith("[VideoRemuxer]"):
+            shown = playlist_state["title"] or title
+            status("running", base + slice_pct * 0.99, f"Đang chuyển định dạng “{shown}”",
+                   shown, playlist_state["item"] or index, playlist_state["count"] or total,
+                   child_pid=pid, stage="convert")
         elif line.startswith("KM_FILE:"):
             output_file["path"] = line.split(":", 1)[1].strip()
 
@@ -339,14 +371,21 @@ def ffmpeg_run(src: Path, options: list[str], dst: Path, dur: float,
     args = [str(FFMPEG), "-hide_banner", "-y", "-i", str(src)] + options + [
         "-progress", "pipe:1", "-nostats", str(dst)
     ]
+    started = time.time()
     def cb(line: str, pid: int):
         m = re.match(r"out_time_(?:us|ms)=([0-9]+)", line)
         if m and dur > 0:
             p = min(99.0, (float(m.group(1)) / (dur * 1_000_000.0)) * 100.0)
+            elapsed = max(0.1, time.time() - started)
+            eta = ""
+            if p > 0.5:
+                remain = elapsed * (100.0 - p) / p
+                eta = f"{int(remain//60):02d}:{int(remain%60):02d}"
             status("running", base + slice_pct * p / 100.0,
-                   f"{label} — {round(p)}%", current, index, total, child_pid=pid)
+                   f"{label} — {round(p)}%", current, index, total, child_pid=pid,
+                   eta=eta, stage="ffmpeg")
         elif line == "progress=end":
-            status("running", base + slice_pct, f"{label} — 100%", current, index, total, child_pid=pid)
+            status("running", base + slice_pct, f"{label} — 100%", current, index, total, child_pid=pid, stage="ffmpeg")
     return run_lines(args, cb, allow_fail=allow_fail)
 
 def read_upload(upload_id: str) -> dict:
@@ -354,6 +393,17 @@ def read_upload(upload_id: str) -> dict:
     if not p.exists():
         raise RuntimeError("Không tìm thấy file đã nhận.")
     return load_json(p)
+
+def cleanup_upload(upload_id: str) -> None:
+    try:
+        meta_path = UPLOADS / f"{upload_id}.json"
+        meta = load_json(meta_path) if meta_path.exists() else {}
+        raw = str(meta.get("path") or "")
+        if raw:
+            Path(raw).unlink(missing_ok=True)
+        meta_path.unlink(missing_ok=True)
+    except Exception as exc:
+        log("Upload cleanup skipped: " + repr(exc))
 
 def convert_one(meta: dict, fmt: str, quality: str,
                 base: float, slice_pct: float, index: int, total: int) -> str:
@@ -532,14 +582,18 @@ def main():
         slice_pct = 98.0 / len(ids)
         for i, uid in enumerate(ids):
             check_cancel()
+            uid = str(uid)
             last = convert_one(
-                read_upload(str(uid)), str(p.get("format") or "mp4"),
+                read_upload(uid), str(p.get("format") or "mp4"),
                 str(p.get("quality") or "medium"),
                 1 + slice_pct * i, slice_pct, i + 1, len(ids)
             )
+            cleanup_upload(uid)
         status("done", 100, "Hoàn tất.", total=len(ids), output=last)
     elif mode == "edit":
-        last = edit_one(read_upload(str(p.get("uploadId") or "")), p)
+        uid = str(p.get("uploadId") or "")
+        last = edit_one(read_upload(uid), p)
+        cleanup_upload(uid)
         status("done", 100, "Hoàn tất.", total=1, output=last)
     else:
         raise RuntimeError("Loại tác vụ không hợp lệ.")
