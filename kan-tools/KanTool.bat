@@ -49,16 +49,16 @@ mkdir "%TMP%" >nul 2>nul
 copy /y "%~f0" "%ROOT%\KanTool.bat" >nul 2>nul
 
 echo [1/8] Dung KanMedia cu neu dang chay...
-powershell -NoProfile -Command "$h=@{'X-KanBan-Agent'='linh-kanban-v1'};try{Invoke-RestMethod -Method Post -Headers $h -ContentType 'application/json' -Body '{}' -Uri 'http://127.0.0.1:47632/shutdown' -TimeoutSec 1|Out-Null}catch{};Start-Sleep -Milliseconds 500;Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.CommandLine -like '*kanmedia-server.py*' -or $_.CommandLine -like '*kanmedia-server.ps1*'}|ForEach-Object{Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue}" >nul 2>nul
+powershell -NoProfile -Command "$h=@{'X-KanBan-Agent'='linh-kanban-v1'};try{Invoke-RestMethod -Method Post -Headers $h -ContentType 'application/json' -Body '{}' -Uri 'http://127.0.0.1:47632/shutdown' -TimeoutSec 1|Out-Null}catch{};Start-Sleep -Milliseconds 500;Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.CommandLine -like '*kanmedia-server.py*' -or $_.CommandLine -like '*kanmedia-server.ps1*' -or $_.CommandLine -like '*kanmedia-worker.py*' -or $_.CommandLine -like '*kanmedia-worker.ps1*'}|ForEach-Object{Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue}" >nul 2>nul
 timeout /t 1 /nobreak >nul
 
 echo [2/8] Tai runtime KanMedia tu repo KanBan...
 powershell -NoProfile -Command ^
  "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';" ^
  "Invoke-WebRequest -UseBasicParsing -Uri '%REPO%/kan-tools/runtime/kanmedia-server.py?ts=%RANDOM%' -OutFile '%RUNTIME%\kanmedia-server.py';" ^
- "Invoke-WebRequest -UseBasicParsing -Uri '%REPO%/kan-tools/runtime/kanmedia-worker.ps1?ts=%RANDOM%' -OutFile '%RUNTIME%\kanmedia-worker.ps1';" ^
+ "Invoke-WebRequest -UseBasicParsing -Uri '%REPO%/kan-tools/runtime/kanmedia-worker.py?ts=%RANDOM%' -OutFile '%RUNTIME%\kanmedia-worker.py';" ^
  "if((Get-Item '%RUNTIME%\kanmedia-server.py').Length -lt 8000){throw 'Runtime KanMedia server khong hop le'};" ^
- "if((Get-Item '%RUNTIME%\kanmedia-worker.ps1').Length -lt 8000){throw 'Runtime KanMedia worker khong hop le'};"
+ "if((Get-Item '%RUNTIME%\kanmedia-worker.py').Length -lt 10000){throw 'Runtime KanMedia worker khong hop le'};"
 if errorlevel 1 goto :FAIL_RUNTIME
 
 echo [3/8] Chuan bi Python cho KanBan Tools...
