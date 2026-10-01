@@ -500,24 +500,50 @@ function drawVirtualWaveform(w){
 }
 function setupWaveDrag(w){
   const wrap=w.querySelector('#kmWaveWrap');if(!wrap)return;
-  function bind(handle,which){
+  function timeFromPointer(ev){
+    const k=kmState.editWave;if(!k)return 0;
+    const r=wrap.getBoundingClientRect(),dur=segmentsDuration(k.segments);
+    return Math.max(0,Math.min(dur,(ev.clientX-r.left)/Math.max(1,r.width)*dur));
+  }
+  function bindRangeHandle(handle,which){
+    if(!handle)return;
     handle.addEventListener('pointerdown',function(e){
-      e.preventDefault();handle.setPointerCapture(e.pointerId);wrap.classList.add('dragging');
+      e.preventDefault();e.stopPropagation();handle.setPointerCapture(e.pointerId);wrap.classList.add('dragging');
       const move=function(ev){
-        const k=kmState.editWave;if(!k)return;const r=wrap.getBoundingClientRect(),dur=segmentsDuration(k.segments);
-        let t=Math.max(0,Math.min(dur,(ev.clientX-r.left)/Math.max(1,r.width)*dur));const sel=waveSelection(k);
+        const k=kmState.editWave;if(!k)return;
+        let t=timeFromPointer(ev),sel=waveSelection(k);
         if(which===0)t=Math.min(t,sel[1]-.02);else t=Math.max(t,sel[0]+.02);
-        k.selection=which===0?[t,sel[1]]:[sel[0],t];syncWaveControls(w,false);
+        k.selection=which===0?[t,sel[1]]:[sel[0],t];
+        syncWaveControls(w,false);
       };
-      const up=function(){wrap.classList.remove('dragging');handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',up);handle.removeEventListener('pointercancel',up);};
+      const up=function(ev){
+        try{handle.releasePointerCapture(ev.pointerId);}catch(x){}
+        wrap.classList.remove('dragging');
+        handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',up);handle.removeEventListener('pointercancel',up);
+      };
       handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',up);handle.addEventListener('pointercancel',up);
     });
   }
-  bind(w.querySelector('#kmWaveStartHandle'),0);bind(w.querySelector('#kmWaveEndHandle'),1);
-  wrap.addEventListener('click',function(e){
-    if(e.target.closest('.km-wave-handle'))return;
-    const k=kmState.editWave;if(!k)return;const r=wrap.getBoundingClientRect(),dur=segmentsDuration(k.segments),t=Math.max(0,Math.min(dur,(e.clientX-r.left)/r.width*dur));
-    const orig=currentToOriginal(k.segments,t),p=w.querySelector('#kmPreview');if(p&&Number.isFinite(orig))p.currentTime=orig;
+  bindRangeHandle(w.querySelector('#kmWaveStartHandle'),0);
+  bindRangeHandle(w.querySelector('#kmWaveEndHandle'),1);
+
+  const playhead=w.querySelector('#kmWavePlayhead');
+  if(playhead){
+    playhead.addEventListener('pointerdown',function(e){
+      e.preventDefault();e.stopPropagation();playhead.setPointerCapture(e.pointerId);wrap.classList.add('seeking');
+      const move=function(ev){setEditCursor(w,timeFromPointer(ev),true);};
+      const up=function(ev){
+        move(ev);try{playhead.releasePointerCapture(ev.pointerId);}catch(x){}
+        wrap.classList.remove('seeking');playhead.removeEventListener('pointermove',move);playhead.removeEventListener('pointerup',up);playhead.removeEventListener('pointercancel',up);
+      };
+      playhead.addEventListener('pointermove',move);playhead.addEventListener('pointerup',up);playhead.addEventListener('pointercancel',up);
+    });
+  }
+
+  wrap.addEventListener('pointerdown',function(e){
+    if(e.target.closest('.km-wave-handle')||e.target.closest('#kmWavePlayhead'))return;
+    if(e.button!==undefined&&e.button!==0)return;
+    setEditCursor(w,timeFromPointer(e),true);
   });
 }
 function applyWaveEdit(w,mode){
@@ -530,28 +556,36 @@ function applyWaveEdit(w,mode){
   else next=sliceSegments(k.segments,0,sel[0]).concat(sliceSegments(k.segments,sel[1],dur));
   if(!next.length)return notice('Thao tác này sẽ xóa toàn bộ media. Hãy chọn lại đoạn.','warn');
   k.undo=k.undo||[];k.undo.push(before);if(k.undo.length>30)k.undo.shift();
-  k.segments=next;k.selection=[0,segmentsDuration(next)];
-  syncWaveControls(w,true);
+  k.segments=next;k.selection=[0,segmentsDuration(next)];kmState.editCursor=0;
+  syncWaveControls(w,true);setEditCursor(w,0,true);
   notice(mode==='keep'?'Đã giữ đoạn chọn trên timeline.':'Đã xóa đoạn chọn và ghép waveform còn lại.','ok');
 }
 function undoWaveEdit(w){
   const k=kmState.editWave;if(!k||!k.undo||!k.undo.length)return;
-  k.segments=k.undo.pop();k.selection=[0,segmentsDuration(k.segments)];syncWaveControls(w,true);
+  k.segments=k.undo.pop();k.selection=[0,segmentsDuration(k.segments)];kmState.editCursor=0;syncWaveControls(w,true);setEditCursor(w,0,true);
 }
 function resetWaveEdit(w){
-  const k=kmState.editWave;if(!k)return;k.undo=[];k.segments=[[0,k.originalDuration]];k.selection=[0,k.originalDuration];syncWaveControls(w,true);
+  const k=kmState.editWave;if(!k)return;k.undo=[];k.segments=[[0,k.originalDuration]];k.selection=[0,k.originalDuration];kmState.editCursor=0;syncWaveControls(w,true);setEditCursor(w,0,true);
 }
 function playVirtualSelection(w){
   const k=kmState.editWave,p=w.querySelector('#kmPreview');if(!k||!p)return;
   const sel=waveSelection(k),pieces=sliceSegments(k.segments,sel[0],sel[1]);if(!pieces.length)return;
   kmState.editPreview={pieces:pieces,index:0};p.currentTime=pieces[0][0];p.play().catch(function(){});
 }
+function playFromCursor(w){
+  const k=kmState.editWave,p=w.querySelector('#kmPreview');if(!k||!p)return;
+  const dur=segmentsDuration(k.segments),cursor=Math.max(0,Math.min(dur,Number(kmState.editCursor)||0));
+  const pieces=sliceSegments(k.segments,cursor,dur);if(!pieces.length)return;
+  kmState.editPreview={pieces:pieces,index:0};
+  const orig=currentToOriginal(k.segments,cursor);if(Number.isFinite(orig))p.currentTime=orig;
+  p.play().catch(function(){});
+}
 function setupVirtualPreview(w){
   const p=w.querySelector('#kmPreview');if(!p)return;
   p.addEventListener('timeupdate',function(){
     const k=kmState.editWave;if(k){
       const ct=originalToCurrent(k.segments,p.currentTime),line=w.querySelector('#kmWavePlayhead'),dur=segmentsDuration(k.segments);
-      if(line){if(ct==null){line.hidden=true;}else{line.hidden=false;line.style.left=(dur?ct/dur*100:0)+'%';}}
+      if(line){if(ct==null){line.hidden=true;}else{kmState.editCursor=ct;line.hidden=false;line.style.left=(dur?ct/dur*100:0)+'%';}}
     }
     const preview=kmState.editPreview;if(!preview||!preview.pieces||!preview.pieces.length)return;
     const cur=preview.pieces[preview.index];if(!cur)return;
@@ -564,13 +598,30 @@ function setupVirtualPreview(w){
   });
   p.addEventListener('pause',function(){if(kmState.editPreview&&!p.ended){}});
 }
+function markWaveReady(w){
+  if(!w)return;
+  w.classList.add('wave-ready');
+  const shell=w.querySelector('.km-edit-work-shell');if(shell)shell.classList.add('wave-ready');
+}
+function setEditCursor(w,t,seek){
+  const k=kmState.editWave;if(!k)return;
+  const dur=segmentsDuration(k.segments);
+  t=Math.max(0,Math.min(dur,Number(t)||0));
+  kmState.editCursor=t;
+  const line=w.querySelector('#kmWavePlayhead');
+  if(line){line.hidden=false;line.style.left=(dur?t/dur*100:0)+'%';}
+  if(seek!==false){
+    const p=w.querySelector('#kmPreview'),orig=currentToOriginal(k.segments,t);
+    if(p&&Number.isFinite(orig))p.currentTime=orig;
+  }
+}
 async function loadWaveformEditor(file,w){
   const token=editFileToken(file),loader=w.querySelector('#kmWaveLoader');
   try{
     if(kmState.editWave&&kmState.editWave.fileToken===token&&kmState.editWave.imageSrc){
       setWaveLoader(w,96,'Đang khôi phục waveform…','Không cần tải lại file.');
       const img=new Image();img.src=kmState.editWave.imageSrc;await img.decode().catch(function(){});
-      kmState.editWave.image=img;hideWaveLoader(w);w.classList.add('wave-ready');syncWaveControls(w,true);return;
+      kmState.editWave.image=img;hideWaveLoader(w);markWaveReady(w);syncWaveControls(w,true);setEditCursor(w,kmState.editCursor||0,false);return;
     }
     setWaveLoader(w,2,'Đang nhận file…','File chỉ chuyển tới KanMedia trên chính máy này.');
     const up=await uploadFileWithProgress(file,function(p){setWaveLoader(w,2+p*.58,'Đang nhận file…',Math.round(p)+'% · '+bytes(file.size));});
@@ -585,12 +636,36 @@ async function loadWaveformEditor(file,w){
     kmState.editWave={fileToken:token,imageSrc:wave.image,image:img,originalDuration:Number(wave.duration)||0,segments:[[0,Number(wave.duration)||0]],selection:[0,Number(wave.duration)||0],undo:[]};
     const end=w.querySelector('#kmEnd');if(end)end.value=(Number(wave.duration)||0).toFixed(2);
     setWaveLoader(w,100,'Waveform đã sẵn sàng','Bạn có thể kéo hai tay nắm để chọn đoạn.');
-    await new Promise(function(r){setTimeout(r,180);});hideWaveLoader(w);w.classList.add('wave-ready');syncWaveControls(w,true);
+    await new Promise(function(r){setTimeout(r,180);});hideWaveLoader(w);markWaveReady(w);syncWaveControls(w,true);setEditCursor(w,kmState.editCursor||0,false);
   }catch(e){
     setWaveLoader(w,100,'Không tạo được waveform',e.message||'Hãy thử file khác.');
     const bar=loader&&loader.querySelector('.km-wave-loadbar');if(bar)bar.classList.add('error');
     notice(e.message||'Không tạo được waveform.','warn');
   }
+}
+function setupFadeControl(w,kind){
+  const isIn=kind==='in',btn=w.querySelector(isIn?'#kmFadeInBtn':'#kmFadeOutBtn'),pop=w.querySelector(isIn?'#kmFadeInPop':'#kmFadeOutPop');
+  const range=w.querySelector(isIn?'#kmFadeIn':'#kmFadeOut'),value=w.querySelector(isIn?'#kmFadeInValue':'#kmFadeOutValue'),state=w.querySelector(isIn?'#kmFadeInState':'#kmFadeOutState');
+  if(!btn||!pop||!range)return;
+  function sync(){
+    const v=Math.max(0,Number(range.value)||0);
+    if(value)value.textContent=v.toFixed(1)+' s';
+    if(state)state.textContent=v>0?v.toFixed(1)+'s':'Tắt';
+    btn.classList.toggle('active',v>0);
+    drawVirtualWaveform(w);
+  }
+  btn.addEventListener('click',function(e){
+    e.stopPropagation();
+    const opening=pop.hidden;
+    w.querySelectorAll('.km-fade-pop').forEach(function(x){x.hidden=true;});
+    if(opening){
+      if((Number(range.value)||0)<=0)range.value='3';
+      pop.hidden=false;sync();
+    }
+  });
+  range.addEventListener('input',sync);
+  const off=pop.querySelector('[data-fade-off]');
+  if(off)off.addEventListener('click',function(e){e.stopPropagation();range.value='0';sync();pop.hidden=true;});
 }
 function renderEditWork(w){
   const f=kmState.editFile;if(!f){w.innerHTML='';return;}
@@ -604,7 +679,7 @@ function renderEditWork(w){
       '<div class="km-wave-wrap" id="kmWaveWrap" data-tooltip="Kéo hai tay nắm để chọn đoạn. Bấm trên waveform để nhảy tới vị trí tương ứng.">',
         '<canvas id="kmWaveform" class="km-waveform"></canvas>',
         '<div class="km-wave-shade left" id="kmWaveShadeLeft"></div><div class="km-wave-shade right" id="kmWaveShadeRight"></div>',
-        '<div class="km-wave-selection" id="kmWaveSelection"></div><div class="km-wave-playhead" id="kmWavePlayhead" hidden></div>',
+        '<div class="km-wave-selection" id="kmWaveSelection"></div><div class="km-wave-playhead" id="kmWavePlayhead" data-tooltip="Vạch phát. Kéo hoặc bấm waveform để đổi vị trí bắt đầu phát." hidden><i></i></div>',
         '<button type="button" class="km-wave-handle start" id="kmWaveStartHandle" data-tooltip="Kéo để đặt điểm đầu"><span>0.00s</span></button>',
         '<button type="button" class="km-wave-handle end" id="kmWaveEndHandle" data-tooltip="Kéo để đặt điểm cuối"><span>0.00s</span></button>',
       '</div>',
@@ -616,13 +691,14 @@ function renderEditWork(w){
       '</div>',
       '<div class="km-edit-grid"><label><span>Âm lượng <b id="kmVolLabel">100%</b></span><input id="kmVolume" type="range" min="0" max="200" step="5" value="100"></label>',
       '<label><span>Tốc độ</span><div class="km-choice km-speed"><button data-speed="0.5">0.5×</button><button data-speed="0.75">0.75×</button><button data-speed="1" class="active">1×</button><button data-speed="1.25">1.25×</button><button data-speed="1.5">1.5×</button><button data-speed="2">2×</button></div></label>',
-      '<label><span>Mờ âm đầu (giây)</span><input id="kmFadeIn" type="number" min="0" max="30" step="0.5" value="0"></label><label><span>Mờ âm cuối (giây)</span><input id="kmFadeOut" type="number" min="0" max="30" step="0.5" value="0"></label></div>',
+      '<div class="km-fade-control"><button type="button" class="km-fade-btn" id="kmFadeInBtn" data-tooltip="Bật mờ âm đầu; mặc định 3 giây"><span class="km-fade-icon in">⌁</span><span>Mờ âm đầu</span><small id="kmFadeInState">Tắt</small></button><div class="km-fade-pop" id="kmFadeInPop" hidden><div class="km-fade-head"><strong>Mờ âm đầu</strong><b id="kmFadeInValue">3.0 s</b></div><input id="kmFadeIn" type="range" min="0" max="30" step="0.5" value="0"><div class="km-fade-foot"><span>0s</span><button type="button" data-fade-off>Tắt</button><span>30s</span></div></div></div>',
+      '<div class="km-fade-control"><button type="button" class="km-fade-btn" id="kmFadeOutBtn" data-tooltip="Bật mờ âm cuối; mặc định 3 giây"><span class="km-fade-icon out">⌁</span><span>Mờ âm cuối</span><small id="kmFadeOutState">Tắt</small></button><div class="km-fade-pop" id="kmFadeOutPop" hidden><div class="km-fade-head"><strong>Mờ âm cuối</strong><b id="kmFadeOutValue">3.0 s</b></div><input id="kmFadeOut" type="range" min="0" max="30" step="0.5" value="0"><div class="km-fade-foot"><span>0s</span><button type="button" data-fade-off>Tắt</button><span>30s</span></div></div></div></div>',
       '<div class="km-row"><label class="km-check"><input id="kmNormalize" type="checkbox"> Tự cân bằng âm lượng</label>',
       isVideo?'<label class="km-check"><input id="kmMute" type="checkbox"> Xóa tiếng video</label><label class="km-check"><input id="kmExtract" type="checkbox"> Lấy âm thanh thành MP3</label>':'',
-      '</div><div class="km-row km-actions"><button class="office-btn" id="kmPreviewStart" type="button">Phát đoạn chọn</button><button class="office-btn primary km-run" id="kmEditRun" type="button">Xuất file</button></div>',
+      '</div><div class="km-row km-actions"><button class="office-btn" id="kmPreviewStart" type="button">▶ Phát từ vạch đỏ</button><button class="office-btn primary km-run" id="kmEditRun" type="button">Xuất file</button></div>',
     '</div>'
   ].join('');
-  const p=w.querySelector('#kmPreview');kmState.edit={speed:1};kmState.editPreview=null;
+  const p=w.querySelector('#kmPreview');kmState.edit={speed:1};kmState.editPreview=null;kmState.editCursor=0;
   setupWaveDrag(w);setupVirtualPreview(w);
   w.querySelector('#kmSetStart').addEventListener('click',function(){const k=kmState.editWave;if(!k)return;const ct=originalToCurrent(k.segments,p.currentTime);if(ct==null)return notice('Vị trí đang phát nằm trong đoạn đã xóa.','warn');k.selection=[ct,waveSelection(k)[1]];syncWaveControls(w,false);});
   w.querySelector('#kmSetEnd').addEventListener('click',function(){const k=kmState.editWave;if(!k)return;const ct=originalToCurrent(k.segments,p.currentTime);if(ct==null)return notice('Vị trí đang phát nằm trong đoạn đã xóa.','warn');k.selection=[waveSelection(k)[0],ct];syncWaveControls(w,false);});
@@ -631,11 +707,11 @@ function renderEditWork(w){
   w.querySelector('#kmRemoveSegment').addEventListener('click',function(){applyWaveEdit(w,'remove');});
   w.querySelector('#kmUndoEdit').addEventListener('click',function(){undoWaveEdit(w);});
   w.querySelector('#kmResetEdit').addEventListener('click',function(){resetWaveEdit(w);});
-  w.querySelector('#kmPreviewStart').addEventListener('click',function(){playVirtualSelection(w);});
+  w.querySelector('#kmPreviewStart').addEventListener('click',function(){playFromCursor(w);});
   w.querySelectorAll('[data-speed]').forEach(function(b){b.addEventListener('click',function(){kmState.edit.speed=Number(b.dataset.speed);p.playbackRate=kmState.edit.speed;w.querySelectorAll('[data-speed]').forEach(function(x){x.classList.toggle('active',x===b);});});});
   w.querySelector('#kmVolume').addEventListener('input',function(e){w.querySelector('#kmVolLabel').textContent=e.target.value+'%';p.volume=Math.min(1,Number(e.target.value)/100);});
-  w.querySelector('#kmFadeIn').addEventListener('input',function(){drawVirtualWaveform(w);});
-  w.querySelector('#kmFadeOut').addEventListener('input',function(){drawVirtualWaveform(w);});
+  setupFadeControl(w,'in');setupFadeControl(w,'out');
+  w.addEventListener('click',function(e){if(!e.target.closest('.km-fade-control'))w.querySelectorAll('.km-fade-pop').forEach(function(x){x.hidden=true;});});
   w.querySelector('#kmEditRun').addEventListener('click',startEdit);
   applyKmTooltips();
   queueMicrotask(function(){loadWaveformEditor(f,w);});
