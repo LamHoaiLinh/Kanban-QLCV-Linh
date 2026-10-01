@@ -2311,7 +2311,9 @@
     if (!clockWorker && !clockTickTimer) clockTickTimer = setInterval(updateClockWidget,500);
     updateClockWidget();
     renderSpecialDateList();
+    renderWorkDateList();
     renderSpecialReminderBar(new Date(),true);
+    renderWorkReminderBar(new Date(),true);
     setTimeout(syncAlarmFromAgent,350);
     const clock = state.settings.clock;
     if (clock.running && clock.endAt) scheduleLocalAlarm(clock);
