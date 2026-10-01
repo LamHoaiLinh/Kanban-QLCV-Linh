@@ -36,11 +36,12 @@ FFMPEG = BIN / "ffmpeg.exe"
 FFPROBE = BIN / "ffprobe.exe"
 WORKER = RUNTIME / "kanmedia-worker.py"
 INSTALLER = ROOT / "KanTool.bat"
-DOWNLOADS = Path.home() / "Downloads" / "KanMedia"
+DEFAULT_DOWNLOADS = Path(os.environ.get("USERPROFILE", str(Path.home()))) / "Desktop" / "KanDownload"
+CONFIG = ROOT / "config.json"
 LOGS = ROOT / "logs"
 LOG = LOGS / "kanmedia-server.log"
 
-for p in (ROOT, RUNTIME, JOBS, UPLOADS, BIN, DOWNLOADS, LOGS):
+for p in (ROOT, RUNTIME, JOBS, UPLOADS, BIN, DEFAULT_DOWNLOADS, LOGS):
     p.mkdir(parents=True, exist_ok=True)
 
 ALLOWED_ORIGINS = {
@@ -81,6 +82,58 @@ def safe_name(name: str) -> str:
         stem, ext = os.path.splitext(name)
         name = stem[:150] + ext[:20]
     return name
+
+def get_downloads() -> Path:
+    folder = DEFAULT_DOWNLOADS
+    try:
+        if CONFIG.exists():
+            data = json.loads(CONFIG.read_text(encoding="utf-8-sig"))
+            raw = str(data.get("downloadDir") or "").strip()
+            if raw:
+                folder = Path(raw)
+    except Exception as exc:
+        log("CONFIG READ " + repr(exc))
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+def set_downloads(folder: str) -> Path:
+    target = Path(str(folder or "").strip())
+    if not str(target):
+        raise ValueError("Chưa chọn thư mục.")
+    target.mkdir(parents=True, exist_ok=True)
+    data = {"downloadDir": str(target)}
+    CONFIG.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    return target
+
+def choose_downloads() -> Path | None:
+    current = str(get_downloads()).replace("'", "''")
+    ps = shutil.which("powershell.exe") or r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
+    script = (
+        "Add-Type -AssemblyName System.Windows.Forms;"
+        "$d=New-Object System.Windows.Forms.FolderBrowserDialog;"
+        "$d.Description='Chọn thư mục lưu cho KanMedia';"
+        "$d.ShowNewFolderButton=$true;"
+        f"$d.SelectedPath='{current}';"
+        "if($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK){"
+        "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;"
+        "Write-Output $d.SelectedPath}"
+    )
+    cp = subprocess.run(
+        [ps, "-NoProfile", "-STA", "-Command", script],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=300,
+        creationflags=CREATE_NO_WINDOW if os.name == "nt" else 0,
+    )
+    picked = cp.stdout.strip()
+    if cp.returncode != 0:
+        raise RuntimeError(cp.stderr.strip() or "Không mở được hộp chọn thư mục.")
+    if not picked:
+        return None
+    return set_downloads(picked)
 
 def node_path() -> str:
     if NODE.exists():
@@ -151,7 +204,7 @@ def health() -> dict:
         "ffmpeg": ff,
         "node": nv,
         "worker": WORKER.exists(),
-        "downloads": str(DOWNLOADS),
+        "downloads": str(get_downloads()),
         "port": PORT,
         "errors": errors,
     }
@@ -175,6 +228,8 @@ def start_job(mode: str, payload: dict) -> dict:
     if not WORKER.exists():
         raise RuntimeError("Thiếu worker KanMedia. Hãy chạy lại KanTool.bat.")
     job_id = uuid.uuid4().hex
+    payload = dict(payload or {})
+    payload["downloadDir"] = str(get_downloads())
     req = {"jobId": job_id, "mode": mode, "created": time.strftime("%Y-%m-%dT%H:%M:%S"), "payload": payload}
     json_dump(JOBS / f"{job_id}.request.json", req)
     json_dump(job_path(job_id), {
@@ -410,11 +465,20 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if path == "/system/open-folder":
                 self._read_json()
+                folder = get_downloads()
                 if os.name == "nt":
-                    os.startfile(str(DOWNLOADS))
+                    os.startfile(str(folder))
                 else:
-                    subprocess.Popen(["xdg-open", str(DOWNLOADS)])
-                self._json({"ok": True, "path": str(DOWNLOADS)})
+                    subprocess.Popen(["xdg-open", str(folder)])
+                self._json({"ok": True, "path": str(folder)})
+                return
+            if path == "/system/select-folder":
+                self._read_json()
+                folder = choose_downloads()
+                if folder is None:
+                    self._json({"ok": True, "cancelled": True, "path": str(get_downloads())})
+                else:
+                    self._json({"ok": True, "cancelled": False, "path": str(folder)})
                 return
             if path == "/system/update":
                 self._read_json()
