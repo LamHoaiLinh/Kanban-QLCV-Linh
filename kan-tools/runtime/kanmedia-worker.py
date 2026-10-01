@@ -63,7 +63,7 @@ def status(state: str, percent: float, message: str, current: str = "", index: i
         "eta": eta,
         "stage": stage,
         "updatedAt": time.time(),
-        "workerVersion": "1.6.0",
+        "workerVersion": "1.7.0",
         "workerPid": os.getpid(),
         "childPid": child_pid,
     })
@@ -182,7 +182,7 @@ def stream_types(path: Path) -> set[str]:
         pass
     return set()
 
-def rename_from_metadata(path: Path) -> Path:
+def rename_from_metadata(path: Path, suffix: str = "") -> Path:
     if not path.exists():
         return path
     try:
@@ -198,6 +198,7 @@ def rename_from_metadata(path: Path) -> Path:
         if not title:
             return path
         base = f"{artist} - {title}" if artist else title
+        base = safe_name(base + str(suffix or ""))
         dst = unique_path(path.parent, base, path.suffix)
         if dst != path:
             path.replace(dst)
@@ -531,7 +532,7 @@ def convert_one(meta: dict, fmt: str, quality: str,
             opts = ["-vn", "-c:a", "libmp3lame", "-q:a", q]
         ffmpeg_run(src, opts, dst, dur, base, slice_pct, label, current, index, total)
 
-    return str(rename_from_metadata(dst))
+    return str(rename_from_metadata(dst, " - KanEdit"))
 
 def edit_one(meta: dict, p: dict) -> str:
     src = Path(meta["path"])
@@ -590,7 +591,7 @@ def edit_one(meta: dict, p: dict) -> str:
     base_name = safe_name(Path(str(meta.get("name") or src.name)).stem)
     audio_only = extract or (has_audio and not has_video)
     ext = ".mp3" if audio_only else ".mp4"
-    dst = unique_path(DOWNLOADS, base_name + " - edited", ext)
+    dst = unique_path(DOWNLOADS, base_name + " - KanEdit", ext)
 
     original_out_dur = sum(max(0.0, b - a) for a, b in segments)
     out_dur = original_out_dur / speed if speed > 0 else original_out_dur
