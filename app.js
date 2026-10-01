@@ -2,7 +2,7 @@
   'use strict';
 
   const STORAGE_KEY = 'linh_personal_kanban_v1';
-  const VERSION = 14;
+  const VERSION = 15;
   const DEFAULT_BACKGROUND_ID = 'bg6';
   const KAN_ALARM_AGENT = 'http://127.0.0.1:47632';
   const KAN_ALARM_HEADERS = {'X-KanBan-Agent':'linh-kanban-v1','Content-Type':'application/json'};
@@ -96,7 +96,7 @@
       'labelOptions','cardColumnSelect','deleteCardBtn','duplicateCardBtn','columnDialog','columnForm','columnDialogTitle','columnNameInput','columnColorOptions',
       'deleteColumnBtn','clearColumnContentBtn','duplicateColumnBtn','quickCaptureDialog','quickCaptureForm','quickCaptureTitleInput','quickCaptureColumnSelect','quickCaptureDestinationHint','backgroundDialog','backgroundOptions','guideDialog','settingsBtn','settingsDialog','settingsExportBtn','quickCaptureProjectName','quickCaptureDefaultColumnSelect','quickCaptureStatus','dailyMoveEnabled','dailyMoveProjectName','dailyMoveRules','addDailyMoveRuleBtn','dailyMoveStatus','openDeletedContentBtn','deletedContentCount','deletedContentDialog','deletedArchiveTabBtn','deletedTrashTabBtn','deletedArchivePanel','deletedTrashPanel','deletedArchiveCount','deletedTrashCount','deletedArchiveList','deletedTrashList','emptyTrashBtn','openResetDataBtn','resetDataDialog','resetDataForm','resetBackupBtn','resetConfirmInput','resetDeleteBtn','resetBackupStatus','confirmDialog','confirmTitle','confirmMessage','globalTooltip','toast',
       'clockCurrentTime','clockDayPeriod','clockWeekday','clockDate','clockLunarDate','timerDisplay','timerDialogDisplay','timerEndTime','timerAgentStatus','clockStatus','timerMinutesInput','timerSecondsInput','timerStartPauseBtn','timerResetBtn','timerStopAlarmBtn','timerTestAlarmBtn','timerLocalAlarmInput','timerRepeatAlarmInput','timerNotifyInput','deskClockWidget','deskClockControls','clockToggleBtn','quickStopAlarmBtn','clockDialog',
-      'clockAlarmTabBtn','clockSpecialTabBtn','clockAlarmPanel','clockSpecialPanel','specialDateNameInput','specialDateTypeSelect','specialBirthdayFields','specialBirthdayDateInput','specialMemorialFields','specialLunarDayInput','specialLunarMonthInput','specialLunarYearInput','specialLunarLeapInput','addSpecialDateBtn','specialTickerSettingInput','specialDateList','specialDateCount','specialDateEmpty','specialReminderBar','specialReminderText','specialReminderToggle'
+      'clockAlarmTabBtn','clockSpecialTabBtn','clockAlarmPanel','clockSpecialPanel','specialDateNameInput','specialDateTypeSelect','specialBirthdayFields','specialBirthdayDateInput','specialMemorialFields','specialLunarDateInput','addSpecialDateBtn','specialTickerSettingInput','specialDateSearchInput','specialDateMonthFilter','specialDateList','specialDateCount','specialDateEmpty','specialReminderBar','specialReminderText','specialReminderToggle'
     ].forEach(id => refs[id] = document.getElementById(id));
   }
 
@@ -215,7 +215,11 @@
     refs.clockAlarmTabBtn.addEventListener('click', () => switchClockTab('alarm'));
     refs.clockSpecialTabBtn.addEventListener('click', () => switchClockTab('special'));
     refs.specialDateTypeSelect.addEventListener('change', updateSpecialDateFields);
+    refs.specialLunarDateInput.addEventListener('input', formatLunarDateDraft);
+    refs.specialLunarDateInput.addEventListener('blur', normalizeLunarDateField);
     refs.addSpecialDateBtn.addEventListener('click', addSpecialDate);
+    refs.specialDateSearchInput.addEventListener('input', renderSpecialDateList);
+    refs.specialDateMonthFilter.addEventListener('change', renderSpecialDateList);
     refs.specialDateList.addEventListener('click', handleSpecialDateListClick);
     refs.specialTickerSettingInput.addEventListener('change', event => setReminderTickerEnabled(event.target.checked));
     refs.specialReminderToggle.addEventListener('change', event => setReminderTickerEnabled(event.target.checked));
@@ -1387,7 +1391,8 @@
   function exportData() {
     state.settings.lastExportAt = nowIso();
     saveNow();
-    const payload = {app:'Kanban Cá Nhân',exportVersion:VERSION,exportedAt:nowIso(),data:state};
+    const specialDateCount=state.settings?.clock?.specialDates?.length || 0;
+    const payload = {app:'Kanban Cá Nhân',exportVersion:VERSION,exportedAt:nowIso(),backupIncludes:{projects:true,notes:true,settings:true,specialDates:specialDateCount},data:state};
     const blob = new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'});
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -1397,7 +1402,7 @@
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
-    showToast('Đã xuất bản sao dữ liệu.');
+    showToast(specialDateCount ? `Đã xuất bản sao dữ liệu, gồm ${specialDateCount} ngày sinh nhật/ngày giỗ.` : 'Đã xuất bản sao dữ liệu.');
   }
 
   async function importData(event) {
@@ -1915,7 +1920,7 @@
         type,
         name:name || (type === 'birthday' ? 'Sinh nhật' : 'Ngày giỗ'),
         day,month,year,
-        leap:type === 'memorial' ? Boolean(item?.leap) : false
+        leap:false
       };
     }).filter(item => item.name);
   }
@@ -1940,6 +1945,29 @@
     refs.specialMemorialFields.hidden = !memorial;
   }
 
+  function formatLunarDateDraft(event) {
+    const input = event?.target || refs.specialLunarDateInput;
+    const digits = String(input.value || '').replace(/\D/g,'').slice(0,8);
+    let out = digits.slice(0,2);
+    if (digits.length > 2) out += '/' + digits.slice(2,4);
+    if (digits.length > 4) out += '/' + digits.slice(4,8);
+    input.value = out;
+  }
+
+  function parseLunarDateInput(value) {
+    const match = String(value || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!match) return null;
+    const day=Number(match[1]),month=Number(match[2]),year=Number(match[3]);
+    if (day<1 || day>30 || month<1 || month>12 || year<1800 || year>2200) return null;
+    return {day,month,year};
+  }
+
+  function normalizeLunarDateField() {
+    const parsed=parseLunarDateInput(refs.specialLunarDateInput.value);
+    if (!parsed) return;
+    refs.specialLunarDateInput.value=`${String(parsed.day).padStart(2,'0')}/${String(parsed.month).padStart(2,'0')}/${parsed.year}`;
+  }
+
   function addSpecialDate() {
     const clock = state.settings.clock || (state.settings.clock = createDefaultClockSettings());
     const name = refs.specialDateNameInput.value.trim();
@@ -1960,29 +1988,19 @@
       }
       entry = {id:uid('date'),type,name,year:parts[0],month:parts[1],day:parts[2],leap:false};
     } else {
-      const day = Number.parseInt(refs.specialLunarDayInput.value,10);
-      const month = Number.parseInt(refs.specialLunarMonthInput.value,10);
-      const yearValue = Number.parseInt(refs.specialLunarYearInput.value,10);
-      if (!Number.isFinite(day) || day < 1 || day > 30 || !Number.isFinite(month) || month < 1 || month > 12) {
-        showToast('Ngày giỗ âm lịch cần ngày 1–30 và tháng 1–12.');
+      const parsed=parseLunarDateInput(refs.specialLunarDateInput.value);
+      if (!parsed) {
+        showToast('Bạn hãy nhập ngày giỗ âm lịch theo dạng dd/mm/yyyy.');
+        refs.specialLunarDateInput.focus();
         return;
       }
-      entry = {
-        id:uid('date'),type,name,day,month,
-        year:Number.isFinite(yearValue) && yearValue >= 1800 && yearValue <= 2200 ? yearValue : null,
-        leap:Boolean(refs.specialLunarLeapInput.checked)
-      };
+      entry = {id:uid('date'),type,name,year:parsed.year,month:parsed.month,day:parsed.day,leap:false};
     }
     clock.specialDates = Array.isArray(clock.specialDates) ? clock.specialDates : [];
     clock.specialDates.push(entry);
     refs.specialDateNameInput.value = '';
     if (type === 'birthday') refs.specialBirthdayDateInput.value = '';
-    else {
-      refs.specialLunarDayInput.value = '';
-      refs.specialLunarMonthInput.value = '';
-      refs.specialLunarYearInput.value = '';
-      refs.specialLunarLeapInput.checked = false;
-    }
+    else refs.specialLunarDateInput.value = '';
     saveNow();
     renderSpecialDateList();
     renderSpecialReminderBar(new Date(),true);
@@ -2002,17 +2020,33 @@
   function formatSpecialDateItem(item) {
     const dd=String(item.day).padStart(2,'0'),mm=String(item.month).padStart(2,'0');
     if (item.type === 'birthday') return `${dd}/${mm}/${item.year || '----'} · Dương lịch`;
-    const year = item.year ? `/${item.year}` : '';
-    return `${dd}/${mm}${item.leap ? ' nhuận' : ''}${year} · Âm lịch`;
+    return `${dd}/${mm}/${item.year || '----'} · Âm lịch`;
+  }
+
+  function foldSpecialSearch(value) {
+    return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').toLocaleLowerCase('vi').trim();
   }
 
   function renderSpecialDateList() {
     const clock = state?.settings?.clock;
     if (!clock || !refs.specialDateList) return;
     const items = clock.specialDates || [];
-    refs.specialDateCount.textContent = `${items.length} ngày`;
-    refs.specialDateEmpty.hidden = items.length > 0;
-    refs.specialDateList.innerHTML = items.map(item => `
+    const query=foldSpecialSearch(refs.specialDateSearchInput?.value || '');
+    const monthValue=refs.specialDateMonthFilter?.value || 'all';
+    const month=monthValue==='all' ? null : Number(monthValue);
+    const filtered=items.filter(item => {
+      if (query && !foldSpecialSearch(item.name).includes(query)) return false;
+      if (month && item.month!==month) return false;
+      return true;
+    });
+    refs.specialDateCount.textContent = filtered.length===items.length
+      ? `${items.length} ngày`
+      : `${filtered.length}/${items.length} ngày`;
+    refs.specialDateEmpty.hidden = filtered.length > 0;
+    refs.specialDateEmpty.textContent = items.length
+      ? 'Không có ngày nào khớp bộ lọc.'
+      : 'Chưa có sinh nhật hoặc ngày giỗ nào.';
+    refs.specialDateList.innerHTML = filtered.map(item => `
       <div class="special-date-item">
         <span class="special-date-kind ${item.type}">${item.type === 'birthday' ? 'SN' : 'GIỖ'}</span>
         <div class="special-date-copy">
@@ -2038,6 +2072,13 @@
     return new Date(base.getFullYear(),base.getMonth(),base.getDate()+offsetDays,12,0,0,0);
   }
 
+  function reminderHue(item) {
+    const source=String(item.id || item.name || '');
+    let hash=0;
+    for (let i=0;i<source.length;i+=1) hash=((hash<<5)-hash+source.charCodeAt(i))|0;
+    return Math.abs(hash)%360;
+  }
+
   function getSpecialReminders(baseDate=new Date()) {
     const clock = state?.settings?.clock;
     const items = clock?.specialDates || [];
@@ -2051,12 +2092,13 @@
         if (item.type === 'birthday') {
           match=item.day===date.getDate() && item.month===date.getMonth()+1;
         } else {
-          match=item.day===lunar.day && item.month===lunar.month && Boolean(item.leap)===Boolean(lunar.leap);
+          // Ngày giỗ tự dùng kỳ tháng âm chính; kỳ tháng nhuận cùng số tháng không nhắc lặp lần hai.
+          match=item.day===lunar.day && item.month===lunar.month && !lunar.leap;
         }
         if (!match) return;
         const when=offset===0?'Hôm nay':offset===1?'Ngày mai':'2 ngày nữa';
         const what=item.type==='birthday'?'Sinh nhật':'Giỗ';
-        out.push({offset,text:`${when}: ${what} ${item.name}`});
+        out.push({id:item.id,offset,hue:reminderHue(item),text:`${when}: ${what} ${item.name}`});
       });
     }
     return out.sort((a,b)=>a.offset-b.offset);
@@ -2071,14 +2113,16 @@
       return;
     }
     const enabled=state.settings.clock.reminderTicker !== false;
-    const text=reminders.map(item=>item.text).join('  •  ');
+    const text=reminders.map(item=>item.text).join('|');
     const key=`${localDateStamp(baseDate)}|${enabled?'1':'0'}|${text}`;
     refs.specialReminderBar.hidden=false;
     refs.specialReminderToggle.checked=enabled;
     if (key===lastSpecialReminderKey && !force) return;
     lastSpecialReminderKey=key;
     refs.specialReminderBar.classList.toggle('ticker-off',!enabled);
-    refs.specialReminderText.textContent=enabled ? text : '';
+    refs.specialReminderText.innerHTML=enabled
+      ? reminders.map((item,index)=>`<span class="special-reminder-event" style="--event-hue:${item.hue}">${escapeHtml(item.text)}</span>${index<reminders.length-1?'<span class="special-reminder-sep">•</span>':''}`).join('')
+      : '';
     refs.specialReminderText.classList.toggle('moving',enabled);
   }
 
