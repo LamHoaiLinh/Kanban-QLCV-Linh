@@ -34,7 +34,7 @@ NODE_DIR = ROOT / "media" / "node"
 NODE = NODE_DIR / "node.exe"
 FFMPEG = BIN / "ffmpeg.exe"
 FFPROBE = BIN / "ffprobe.exe"
-WORKER = RUNTIME / "kanmedia-worker.ps1"
+WORKER = RUNTIME / "kanmedia-worker.py"
 INSTALLER = ROOT / "KanTool.bat"
 DOWNLOADS = Path.home() / "Downloads" / "KanMedia"
 LOGS = ROOT / "logs"
@@ -181,17 +181,54 @@ def start_job(mode: str, payload: dict) -> dict:
         "ok": True, "state": "queued", "percent": 0, "message": "Đang chuẩn bị…",
         "workerPid": 0, "childPid": 0, "mode": mode,
     })
-    ps = shutil.which("powershell.exe") or r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
     creation = CREATE_NO_WINDOW if os.name == "nt" else 0
+    worker_log = JOBS / f"{job_id}.launcher.log"
+    log_handle = worker_log.open("a", encoding="utf-8")
     proc = subprocess.Popen(
-        [ps, "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden",
-         "-File", str(WORKER), "-JobId", job_id],
+        [sys.executable, str(WORKER), job_id],
         cwd=str(ROOT),
         env=tool_env(),
         creationflags=creation,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=log_handle,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
     )
+    def watch():
+        code = proc.wait()
+        try:
+            log_handle.close()
+        except Exception:
+            pass
+        try:
+            current = json_load(job_path(job_id))
+        except Exception:
+            current = {}
+        if code != 0 and str(current.get("state", "")) not in {"done", "error", "cancelled"}:
+            detail = ""
+            for candidate in (JOBS / f"{job_id}.worker.log", worker_log):
+                try:
+                    lines = candidate.read_text(encoding="utf-8", errors="replace").splitlines()
+                    if lines:
+                        detail = " | ".join(lines[-5:])
+                        break
+                except Exception:
+                    pass
+            json_dump(job_path(job_id), {
+                "ok": False,
+                "state": "error",
+                "percent": float(current.get("percent") or 0),
+                "message": "Worker KanMedia đã dừng.",
+                "current": str(current.get("current") or ""),
+                "index": int(current.get("index") or 0),
+                "total": int(current.get("total") or 0),
+                "output": "",
+                "error": detail or f"Worker kết thúc với mã {code}.",
+                "workerPid": proc.pid,
+                "childPid": 0,
+            })
+    threading.Thread(target=watch, daemon=True).start()
     return {"ok": True, "jobId": job_id, "workerPid": proc.pid}
 
 def cancel_job(job_id: str) -> bool:
