@@ -6,7 +6,8 @@ const MEDIA='http://127.0.0.1:47632',CAPTURE='http://127.0.0.1:47631',SIGN='http
 let panel=null,lastDiagnostics=null;
 async function probe(url,headers,timeout){const c=new AbortController(),t=setTimeout(function(){c.abort();},timeout||1100);try{const r=await fetch(url,{headers:headers||{},cache:'no-store',signal:c.signal,targetAddressSpace:'loopback'});return r.ok?await r.json().catch(function(){return {ok:true};}):null;}catch(e){return null;}finally{clearTimeout(t);}}
 function downloadBat(){const a=document.createElement('a');a.href='kan-tools/KanTool.bat?t='+Date.now();a.download='KanTool.bat';document.body.appendChild(a);a.click();a.remove();}
-function row(name,ok){return '<div class="kantool-row"><span>'+name+'</span><strong class="'+(ok?'ok':'miss')+'">'+(ok?'✓ Sẵn sàng':'— Chưa sẵn sàng')+'</strong></div>';}
+function esc(v){return String(v==null?'':v).replace(/[&<>\"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c];});}
+function row(name,ok){return '<div class="kantool-row"><span>'+esc(name)+'</span><strong class="'+(ok?'ok':'miss')+'">'+(ok?'✓ Sẵn sàng':'— Chưa sẵn sàng')+'</strong></div>';}
 function ensurePanel(){
  if(panel)return panel;
  panel=document.createElement('div');panel.className='capture-setup-backdrop';panel.hidden=true;
@@ -25,7 +26,7 @@ function ensurePanel(){
        const bad=(lastDiagnostics.checks||[]).filter(function(x){return !x.ok;});
        box.hidden=false;
        box.innerHTML=(lastDiagnostics.checks||[]).map(function(x){
-         return '<div class="kantool-diag-row"><span>'+(x.ok?'✓':'!')+' '+x.label+'</span><small>'+String(x.detail||'')+'</small></div>';
+         return '<div class="kantool-diag-row"><span>'+(x.ok?'✓':'!')+' '+esc(x.label)+'</span><small>'+esc(x.detail||'')+'</small></div>';
        }).join('')+'<strong>'+(bad.length?'Có '+bad.length+' mục cần sửa.':'Không phát hiện lỗi.')+'</strong>';
      }
      return lastDiagnostics;
@@ -62,7 +63,7 @@ async function refresh(){
  const result=await Promise.all([probe(CAPTURE+'/ping'),probe(MEDIA+'/health',HEAD,1700),probe(SIGN+'/health',HEAD,1700)]);
  const cap=result[0],media=result[1],sign=result[2];list.innerHTML=row('Chụp màn hình',!!cap)+row('KanMedia',!!(media&&media.mediaReady))+row('Ký số PDF',!!(sign&&sign.ok));
  const updateBtn=panel.querySelector('[data-update]');if(updateBtn){updateBtn.disabled=!media;updateBtn.title=media?'Cập nhật bộ KanBan Tools đã cài trên máy.':'Chỉ dùng khi KanBan Tools đang chạy; nếu chưa chạy hãy tải bộ cài mới nhất.';}
- const ready=!!cap&&!!(media&&media.mediaReady);status.textContent=ready?'KanBan Tools đã sẵn sàng.':'Thiếu một hoặc nhiều thành phần; chạy KanTool.bat để cài/sửa/cập nhật.';status.classList.toggle('ready',ready);
+ const ready=!!cap&&!!(media&&media.mediaReady)&&!!(sign&&sign.ok);status.textContent=ready?'KanBan Tools đã sẵn sàng.':'Thiếu một hoặc nhiều thành phần; chạy KanTool.bat để cài/sửa/cập nhật.';status.classList.toggle('ready',ready);
 }
 toolBtn.addEventListener('contextmenu',function(e){e.preventDefault();ensurePanel().hidden=false;refresh();});
 toolBtn.addEventListener('auxclick',function(e){if(e.button===1){e.preventDefault();ensurePanel().hidden=false;refresh();}});
