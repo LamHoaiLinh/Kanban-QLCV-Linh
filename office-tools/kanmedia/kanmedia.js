@@ -1,7 +1,7 @@
 
 const KANMEDIA_AGENT='http://127.0.0.1:47632';
 const KANMEDIA_HEADERS={'X-KanBan-Agent':'linh-kanban-v1'};
-const kmState={tab:'download',kind:'audio',format:'mp3',quality:'high',urls:[],urlText:'',files:[],editFile:null,editUrl:null,jobId:null,poll:null,probe:null};
+const kmState={tab:'download',kind:'audio',format:'mp3',quality:'high',urls:[],urlText:'',allPlaylist:false,downloadDir:'',files:[],editFile:null,editUrl:null,jobId:null,poll:null,probe:null,aliveTimer:null,aliveStep:0};
 let kmHost=null;
 
 export function renderKanMediaTool(host){
@@ -24,7 +24,8 @@ function applyKmTooltips(){
   const tips={
     kmUpdateBtn:'Kiểm tra và cập nhật KanBan Tools cùng lõi tải Media.',
     kmClearUrls:'Xóa toàn bộ link đang dán.',
-    kmOpenFolder:'Mở thư mục Downloads\\KanMedia.',
+    kmOpenFolder:'Mở thư mục lưu hiện tại của KanMedia.',
+    kmChooseFolder:'Chọn thư mục lưu khác trên máy. KanMedia sẽ nhớ lựa chọn cho lần sau.',
     kmDownload:'Bắt đầu tải các link đã nhận.',
     kmCancel:'Hủy tác vụ Media đang chạy.',
     kmConvertRun:'Chuyển toàn bộ file đã chọn sang định dạng và chất lượng đang chọn.',
@@ -54,7 +55,7 @@ function applyKmTooltips(){
 }
 function ensureKanMediaCss(){
   if(document.querySelector('link[data-kanmedia-css]'))return;
-  const l=document.createElement('link');l.rel='stylesheet';l.href='office-tools/kanmedia/kanmedia.css?v=1.0.0';l.dataset.kanmediaCss='1';document.head.appendChild(l);
+  const l=document.createElement('link');l.rel='stylesheet';l.href='office-tools/kanmedia/kanmedia.css?v=1.1.0';l.dataset.kanmediaCss='1';document.head.appendChild(l);
 }
 function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function bytes(n){n=Number(n)||0;if(n<1024)return n+' B';const u=['KB','MB','GB','TB'];let i=-1;do{n/=1024;i++;}while(n>=1024&&i<u.length-1);return n.toFixed(n>=100?0:n>=10?1:2)+' '+u[i];}
@@ -89,6 +90,7 @@ async function checkKanMediaAgent(){
     const s=await kmApi('/health',{timeout:1800});
     p.classList.toggle('ready',!!s.mediaReady);p.classList.toggle('warn',!s.mediaReady);
     p.querySelector('span').textContent=s.mediaReady?'Sẵn sàng':'Cần bổ sung thành phần';
+    if(s.downloads){kmState.downloadDir=s.downloads;const pathEl=kmHost&&kmHost.querySelector('#kmDownloadPath');if(pathEl)pathEl.textContent=s.downloads;}
   }catch(e){p.classList.remove('ready');p.classList.add('warn');p.querySelector('span').textContent='Chưa cài KanBan Tools';}
 }
 async function updateKanTools(){
@@ -105,7 +107,7 @@ function parseUrls(text){
 function progressCard(){
   return [
     '<div class="km-card km-progress-card"><div class="km-section-title">Tiến độ</div>',
-    '<div class="km-progress"><i id="kmProgressFill"></i></div><div id="kmProgressText" class="km-progress-text">Sẵn sàng.</div>',
+    '<div class="km-progress"><i id="kmProgressFill"></i></div><div class="km-progress-line"><div id="kmProgressText" class="km-progress-text">Sẵn sàng.</div><span id="kmAliveDots" class="km-alive-dots" hidden>.</span></div>',
     '<div id="kmProgressSub" class="km-progress-sub"></div><div id="kmInlineNotice" class="km-notice" hidden></div>',
     '<div class="km-row"><button type="button" class="office-btn danger" id="kmCancel" disabled>Hủy</button></div></div>'
   ].join('');
@@ -114,9 +116,16 @@ function setProgress(pct,text,sub){
   const f=kmHost&&kmHost.querySelector('#kmProgressFill'),t=kmHost&&kmHost.querySelector('#kmProgressText'),s=kmHost&&kmHost.querySelector('#kmProgressSub');
   if(f)f.style.width=Math.max(0,Math.min(100,Number(pct)||0))+'%';if(t)t.textContent=text||'';if(s)s.textContent=sub||'';
 }
+function setAlive(v){
+  clearInterval(kmState.aliveTimer);kmState.aliveTimer=null;kmState.aliveStep=0;
+  const d=kmHost&&kmHost.querySelector('#kmAliveDots');if(!d)return;
+  d.hidden=!v;if(!v){d.textContent='.';return;}
+  const tick=function(){kmState.aliveStep=(kmState.aliveStep%3)+1;d.textContent='.'.repeat(kmState.aliveStep);};
+  tick();kmState.aliveTimer=setInterval(tick,420);
+}
 function setBusy(v){
   if(!kmHost)return;kmHost.querySelectorAll('.km-run').forEach(function(b){b.disabled=!!v;});
-  const c=kmHost.querySelector('#kmCancel');if(c)c.disabled=!v;
+  const c=kmHost.querySelector('#kmCancel');if(c)c.disabled=!v;setAlive(!!v);
 }
 function bindCancel(){
   const c=kmHost&&kmHost.querySelector('#kmCancel');if(c)c.addEventListener('click',async function(){if(!kmState.jobId)return;try{await kmApi('/jobs/'+encodeURIComponent(kmState.jobId)+'/cancel',{method:'POST',json:{}});setProgress(0,'Đang hủy…','');}catch(e){notice('Không gửi được lệnh hủy.','warn');}});
@@ -134,7 +143,9 @@ function startPolling(id){
         else if(j.state==='cancelled')notice('Đã hủy tác vụ.','warn');
         else notice(j.error||'Tác vụ không hoàn tất.','warn');
       }
-    }catch(e){}
+    }catch(e){
+      const sub=kmHost&&kmHost.querySelector('#kmProgressSub');if(sub&&!sub.textContent)sub.textContent='KanMedia vẫn đang xử lý trên máy…';
+    }
   };
   poll();kmState.poll=setInterval(poll,700);
 }
@@ -150,10 +161,12 @@ function renderDownload(h){
     '<div class="km-grid-main"><div class="km-card"><label class="km-label">Dán link video / nhạc</label>',
     '<textarea id="kmUrls" class="km-urlbox" rows="6" placeholder="Dán một hoặc nhiều link. Không cần xuống dòng đúng, KanMedia sẽ tự tách link." data-tooltip="Bạn có thể dán nhiều link trên cùng một dòng; KanMedia tự tách và bỏ link trùng."></textarea>',
     '<div class="km-row km-url-status"><span id="kmUrlCount">Chưa có link</span><button class="km-link-btn" id="kmClearUrls" type="button">Xóa</button></div>',
+    '<label class="km-playlist-option" data-tooltip="Mặc định tắt: link có video + playlist chỉ tải đúng video đang mở. Bật tùy chọn này nếu bạn muốn tải toàn bộ playlist."><input id="kmAllPlaylist" type="checkbox"> <span>Tải toàn bộ playlist nếu link có playlist</span></label>',
     '<div class="km-kind-row"><div class="km-format-wrap"><button class="km-kind" data-kind="audio" type="button">♪ Audio</button>'+formatMenu('audio')+'</div>',
     '<div class="km-format-wrap"><button class="km-kind" data-kind="video" type="button">▶ Video</button>'+formatMenu('video')+'</div></div>',
     '<div class="km-section-title">Chất lượng</div>',qualityButtons(),
     '<div class="km-hint" id="kmProbeHint">MP3 và MP4 được ưu tiên mặc định. KanMedia tự chọn chất lượng gần nhất phù hợp cho từng link.</div>',
+    '<div class="km-download-folder"><span class="km-folder-label">Thư mục lưu</span><div class="km-folder-box"><span id="kmDownloadPath">'+esc(kmState.downloadDir||'Desktop\\KanDownload')+'</span><button class="office-btn" id="kmChooseFolder" type="button">Đổi thư mục</button></div></div>',
     '<div class="km-row km-actions"><button class="office-btn" id="kmOpenFolder" type="button">Mở thư mục</button><button class="office-btn primary km-run" id="kmDownload" type="button">Tải xuống</button></div></div>',
     progressCard(),'</div>'
   ].join('');
@@ -161,11 +174,18 @@ function renderDownload(h){
   let timer=null;
   function sync(){kmState.urlText=ta.value;kmState.urls=parseUrls(ta.value);h.querySelector('#kmUrlCount').textContent=kmState.urls.length?kmState.urls.length+' link hợp lệ':'Chưa có link';clearTimeout(timer);if(kmState.urls.length)timer=setTimeout(probeDownload,700);}
   ta.addEventListener('input',sync);sync();
+  const playlistBox=h.querySelector('#kmAllPlaylist');playlistBox.checked=!!kmState.allPlaylist;playlistBox.addEventListener('change',function(){kmState.allPlaylist=playlistBox.checked;});
   h.querySelector('#kmClearUrls').addEventListener('click',function(){ta.value='';kmState.probe=null;sync();});
   h.querySelectorAll('[data-kind]').forEach(function(b){b.addEventListener('click',function(){kmState.kind=b.dataset.kind;kmState.format=kmState.kind==='audio'?'mp3':'mp4';refreshDownloadSelection(h);});});
   h.querySelectorAll('[data-format]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();kmState.format=b.dataset.format;kmState.kind=b.closest('.km-format-wrap').querySelector('[data-kind]').dataset.kind;refreshDownloadSelection(h);});});
   h.querySelectorAll('[data-quality]').forEach(function(b){b.addEventListener('click',function(){if(b.disabled)return;kmState.quality=b.dataset.quality;refreshDownloadSelection(h);});});
   h.querySelector('#kmOpenFolder').addEventListener('click',function(){kmApi('/system/open-folder',{method:'POST',json:{}}).catch(function(){notice('Chưa mở được thư mục.','warn');});});
+  h.querySelector('#kmChooseFolder').addEventListener('click',async function(){
+    try{
+      const r=await kmApi('/system/select-folder',{method:'POST',json:{},timeout:300000});
+      if(!r.cancelled&&r.path){kmState.downloadDir=r.path;const el=h.querySelector('#kmDownloadPath');if(el)el.textContent=r.path;notice('Đã đổi thư mục lưu.','ok');}
+    }catch(e){notice(e.message||'Chưa đổi được thư mục.','warn');}
+  });
   h.querySelector('#kmDownload').addEventListener('click',startDownload);
   bindCancel();refreshDownloadSelection(h);
 }
@@ -188,7 +208,7 @@ async function startDownload(){
   if(!kmState.urls.length)return notice('Bạn hãy dán ít nhất một link hợp lệ.','warn');
   setProgress(1,'Đang chuẩn bị…','');setBusy(true);
   try{
-    const r=await kmApi('/media/download',{method:'POST',json:{urls:kmState.urls,kind:kmState.kind,format:kmState.format,quality:kmState.quality},timeout:5000});
+    const r=await kmApi('/media/download',{method:'POST',json:{urls:kmState.urls,kind:kmState.kind,format:kmState.format,quality:kmState.quality,allPlaylist:!!kmState.allPlaylist},timeout:5000});
     startPolling(r.jobId);
   }catch(e){setBusy(false);setProgress(0,'KanMedia chưa kết nối.','');notice(e.message,'warn');}
 }
