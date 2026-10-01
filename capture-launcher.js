@@ -23,7 +23,7 @@
     const timer=setTimeout(()=>controller.abort(),timeout);
     try{
       const response=await fetch(`${AGENT}/${action}?t=${Date.now()}`,{
-        method:'GET',mode:'cors',cache:'no-store',signal:controller.signal
+        method:'GET',mode:'cors',cache:'no-store',signal:controller.signal,targetAddressSpace:'loopback'
       });
       clearTimeout(timer);
       if(!response.ok)throw new Error('Agent không phản hồi');
