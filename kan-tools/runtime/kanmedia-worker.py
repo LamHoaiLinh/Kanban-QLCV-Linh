@@ -321,6 +321,9 @@ def download_one(url: str, kind: str, fmt: str, quality: str,
             output_file["path"] = line.split(":", 1)[1].strip()
 
     run_lines(args, line_cb)
+    shown = playlist_state["title"] or title
+    status("running", base + slice_pct * 0.995, f"Đang hoàn tất file “{shown}”", shown,
+           playlist_state["item"] or index, playlist_state["count"] or total)
     path = Path(output_file["path"]) if output_file["path"] else None
     if not path or not path.exists():
         candidates = sorted(DOWNLOADS.glob("*"), key=lambda p: p.stat().st_mtime, reverse=True)
