@@ -58,7 +58,7 @@ function applyKmTooltips(){
 }
 function ensureKanMediaCss(){
   if(document.querySelector('link[data-kanmedia-css]'))return;
-  const l=document.createElement('link');l.rel='stylesheet';l.href='office-tools/kanmedia/kanmedia.css?v=1.5.2';l.dataset.kanmediaCss='1';document.head.appendChild(l);
+  const l=document.createElement('link');l.rel='stylesheet';l.href='office-tools/kanmedia/kanmedia.css?v=1.5.3';l.dataset.kanmediaCss='1';document.head.appendChild(l);
 }
 function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function bytes(n){n=Number(n)||0;if(n<1024)return n+' B';const u=['KB','MB','GB','TB'];let i=-1;do{n/=1024;i++;}while(n>=1024&&i<u.length-1);return n.toFixed(n>=100?0:n>=10?1:2)+' '+u[i];}
@@ -168,9 +168,16 @@ function bindCancel(){
 }
 function startPolling(id,reconnected){
   kmState.jobId=id;clearInterval(kmState.poll);setBusy(true);bindCancel();
+  let lastSignature='',lastChange=Date.now(),stallShown=false;
   const poll=async function(){
     try{
       const j=await kmApi('/jobs/'+encodeURIComponent(id),{timeout:3000});
+      const signature=[j.state,j.percent,j.message,j.current,j.index,j.total,j.updatedAt].join('|');
+      if(signature!==lastSignature){lastSignature=signature;lastChange=Date.now();stallShown=false;}
+      else if(!stallShown&&['queued','running'].includes(j.state)&&Date.now()-lastChange>45000){
+        stallShown=true;
+        notice('Tác vụ đã hơn 45 giây không cập nhật. KanMedia đang kiểm tra worker; nếu worker đã dừng, trạng thái sẽ tự chuyển sang lỗi thay vì treo mãi.','warn');
+      }
       const parts=[];
       if(j.current)parts.push(j.current);
       if(j.index&&j.total)parts.push(j.index+'/'+j.total);
