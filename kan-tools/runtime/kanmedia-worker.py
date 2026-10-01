@@ -404,6 +404,7 @@ def cleanup_upload(upload_id: str) -> None:
         if raw:
             Path(raw).unlink(missing_ok=True)
         meta_path.unlink(missing_ok=True)
+        (UPLOADS / f"{upload_id}.wave.png").unlink(missing_ok=True)
     except Exception as exc:
         log("Upload cleanup skipped: " + repr(exc))
 
