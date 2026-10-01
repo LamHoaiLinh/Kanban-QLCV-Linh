@@ -4,6 +4,7 @@ $ErrorActionPreference='Stop'
 $Root=Join-Path $env:LOCALAPPDATA 'KanBanTools';$Runtime=Join-Path $Root 'runtime';$Jobs=Join-Path $Root 'jobs';$Uploads=Join-Path $Root 'uploads';$Bin=Join-Path $Root 'media\bin'
 $Python=Join-Path $Root '.venv\Scripts\python.exe';$Ffmpeg=Join-Path $Bin 'ffmpeg.exe';$Ffprobe=Join-Path $Bin 'ffprobe.exe';$Worker=Join-Path $Runtime 'kanmedia-worker.ps1';$Installer=Join-Path $Root 'KanTool.bat'
 $Downloads=Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Downloads\KanMedia'
+$LocalNode=Join-Path $Root 'media\node\node.exe';if(Test-Path $LocalNode){$env:PATH=(Split-Path $LocalNode -Parent)+';'+$env:PATH}
 New-Item -ItemType Directory -Force -Path $Root,$Runtime,$Jobs,$Uploads,$Bin,$Downloads|Out-Null
 $script:StopServer=$false;$script:ResponseOrigin='https://lamhoailinh.github.io'
 function Origin-Allowed([string]$o){if([string]::IsNullOrWhiteSpace($o)){return $true};return $o -eq 'https://lamhoailinh.github.io' -or $o -match '^http://(localhost|127\.0\.0\.1)(:\d+)?$'}
@@ -28,7 +29,7 @@ function ReadBody($stream,$headers,[int64]$max=8388608){
 }
 function ReadJson($stream,$headers){$raw=ReadBody $stream $headers;if(-not $raw.Length){return @{}};return [Text.Encoding]::UTF8.GetString($raw)|ConvertFrom-Json}
 function SafeName([string]$n){if([string]::IsNullOrWhiteSpace($n)){return 'media.bin'};foreach($c in [IO.Path]::GetInvalidFileNameChars()){$n=$n.Replace([string]$c,'_')};$n=$n.Trim().TrimEnd('.');if($n.Length -gt 180){$e=[IO.Path]::GetExtension($n);$b=[IO.Path]::GetFileNameWithoutExtension($n);$n=$b.Substring(0,[Math]::Min(150,$b.Length))+$e};return $n}
-function NodePath(){try{return (Get-Command node.exe -ErrorAction Stop).Source}catch{return ''}}
+function NodePath(){if(Test-Path $LocalNode){return $LocalNode};try{return (Get-Command node.exe -ErrorAction Stop).Source}catch{return ''}}
 function Health(){
  $node=NodePath;$yt='';$fv='';try{if(Test-Path $Python){$yt=(& $Python -m yt_dlp --version 2>$null|Out-String).Trim()}}catch{};try{if(Test-Path $Ffmpeg){$fv=((& $Ffmpeg -version 2>$null|Select-Object -First 1)|Out-String).Trim()}}catch{}
  $nv='';try{if($node){$nv=(& $node --version 2>$null|Out-String).Trim()}}catch{}
