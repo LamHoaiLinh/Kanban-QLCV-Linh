@@ -9,6 +9,7 @@ KanMedia local server for KanBan.
 from __future__ import annotations
 
 import json
+import base64
 import os
 import re
 import shutil
@@ -197,6 +198,66 @@ def cleanup_stale_files() -> None:
         except Exception:
             pass
 
+def read_upload_meta(upload_id: str) -> dict:
+    if not re.fullmatch(r"[a-f0-9]{32}", str(upload_id or "")):
+        raise ValueError("Mã file tạm không hợp lệ.")
+    meta_path = UPLOADS / f"{upload_id}.json"
+    if not meta_path.exists():
+        raise FileNotFoundError("File tạm không còn tồn tại.")
+    meta = json_load(meta_path)
+    src = Path(str(meta.get("path") or ""))
+    if not src.exists():
+        raise FileNotFoundError("Không tìm thấy file media tạm.")
+    return meta
+
+def waveform_preview(payload: dict) -> dict:
+    upload_id = str(payload.get("uploadId") or "")
+    meta = read_upload_meta(upload_id)
+    src = Path(str(meta["path"]))
+    code, out, err = run_text([
+        str(FFPROBE), "-v", "error", "-show_entries", "format=duration",
+        "-of", "default=nw=1:nk=1", str(src)
+    ], 30)
+    if code != 0:
+        raise RuntimeError(err or "Không đọc được thời lượng media.")
+    try:
+        dur = max(0.0, float((out.strip().splitlines() or ["0"])[-1]))
+    except Exception:
+        dur = 0.0
+    if dur <= 0:
+        raise RuntimeError("Không xác định được thời lượng media.")
+
+    png = UPLOADS / f"{upload_id}.wave.png"
+    args = [
+        str(FFMPEG), "-hide_banner", "-loglevel", "error", "-y",
+        "-i", str(src),
+        "-filter_complex", "aformat=channel_layouts=mono,showwavespic=s=1600x180:colors=0x78b89c",
+        "-frames:v", "1", str(png)
+    ]
+    cp = subprocess.run(
+        args,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=240,
+        env=tool_env(),
+        creationflags=CREATE_NO_WINDOW if os.name == "nt" else 0,
+    )
+    if cp.returncode != 0 or not png.exists() or png.stat().st_size < 100:
+        raise RuntimeError(cp.stderr.strip() or "Không tạo được waveform. File có thể không có luồng âm thanh.")
+    raw = base64.b64encode(png.read_bytes()).decode("ascii")
+    return {
+        "ok": True,
+        "uploadId": upload_id,
+        "duration": dur,
+        "width": 1600,
+        "height": 180,
+        "image": "data:image/png;base64," + raw,
+        "name": str(meta.get("name") or src.name),
+    }
+
 def active_job() -> dict | None:
     candidates = []
     for p in JOBS.glob("*.status.json"):
@@ -316,7 +377,7 @@ def health() -> dict:
     ready = bool(yt and nv and ff and FFPROBE.exists() and WORKER.exists())
     return {
         "ok": True,
-        "version": "KanMedia Agent 1.3",
+        "version": "KanMedia Agent 1.4",
         "mediaReady": ready,
         "ytDlp": yt,
         "ffmpeg": ff,
@@ -596,6 +657,9 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if path == "/media/probe":
                 self._json(probe(self._read_json()))
+                return
+            if path == "/media/waveform":
+                self._json(waveform_preview(self._read_json()))
                 return
             if path in {"/media/download", "/media/convert", "/media/edit"}:
                 mode = path.rsplit("/", 1)[-1]
