@@ -2386,7 +2386,7 @@
     lastWorkReminderKey=key;
     refs.workReminderBar.classList.toggle('ticker-off',!enabled);
     refs.workReminderText.innerHTML=enabled
-      ? reminders.map((item,index)=>`<span class="work-reminder-event">${escapeHtml(item.text)}</span>${index<reminders.length-1?'<span class="special-reminder-sep">•</span>':''}`).join('')
+      ? reminders.map((item,index)=>`<span class="work-reminder-event ${index%2===0?'work-tone-black':'work-tone-orange'}">${escapeHtml(item.text)}</span>${index<reminders.length-1?'<span class="special-reminder-sep">•</span>':''}`).join('')
       : '';
     refs.workReminderText.classList.toggle('moving',enabled);
   }
@@ -2569,9 +2569,8 @@
     if (key===lastSpecialReminderKey && !force) return;
     lastSpecialReminderKey=key;
     refs.specialReminderBar.classList.toggle('ticker-off',!enabled);
-    const palette=[154,211,28,338,274,188,46,103,318,16];
     refs.specialReminderText.innerHTML=enabled
-      ? reminders.map((item,index)=>`<span class="special-reminder-event" style="--event-hue:${palette[index%palette.length]}">${escapeHtml(item.text)}</span>${index<reminders.length-1?'<span class="special-reminder-sep">•</span>':''}`).join('')
+      ? reminders.map((item,index)=>`<span class="special-reminder-event ${index%2===0?'special-tone-green':'special-tone-blue'}">${escapeHtml(item.text)}</span>${index<reminders.length-1?'<span class="special-reminder-sep">•</span>':''}`).join('')
       : '';
     refs.specialReminderText.classList.toggle('moving',enabled);
   }
