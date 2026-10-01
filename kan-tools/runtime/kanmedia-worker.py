@@ -358,10 +358,12 @@ def download_one(url: str, kind: str, fmt: str, quality: str,
            playlist_state["item"] or index, playlist_state["count"] or total)
     path = Path(output_file["path"]) if output_file["path"] else None
     if not path or not path.exists():
-        candidates = sorted(DOWNLOADS.glob("*"), key=lambda p: p.stat().st_mtime, reverse=True)
+        candidates = sorted((p for p in DOWNLOADS.rglob("*") if p.is_file()),
+                            key=lambda p: p.stat().st_mtime, reverse=True)
         path = candidates[0] if candidates else None
     if path and path.exists():
-        path = rename_from_metadata(path)
+        if not all_playlist:
+            path = rename_from_metadata(path)
         return str(path)
     return ""
 
