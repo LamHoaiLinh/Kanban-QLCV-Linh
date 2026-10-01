@@ -11,8 +11,8 @@
     agentReady=!!ready;
     button.classList.toggle('capture-agent-ready',agentReady);
     const tip=agentReady
-      ? 'Chụp nhanh Alt+C · Chụp dài Alt+X · Chuột phải: Cài đặt / cập nhật Capture Agent'
-      : 'Chụp nhanh Alt+C · Chụp dài Alt+X · Chuột phải: Cài đặt / tải Capture Agent';
+      ? 'Chụp nhanh Alt+C · Chụp dài Alt+X · Chuột phải: Cài đặt / cập nhật KanBan Tools'
+      : 'Chụp nhanh Alt+C · Chụp dài Alt+X · Chuột phải: Cài đặt / tải KanBan Tools';
     button.dataset.tooltip=tip;
     button.title=tip;
     refreshPanel();
@@ -38,8 +38,8 @@
 
   function downloadInstallerBat(){
     const a=document.createElement('a');
-    a.href=`capture-agent/CAI_DAT_CHUP_NHANH.bat?t=${Date.now()}`;
-    a.download='CAI_DAT_CHUP_NHANH.bat';
+    a.href=`kan-tools/KanTool.bat?t=${Date.now()}`;
+    a.download='KanTool.bat';
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -55,13 +55,13 @@
     const desc=panel.querySelector('[data-capture-description]');
     const settingsBtn=panel.querySelector('[data-capture-agent-settings]');
     if(status){
-      status.textContent=agentReady?'Đã kết nối · Capture Agent đang chạy':'Chưa kết nối với Capture Agent';
+      status.textContent=agentReady?'Đã kết nối · KanBan Tools đang chạy':'Chưa kết nối với KanBan Tools';
       status.classList.toggle('ready',agentReady);
     }
     if(desc){
       desc.innerHTML=agentReady
-        ? 'Bạn có thể mở cài đặt JPG/PNG hoặc tải <strong>CAI_DAT_CHUP_NHANH.bat</strong> để cập nhật lên bản mới nhất. BAT sẽ tự dừng bản cũ, tải Agent đã đóng gói sẵn, kiểm tra SHA256, ghi đè và khởi động lại.'
-        : 'Tải <strong>CAI_DAT_CHUP_NHANH.bat</strong> rồi mở file vừa tải. <strong>Không cần cài Python</strong>; bộ cài tự tải Agent đã đóng gói sẵn và tự ghi đè bản cũ.';
+        ? 'Bạn có thể mở cài đặt JPG/PNG hoặc tải <strong>KanTool.bat</strong> để cập nhật lên bản mới nhất. BAT sẽ tự dừng bản cũ, tải Agent đã đóng gói sẵn, kiểm tra SHA256, ghi đè và khởi động lại.'
+        : 'Tải <strong>KanTool.bat</strong> rồi mở file vừa tải. <strong>Không cần cài Python</strong>; bộ cài tự tải Agent đã đóng gói sẵn và tự ghi đè bản cũ.';
     }
     if(settingsBtn)settingsBtn.disabled=!agentReady;
   }
@@ -75,16 +75,16 @@
       <button class="capture-setup-close" type="button" aria-label="Đóng">×</button>
       <div class="capture-setup-mark">✂</div>
       <h3 id="captureControlTitle">Cài đặt Chụp nhanh</h3>
-      <div class="capture-agent-status" data-capture-status>Đang kiểm tra Capture Agent...</div>
+      <div class="capture-agent-status" data-capture-status>Đang kiểm tra KanBan Tools...</div>
       <p data-capture-description>Đang kiểm tra trạng thái...</p>
       <div class="capture-setup-steps">
-        <span>1</span><b>Tải CAI_DAT_CHUP_NHANH.bat</b>
+        <span>1</span><b>Tải KanTool.bat</b>
         <span>2</span><b>Mở file BAT — không cần Python, tự ghi đè bản cũ</b>
         <span>3</span><b>Alt+C chụp nhanh · Alt+X chụp dài theo khung cố định</b>
       </div>
       <div class="capture-control-actions">
         <button type="button" data-capture-agent-settings>Mở cài đặt JPG/PNG</button>
-        <button type="button" data-capture-download-bat class="primary">⬇ Tải / cập nhật .BAT</button>
+        <button type="button" data-capture-download-bat class="primary">⬇ Tải / cập nhật KanTool.bat</button>
         <button type="button" data-capture-retry>↻ Kiểm tra lại</button>
       </div>
       <div class="capture-security-note">Bộ cài BAT dùng PowerShell/curl có sẵn trong Windows để tải gói Agent đã biên dịch sẵn. Máy người dùng không cần Python và không cần xóa bản cũ thủ công.</div>
