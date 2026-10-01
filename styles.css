@@ -1833,3 +1833,65 @@ body.kalo-open{overflow:hidden!important}
   .special-date-row-actions{gap:4px}
   .special-date-edit{min-width:42px;padding:0 7px}
 }
+
+/* ===== Lịch Công việc lặp hàng tháng / hàng năm v3.9 ===== */
+.work-repeat-options{
+  grid-column:1/-1;
+  display:flex;
+  align-items:stretch;
+  gap:10px;
+}
+.work-repeat-option{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  align-items:start;
+  gap:8px;
+  min-width:220px;
+  padding:10px 12px;
+  border:1px solid #d5e8f5;
+  border-radius:11px;
+  background:color-mix(in srgb,#edf6fc 70%,var(--panel));
+  cursor:pointer;
+  user-select:none;
+}
+.work-repeat-option input{
+  width:17px;
+  height:17px;
+  margin:2px 0 0;
+  accent-color:#4f95bf;
+}
+.work-repeat-option span{
+  display:grid;
+  gap:2px;
+}
+.work-repeat-option strong{
+  color:var(--text);
+  font-size:11px;
+}
+.work-repeat-option small{
+  color:var(--muted);
+  font-size:9px;
+  line-height:1.35;
+}
+.work-repeat-option:has(input:checked){
+  border-color:#83b7d7;
+  background:#e6f3fb;
+  box-shadow:0 0 0 2px rgba(79,149,191,.08);
+}
+:root[data-theme="dark"] .work-repeat-option{
+  border-color:#315d78;
+  background:#183346;
+}
+:root[data-theme="dark"] .work-repeat-option:has(input:checked){
+  border-color:#5798bd;
+  background:#1d4056;
+}
+@media(max-width:700px){
+  .work-repeat-options{
+    display:grid;
+    grid-template-columns:1fr;
+  }
+  .work-repeat-option{
+    min-width:0;
+  }
+}
