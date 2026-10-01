@@ -26,6 +26,8 @@ function applyKmTooltips(){
     kmClearUrls:'Xóa toàn bộ link đang dán.',
     kmOpenFolder:'Mở thư mục lưu hiện tại của KanMedia.',
     kmChooseFolder:'Chọn thư mục lưu khác trên máy. KanMedia sẽ nhớ lựa chọn cho lần sau.',
+    kmConvertChooseFolder:'Chọn thư mục lưu file sau khi chuyển đổi. KanMedia sẽ nhớ lựa chọn này.',
+    kmConvertOpenFolder:'Mở thư mục lưu hiện tại của KanMedia.',
     kmDownload:'Bắt đầu tải các link đã nhận.',
     kmCancel:'Hủy tác vụ Media đang chạy.',
     kmConvertRun:'Chuyển toàn bộ file đã chọn sang định dạng và chất lượng đang chọn.',
@@ -55,7 +57,7 @@ function applyKmTooltips(){
 }
 function ensureKanMediaCss(){
   if(document.querySelector('link[data-kanmedia-css]'))return;
-  const l=document.createElement('link');l.rel='stylesheet';l.href='office-tools/kanmedia/kanmedia.css?v=1.2.0';l.dataset.kanmediaCss='1';document.head.appendChild(l);
+  const l=document.createElement('link');l.rel='stylesheet';l.href='office-tools/kanmedia/kanmedia.css?v=1.3.0';l.dataset.kanmediaCss='1';document.head.appendChild(l);
 }
 function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function bytes(n){n=Number(n)||0;if(n<1024)return n+' B';const u=['KB','MB','GB','TB'];let i=-1;do{n/=1024;i++;}while(n>=1024&&i<u.length-1);return n.toFixed(n>=100?0:n>=10?1:2)+' '+u[i];}
@@ -90,7 +92,11 @@ async function checkKanMediaAgent(){
     const s=await kmApi('/health',{timeout:1800});
     p.classList.toggle('ready',!!s.mediaReady);p.classList.toggle('warn',!s.mediaReady);
     p.querySelector('span').textContent=s.mediaReady?'Sẵn sàng':'Cần bổ sung thành phần';
-    if(s.downloads){kmState.downloadDir=s.downloads;const pathEl=kmHost&&kmHost.querySelector('#kmDownloadPath');if(pathEl)pathEl.textContent=s.downloads;}
+    if(s.downloads){
+      kmState.downloadDir=s.downloads;
+      const pathEl=kmHost&&kmHost.querySelector('#kmDownloadPath');if(pathEl)pathEl.textContent=s.downloads;
+      const convertPath=kmHost&&kmHost.querySelector('#kmConvertPath');if(convertPath)convertPath.textContent=s.downloads;
+    }
   }catch(e){p.classList.remove('ready');p.classList.add('warn');p.querySelector('span').textContent='Chưa cài KanBan Tools';}
 }
 async function resumeActiveJob(){
@@ -124,19 +130,31 @@ function isPurePlaylistUrl(u){
 function progressCard(){
   return [
     '<div class="km-card km-progress-card"><div class="km-section-title">Tiến độ</div>',
-    '<div class="km-progress"><i id="kmProgressFill"></i></div><div class="km-progress-line"><div id="kmProgressText" class="km-progress-text">Sẵn sàng.</div><span id="kmAliveDots" class="km-alive-dots" hidden>.</span></div>',
-    '<div id="kmProgressSub" class="km-progress-sub"></div><div id="kmInlineNotice" class="km-notice" hidden></div>',
-    '<div class="km-row"><button type="button" class="office-btn danger" id="kmCancel" disabled>Hủy</button></div></div>'
+    '<div class="km-progress"><i id="kmProgressFill"></i></div>',
+    '<div class="km-now-card"><div class="km-progress-line"><div id="kmProgressText" class="km-progress-text">Sẵn sàng</div><span id="kmAliveDots" class="km-alive-dots" hidden></span></div>',
+    '<div id="kmProgressSub" class="km-progress-sub"></div></div>',
+    '<div id="kmInlineNotice" class="km-notice" hidden></div>',
+    '<div class="km-row km-progress-actions"><button type="button" class="office-btn danger" id="kmCancel" disabled>Hủy</button></div></div>'
   ].join('');
 }
 function setProgress(pct,text,sub){
-  const f=kmHost&&kmHost.querySelector('#kmProgressFill'),t=kmHost&&kmHost.querySelector('#kmProgressText'),s=kmHost&&kmHost.querySelector('#kmProgressSub');
-  if(f)f.style.width=Math.max(0,Math.min(100,Number(pct)||0))+'%';if(t)t.textContent=text||'';if(s)s.textContent=sub||'';
+  const f=kmHost&&kmHost.querySelector('#kmProgressFill'),t=kmHost&&kmHost.querySelector('#kmProgressText'),box=kmHost&&kmHost.querySelector('#kmProgressSub');
+  if(f)f.style.width=Math.max(0,Math.min(100,Number(pct)||0))+'%';
+  if(t)t.textContent=String(text||'').replace(/[.。]+\s*$/,'');
+  if(box){
+    const parts=String(sub||'').split(' · ').filter(Boolean);
+    if(!parts.length){box.innerHTML='';}
+    else{
+      const first=parts.shift();
+      box.innerHTML='<div class="km-current-title">'+esc(first)+'</div>'+(parts.length?'<div class="km-progress-meta">'+parts.map(function(x){return '<span>'+esc(x)+'</span>';}).join('')+'</div>':'');
+    }
+  }
 }
 function setAlive(v){
   clearInterval(kmState.aliveTimer);kmState.aliveTimer=null;kmState.aliveStep=0;
   const d=kmHost&&kmHost.querySelector('#kmAliveDots');if(!d)return;
-  d.hidden=!v;if(!v){d.textContent='.';return;}
+  if(!v){d.hidden=true;d.textContent='';return;}
+  d.hidden=false;
   const tick=function(){kmState.aliveStep=(kmState.aliveStep%3)+1;d.textContent='.'.repeat(kmState.aliveStep);};
   tick();kmState.aliveTimer=setInterval(tick,420);
 }
@@ -171,20 +189,32 @@ function startPolling(id,reconnected){
   poll();kmState.poll=setInterval(poll,700);
 }
 function qualityButtons(){
-  return '<div class="km-quality" id="kmQuality"><button type="button" data-quality="ultra">Siêu cao</button><button type="button" data-quality="high">Cao</button><button type="button" data-quality="medium">Trung bình</button><button type="button" data-quality="low">Thấp</button></div>';
+  return '<div class="km-quality" id="kmQuality"><button type="button" data-quality="ultra"></button><button type="button" data-quality="high"></button><button type="button" data-quality="medium"></button><button type="button" data-quality="low"></button></div>';
+}
+function setQualityButton(b,title,note){
+  if(!b)return;
+  b.innerHTML='<span class="km-q-title">'+esc(title)+'</span>'+(note?'<small class="km-q-note">'+esc(note)+'</small>':'');
 }
 function audioQualityLabels(){
-  if(kmState.format==='mp3')return {ultra:'Tốt nhất',high:'Cao',medium:'Trung bình',low:'Nhẹ',tips:{ultra:'MP3 chất lượng cao nhất từ nguồn.',high:'MP3 chất lượng cao.',medium:'MP3 cân bằng chất lượng và dung lượng.',low:'MP3 nhẹ hơn, phù hợp lưu/gửi nhanh.'}};
-  if(kmState.format==='m4a')return {ultra:'256 kbps',high:'192 kbps',medium:'128 kbps',low:'96 kbps'};
-  if(kmState.format==='opus')return {ultra:'192 kbps',high:'160 kbps',medium:'128 kbps',low:'96 kbps'};
-  if(kmState.format==='flac'||kmState.format==='wav')return {ultra:'Theo nguồn',lossless:true};
-  return {ultra:'Tốt nhất',high:'Cao',medium:'Trung bình',low:'Nhẹ'};
+  if(kmState.format==='mp3')return {
+    ultra:{title:'Tốt nhất',note:'~245k VBR'},high:{title:'Cao',note:'~190k VBR'},medium:{title:'Trung bình',note:'~165k VBR'},low:{title:'Nhẹ',note:'~100k VBR'},
+    tips:{ultra:'MP3 VBR chất lượng cao nhất từ nguồn.',high:'MP3 VBR chất lượng cao.',medium:'MP3 VBR cân bằng chất lượng và dung lượng.',low:'MP3 VBR nhẹ hơn, phù hợp lưu/gửi nhanh.'}
+  };
+  if(kmState.format==='m4a')return {ultra:{title:'Tốt nhất',note:'256 kbps'},high:{title:'Cao',note:'192 kbps'},medium:{title:'Trung bình',note:'128 kbps'},low:{title:'Nhẹ',note:'96 kbps'}};
+  if(kmState.format==='opus')return {ultra:{title:'Tốt nhất',note:'192 kbps'},high:{title:'Cao',note:'160 kbps'},medium:{title:'Trung bình',note:'128 kbps'},low:{title:'Nhẹ',note:'96 kbps'}};
+  if(kmState.format==='flac'||kmState.format==='wav')return {ultra:{title:'Theo nguồn',note:'không tăng giả'},lossless:true};
+  return {ultra:{title:'Tốt nhất',note:''},high:{title:'Cao',note:''},medium:{title:'Trung bình',note:''},low:{title:'Nhẹ',note:''}};
 }
 function syncQualityUi(h){
   const buttons=[...h.querySelectorAll('[data-quality]')];
   if(kmState.kind==='video'){
-    const labels={ultra:'Siêu cao',high:'Cao',medium:'Trung bình',low:'Thấp'};
-    buttons.forEach(function(b){b.hidden=false;b.disabled=false;b.textContent=labels[b.dataset.quality]||b.dataset.quality;});
+    const labels={
+      ultra:{title:'Tốt nhất',note:'1440p+'},
+      high:{title:'Cao',note:'1080p'},
+      medium:{title:'Trung bình',note:'720p'},
+      low:{title:'Nhẹ',note:'480p'}
+    };
+    buttons.forEach(function(b){b.hidden=false;b.disabled=false;const x=labels[b.dataset.quality];setQualityButton(b,x.title,x.note);});
     const max=Number(kmState.probe&&kmState.probe.maxHeight)||0;
     const ultra=h.querySelector('[data-quality="ultra"]');if(ultra)ultra.disabled=max>0&&max<1440;
     return;
@@ -192,10 +222,10 @@ function syncQualityUi(h){
   const spec=audioQualityLabels();
   if(spec.lossless)kmState.quality='ultra';
   buttons.forEach(function(b){
-    const key=b.dataset.quality;
+    const key=b.dataset.quality;const x=spec[key]||{title:key,note:''};
     b.hidden=!!spec.lossless&&key!=='ultra';
     b.disabled=!!spec.lossless&&key!=='ultra';
-    b.textContent=spec[key]||key;
+    setQualityButton(b,x.title,x.note);
     if(spec.tips&&spec.tips[key]){b.dataset.tooltip=spec.tips[key];b.title=spec.tips[key];}
   });
 }
@@ -256,7 +286,7 @@ async function probeDownload(){
     if(kmState.allPlaylist&&kmState.probe.playlistCount){
       const names=(kmState.probe.playlistTitles||[]).filter(Boolean).slice(0,2).join(' · ');
       if(hint)hint.textContent='Đã nhận playlist'+(names?' “'+names+'”':'')+': '+kmState.probe.playlistCount+' bài. Bài đã tải trước đó sẽ tự được bỏ qua.';
-    }else if(hint)hint.textContent=max?'Đã đọc chất lượng. Video cao nhất trong danh sách: '+max+'p.':'Đã đọc thông tin nguồn.';
+    }else if(hint)hint.textContent=max?'Nguồn video cao nhất: '+max+'p':'Đã đọc xong thông tin nguồn.';
   }catch(e){kmState.probe=null;if(hint)hint.textContent='Chưa đọc được trước chất lượng. Bạn vẫn có thể tải; KanMedia sẽ tự chọn khi bắt đầu.';}
 }
 async function startDownload(){
@@ -275,25 +305,58 @@ function renderConvert(h){
     '<div class="km-grid-main"><div class="km-card"><div class="km-drop" id="kmConvertDrop"><strong>Kéo audio/video vào đây</strong><br><span>hoặc bấm để chọn nhiều file</span><input id="kmConvertInput" type="file" accept="audio/*,video/*" multiple hidden></div>',
     '<div class="km-file-list" id="kmConvertFiles"></div><div class="km-section-title">Chuyển thành</div>',
     '<div class="km-choice" id="kmConvertFormat"><button data-out="mp4">MP4</button><button data-out="mkv">MKV</button><button data-out="webm">WebM</button><button data-out="mp3">MP3</button><button data-out="m4a">M4A</button><button data-out="wav">WAV</button><button data-out="flac">FLAC</button><button data-out="ogg">OGG</button></div>',
-    '<div class="km-section-title">Chất lượng</div><div class="km-choice" id="kmConvertQuality"><button data-cq="high">Cao</button><button data-cq="medium">Trung bình</button><button data-cq="light">Nhẹ</button></div>',
-    '<div class="km-hint">Nếu định dạng tương thích, KanMedia tự chuyển nhanh mà không giảm chất lượng. Nếu cần, hệ thống mới mã hóa lại.</div>',
-    '<div class="km-row km-actions"><button class="office-btn primary km-run" id="kmConvertRun" type="button">Chuyển đổi</button></div></div>',progressCard(),'</div>'
+    '<div class="km-section-title">Chất lượng</div><div class="km-choice km-convert-quality" id="kmConvertQuality"><button data-cq="high"></button><button data-cq="medium"></button><button data-cq="light"></button></div>',
+    '<div class="km-hint" id="kmConvertHint">Nếu định dạng tương thích, KanMedia tự chuyển nhanh mà không giảm chất lượng. Nếu cần, hệ thống mới mã hóa lại.</div>',
+    '<div class="km-download-folder"><span class="km-folder-label">Thư mục lưu</span><div class="km-folder-box"><span id="kmConvertPath">'+esc(kmState.downloadDir||'Desktop\\KanDownload')+'</span><button class="office-btn" id="kmConvertChooseFolder" type="button">Đổi thư mục</button></div></div>',
+    '<div class="km-row km-actions"><button class="office-btn" id="kmConvertOpenFolder" type="button">Mở thư mục</button><button class="office-btn primary km-run" id="kmConvertRun" type="button">Chuyển đổi</button></div></div>',progressCard(),'</div>'
   ].join('');
   kmState.convertFormat=kmState.convertFormat||'mp4';kmState.convertQuality=kmState.convertQuality||'medium';
   const inp=h.querySelector('#kmConvertInput'),drop=h.querySelector('#kmConvertDrop');
   function add(fs){kmState.files=Array.from(fs||[]).filter(function(f){return /^(audio|video)\//.test(f.type)||/\.(mp3|m4a|wav|flac|ogg|opus|mp4|mkv|mov|avi|webm)$/i.test(f.name);});renderConvertFiles(h);}
   inp.addEventListener('change',function(){add(inp.files);});drop.addEventListener('click',function(){inp.click();});drop.addEventListener('dragover',function(e){e.preventDefault();drop.classList.add('dragover');});drop.addEventListener('dragleave',function(){drop.classList.remove('dragover');});drop.addEventListener('drop',function(e){e.preventDefault();drop.classList.remove('dragover');add(e.dataTransfer.files);});
   h.querySelectorAll('[data-out]').forEach(function(b){b.addEventListener('click',function(){kmState.convertFormat=b.dataset.out;refreshConvert(h);});});
-  h.querySelectorAll('[data-cq]').forEach(function(b){b.addEventListener('click',function(){kmState.convertQuality=b.dataset.cq;refreshConvert(h);});});
+  h.querySelectorAll('[data-cq]').forEach(function(b){b.addEventListener('click',function(){if(b.disabled)return;kmState.convertQuality=b.dataset.cq;refreshConvert(h);});});
+  h.querySelector('#kmConvertOpenFolder').addEventListener('click',function(){kmApi('/system/open-folder',{method:'POST',json:{}}).catch(function(){notice('Chưa mở được thư mục.','warn');});});
+  h.querySelector('#kmConvertChooseFolder').addEventListener('click',async function(){
+    try{
+      const r=await kmApi('/system/select-folder',{method:'POST',json:{},timeout:300000});
+      if(!r.cancelled&&r.path){
+        kmState.downloadDir=r.path;
+        const el=h.querySelector('#kmConvertPath');if(el)el.textContent=r.path;
+        notice('Đã đổi thư mục lưu.','ok');
+      }
+    }catch(e){notice(e.message||'Chưa đổi được thư mục.','warn');}
+  });
   h.querySelector('#kmConvertRun').addEventListener('click',startConvert);renderConvertFiles(h);refreshConvert(h);bindCancel();
 }
 function renderConvertFiles(h){
   const list=h.querySelector('#kmConvertFiles');if(!list)return;
   list.innerHTML=kmState.files.length?kmState.files.map(function(f){return '<div class="km-file"><span>'+esc(f.name)+'</span><b>'+bytes(f.size)+'</b></div>';}).join(''):'<div class="km-hint">Chưa chọn file.</div>';
 }
+function convertQualitySpec(fmt){
+  if(fmt==='m4a')return {high:['Cao','256 kbps'],medium:['Trung bình','192 kbps'],light:['Nhẹ','128 kbps']};
+  if(fmt==='mp3')return {high:['Cao','~245k VBR'],medium:['Trung bình','~175k VBR'],light:['Nhẹ','~115k VBR']};
+  if(fmt==='ogg')return {high:['Cao','q7'],medium:['Trung bình','q5'],light:['Nhẹ','q3']};
+  if(fmt==='wav'||fmt==='flac')return {lossless:true,high:['Theo nguồn','không giảm thêm']};
+  return {high:['Cao','CRF 18'],medium:['Trung bình','CRF 23'],light:['Nhẹ','CRF 29']};
+}
 function refreshConvert(h){
   h.querySelectorAll('[data-out]').forEach(function(b){b.classList.toggle('active',b.dataset.out===kmState.convertFormat);});
-  h.querySelectorAll('[data-cq]').forEach(function(b){b.classList.toggle('active',b.dataset.cq===kmState.convertQuality);});
+  const spec=convertQualitySpec(kmState.convertFormat);
+  if(spec.lossless)kmState.convertQuality='high';
+  h.querySelectorAll('[data-cq]').forEach(function(b){
+    const key=b.dataset.cq;const x=spec[key]||[key,''];
+    b.hidden=!!spec.lossless&&key!=='high';
+    b.disabled=!!spec.lossless&&key!=='high';
+    setQualityButton(b,x[0],x[1]);
+    b.classList.toggle('active',key===kmState.convertQuality);
+  });
+  const hint=h.querySelector('#kmConvertHint');
+  if(hint){
+    if(spec.lossless)hint.textContent='FLAC/WAV giữ chất lượng theo nguồn; tăng thông số không thể tạo thêm chi tiết âm thanh.';
+    else if(['mp4','mkv','webm'].includes(kmState.convertFormat))hint.textContent='Số CRF chỉ để tham chiếu khi cần mã hóa lại: số càng thấp thì hình càng nét và file thường lớn hơn.';
+    else hint.textContent='Bitrate bên dưới là mức tham chiếu đầu ra; chất lượng thực tế vẫn phụ thuộc file nguồn.';
+  }
 }
 async function uploadFile(file){
   return kmApi('/media/upload',{method:'POST',body:file,headers:{'Content-Type':'application/octet-stream','X-KanBan-File-Name':encodeURIComponent(file.name),'X-KanBan-File-Type':file.type||''},timeout:Math.max(60000,Math.min(900000,file.size/10000))});
