@@ -16,8 +16,8 @@ export function renderKanMediaTool(host){
   ].join('');
   host.querySelectorAll('[data-km-tab]').forEach(function(b){b.addEventListener('click',function(){kmState.tab=b.dataset.kmTab;renderKmTab();});});
   host.querySelector('#kmUpdateBtn').addEventListener('click',updateKanTools);
-  checkKanMediaAgent();
   renderKmTab();
+  checkKanMediaAgent().then(resumeActiveJob);
 }
 function applyKmTooltips(){
   if(!kmHost)return;
@@ -55,7 +55,7 @@ function applyKmTooltips(){
 }
 function ensureKanMediaCss(){
   if(document.querySelector('link[data-kanmedia-css]'))return;
-  const l=document.createElement('link');l.rel='stylesheet';l.href='office-tools/kanmedia/kanmedia.css?v=1.1.0';l.dataset.kanmediaCss='1';document.head.appendChild(l);
+  const l=document.createElement('link');l.rel='stylesheet';l.href='office-tools/kanmedia/kanmedia.css?v=1.2.0';l.dataset.kanmediaCss='1';document.head.appendChild(l);
 }
 function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function bytes(n){n=Number(n)||0;if(n<1024)return n+' B';const u=['KB','MB','GB','TB'];let i=-1;do{n/=1024;i++;}while(n>=1024&&i<u.length-1);return n.toFixed(n>=100?0:n>=10?1:2)+' '+u[i];}
@@ -92,6 +92,18 @@ async function checkKanMediaAgent(){
     p.querySelector('span').textContent=s.mediaReady?'Sẵn sàng':'Cần bổ sung thành phần';
     if(s.downloads){kmState.downloadDir=s.downloads;const pathEl=kmHost&&kmHost.querySelector('#kmDownloadPath');if(pathEl)pathEl.textContent=s.downloads;}
   }catch(e){p.classList.remove('ready');p.classList.add('warn');p.querySelector('span').textContent='Chưa cài KanBan Tools';}
+}
+async function resumeActiveJob(){
+  if(kmState.jobId)return;
+  try{
+    const r=await kmApi('/jobs/active',{timeout:1800});
+    const j=r&&r.job;if(!j||!j.jobId)return;
+    if(['download','convert','edit'].includes(j.mode)&&kmState.tab!==j.mode){
+      kmState.tab=j.mode;renderKmTab();
+    }
+    startPolling(j.jobId,true);
+    notice('Đã nối lại tác vụ đang chạy trên máy.','ok');
+  }catch(e){}
 }
 async function updateKanTools(){
   try{await kmApi('/system/update',{method:'POST',json:{scope:'all'},timeout:3500});notice('Đã mở cập nhật KanBan Tools.','ok');}
@@ -135,13 +147,17 @@ function setBusy(v){
 function bindCancel(){
   const c=kmHost&&kmHost.querySelector('#kmCancel');if(c)c.addEventListener('click',async function(){if(!kmState.jobId)return;try{await kmApi('/jobs/'+encodeURIComponent(kmState.jobId)+'/cancel',{method:'POST',json:{}});setProgress(0,'Đang hủy…','');}catch(e){notice('Không gửi được lệnh hủy.','warn');}});
 }
-function startPolling(id){
+function startPolling(id,reconnected){
   kmState.jobId=id;clearInterval(kmState.poll);setBusy(true);bindCancel();
   const poll=async function(){
     try{
       const j=await kmApi('/jobs/'+encodeURIComponent(id),{timeout:3000});
-      const sub=j.current?(j.current+(j.index&&j.total?' · '+j.index+'/'+j.total:'')):'';
-      setProgress(j.percent||0,j.message||'Đang xử lý…',sub);
+      const parts=[];
+      if(j.current)parts.push(j.current);
+      if(j.index&&j.total)parts.push(j.index+'/'+j.total);
+      if(j.speed)parts.push(j.speed);
+      if(j.eta&&j.eta!=='NA')parts.push('còn khoảng '+j.eta);
+      setProgress(j.percent||0,j.message||'Đang xử lý…',parts.join(' · '));
       if(['done','error','cancelled'].includes(j.state)){
         clearInterval(kmState.poll);kmState.poll=null;kmState.jobId=null;setBusy(false);
         if(j.state==='done')notice(j.output?'Hoàn tất. File đã lưu tại '+j.output:'Hoàn tất.','ok');
@@ -156,6 +172,32 @@ function startPolling(id){
 }
 function qualityButtons(){
   return '<div class="km-quality" id="kmQuality"><button type="button" data-quality="ultra">Siêu cao</button><button type="button" data-quality="high">Cao</button><button type="button" data-quality="medium">Trung bình</button><button type="button" data-quality="low">Thấp</button></div>';
+}
+function audioQualityLabels(){
+  if(kmState.format==='mp3')return {ultra:'Tốt nhất',high:'Cao',medium:'Trung bình',low:'Nhẹ',tips:{ultra:'MP3 chất lượng cao nhất từ nguồn.',high:'MP3 chất lượng cao.',medium:'MP3 cân bằng chất lượng và dung lượng.',low:'MP3 nhẹ hơn, phù hợp lưu/gửi nhanh.'}};
+  if(kmState.format==='m4a')return {ultra:'256 kbps',high:'192 kbps',medium:'128 kbps',low:'96 kbps'};
+  if(kmState.format==='opus')return {ultra:'192 kbps',high:'160 kbps',medium:'128 kbps',low:'96 kbps'};
+  if(kmState.format==='flac'||kmState.format==='wav')return {ultra:'Theo nguồn',lossless:true};
+  return {ultra:'Tốt nhất',high:'Cao',medium:'Trung bình',low:'Nhẹ'};
+}
+function syncQualityUi(h){
+  const buttons=[...h.querySelectorAll('[data-quality]')];
+  if(kmState.kind==='video'){
+    const labels={ultra:'Siêu cao',high:'Cao',medium:'Trung bình',low:'Thấp'};
+    buttons.forEach(function(b){b.hidden=false;b.disabled=false;b.textContent=labels[b.dataset.quality]||b.dataset.quality;});
+    const max=Number(kmState.probe&&kmState.probe.maxHeight)||0;
+    const ultra=h.querySelector('[data-quality="ultra"]');if(ultra)ultra.disabled=max>0&&max<1440;
+    return;
+  }
+  const spec=audioQualityLabels();
+  if(spec.lossless)kmState.quality='ultra';
+  buttons.forEach(function(b){
+    const key=b.dataset.quality;
+    b.hidden=!!spec.lossless&&key!=='ultra';
+    b.disabled=!!spec.lossless&&key!=='ultra';
+    b.textContent=spec[key]||key;
+    if(spec.tips&&spec.tips[key]){b.dataset.tooltip=spec.tips[key];b.title=spec.tips[key];}
+  });
 }
 function formatMenu(kind){
   if(kind==='audio')return '<div class="km-format-menu"><button data-format="mp3">MP3 <small>mặc định</small></button><button data-format="m4a">M4A</button><button data-format="opus">OPUS</button><button data-format="flac">FLAC</button><button data-format="wav">WAV</button></div>';
@@ -179,7 +221,7 @@ function renderDownload(h){
   let timer=null;
   function sync(){kmState.urlText=ta.value;kmState.urls=parseUrls(ta.value);h.querySelector('#kmUrlCount').textContent=kmState.urls.length?kmState.urls.length+' link hợp lệ':'Chưa có link';clearTimeout(timer);if(kmState.urls.length)timer=setTimeout(probeDownload,700);}
   ta.addEventListener('input',sync);sync();
-  const playlistBox=h.querySelector('#kmAllPlaylist');playlistBox.checked=!!kmState.allPlaylist;playlistBox.addEventListener('change',function(){kmState.allPlaylist=playlistBox.checked;});
+  const playlistBox=h.querySelector('#kmAllPlaylist');playlistBox.checked=!!kmState.allPlaylist;playlistBox.addEventListener('change',function(){kmState.allPlaylist=playlistBox.checked;kmState.probe=null;if(kmState.urls.length)probeDownload();});
   h.querySelector('#kmClearUrls').addEventListener('click',function(){ta.value='';kmState.probe=null;sync();});
   h.querySelectorAll('[data-kind]').forEach(function(b){b.addEventListener('click',function(){kmState.kind=b.dataset.kind;kmState.format=kmState.kind==='audio'?'mp3':'mp4';refreshDownloadSelection(h);});});
   h.querySelectorAll('[data-format]').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();kmState.format=b.dataset.format;kmState.kind=b.closest('.km-format-wrap').querySelector('[data-kind]').dataset.kind;refreshDownloadSelection(h);});});
@@ -195,23 +237,33 @@ function renderDownload(h){
   bindCancel();refreshDownloadSelection(h);
 }
 function refreshDownloadSelection(h){
-  h.querySelectorAll('[data-kind]').forEach(function(b){b.classList.toggle('active',b.dataset.kind===kmState.kind);});
+  h.querySelectorAll('[data-kind]').forEach(function(b){
+    b.classList.toggle('active',b.dataset.kind===kmState.kind);
+    if(b.dataset.kind==='audio')b.textContent='♪ Audio · '+(kmState.kind==='audio'?kmState.format.toUpperCase():'MP3');
+    if(b.dataset.kind==='video')b.textContent='▶ Video · '+(kmState.kind==='video'?kmState.format.toUpperCase():'MP4');
+  });
   h.querySelectorAll('[data-format]').forEach(function(b){b.classList.toggle('active',b.dataset.format===kmState.format);});
+  syncQualityUi(h);
   h.querySelectorAll('[data-quality]').forEach(function(b){b.classList.toggle('active',b.dataset.quality===kmState.quality);});
 }
 async function probeDownload(){
   if(kmState.tab!=='download'||!kmState.urls.length)return;
   const hint=kmHost&&kmHost.querySelector('#kmProbeHint');if(hint)hint.textContent='Đang đọc chất lượng khả dụng…';
   try{
-    kmState.probe=await kmApi('/media/probe',{method:'POST',json:{urls:kmState.urls.slice(0,20)},timeout:30000});
+    kmState.probe=await kmApi('/media/probe',{method:'POST',json:{urls:kmState.urls.slice(0,20),allPlaylist:!!kmState.allPlaylist},timeout:90000});
     const max=Number(kmState.probe.maxHeight)||0;
-    const u=kmHost&&kmHost.querySelector('[data-quality="ultra"]');if(u)u.disabled=kmState.kind==='video'&&max>0&&max<1440;
-    if(hint)hint.textContent=max?'Đã đọc chất lượng. Video cao nhất trong danh sách: '+max+'p.':'Đã đọc thông tin nguồn.';
+    const current=kmHost&&kmHost.querySelector('#kmTabHost');if(current)syncQualityUi(current);
+    if(kmState.allPlaylist&&kmState.probe.playlistCount){
+      const names=(kmState.probe.playlistTitles||[]).filter(Boolean).slice(0,2).join(' · ');
+      if(hint)hint.textContent='Đã nhận playlist'+(names?' “'+names+'”':'')+': '+kmState.probe.playlistCount+' bài. Bài đã tải trước đó sẽ tự được bỏ qua.';
+    }else if(hint)hint.textContent=max?'Đã đọc chất lượng. Video cao nhất trong danh sách: '+max+'p.':'Đã đọc thông tin nguồn.';
   }catch(e){kmState.probe=null;if(hint)hint.textContent='Chưa đọc được trước chất lượng. Bạn vẫn có thể tải; KanMedia sẽ tự chọn khi bắt đầu.';}
 }
 async function startDownload(){
   if(!kmState.urls.length)return notice('Bạn hãy dán ít nhất một link hợp lệ.','warn');
   if(!kmState.allPlaylist&&kmState.urls.some(isPurePlaylistUrl))return notice('Link playlist thuần không có bài cụ thể. Hãy tick “Tải toàn bộ playlist” hoặc dán link của một bài trong playlist.','warn');
+  const pc=Number(kmState.probe&&kmState.probe.playlistCount)||0;
+  if(kmState.allPlaylist&&pc>=200&&!window.confirm('Playlist có '+pc+' bài. Bạn có muốn tải toàn bộ không?'))return;
   setProgress(1,'Đang chuẩn bị…','');setBusy(true);
   try{
     const r=await kmApi('/media/download',{method:'POST',json:{urls:kmState.urls,kind:kmState.kind,format:kmState.format,quality:kmState.quality,allPlaylist:!!kmState.allPlaylist},timeout:5000});
