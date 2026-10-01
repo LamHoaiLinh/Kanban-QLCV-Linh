@@ -61,7 +61,7 @@
     if(desc){
       desc.innerHTML=agentReady
         ? 'Bạn có thể mở cài đặt JPG/PNG hoặc tải <strong>KanTool.bat</strong> để cập nhật lên bản mới nhất. BAT sẽ tự dừng bản cũ, tải Agent đã đóng gói sẵn, kiểm tra SHA256, ghi đè và khởi động lại.'
-        : 'Tải <strong>KanTool.bat</strong> rồi mở file vừa tải. <strong>Không cần cài Python</strong>; bộ cài tự tải Agent đã đóng gói sẵn và tự ghi đè bản cũ.';
+        : 'Tải <strong>KanTool.bat</strong> rồi mở file vừa tải. <strong>Bạn không cần tự cài Python hay FFmpeg</strong>; KanTool tự chuẩn bị các thành phần cần thiết.';
     }
     if(settingsBtn)settingsBtn.disabled=!agentReady;
   }
@@ -87,7 +87,7 @@
         <button type="button" data-capture-download-bat class="primary">⬇ Tải / cập nhật KanTool.bat</button>
         <button type="button" data-capture-retry>↻ Kiểm tra lại</button>
       </div>
-      <div class="capture-security-note">Bộ cài BAT dùng PowerShell/curl có sẵn trong Windows để tải gói Agent đã biên dịch sẵn. Máy người dùng không cần Python và không cần xóa bản cũ thủ công.</div>
+      <div class="capture-security-note">KanTool không tắt Windows Security. Capture ưu tiên gói đã kiểm SHA256; nếu EXE bị Windows chặn, bộ cài có thể dùng mã nguồn Python thay thế.</div>
     </section>`;
     document.body.appendChild(panel);
 
