@@ -87,7 +87,7 @@ function Convert-One($meta,[string]$format,[string]$quality,[double]$base,[doubl
   elseif($format -eq 'm4a'){$a=@('-vn','-c:a','aac','-b:a',$(if($quality -eq 'high'){'256k'}elseif($quality -eq 'light'){'128k'}else{'192k'}),$dst)}
   elseif($format -eq 'ogg'){$a=@('-vn','-c:a','libvorbis','-q:a',$(if($quality -eq 'high'){'7'}elseif($quality -eq 'light'){'3'}else{'5'}),$dst)}
   else{$a=@('-vn','-c:a','libmp3lame','-q:a',$(if($quality -eq 'high'){'0'}elseif($quality -eq 'light'){'6'}else{'3'}),$dst)}
-  Ffmpeg-Run $src $a $dur $base $slice $label|Out-Null
+  Ffmpeg-Run $src $a $dur $base $slice $label ([string]$meta.name) $index $total|Out-Null
  }
  return (Rename-FromMetadata $dst)
 }
