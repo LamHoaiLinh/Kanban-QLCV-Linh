@@ -1,0 +1,50 @@
+name: Check KanBan Tools
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'kan-tools/**'
+      - 'office-tools/kanmedia/**'
+      - 'kantool-launcher.js'
+      - 'kantool-extra.css'
+      - '.github/workflows/check-kantools.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Check Python syntax
+        shell: pwsh
+        run: python -m py_compile kan-tools/runtime/kanmedia-server.py kan-tools/runtime/kanmedia-worker.py capture-agent/capture_agent.py office-tools/signing-agent/package/kanban_signing_agent.py
+
+      - name: Check PowerShell installer syntax
+        shell: pwsh
+        run: |
+          $tokens=$null
+          $errors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'kan-tools/install.ps1'),[ref]$tokens,[ref]$errors) | Out-Null
+          if($errors.Count -gt 0){
+            $errors | Format-List | Out-String | Write-Error
+            exit 1
+          }
+
+      - name: Check manifest JSON
+        shell: pwsh
+        run: Get-Content 'kan-tools/manifest.json' -Raw | ConvertFrom-Json | Out-Null
+
+      - name: Check JavaScript syntax
+        shell: pwsh
+        run: node -e "const fs=require('fs'); for(const p of ['office-tools/kanmedia/kanmedia.js','kantool-launcher.js','capture-launcher.js']){let s=fs.readFileSync(p,'utf8').replace(/\\bexport\\s+/g,''); new Function(s); console.log('OK '+p)}"
