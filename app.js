@@ -2,7 +2,7 @@
   'use strict';
 
   const STORAGE_KEY = 'linh_personal_kanban_v1';
-  const VERSION = 15;
+  const VERSION = 16;
   const DEFAULT_BACKGROUND_ID = 'bg6';
   const KAN_ALARM_AGENT = 'http://127.0.0.1:47632';
   const KAN_ALARM_HEADERS = {'X-KanBan-Agent':'linh-kanban-v1','Content-Type':'application/json'};
@@ -2306,78 +2306,84 @@
     refreshAlarmAgentStatus();
   }
 
+  // Âm lịch Việt Nam: thuật toán Hồ Ngọc Đức / Jean Meeus, UTC+7.
+  // Đồng bộ theo mã nguồn lich-viet-pwa mà người dùng cung cấp.
   function lunarJdFromDate(day,month,year) {
-    const a = Math.floor((14-month)/12);
-    const y = year+4800-a;
-    const m = month+12*a-3;
-    let jd = day+Math.floor((153*m+2)/5)+365*y+Math.floor(y/4)-Math.floor(y/100)+Math.floor(y/400)-32045;
-    if (jd < 2299161) jd = day+Math.floor((153*m+2)/5)+365*y+Math.floor(y/4)-32083;
-    return jd;
+    const F=Math.floor;
+    const a=F((14-month)/12),yy=year+4800-a,mm=month+12*a-3;
+    const jd=day+F((153*mm+2)/5)+365*yy+F(yy/4)-F(yy/100)+F(yy/400)-32045;
+    return jd<2299161 ? day+F((153*mm+2)/5)+365*yy+F(yy/4)-32083 : jd;
   }
 
-  function lunarNewMoon(k) {
-    const T=k/1236.85,T2=T*T,T3=T2*T,dr=Math.PI/180;
-    let jd=2415020.75933+29.53058868*k+0.0001178*T2-0.000000155*T3;
-    jd+=0.00033*Math.sin((166.56+132.87*T-0.009173*T2)*dr);
-    const M=359.2242+29.10535608*k-0.0000333*T2-0.00000347*T3;
-    const Mpr=306.0253+385.81691806*k+0.0107306*T2+0.00001236*T3;
-    const F=21.2964+390.67050646*k-0.0016528*T2-0.00000239*T3;
-    let c=(0.1734-0.000393*T)*Math.sin(M*dr)+0.0021*Math.sin(2*M*dr);
-    c-=0.4068*Math.sin(Mpr*dr)+0.0161*Math.sin(2*Mpr*dr)+0.0004*Math.sin(3*Mpr*dr);
-    c+=0.0104*Math.sin(2*F*dr)-0.0051*Math.sin((M+Mpr)*dr)-0.0074*Math.sin((M-Mpr)*dr);
-    c+=0.0004*Math.sin((2*F+M)*dr)-0.0004*Math.sin((2*F-M)*dr)-0.0006*Math.sin((2*F+Mpr)*dr);
-    c+=0.0010*Math.sin((2*F-Mpr)*dr)+0.0005*Math.sin((2*Mpr+M)*dr);
-    const dt=T<-11
-      ?0.001+0.000839*T+0.0002261*T2-0.00000845*T3-0.000000081*T*T3
-      :-0.000278+0.000265*T+0.000262*T2;
-    return jd+c-dt;
+  function lunarJdToDate(jd) {
+    const F=Math.floor;
+    let a,b,c,d,e,m;
+    if (jd>2299160) {
+      a=jd+32044;b=F((4*a+3)/146097);c=a-F(b*146097/4);
+    } else {
+      b=0;c=jd+32082;
+    }
+    d=F((4*c+3)/1461);e=c-F(1461*d/4);m=F((5*e+2)/153);
+    return {day:e-F((153*m+2)/5)+1,month:m+3-12*F(m/10),year:b*100+d-4800+F(m/10)};
   }
 
   function lunarNewMoonDay(k,timeZone=7) {
-    return Math.floor(lunarNewMoon(k)+0.5+timeZone/24);
+    const F=Math.floor,PI=Math.PI;
+    const T=k/1236.85,T2=T*T,T3=T2*T,dr=PI/180;
+    let J=2415020.75933+29.53058868*k+0.0001178*T2-0.000000155*T3
+      +0.00033*Math.sin((166.56+132.87*T-0.009173*T2)*dr);
+    const M=359.2242+29.10535608*k-0.0000333*T2-0.00000347*T3;
+    const Mp=306.0253+385.81691806*k+0.0107306*T2+0.00001236*T3;
+    const Fv=21.2964+390.67050646*k-0.0016528*T2-0.00000239*T3;
+    const C=(0.1734-0.000393*T)*Math.sin(M*dr)+0.0021*Math.sin(2*dr*M)
+      -0.4068*Math.sin(Mp*dr)+0.0161*Math.sin(2*dr*Mp)-0.0004*Math.sin(3*dr*Mp)
+      +0.0104*Math.sin(2*dr*Fv)-0.0051*Math.sin(dr*(M+Mp))-0.0074*Math.sin(dr*(M-Mp))
+      +0.0004*Math.sin(dr*(2*Fv+M))-0.0004*Math.sin(dr*(2*Fv-M))
+      -0.0006*Math.sin(dr*(2*Fv+Mp))+0.001*Math.sin(dr*(2*Fv-Mp))+0.0005*Math.sin(dr*(2*Mp+M));
+    const dt=T<-11
+      ?0.001+0.000839*T+0.0002261*T2-0.00000845*T3-0.000000081*T*T3
+      :-0.000278+0.000265*T+0.000262*T2;
+    return F(J+C-dt+0.5+timeZone/24);
   }
 
-  function lunarSunLongitude(jdn) {
-    const T=(jdn-2451545.0)/36525,T2=T*T,dr=Math.PI/180;
-    const M=357.52910+35999.05030*T-0.0001559*T2-0.00000048*T*T2;
-    const L0=280.46645+36000.76983*T+0.0003032*T2;
-    let dl=(1.914600-0.004817*T-0.000014*T2)*Math.sin(dr*M);
-    dl+=(0.019993-0.000101*T)*Math.sin(dr*2*M)+0.000290*Math.sin(dr*3*M);
-    let L=(L0+dl)*dr;
-    L-=Math.PI*2*Math.floor(L/(Math.PI*2));
-    return L;
-  }
-
-  function lunarSunLongitudeSector(dayNumber,timeZone=7) {
-    return Math.floor(lunarSunLongitude(dayNumber-0.5-timeZone/24)/Math.PI*6);
+  function lunarSunLongitudeSector(jdn,timeZone=7) {
+    const F=Math.floor,PI=Math.PI;
+    const T=(jdn-2451545.5-timeZone/24)/36525,T2=T*T,dr=PI/180;
+    const M=357.5291+35999.0503*T-0.0001559*T2-0.00000048*T*T2;
+    const L=280.46645+36000.76983*T+0.0003032*T2;
+    const DL=(1.9146-0.004817*T-0.000014*T2)*Math.sin(dr*M)
+      +(0.019993-0.000101*T)*Math.sin(2*dr*M)+0.00029*Math.sin(3*dr*M);
+    let longitude=(L+DL)*dr;
+    longitude-=PI*2*F(longitude/(PI*2));
+    return F(longitude/PI*6);
   }
 
   function lunarMonth11(year,timeZone=7) {
-    const off=lunarJdFromDate(31,12,year)-2415021;
-    const k=Math.floor(off/29.530588853);
-    let nm=lunarNewMoonDay(k,timeZone);
-    if (lunarSunLongitudeSector(nm,timeZone)>=9) nm=lunarNewMoonDay(k-1,timeZone);
-    return nm;
+    const F=Math.floor;
+    const k=F((lunarJdFromDate(31,12,year)-2415021)/29.530588853);
+    const nm=lunarNewMoonDay(k,timeZone);
+    return lunarSunLongitudeSector(nm,timeZone)>=9 ? lunarNewMoonDay(k-1,timeZone) : nm;
   }
 
   function lunarLeapMonthOffset(a11,timeZone=7) {
-    const k=Math.floor(0.5+(a11-2415021.076998695)/29.530588853);
-    let last=0,i=1,arc=lunarSunLongitudeSector(lunarNewMoonDay(k+i,timeZone),timeZone);
-    do {
-      last=arc;
-      i+=1;
-      arc=lunarSunLongitudeSector(lunarNewMoonDay(k+i,timeZone),timeZone);
-    } while (arc!==last && i<14);
+    const F=Math.floor;
+    const k=F((a11-2415021.076998695)/29.530588853+0.5);
+    let i=1,last=0,arc=lunarSunLongitudeSector(lunarNewMoonDay(k+i,timeZone),timeZone);
+    while (true) {
+      last=arc;i+=1;arc=lunarSunLongitudeSector(lunarNewMoonDay(k+i,timeZone),timeZone);
+      if (arc===last || i>=14) break;
+    }
     return i-1;
   }
 
   function solarToVietnameseLunar(day,month,year) {
-    const timeZone=7;
-    const dayNumber=lunarJdFromDate(day,month,year);
-    const k=Math.floor((dayNumber-2415021.076998695)/29.530588853);
+    const F=Math.floor,timeZone=7;
+    const jd=lunarJdFromDate(day,month,year);
+    const k=F((jd-2415021.076998695)/29.530588853);
     let monthStart=lunarNewMoonDay(k+1,timeZone);
-    if (monthStart>dayNumber) monthStart=lunarNewMoonDay(k,timeZone);
-    let a11=lunarMonth11(year,timeZone),b11=a11,lunarYear;
+    if (monthStart>jd) monthStart=lunarNewMoonDay(k,timeZone);
+    if (monthStart>jd) monthStart=lunarNewMoonDay(k-1,timeZone);
+    let a11=lunarMonth11(year,timeZone),b11=a11,lunarYear=year;
     if (a11>=monthStart) {
       lunarYear=year;
       a11=lunarMonth11(year-1,timeZone);
@@ -2385,19 +2391,34 @@
       lunarYear=year+1;
       b11=lunarMonth11(year+1,timeZone);
     }
-    const lunarDay=dayNumber-monthStart+1;
-    const diff=Math.floor((monthStart-a11)/29);
-    let lunarLeap=0,lunarMonth=diff+11;
+    const lunarDay=jd-monthStart+1;
+    const diff=F((monthStart-a11)/29);
+    let leap=false,lunarMonth=diff+11;
     if (b11-a11>365) {
-      const leapDiff=lunarLeapMonthOffset(a11,timeZone);
-      if (diff>=leapDiff) {
+      const offset=lunarLeapMonthOffset(a11,timeZone);
+      if (diff>=offset) {
         lunarMonth=diff+10;
-        if (diff===leapDiff) lunarLeap=1;
+        if (diff===offset) leap=true;
       }
     }
     if (lunarMonth>12) lunarMonth-=12;
     if (lunarMonth>=11 && diff<4) lunarYear-=1;
-    return {day:lunarDay,month:lunarMonth,year:lunarYear,leap:Boolean(lunarLeap)};
+    return {day:lunarDay,month:lunarMonth,year:lunarYear,leap};
+  }
+
+  function vietnameseLunarToSolar(day,month,year,isLeap=false) {
+    const F=Math.floor,timeZone=7;
+    const a11=month<11 ? lunarMonth11(year-1,timeZone) : lunarMonth11(year,timeZone);
+    const b11=month<11 ? lunarMonth11(year,timeZone) : lunarMonth11(year+1,timeZone);
+    const k=F((a11-2415021.076998695)/29.530588853+0.5);
+    let offset=month-11;
+    if (offset<0) offset+=12;
+    if (b11-a11>365) {
+      const leapOffset=lunarLeapMonthOffset(a11,timeZone);
+      if (isLeap && month!==(leapOffset-2+12)%12) return null;
+      if (isLeap || offset>=leapOffset) offset+=1;
+    }
+    return lunarJdToDate(lunarNewMoonDay(k+offset,timeZone)+day-1);
   }
 
   function formatVietnameseLunarDate(date) {
