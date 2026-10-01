@@ -62,6 +62,7 @@ ALARM_FILE = ROOT / "alarm-state.json"
 ALARM_LOCK = threading.RLock()
 ALARM_WAKE = threading.Event()
 ALARM_STOP = threading.Event()
+ALARM_RINGING = threading.Event()
 ALARM_STATE = {
     "ok": True, "scheduled": False, "active": False, "deadlineMs": 0,
     "durationSec": 0, "label": "Hẹn giờ KanBan", "repeat": True,
@@ -540,30 +541,36 @@ def _notify_windows_alarm(title: str, message: str) -> None:
         log("ALARM NOTIFY " + repr(exc))
 
 def _alarm_sound_loop() -> None:
+    if ALARM_RINGING.is_set():
+        return
+    ALARM_RINGING.set()
     try:
         import winsound
     except Exception:
         winsound = None
-    while True:
-        state = _alarm_snapshot()
-        if not state.get("active") or ALARM_STOP.is_set():
-            break
-        if state.get("sound") and winsound is not None:
-            try:
-                winsound.Beep(880, 220)
-                time.sleep(0.08)
-                winsound.Beep(1175, 300)
-                time.sleep(0.08)
-                winsound.Beep(988, 220)
-            except Exception:
+    try:
+        while True:
+            state = _alarm_snapshot()
+            if not state.get("active") or ALARM_STOP.is_set():
+                break
+            if state.get("sound") and winsound is not None:
                 try:
-                    winsound.MessageBeep()
+                    winsound.Beep(880, 220)
+                    time.sleep(0.08)
+                    winsound.Beep(1175, 300)
+                    time.sleep(0.08)
+                    winsound.Beep(988, 220)
                 except Exception:
-                    pass
-        if not state.get("repeat"):
-            break
-        if ALARM_STOP.wait(1.15):
-            break
+                    try:
+                        winsound.MessageBeep()
+                    except Exception:
+                        pass
+            if not state.get("repeat"):
+                break
+            if ALARM_STOP.wait(1.15):
+                break
+    finally:
+        ALARM_RINGING.clear()
 
 def _fire_alarm(reason: str = "deadline") -> dict:
     with ALARM_LOCK:
@@ -651,7 +658,7 @@ def alarm_scheduler_loop() -> None:
     while True:
         state = _alarm_snapshot()
         if state.get("active"):
-            if not ALARM_STOP.is_set():
+            if not ALARM_STOP.is_set() and not ALARM_RINGING.is_set():
                 threading.Thread(target=_alarm_sound_loop, daemon=True).start()
                 if state.get("notify"):
                     threading.Thread(
