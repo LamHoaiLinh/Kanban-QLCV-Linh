@@ -58,6 +58,15 @@ DEFAULT_DOWNLOADS = windows_desktop() / "KanDownload"
 CONFIG = ROOT / "config.json"
 LOGS = ROOT / "logs"
 LOG = LOGS / "kanmedia-server.log"
+ALARM_FILE = ROOT / "alarm-state.json"
+ALARM_LOCK = threading.RLock()
+ALARM_WAKE = threading.Event()
+ALARM_STOP = threading.Event()
+ALARM_STATE = {
+    "ok": True, "scheduled": False, "active": False, "deadlineMs": 0,
+    "durationSec": 0, "label": "Hẹn giờ KanBan", "repeat": True,
+    "sound": True, "notify": True, "createdAt": 0, "firedAt": 0,
+}
 
 for p in (ROOT, RUNTIME, JOBS, UPLOADS, BIN, DEFAULT_DOWNLOADS, LOGS):
     p.mkdir(parents=True, exist_ok=True)
@@ -428,6 +437,7 @@ def diagnostics() -> dict:
     add("ffmpeg", "FFmpeg", FFMPEG.exists() and FFPROBE.exists(), str(FFMPEG))
     add("capture", "Chụp màn hình", _probe_http("http://127.0.0.1:47631/ping"), "127.0.0.1:47631")
     add("media", "KanMedia", True, f"127.0.0.1:{PORT}")
+    add("alarm", "KanAlarm Windows", os.name == "nt", "Âm thanh và thông báo hệ thống qua KanTool runtime")
     add("signing", "Ký số PDF", _probe_http("http://127.0.0.1:8765/health", {"X-KanBan-Agent": TOKEN}), "127.0.0.1:8765")
     try:
         folder = get_downloads()
@@ -472,6 +482,201 @@ def diagnostics() -> dict:
         "activeJob": active_job(),
     }
 
+def _alarm_snapshot() -> dict:
+    with ALARM_LOCK:
+        return dict(ALARM_STATE)
+
+def _save_alarm_state() -> None:
+    try:
+        json_dump(ALARM_FILE, _alarm_snapshot())
+    except Exception as exc:
+        log("ALARM SAVE " + repr(exc))
+
+def _load_alarm_state() -> None:
+    if not ALARM_FILE.exists():
+        return
+    try:
+        data = json_load(ALARM_FILE)
+        with ALARM_LOCK:
+            ALARM_STATE.update({
+                "ok": True,
+                "scheduled": bool(data.get("scheduled")),
+                "active": bool(data.get("active")),
+                "deadlineMs": int(data.get("deadlineMs") or 0),
+                "durationSec": int(data.get("durationSec") or 0),
+                "label": str(data.get("label") or "Hẹn giờ KanBan")[:120],
+                "repeat": bool(data.get("repeat", True)),
+                "sound": bool(data.get("sound", True)),
+                "notify": bool(data.get("notify", True)),
+                "createdAt": float(data.get("createdAt") or 0),
+                "firedAt": float(data.get("firedAt") or 0),
+            })
+    except Exception as exc:
+        log("ALARM LOAD " + repr(exc))
+
+def _notify_windows_alarm(title: str, message: str) -> None:
+    if os.name != "nt":
+        return
+    try:
+        ps = shutil.which("powershell.exe") or r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
+        title_ps = str(title).replace("'", "''")
+        msg_ps = str(message).replace("'", "''")
+        script = (
+            "Add-Type -AssemblyName System.Windows.Forms;"
+            "Add-Type -AssemblyName System.Drawing;"
+            "$n=New-Object System.Windows.Forms.NotifyIcon;"
+            "$n.Icon=[System.Drawing.SystemIcons]::Information;"
+            f"$n.BalloonTipTitle='{title_ps}';"
+            f"$n.BalloonTipText='{msg_ps}';"
+            "$n.Visible=$true;$n.ShowBalloonTip(10000);"
+            "Start-Sleep -Seconds 11;$n.Dispose()"
+        )
+        subprocess.Popen(
+            [ps, "-NoProfile", "-STA", "-Command", script],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            creationflags=CREATE_NO_WINDOW if os.name == "nt" else 0,
+        )
+    except Exception as exc:
+        log("ALARM NOTIFY " + repr(exc))
+
+def _alarm_sound_loop() -> None:
+    try:
+        import winsound
+    except Exception:
+        winsound = None
+    while True:
+        state = _alarm_snapshot()
+        if not state.get("active") or ALARM_STOP.is_set():
+            break
+        if state.get("sound") and winsound is not None:
+            try:
+                winsound.Beep(880, 220)
+                time.sleep(0.08)
+                winsound.Beep(1175, 300)
+                time.sleep(0.08)
+                winsound.Beep(988, 220)
+            except Exception:
+                try:
+                    winsound.MessageBeep()
+                except Exception:
+                    pass
+        if not state.get("repeat"):
+            break
+        if ALARM_STOP.wait(1.15):
+            break
+
+def _fire_alarm(reason: str = "deadline") -> dict:
+    with ALARM_LOCK:
+        if ALARM_STATE.get("active"):
+            return dict(ALARM_STATE)
+        ALARM_STATE["scheduled"] = False
+        ALARM_STATE["active"] = True
+        ALARM_STATE["firedAt"] = time.time()
+        label = str(ALARM_STATE.get("label") or "Hẹn giờ KanBan")
+        duration = int(ALARM_STATE.get("durationSec") or 0)
+        notify = bool(ALARM_STATE.get("notify", True))
+    _save_alarm_state()
+    ALARM_STOP.clear()
+    if notify:
+        mins, secs = divmod(max(0, duration), 60)
+        detail = f"Đã hết {mins} phút {secs} giây." if duration else "Đã hết giờ."
+        threading.Thread(
+            target=_notify_windows_alarm,
+            args=(label, detail + " Mở KanBan để tắt chuông."),
+            daemon=True,
+        ).start()
+    threading.Thread(target=_alarm_sound_loop, daemon=True).start()
+    log(f"ALARM FIRE reason={reason} label={label!r}")
+    return _alarm_snapshot()
+
+def schedule_alarm(payload: dict) -> dict:
+    deadline_ms = int(float(payload.get("deadlineMs") or 0))
+    now_ms = int(time.time() * 1000)
+    if deadline_ms <= now_ms:
+        raise ValueError("Thời điểm báo thức phải ở tương lai.")
+    if deadline_ms - now_ms > 7 * 24 * 3600 * 1000:
+        raise ValueError("Báo thức vượt quá giới hạn 7 ngày.")
+    label = str(payload.get("label") or "Hẹn giờ KanBan").strip()[:120] or "Hẹn giờ KanBan"
+    with ALARM_LOCK:
+        ALARM_STATE.update({
+            "ok": True,
+            "scheduled": True,
+            "active": False,
+            "deadlineMs": deadline_ms,
+            "durationSec": max(0, int(payload.get("durationSec") or 0)),
+            "label": label,
+            "repeat": bool(payload.get("repeat", True)),
+            "sound": bool(payload.get("sound", True)),
+            "notify": bool(payload.get("notify", True)),
+            "createdAt": time.time(),
+            "firedAt": 0,
+        })
+    ALARM_STOP.set()
+    ALARM_STOP.clear()
+    _save_alarm_state()
+    ALARM_WAKE.set()
+    return _alarm_snapshot()
+
+def stop_alarm() -> dict:
+    ALARM_STOP.set()
+    with ALARM_LOCK:
+        ALARM_STATE["scheduled"] = False
+        ALARM_STATE["active"] = False
+        ALARM_STATE["deadlineMs"] = 0
+        ALARM_STATE["firedAt"] = 0
+    _save_alarm_state()
+    ALARM_WAKE.set()
+    return _alarm_snapshot()
+
+def test_alarm(payload: dict | None = None) -> dict:
+    payload = payload or {}
+    with ALARM_LOCK:
+        ALARM_STATE.update({
+            "ok": True,
+            "scheduled": False,
+            "active": False,
+            "deadlineMs": int(time.time() * 1000),
+            "durationSec": int(payload.get("durationSec") or 3),
+            "label": str(payload.get("label") or "Thử chuông KanBan")[:120],
+            "repeat": bool(payload.get("repeat", False)),
+            "sound": bool(payload.get("sound", True)),
+            "notify": bool(payload.get("notify", True)),
+            "createdAt": time.time(),
+            "firedAt": 0,
+        })
+    return _fire_alarm("test")
+
+def alarm_scheduler_loop() -> None:
+    _load_alarm_state()
+    while True:
+        state = _alarm_snapshot()
+        if state.get("active"):
+            if not ALARM_STOP.is_set():
+                threading.Thread(target=_alarm_sound_loop, daemon=True).start()
+                if state.get("notify"):
+                    threading.Thread(
+                        target=_notify_windows_alarm,
+                        args=(str(state.get("label") or "Hẹn giờ KanBan"), "Báo thức đang hoạt động. Mở KanBan để tắt chuông."),
+                        daemon=True,
+                    ).start()
+            ALARM_WAKE.wait(1.0)
+            ALARM_WAKE.clear()
+            continue
+        if state.get("scheduled") and int(state.get("deadlineMs") or 0) > 0:
+            diff = int(state.get("deadlineMs") or 0) / 1000.0 - time.time()
+            if diff <= 0:
+                # Catch-up after sleep/restart; ignore alarms older than 6 hours.
+                if diff >= -6 * 3600:
+                    _fire_alarm("catchup" if diff < -1 else "deadline")
+                else:
+                    stop_alarm()
+                continue
+            ALARM_WAKE.wait(min(max(diff, 0.05), 1.0))
+            ALARM_WAKE.clear()
+            continue
+        ALARM_WAKE.wait(1.0)
+        ALARM_WAKE.clear()
+
 def health() -> dict:
     yt = ""
     ff = ""
@@ -507,12 +712,14 @@ def health() -> dict:
     ready = bool(yt and nv and ff and FFPROBE.exists() and WORKER.exists())
     return {
         "ok": True,
-        "version": "KanMedia Agent 1.6.0",
+        "version": "KanMedia Agent 1.7.0",
         "mediaReady": ready,
         "ytDlp": yt,
         "ffmpeg": ff,
         "node": nv,
         "worker": WORKER.exists(),
+        "alarmReady": os.name == "nt",
+        "alarm": _alarm_snapshot(),
         "downloads": str(get_downloads()),
         "port": PORT,
         "errors": errors,
@@ -824,6 +1031,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/jobs/active":
                 self._json({"ok": True, "job": active_job()})
                 return
+            if path == "/alarm/state":
+                self._json(_alarm_snapshot())
+                return
             if path == "/system/diagnostics":
                 self._json(diagnostics())
                 return
@@ -850,6 +1060,16 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/media/upload":
                 self._handle_upload()
+                return
+            if path == "/alarm/schedule":
+                self._json(schedule_alarm(self._read_json()))
+                return
+            if path == "/alarm/stop":
+                self._read_json()
+                self._json(stop_alarm())
+                return
+            if path == "/alarm/test":
+                self._json(test_alarm(self._read_json()))
                 return
             if path == "/media/probe":
                 self._json(probe(self._read_json()))
@@ -949,6 +1169,7 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     cleanup_stale_files()
     reconcile_jobs()
+    threading.Thread(target=alarm_scheduler_loop, daemon=True, name="KanAlarmScheduler").start()
     log(f"START Python={sys.executable} port={PORT}")
     try:
         server = KanMediaHTTPServer((HOST, PORT), Handler)
