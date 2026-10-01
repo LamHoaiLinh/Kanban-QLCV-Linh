@@ -5,6 +5,7 @@ $Root=Join-Path $env:LOCALAPPDATA 'KanBanTools'
 $Jobs=Join-Path $Root 'jobs';$Uploads=Join-Path $Root 'uploads';$Bin=Join-Path $Root 'media\bin'
 $Python=Join-Path $Root '.venv\Scripts\python.exe';$Ffmpeg=Join-Path $Bin 'ffmpeg.exe';$Ffprobe=Join-Path $Bin 'ffprobe.exe'
 $Downloads=Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Downloads\KanMedia'
+$LocalNode=Join-Path $Root 'media\node\node.exe';if(Test-Path $LocalNode){$env:PATH=(Split-Path $LocalNode -Parent)+';'+$env:PATH}
 $RequestPath=Join-Path $Jobs ($JobId+'.request.json');$StatusPath=Join-Path $Jobs ($JobId+'.status.json');$CancelPath=Join-Path $Jobs ($JobId+'.cancel')
 New-Item -ItemType Directory -Force -Path $Downloads | Out-Null
 $script:WorkerPid=$PID;$script:ChildPid=0
@@ -44,7 +45,7 @@ function Resolve-Height($formats,[string]$quality){
  $lower=@($hs|Where-Object{$_ -lt $want}|Sort-Object -Descending);if($lower.Count){return $lower[0]}
  return ($hs|Measure-Object -Maximum).Maximum
 }
-function Yt-Info([string]$url){$old=$env:PATH;$node=(Get-Command node.exe -ErrorAction SilentlyContinue).Source;if($node){$env:PATH=(Split-Path $node -Parent)+';'+$old};try{return (& $Python -m yt_dlp --no-playlist --skip-download --js-runtimes node -J $url 2>$null|Out-String|ConvertFrom-Json)}finally{$env:PATH=$old}}
+function Yt-Info([string]$url){$old=$env:PATH;$node=if(Test-Path $LocalNode){$LocalNode}else{(Get-Command node.exe -ErrorAction SilentlyContinue).Source};if($node){$env:PATH=(Split-Path $node -Parent)+';'+$old};try{return (& $Python -m yt_dlp --no-playlist --skip-download --js-runtimes node -J $url 2>$null|Out-String|ConvertFrom-Json)}finally{$env:PATH=$old}}
 function Download-One([string]$url,[string]$kind,[string]$format,[string]$quality,[int]$index,[int]$total,[double]$base,[double]$slice){
  $info=Yt-Info $url;$title=[string]$info.title;if(-not $title){$title='Media '+$index};Set-Status 'running' $base ('Đang tải “'+$title+'” — 0%') $title $index $total
  $tmpl=Join-Path $Downloads '%(title).180B [%(id)s].%(ext)s'
