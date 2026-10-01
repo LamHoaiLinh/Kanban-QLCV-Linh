@@ -2033,10 +2033,16 @@
     const items = clock.specialDates || [];
     const query=foldSpecialSearch(refs.specialDateSearchInput?.value || '');
     const monthValue=refs.specialDateMonthFilter?.value || 'all';
-    const month=monthValue==='all' ? null : Number(monthValue);
+    const now=new Date();
+    const lunarNow=solarToVietnameseLunar(now.getDate(),now.getMonth()+1,now.getFullYear());
     const filtered=items.filter(item => {
       if (query && !foldSpecialSearch(item.name).includes(query)) return false;
-      if (month && item.month!==month) return false;
+      if (monthValue==='current') {
+        const currentMonth=item.type==='birthday' ? now.getMonth()+1 : lunarNow.month;
+        if (item.month!==currentMonth) return false;
+      } else if (monthValue!=='all' && item.month!==Number(monthValue)) {
+        return false;
+      }
       return true;
     });
     refs.specialDateCount.textContent = filtered.length===items.length
@@ -2120,8 +2126,9 @@
     if (key===lastSpecialReminderKey && !force) return;
     lastSpecialReminderKey=key;
     refs.specialReminderBar.classList.toggle('ticker-off',!enabled);
+    const palette=[154,211,28,338,274,188,46,103,318,16];
     refs.specialReminderText.innerHTML=enabled
-      ? reminders.map((item,index)=>`<span class="special-reminder-event" style="--event-hue:${item.hue}">${escapeHtml(item.text)}</span>${index<reminders.length-1?'<span class="special-reminder-sep">•</span>':''}`).join('')
+      ? reminders.map((item,index)=>`<span class="special-reminder-event" style="--event-hue:${palette[index%palette.length]}">${escapeHtml(item.text)}</span>${index<reminders.length-1?'<span class="special-reminder-sep">•</span>':''}`).join('')
       : '';
     refs.specialReminderText.classList.toggle('moving',enabled);
   }
