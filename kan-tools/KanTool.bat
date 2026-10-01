@@ -97,7 +97,7 @@ echo     Cap nhat yt-dlp nightly...
 "%ROOT%\.venv\Scripts\python.exe" -m pip install --disable-pip-version-check -U --pre "yt-dlp[default]"
 if errorlevel 1 goto :FAIL_PYTHON
 echo     Cap nhat thu vien ky so...
-"%ROOT%\.venv\Scripts\python.exe" -m pip install --disable-pip-version-check -U cryptography pyhanko reportlab
+"%ROOT%\.venv\Scripts\python.exe" -m pip install --disable-pip-version-check -U cryptography pyhanko reportlab pillow
 if errorlevel 1 echo [CANH BAO] Thu vien ky so chua cap nhat duoc. KanMedia van tiep tuc cai.
 
 echo [4/8] Chuan bi Node.js portable tu nodejs.org...
@@ -142,11 +142,29 @@ powershell -NoProfile -Command ^
  "$baseKey='HKCU:\Software\Classes\kanbancapture';New-Item $baseKey -Force|Out-Null;Set-Item $baseKey -Value 'URL:Kanban Capture';New-ItemProperty $baseKey -Name 'URL Protocol' -Value '' -PropertyType String -Force|Out-Null;" ^
  "$cmdKey=$baseKey+'\shell\open\command';New-Item $cmdKey -Force|Out-Null;$pct=[char]37;Set-Item $cmdKey -Value ('\"%CAPDIR%\KanbanCapture.exe\" \"'+$pct+'1\"');" ^
  "$run='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run';New-ItemProperty $run -Name 'KanbanCapture' -Value ('\"%CAPDIR%\KanbanCapture.exe\" --background') -PropertyType String -Force|Out-Null;"
+if errorlevel 1 goto :CAPTURE_SOURCE
+start "" "%CAPDIR%\KanbanCapture.exe" --background
+timeout /t 1 /nobreak >nul
+powershell -NoProfile -Command "try{$r=Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:47631/ping' -TimeoutSec 2;if($r.StatusCode -ne 200){exit 1}}catch{exit 1}" >nul 2>nul
+if errorlevel 1 goto :CAPTURE_SOURCE
+goto :CAPTURE_DONE
+
+:CAPTURE_SOURCE
+echo     Capture EXE khong chay duoc. Dang dung ban source Python thay the...
+if not exist "%ROOT%\capture" mkdir "%ROOT%\capture"
+powershell -NoProfile -Command ^
+ "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';" ^
+ "Invoke-WebRequest -UseBasicParsing -Uri '%REPO%/capture-agent/capture_agent.py?ts=%RANDOM%' -OutFile '%ROOT%\capture\capture_agent.py';" ^
+ "$pyw='%ROOT%\.venv\Scripts\pythonw.exe';$src='%ROOT%\capture\capture_agent.py';$baseKey='HKCU:\Software\Classes\kanbancapture';" ^
+ "New-Item $baseKey -Force|Out-Null;Set-Item $baseKey -Value 'URL:Kanban Capture';New-ItemProperty $baseKey -Name 'URL Protocol' -Value '' -PropertyType String -Force|Out-Null;" ^
+ "$cmdKey=$baseKey+'\shell\open\command';New-Item $cmdKey -Force|Out-Null;$pct=[char]37;Set-Item $cmdKey -Value ('\"'+$pyw+'\" \"'+$src+'\" \"'+$pct+'1\"');" ^
+ "$run='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run';New-ItemProperty $run -Name 'KanbanCapture' -Value ('\"'+$pyw+'\" \"'+$src+'\" --background') -PropertyType String -Force|Out-Null;"
 if errorlevel 1 (
- echo [CANH BAO] Capture chua cap nhat duoc. KanMedia van duoc cai.
+ echo [CANH BAO] Cong cu Chup chua cai duoc. KanMedia van duoc cai tiep.
 ) else (
- start "" "%CAPDIR%\KanbanCapture.exe" --background
+ start "" /min "%ROOT%\.venv\Scripts\pythonw.exe" "%ROOT%\capture\capture_agent.py" --background
 )
+:CAPTURE_DONE
 
 echo [7/8] Cai Signing Agent dung chung...
 powershell -NoProfile -Command "Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.CommandLine -like '*kanban_signing_agent.py*'}|ForEach-Object{Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue}" >nul 2>nul
