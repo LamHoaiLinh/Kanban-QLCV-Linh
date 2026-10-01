@@ -8,6 +8,7 @@ import {analyzeWorkbookForAI,createIntegrityTracker} from './excel-ai-analysis.m
 import {renderPdfSigningTool} from './pdf-signing.js?v=1.5.0';
 import {openWorksheetEditor,isWorksheetEditorOpen,closeWorksheetEditor} from './worksheet-editor.js?v=1.2.0';
 import {extractVbaProject,vbaRawByteLength} from './vba-extractor.mjs?v=2.0.0';
+import {renderKanMediaTool} from './kanmedia/kanmedia.js?v=1.0.0';
 const OFFICE_SETTINGS_KEY = 'linh_kanban_office_settings_v1';
 const KANPAINT_URL = 'https://lamhoailinh.github.io/KanPaint/';
 const KANPAINT_BUILD_ID = '20260927-csp-hotfix';
@@ -66,6 +67,7 @@ function injectDialog(){
         ${navButton('rename','Rename','Đổi tên hàng loạt')}
         ${navButton('excel','Excel','Đọc và gộp Excel')}
         ${navButton('kanpaint','KP','Chỉnh ảnh chuyên sâu bằng KanPaint','KanPaint')}
+        ${navButton('kanmedia','KM','Tải, chuyển đổi và chỉnh nhanh audio/video','KanMedia')}
       </nav>
       <main class="office-main" id="officeMain"></main>
     </div>
@@ -87,7 +89,7 @@ function injectDialog(){
 function navButton(id,label,title,displayLabel=label){return `<button type="button" data-office-nav="${id}" title="${escapeHtml(title)}"><span class="office-btn-mark">${label}</span><span>${displayLabel}</span></button>`;}
 
 function openOffice(tool='pdf'){
-  state.tool=['pdf','image','rename','excel','kanpaint'].includes(tool)?tool:'pdf';
+  state.tool=['pdf','image','rename','excel','kanpaint','kanmedia'].includes(tool)?tool:'pdf';
   if(!dialog.open) dialog.showModal();
   renderTool();
 }
@@ -101,7 +103,8 @@ function renderTool(){
     image:['Công cụ hình ảnh','Chuyển đổi, crop, ghép, đóng dấu và tạo ảnh dài từ nội dung dán.'],
     rename:['Đổi tên hàng loạt','Xem trước tên mới trước khi tạo bản sao hoặc đổi tên tại chỗ.'],
     excel:['Công cụ Excel','Đọc giá trị/công thức, xuất JSON và gộp sheet hoặc workbook.'],
-    kanpaint:['KanPaint','Chỉnh ảnh chuyên sâu, layer, mask, Skin Retouch, script và xuất asset ngay trong KanBan.']
+    kanpaint:['KanPaint','Chỉnh ảnh chuyên sâu, layer, mask, Skin Retouch, script và xuất asset ngay trong KanBan.'],
+    kanmedia:['KanMedia','Tải, chuyển đổi và chỉnh nhanh audio/video với ít thao tác.']
   }[state.tool];
   dialog.querySelector('#officeDialogTitle').textContent=meta[0];dialog.querySelector('#officeDialogDesc').textContent=meta[1];
   if(state.tool==='pdf')renderPdfTool();
@@ -109,6 +112,7 @@ function renderTool(){
   if(state.tool==='rename')renderRenameTool();
   if(state.tool==='excel')renderExcelTool();
   if(state.tool==='kanpaint')renderKanPaintTool();
+  if(state.tool==='kanmedia')renderKanMediaTool(mainHost,{setStatus});
   setStatus(state.tool==='kanpaint'?'KanPaint đang chạy trực tiếp trong KanBan.':'Sẵn sàng.',0);
 }
 function cleanupTransient(){ state.abort=false; if(isWorksheetEditorOpen())closeWorksheetEditor(); revokeAllPreviews(); }
