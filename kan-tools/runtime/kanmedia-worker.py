@@ -489,7 +489,7 @@ def convert_one(meta: dict, fmt: str, quality: str,
                 base: float, slice_pct: float, index: int, total: int) -> str:
     src = Path(meta["path"])
     name = safe_name(Path(str(meta.get("name") or src.name)).stem)
-    dst = unique_path(DOWNLOADS, name, "." + fmt)
+    dst = unique_path(DOWNLOADS, name + " - KanConvert", "." + fmt)
     dur = duration(src)
     label = f"Đang chuyển “{meta.get('name', src.name)}”"
     current = str(meta.get("name", src.name))
@@ -532,7 +532,7 @@ def convert_one(meta: dict, fmt: str, quality: str,
             opts = ["-vn", "-c:a", "libmp3lame", "-q:a", q]
         ffmpeg_run(src, opts, dst, dur, base, slice_pct, label, current, index, total)
 
-    return str(rename_from_metadata(dst, " - KanEdit"))
+    return str(rename_from_metadata(dst, " - KanConvert"))
 
 def edit_one(meta: dict, p: dict) -> str:
     src = Path(meta["path"])
@@ -687,7 +687,7 @@ def edit_one(meta: dict, p: dict) -> str:
     status("running", 4, "Đang dựng thao tác chỉnh sửa…", display_name, 1, 1, stage="prepare")
     label = f"Đang xử lý “{display_name}”"
     ffmpeg_run(src, opts, dst, out_dur, 5, 94, label, display_name, 1, 1)
-    return str(rename_from_metadata(dst))
+    return str(rename_from_metadata(dst, " - KanEdit"))
 
 def main():
     if not REQUEST.exists():
