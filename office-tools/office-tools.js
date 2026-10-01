@@ -5,10 +5,10 @@
  * - Các thư viện PDF/Excel được tải lười khi người dùng mở đúng công cụ.
  */
 import {analyzeWorkbookForAI,createIntegrityTracker} from './excel-ai-analysis.mjs?v=1.0.0';
-import {renderPdfSigningTool} from './pdf-signing.js?v=1.5.0';
+import {renderPdfSigningTool} from './pdf-signing.js?v=1.5.1';
 import {openWorksheetEditor,isWorksheetEditorOpen,closeWorksheetEditor} from './worksheet-editor.js?v=1.2.0';
 import {extractVbaProject,vbaRawByteLength} from './vba-extractor.mjs?v=2.0.0';
-import {renderKanMediaTool} from './kanmedia/kanmedia.js?v=1.0.2';
+import {renderKanMediaTool} from './kanmedia/kanmedia.js?v=1.1.0';
 const OFFICE_SETTINGS_KEY = 'linh_kanban_office_settings_v1';
 const KANPAINT_URL = 'https://lamhoailinh.github.io/KanPaint/';
 const KANPAINT_BUILD_ID = '20260927-csp-hotfix';
