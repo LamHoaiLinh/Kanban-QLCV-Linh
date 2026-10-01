@@ -20,7 +20,7 @@ BIN = ROOT / "media" / "bin"
 NODE = ROOT / "media" / "node" / "node.exe"
 FFMPEG = BIN / "ffmpeg.exe"
 FFPROBE = BIN / "ffprobe.exe"
-DOWNLOADS = Path.home() / "Downloads" / "KanMedia"
+DOWNLOADS = Path(os.environ.get("USERPROFILE", str(Path.home()))) / "Desktop" / "KanDownload"
 REQUEST = JOBS / f"{JOB_ID}.request.json"
 STATUS = JOBS / f"{JOB_ID}.status.json"
 CANCEL = JOBS / f"{JOB_ID}.cancel"
@@ -227,19 +227,27 @@ def resolve_height(formats: list[dict], quality: str) -> int:
     return max(hs)
 
 def download_one(url: str, kind: str, fmt: str, quality: str,
-                 index: int, total: int, base: float, slice_pct: float) -> str:
-    status("running", base, f"Đang đọc thông tin link {index}/{total}…", "", index, total)
-    info = yt_info(url)
-    title = str(info.get("title") or f"Media {index}")
+                 index: int, total: int, base: float, slice_pct: float,
+                 all_playlist: bool = False) -> str:
+    title = f"Link {index}"
+    info = None
+    if not all_playlist:
+        status("running", base, f"Đang đọc thông tin link {index}/{total}…", "", index, total)
+        info = yt_info(url)
+        title = str(info.get("title") or f"Media {index}")
+    else:
+        status("running", base, f"Đang chuẩn bị playlist {index}/{total}…", "", index, total)
     status("running", base, f"Đang tải “{title}” — 0%", title, index, total)
     tmpl = str(DOWNLOADS / "%(title).180B [%(id)s].%(ext)s")
     args = [
         sys.executable, "-m", "yt_dlp",
-        "--js-runtimes", "node", "--no-playlist", "--newline", "--progress", "--no-overwrites",
+        "--js-runtimes", "node", "--newline", "--progress", "--no-overwrites",
         "--embed-metadata", "--ffmpeg-location", str(BIN), "-o", tmpl,
         "--progress-template", "download:KM_PROGRESS:%(progress._percent_str)s",
+        "--print", "before_dl:KM_ITEM:%(playlist_index)s/%(playlist_count)s:%(title)s",
         "--print", "after_move:KM_FILE:%(filepath)s",
     ]
+    args.append("--yes-playlist" if all_playlist else "--no-playlist")
     if kind == "audio":
         codec = fmt if fmt in {"mp3", "m4a", "opus", "flac", "wav"} else "mp3"
         args += ["-f", "bestaudio/best", "-x", "--audio-format", codec]
@@ -251,15 +259,21 @@ def download_one(url: str, kind: str, fmt: str, quality: str,
                 aq = "7"
             args += ["--audio-quality", aq]
     else:
-        h = resolve_height(info.get("formats") or [], quality)
-        if h:
-            selector = (
-                f"bestvideo[height={h}]+bestaudio/"
-                f"best[height={h}]/"
-                f"bestvideo[height<={h}]+bestaudio/"
-                f"best[height<={h}]"
-            )
-            args += ["-f", selector]
+        if all_playlist:
+            cap = {"high": 1080, "medium": 720, "low": 480}.get(quality)
+            if cap:
+                selector = f"bestvideo[height<={cap}]+bestaudio/best[height<={cap}]"
+                args += ["-f", selector]
+        else:
+            h = resolve_height((info or {}).get("formats") or [], quality)
+            if h:
+                selector = (
+                    f"bestvideo[height={h}]+bestaudio/"
+                    f"best[height={h}]/"
+                    f"bestvideo[height<={h}]+bestaudio/"
+                    f"best[height<={h}]"
+                )
+                args += ["-f", selector]
         if fmt == "mkv":
             args += ["--merge-output-format", "mkv"]
         elif fmt == "webm":
@@ -269,13 +283,40 @@ def download_one(url: str, kind: str, fmt: str, quality: str,
 
     args.append(url)
     output_file = {"path": ""}
+    playlist_state = {"item": 0, "count": 0, "title": title}
 
     def line_cb(line: str, pid: int):
+        item = re.match(r"KM_ITEM:([^/]+)/([^:]+):(.*)", line)
+        if item:
+            try:
+                playlist_state["item"] = int(item.group(1))
+            except Exception:
+                playlist_state["item"] = 0
+            try:
+                playlist_state["count"] = int(item.group(2))
+            except Exception:
+                playlist_state["count"] = 0
+            playlist_state["title"] = item.group(3).strip() or title
+            shown = playlist_state["title"]
+            if playlist_state["item"] and playlist_state["count"]:
+                status("running", base,
+                       f"Đang xử lý bài {playlist_state['item']}/{playlist_state['count']}: “{shown}”",
+                       shown, playlist_state["item"], playlist_state["count"], child_pid=pid)
+            else:
+                status("running", base, f"Đang xử lý “{shown}”", shown, index, total, child_pid=pid)
+            return
         m = re.search(r"KM_PROGRESS:\s*([0-9.]+)%", line)
         if m:
             p = float(m.group(1))
-            status("running", base + slice_pct * p / 100.0,
-                   f"Đang tải “{title}” — {round(p)}%", title, index, total, child_pid=pid)
+            shown = playlist_state["title"] or title
+            if all_playlist and playlist_state["item"] and playlist_state["count"]:
+                overall = ((playlist_state["item"] - 1) + p / 100.0) / playlist_state["count"]
+                pct = base + slice_pct * overall
+                msg = f"Đang tải bài {playlist_state['item']}/{playlist_state['count']} “{shown}” — {round(p)}%"
+                status("running", pct, msg, shown, playlist_state["item"], playlist_state["count"], child_pid=pid)
+            else:
+                status("running", base + slice_pct * p / 100.0,
+                       f"Đang tải “{shown}” — {round(p)}%", shown, index, total, child_pid=pid)
         elif line.startswith("KM_FILE:"):
             output_file["path"] = line.split(":", 1)[1].strip()
 
@@ -461,6 +502,9 @@ def main():
     req = load_json(REQUEST)
     mode = str(req.get("mode") or "")
     p = req.get("payload") or {}
+    global DOWNLOADS
+    DOWNLOADS = Path(str(p.get("downloadDir") or DOWNLOADS))
+    DOWNLOADS.mkdir(parents=True, exist_ok=True)
     status("running", 1, "Đang chuẩn bị…")
 
     if mode == "download":
@@ -474,7 +518,7 @@ def main():
             last = download_one(
                 str(url), str(p.get("kind") or "audio"), str(p.get("format") or "mp3"),
                 str(p.get("quality") or "high"), i + 1, len(urls),
-                1 + slice_pct * i, slice_pct
+                1 + slice_pct * i, slice_pct, bool(p.get("allPlaylist"))
             )
         status("done", 100, "Hoàn tất.", total=len(urls), output=last)
     elif mode == "convert":
