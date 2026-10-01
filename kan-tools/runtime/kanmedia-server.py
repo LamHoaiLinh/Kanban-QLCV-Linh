@@ -658,7 +658,7 @@ def alarm_scheduler_loop() -> None:
     while True:
         state = _alarm_snapshot()
         if state.get("active"):
-            if not ALARM_STOP.is_set() and not ALARM_RINGING.is_set():
+            if state.get("repeat") and not ALARM_STOP.is_set() and not ALARM_RINGING.is_set():
                 threading.Thread(target=_alarm_sound_loop, daemon=True).start()
                 if state.get("notify"):
                     threading.Thread(
