@@ -32,6 +32,7 @@ echo   Chup man hinh  - KanMedia  - Ho tro ky so PDF
 echo.
 echo   Bo cai KHONG tat Windows Security, KHONG tao Defender
 echo   exclusion va KHONG chen EXE dang Base64 vao file BAT.
+echo   Capture trong bo cai chung chay tu source Python, khong dung EXE tu dong goi.
 echo ============================================================
 echo.
 
@@ -94,7 +95,7 @@ if not exist "%ROOT%\.venv\Scripts\python.exe" (
 "%ROOT%\.venv\Scripts\python.exe" -m pip install --disable-pip-version-check --upgrade pip setuptools wheel
 if errorlevel 1 goto :FAIL_PYTHON
 echo     Cap nhat yt-dlp nightly...
-"%ROOT%\.venv\Scripts\python.exe" -m pip install --disable-pip-version-check -U --pre "yt-dlp[default]"
+"%ROOT%\.venv\Scripts\python.exe" -m pip install --disable-pip-version-check -U --pre "yt-dlp[default]" pillow
 if errorlevel 1 goto :FAIL_PYTHON
 echo     Cap nhat thu vien ky so...
 "%ROOT%\.venv\Scripts\python.exe" -m pip install --disable-pip-version-check -U cryptography pyhanko reportlab pillow
@@ -126,28 +127,43 @@ powershell -NoProfile -Command ^
 if errorlevel 1 goto :FAIL_FFMPEG
 :FFMPEG_OK
 
-echo [6/8] Cai / cap nhat cong cu Chup...
-set "CAPDIR=%LOCALAPPDATA%\KanbanCapture"
-set "CAPPKG=%TMP%\KanbanCapture-package.zip"
-set "CAPSHA=%TMP%\KanbanCapture-package.sha256"
-set "CAPSTAGE=%TMP%\capture"
-if not exist "%CAPDIR%" mkdir "%CAPDIR%"
+echo [6/8] Cai / cap nhat cong cu Chup tu ma nguon...
+set "CAPSRC=%ROOT%\capture\capture_agent.py"
+if not exist "%ROOT%\capture" mkdir "%ROOT%\capture"
+
+echo     Dung ban Capture cu neu dang chay...
+powershell -NoProfile -Command "try{Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:47631/quit' -TimeoutSec 1|Out-Null}catch{}" >nul 2>nul
+timeout /t 1 /nobreak >nul
+taskkill /IM KanbanCapture.exe /F >nul 2>nul
+powershell -NoProfile -Command "Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.CommandLine -like '*capture_agent.py*'}|ForEach-Object{Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue}" >nul 2>nul
+
+echo     Tai source Capture tu repo KanBan...
 powershell -NoProfile -Command ^
- "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$base='%REPO%/capture-agent/bin';" ^
- "Invoke-WebRequest -UseBasicParsing -Uri ($base+'/KanbanCapture-package.zip?ts=%RANDOM%') -OutFile '%CAPPKG%';" ^
- "Invoke-WebRequest -UseBasicParsing -Uri ($base+'/KanbanCapture-package.sha256?ts=%RANDOM%') -OutFile '%CAPSHA%';" ^
- "$expected=(Get-Content -Raw '%CAPSHA%').Trim().ToLowerInvariant();$actual=(Get-FileHash '%CAPPKG%' -Algorithm SHA256).Hash.ToLowerInvariant();if($expected -ne $actual){throw 'SHA256 Capture khong khop'};" ^
- "try{Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:47631/quit' -TimeoutSec 1|Out-Null}catch{};Start-Sleep -Milliseconds 500;" ^
- "Expand-Archive '%CAPPKG%' '%CAPSTAGE%' -Force;$exe=Join-Path '%CAPSTAGE%' 'KanbanCapture.exe';if(-not(Test-Path $exe)){throw 'Khong tim thay KanbanCapture.exe'};Copy-Item $exe '%CAPDIR%\KanbanCapture.exe' -Force;" ^
+ "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';" ^
+ "Invoke-WebRequest -UseBasicParsing -Uri '%REPO%/capture-agent/capture_agent.py?ts=%RANDOM%' -OutFile '%CAPSRC%';" ^
+ "if((Get-Item '%CAPSRC%').Length -lt 20000){throw 'Source Capture tai ve khong hop le'};"
+if errorlevel 1 (
+ echo [CANH BAO] Chua tai duoc source Capture. KanMedia van tiep tuc cai.
+ goto :CAPTURE_DONE
+)
+
+echo     Dang ky Alt+C / Alt+X va khoi dong cung Windows...
+powershell -NoProfile -Command ^
+ "$ErrorActionPreference='Stop';$pyw='%ROOT%\.venv\Scripts\pythonw.exe';$src='%CAPSRC%';" ^
+ "if(-not(Test-Path $pyw)){throw 'Khong tim thay pythonw.exe'};" ^
  "$baseKey='HKCU:\Software\Classes\kanbancapture';New-Item $baseKey -Force|Out-Null;Set-Item $baseKey -Value 'URL:Kanban Capture';New-ItemProperty $baseKey -Name 'URL Protocol' -Value '' -PropertyType String -Force|Out-Null;" ^
- "$cmdKey=$baseKey+'\shell\open\command';New-Item $cmdKey -Force|Out-Null;$pct=[char]37;Set-Item $cmdKey -Value ('\"%CAPDIR%\KanbanCapture.exe\" \"'+$pct+'1\"');" ^
- "$run='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run';New-ItemProperty $run -Name 'KanbanCapture' -Value ('\"%CAPDIR%\KanbanCapture.exe\" --background') -PropertyType String -Force|Out-Null;"
-if errorlevel 1 goto :CAPTURE_SOURCE
-start "" "%CAPDIR%\KanbanCapture.exe" --background
+ "$cmdKey=$baseKey+'\shell\open\command';New-Item $cmdKey -Force|Out-Null;$pct=[char]37;Set-Item $cmdKey -Value ('\"'+$pyw+'\" \"'+$src+'\" \"'+$pct+'1\"');" ^
+ "$run='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run';New-ItemProperty $run -Name 'KanbanCapture' -Value ('\"'+$pyw+'\" \"'+$src+'\" --background') -PropertyType String -Force|Out-Null;"
+if errorlevel 1 (
+ echo [CANH BAO] Khong dang ky duoc cong cu Chup. KanMedia van tiep tuc cai.
+ goto :CAPTURE_DONE
+)
+
+start "" /min "%ROOT%\.venv\Scripts\pythonw.exe" "%CAPSRC%" --background
 timeout /t 1 /nobreak >nul
 powershell -NoProfile -Command "try{$r=Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:47631/ping' -TimeoutSec 2;if($r.StatusCode -ne 200){exit 1}}catch{exit 1}" >nul 2>nul
-if errorlevel 1 goto :CAPTURE_SOURCE
-goto :CAPTURE_DONE
+if errorlevel 1 echo [CANH BAO] Capture chua phan hoi. Hay chay lai KanTool.bat neu Alt+C chua hoat dong.
+:CAPTURE_DONE
 
 :CAPTURE_SOURCE
 taskkill /IM KanbanCapture.exe /F >nul 2>nul
