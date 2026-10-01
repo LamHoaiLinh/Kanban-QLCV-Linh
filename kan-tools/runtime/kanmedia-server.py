@@ -18,6 +18,7 @@ import threading
 import time
 import traceback
 import uuid
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
@@ -36,7 +37,23 @@ FFMPEG = BIN / "ffmpeg.exe"
 FFPROBE = BIN / "ffprobe.exe"
 WORKER = RUNTIME / "kanmedia-worker.py"
 INSTALLER = ROOT / "KanTool.bat"
-DEFAULT_DOWNLOADS = Path(os.environ.get("USERPROFILE", str(Path.home()))) / "Desktop" / "KanDownload"
+def windows_desktop() -> Path:
+    fallback = Path(os.environ.get("USERPROFILE", str(Path.home()))) / "Desktop"
+    if os.name != "nt":
+        return fallback
+    try:
+        import winreg
+        key_path = r"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders"
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path) as key:
+            raw, _ = winreg.QueryValueEx(key, "Desktop")
+        expanded = os.path.expandvars(str(raw))
+        if expanded:
+            return Path(expanded)
+    except Exception:
+        pass
+    return fallback
+
+DEFAULT_DOWNLOADS = windows_desktop() / "KanDownload"
 CONFIG = ROOT / "config.json"
 LOGS = ROOT / "logs"
 LOG = LOGS / "kanmedia-server.log"
@@ -163,6 +180,107 @@ def run_text(args: list[str], timeout: int = 15) -> tuple[int, str, str]:
     )
     return cp.returncode, cp.stdout.strip(), cp.stderr.strip()
 
+def cleanup_stale_files() -> None:
+    now = time.time()
+    # Uploads còn dang dở được giữ 24 giờ để có thể chẩn đoán lỗi.
+    for path in UPLOADS.glob("*"):
+        try:
+            if path.is_file() and now - path.stat().st_mtime > 24 * 3600:
+                path.unlink(missing_ok=True)
+        except Exception:
+            pass
+    # Log/job cũ chỉ giữ 7 ngày.
+    for path in JOBS.glob("*"):
+        try:
+            if path.is_file() and now - path.stat().st_mtime > 7 * 24 * 3600:
+                path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+def active_job() -> dict | None:
+    candidates = []
+    for p in JOBS.glob("*.status.json"):
+        try:
+            data = json_load(p)
+            if str(data.get("state", "")) in {"queued", "running"}:
+                candidates.append((p.stat().st_mtime, p, data))
+        except Exception:
+            pass
+    if not candidates:
+        return None
+    _, p, data = max(candidates, key=lambda x: x[0])
+    job_id = p.name.replace(".status.json", "")
+    req = {}
+    try:
+        req = json_load(JOBS / f"{job_id}.request.json")
+    except Exception:
+        pass
+    out = dict(data)
+    out["jobId"] = job_id
+    out["mode"] = out.get("mode") or req.get("mode") or ""
+    return out
+
+def _probe_http(url: str, headers: dict | None = None, timeout: float = 1.2) -> bool:
+    try:
+        req = urllib.request.Request(url, headers=headers or {})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return 200 <= int(getattr(r, "status", 200)) < 300
+    except Exception:
+        return False
+
+def diagnostics() -> dict:
+    checks = []
+    def add(key: str, label: str, ok: bool, detail: str = ""):
+        checks.append({"key": key, "label": label, "ok": bool(ok), "detail": detail})
+    add("python", "Python KanBan Tools", bool(sys.executable and Path(sys.executable).exists()), sys.version.split()[0])
+    try:
+        code, out, _ = run_text([sys.executable, "-m", "yt_dlp", "--version"], 8)
+        add("ytdlp", "Lõi tải yt-dlp", code == 0, out.strip())
+    except Exception as exc:
+        add("ytdlp", "Lõi tải yt-dlp", False, str(exc))
+    n = node_path()
+    try:
+        code, out, _ = run_text([n, "--version"], 6) if n else (1, "", "")
+        add("node", "Node.js", code == 0, out.strip())
+    except Exception as exc:
+        add("node", "Node.js", False, str(exc))
+    add("ffmpeg", "FFmpeg", FFMPEG.exists() and FFPROBE.exists(), str(FFMPEG))
+    add("capture", "Chụp màn hình", _probe_http("http://127.0.0.1:47631/ping"), "127.0.0.1:47631")
+    add("media", "KanMedia", True, f"127.0.0.1:{PORT}")
+    add("signing", "Ký số PDF", _probe_http("http://127.0.0.1:8765/health", {"X-KanBan-Agent": TOKEN}), "127.0.0.1:8765")
+    try:
+        folder = get_downloads()
+        test = folder / ".kanmedia_write_test"
+        test.write_text("ok", encoding="utf-8")
+        test.unlink(missing_ok=True)
+        add("folder", "Thư mục tải", True, str(folder))
+    except Exception as exc:
+        add("folder", "Thư mục tải", False, str(exc))
+    startup = {}
+    if os.name == "nt":
+        try:
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run") as key:
+                for name in ("KanbanCapture", "KanBanMedia", "KanBanSigning"):
+                    try:
+                        startup[name] = winreg.QueryValueEx(key, name)[0]
+                    except Exception:
+                        startup[name] = ""
+        except Exception:
+            pass
+    add("startup", "Tự chạy cùng Windows", all(startup.get(x) for x in ("KanbanCapture","KanBanMedia","KanBanSigning")), " / ".join(k for k,v in startup.items() if v))
+    try:
+        installed = json_load(ROOT / "installed.json") if (ROOT / "installed.json").exists() else {}
+    except Exception:
+        installed = {}
+    return {
+        "ok": True,
+        "allOk": all(x["ok"] for x in checks),
+        "checks": checks,
+        "installed": installed,
+        "activeJob": active_job(),
+    }
+
 def health() -> dict:
     yt = ""
     ff = ""
@@ -198,7 +316,7 @@ def health() -> dict:
     ready = bool(yt and nv and ff and FFPROBE.exists() and WORKER.exists())
     return {
         "ok": True,
-        "version": "KanMedia Agent 1.1",
+        "version": "KanMedia Agent 1.3",
         "mediaReady": ready,
         "ytDlp": yt,
         "ffmpeg": ff,
@@ -314,17 +432,30 @@ def probe(payload: dict) -> dict:
             break
     if not urls:
         raise ValueError("Không có link hợp lệ.")
+    all_playlist = bool(payload.get("allPlaylist"))
     items = []
     heights: set[int] = set()
     max_height = 0
+    playlist_total = 0
+    playlist_titles = []
     for url in urls:
-        code, out, err = run_text([
-            sys.executable, "-m", "yt_dlp",
-            "--no-playlist", "--skip-download", "--js-runtimes", "node", "-J", url
-        ], 60)
+        args = [sys.executable, "-m", "yt_dlp", "--skip-download", "--js-runtimes", "node"]
+        if all_playlist:
+            args += ["--yes-playlist", "--flat-playlist", "-J", url]
+        else:
+            args += ["--no-playlist", "-J", url]
+        code, out, err = run_text(args, 90)
         if code != 0 or not out:
-            raise RuntimeError(err or "Không đọc được thông tin video.")
+            raise RuntimeError(err or "Không đọc được thông tin nguồn.")
         info = json.loads(out)
+        if all_playlist and (info.get("_type") == "playlist" or info.get("entries")):
+            entries = [x for x in (info.get("entries") or []) if x]
+            count = len(entries)
+            title = info.get("title") or info.get("playlist_title") or "Playlist"
+            playlist_total += count
+            playlist_titles.append(title)
+            items.append({"url": url, "title": title, "playlist": True, "playlistCount": count, "heights": []})
+            continue
         hs = sorted({
             int(f.get("height")) for f in (info.get("formats") or [])
             if f.get("height") not in (None, "")
@@ -338,8 +469,17 @@ def probe(payload: dict) -> dict:
             "duration": info.get("duration"),
             "heights": hs,
             "thumbnail": info.get("thumbnail") or "",
+            "playlist": False,
+            "playlistCount": 0,
         })
-    return {"ok": True, "items": items, "heights": sorted(heights), "maxHeight": max_height}
+    return {
+        "ok": True,
+        "items": items,
+        "heights": sorted(heights),
+        "maxHeight": max_height,
+        "playlistCount": playlist_total,
+        "playlistTitles": playlist_titles,
+    }
 
 class KanMediaHTTPServer(ThreadingHTTPServer):
     daemon_threads = True
@@ -427,6 +567,12 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/health":
                 self._json(health())
                 return
+            if path == "/jobs/active":
+                self._json({"ok": True, "job": active_job()})
+                return
+            if path == "/system/diagnostics":
+                self._json(diagnostics())
+                return
             m = re.fullmatch(r"/jobs/([a-f0-9]{32})", path)
             if m:
                 p = job_path(m.group(1))
@@ -479,6 +625,26 @@ class Handler(BaseHTTPRequestHandler):
                     self._json({"ok": True, "cancelled": True, "path": str(get_downloads())})
                 else:
                     self._json({"ok": True, "cancelled": False, "path": str(folder)})
+                return
+            if path == "/system/diagnostics":
+                self._read_json()
+                self._json(diagnostics())
+                return
+            if path == "/system/repair":
+                self._read_json()
+                if running_jobs():
+                    self._error("Hãy chờ tác vụ Media hiện tại hoàn tất rồi sửa công cụ.", 409)
+                    return
+                if not INSTALLER.exists():
+                    self._error("Không tìm thấy KanTool.bat.", 404)
+                    return
+                if os.name == "nt":
+                    subprocess.Popen(
+                        [os.environ.get("COMSPEC", "cmd.exe"), "/c", str(INSTALLER), "/repair"],
+                        cwd=str(ROOT),
+                        creationflags=CREATE_NEW_CONSOLE,
+                    )
+                self._json({"ok": True})
                 return
             if path == "/system/update":
                 self._read_json()
@@ -537,6 +703,7 @@ class Handler(BaseHTTPRequestHandler):
         self._json(meta, 201)
 
 def main():
+    cleanup_stale_files()
     log(f"START Python={sys.executable} port={PORT}")
     try:
         server = KanMediaHTTPServer((HOST, PORT), Handler)
