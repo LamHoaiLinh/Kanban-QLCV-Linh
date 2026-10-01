@@ -82,3 +82,87 @@
 [data-theme=dark] .km-progress-text{color:#e1eee8}
 [data-theme=dark] .km-current-title{color:#b8c9c1}
 [data-theme=dark] .km-progress-meta span{background:#25332d;color:#c2d2ca}
+
+/* KanMedia 1.4 - interactive waveform editor */
+.km-edit-work-shell{position:relative;display:grid;gap:12px}
+.km-wave-loader{
+  position:absolute;inset:0;z-index:40;
+  display:flex;align-items:flex-start;justify-content:center;
+  padding:86px 18px 18px;
+  border-radius:12px;
+  background:rgba(248,252,250,.9);
+  backdrop-filter:blur(3px);
+}
+.km-wave-loader[hidden]{display:none}
+.km-wave-loader-card{
+  width:min(430px,92%);display:grid;gap:10px;padding:16px;
+  border:1px solid #cee0d7;border-radius:14px;background:#fff;
+  box-shadow:0 14px 38px rgba(31,60,48,.16)
+}
+.km-wave-loader-head{display:flex;align-items:center;justify-content:space-between;gap:12px;color:#29483b}
+.km-wave-loader-head b{color:#4a8e70;font-variant-numeric:tabular-nums}
+.km-wave-loader-card small{color:#687b72;line-height:1.4}
+.km-wave-loadbar{height:9px;border-radius:999px;overflow:hidden;background:#e5efea}
+.km-wave-loadbar i{display:block;width:0;height:100%;background:#69af8f;transition:width .18s}
+.km-wave-loadbar.error i{background:#c76b6b}
+.km-wave-wrap{
+  position:relative;height:126px;border:1px solid #cfe0d8;border-radius:12px;
+  overflow:visible;background:#f8fbfa;touch-action:none;user-select:none
+}
+.km-waveform{
+  display:block;width:100%;height:118px;margin:3px 0 0;border:0;border-radius:11px;
+  background:#f8fbfa;color:#4b8d70;cursor:crosshair
+}
+.km-wave-shade{position:absolute;top:0;bottom:0;z-index:3;background:rgba(34,53,45,.28);pointer-events:none}
+.km-wave-shade.left{left:0;border-radius:11px 0 0 11px}
+.km-wave-shade.right{right:0;border-radius:0 11px 11px 0}
+.km-wave-selection{
+  position:absolute;top:0;bottom:0;z-index:4;
+  border-top:2px solid rgba(71,157,119,.8);border-bottom:2px solid rgba(71,157,119,.8);
+  background:rgba(105,175,143,.06);pointer-events:none
+}
+.km-wave-playhead{position:absolute;top:0;bottom:0;z-index:7;width:2px;background:#e05b57;pointer-events:none}
+.km-wave-handle{
+  position:absolute;top:-7px;bottom:-7px;z-index:8;width:16px;padding:0;margin-left:-8px;
+  border:0;border-radius:7px;background:#3f9a73;cursor:ew-resize;box-shadow:0 2px 7px rgba(28,71,53,.25)
+}
+.km-wave-handle::after{
+  content:'';position:absolute;left:6px;top:18px;bottom:18px;width:4px;border-radius:999px;
+  background:rgba(255,255,255,.9)
+}
+.km-wave-handle span{
+  position:absolute;top:-27px;left:50%;transform:translateX(-50%);
+  min-width:58px;padding:3px 6px;border-radius:7px;background:#23483a;color:#fff;
+  font-size:10px;font-weight:750;line-height:1.2;white-space:nowrap;pointer-events:none
+}
+.km-wave-handle.end span{left:auto;right:0;transform:none}
+.km-wave-handle.start span{left:0;transform:none}
+.km-wave-wrap.dragging .km-wave-handle{box-shadow:0 0 0 3px rgba(63,154,115,.18),0 2px 8px rgba(28,71,53,.25)}
+.km-wave-summary{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:11px;color:#63766d}
+.km-wave-summary span:first-child{font-weight:800;color:#426658}
+.km-time-box{padding:11px;border-radius:11px;background:#f7faf8;display:grid;gap:9px}
+.km-time-row{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px;align-items:end}
+.km-time-row .office-btn{width:100%;min-height:38px}
+.km-time-row label{display:grid;grid-template-columns:74px minmax(0,1fr);gap:8px;align-items:center;font-size:12px;color:#526a60}
+.km-time-row input{
+  width:100%;padding:8px 9px;border:1px solid #d0ddd7;border-radius:9px;
+  background:#fff;color:#253b32;font-variant-numeric:tabular-nums
+}
+.km-wave-actions{display:flex;gap:8px;flex-wrap:wrap;padding-top:2px}
+.km-wave-actions .office-btn{min-width:116px}
+.km-edit-work-shell:not(.wave-ready) .km-wave-handle,
+.km-edit-work-shell:not(.wave-ready) .km-wave-actions,
+.km-edit-work-shell:not(.wave-ready) .km-edit-grid,
+.km-edit-work-shell:not(.wave-ready) .km-actions{pointer-events:none;opacity:.48}
+[data-theme=dark] .km-wave-loader{background:rgba(19,28,24,.9)}
+[data-theme=dark] .km-wave-loader-card{background:#1e2925;border-color:#3a4c44}
+[data-theme=dark] .km-wave-loader-head{color:#e0eee7}
+[data-theme=dark] .km-wave-loadbar{background:#27352f}
+[data-theme=dark] .km-wave-wrap,[data-theme=dark] .km-waveform{background:#151e1a;border-color:#384a43}
+[data-theme=dark] .km-time-box{background:#17201d}
+[data-theme=dark] .km-time-row input{background:#111916;border-color:#3b4d45;color:#e8f0ec}
+@media(max-width:700px){
+  .km-time-row{grid-template-columns:1fr}
+  .km-time-row label{grid-template-columns:74px minmax(0,1fr)}
+  .km-wave-handle span{display:none}
+}
