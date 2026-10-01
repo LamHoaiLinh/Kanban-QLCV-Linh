@@ -58,7 +58,7 @@ function applyKmTooltips(){
 }
 function ensureKanMediaCss(){
   if(document.querySelector('link[data-kanmedia-css]'))return;
-  const l=document.createElement('link');l.rel='stylesheet';l.href='office-tools/kanmedia/kanmedia.css?v=1.5.1';l.dataset.kanmediaCss='1';document.head.appendChild(l);
+  const l=document.createElement('link');l.rel='stylesheet';l.href='office-tools/kanmedia/kanmedia.css?v=1.5.2';l.dataset.kanmediaCss='1';document.head.appendChild(l);
 }
 function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function bytes(n){n=Number(n)||0;if(n<1024)return n+' B';const u=['KB','MB','GB','TB'];let i=-1;do{n/=1024;i++;}while(n>=1024&&i<u.length-1);return n.toFixed(n>=100?0:n>=10?1:2)+' '+u[i];}
@@ -524,8 +524,11 @@ function setupWaveDrag(w){
       handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',up);handle.addEventListener('pointercancel',up);
     });
   }
-  bindRangeHandle(w.querySelector('#kmWaveStartHandle'),0);
-  bindRangeHandle(w.querySelector('#kmWaveEndHandle'),1);
+  const startHandle=w.querySelector('#kmWaveStartHandle'),endHandle=w.querySelector('#kmWaveEndHandle');
+  if(startHandle)startHandle.draggable=false;if(endHandle)endHandle.draggable=false;
+  bindRangeHandle(startHandle,0);
+  bindRangeHandle(endHandle,1);
+  wrap.addEventListener('dragstart',function(e){e.preventDefault();});
 
   const playhead=w.querySelector('#kmWavePlayhead');
   if(playhead){
@@ -650,18 +653,16 @@ function setupFadeControl(w,kind){
   function sync(){
     const v=Math.max(0,Number(range.value)||0);
     if(value)value.textContent=v.toFixed(1)+' s';
-    if(state)state.textContent=v>0?v.toFixed(1)+'s':'Tắt';
+    if(state)state.textContent=v>0?'ON · '+v.toFixed(1)+'s':'Tắt';
     btn.classList.toggle('active',v>0);
     drawVirtualWaveform(w);
   }
   btn.addEventListener('click',function(e){
     e.stopPropagation();
     const opening=pop.hidden;
+    if((Number(range.value)||0)<=0){range.value='3';sync();}
     w.querySelectorAll('.km-fade-pop').forEach(function(x){x.hidden=true;});
-    if(opening){
-      if((Number(range.value)||0)<=0)range.value='3';
-      pop.hidden=false;sync();
-    }
+    if(opening)pop.hidden=false;
   });
   range.addEventListener('input',sync);
   const off=pop.querySelector('[data-fade-off]');

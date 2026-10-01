@@ -428,3 +428,29 @@
       transparent 8px),
     linear-gradient(#66c89b,#66c89b) center 12px / 3px calc(100% - 24px) no-repeat;
 }
+
+/* KanMedia 1.5.2 - keep waveform visually fixed while trim handles move */
+.km-wave-wrap,
+.km-waveform,
+.km-wave-selection,
+.km-wave-shade{
+  transform:none !important;
+  rotate:none !important;
+  skew:none !important;
+}
+.km-wave-wrap.dragging .km-waveform,
+.km-wave-wrap.seeking .km-waveform{
+  transform:none !important;
+  transition:none !important;
+}
+.km-wave-shade{
+  backdrop-filter:none !important;
+  -webkit-backdrop-filter:none !important;
+}
+.km-wave-wrap.dragging,
+.km-wave-wrap.seeking{
+  transform:none !important;
+}
+.km-fade-btn.active small{
+  text-transform:none;
+}
