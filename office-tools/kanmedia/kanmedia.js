@@ -58,7 +58,7 @@ function applyKmTooltips(){
 }
 function ensureKanMediaCss(){
   if(document.querySelector('link[data-kanmedia-css]'))return;
-  const l=document.createElement('link');l.rel='stylesheet';l.href='office-tools/kanmedia/kanmedia.css?v=1.3.0';l.dataset.kanmediaCss='1';document.head.appendChild(l);
+  const l=document.createElement('link');l.rel='stylesheet';l.href='office-tools/kanmedia/kanmedia.css?v=1.4.0';l.dataset.kanmediaCss='1';document.head.appendChild(l);
 }
 function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function bytes(n){n=Number(n)||0;if(n<1024)return n+' B';const u=['KB','MB','GB','TB'];let i=-1;do{n/=1024;i++;}while(n>=1024&&i<u.length-1);return n.toFixed(n>=100?0:n>=10?1:2)+' '+u[i];}
@@ -626,7 +626,7 @@ function renderEditWork(w){
   setupWaveDrag(w);setupVirtualPreview(w);
   w.querySelector('#kmSetStart').addEventListener('click',function(){const k=kmState.editWave;if(!k)return;const ct=originalToCurrent(k.segments,p.currentTime);if(ct==null)return notice('Vị trí đang phát nằm trong đoạn đã xóa.','warn');k.selection=[ct,waveSelection(k)[1]];syncWaveControls(w,false);});
   w.querySelector('#kmSetEnd').addEventListener('click',function(){const k=kmState.editWave;if(!k)return;const ct=originalToCurrent(k.segments,p.currentTime);if(ct==null)return notice('Vị trí đang phát nằm trong đoạn đã xóa.','warn');k.selection=[waveSelection(k)[0],ct];syncWaveControls(w,false);});
-  ['#kmStart','#kmEnd'].forEach(function(sel){w.querySelector(sel).addEventListener('change',function(){const k=kmState.editWave;if(!k)return;let a=Number(w.querySelector('#kmStart').value)||0,b=Number(w.querySelector('#kmEnd').value)||0,d=segmentsDuration(k.segments);a=Math.max(0,Math.min(d,a));b=Math.max(a+.02,Math.min(d,b));k.selection=[a,b];syncWaveControls(w,false);});});
+  ['#kmStart','#kmEnd'].forEach(function(sel){w.querySelector(sel).addEventListener('change',function(){const k=kmState.editWave;if(!k)return;let a=Number(w.querySelector('#kmStart').value)||0,b=Number(w.querySelector('#kmEnd').value)||0,d=segmentsDuration(k.segments);a=Math.max(0,Math.min(Math.max(0,d-.02),a));b=Math.max(a+.02,Math.min(d,b));k.selection=[a,Math.min(d,b)];syncWaveControls(w,false);});});
   w.querySelector('#kmKeepSegment').addEventListener('click',function(){applyWaveEdit(w,'keep');});
   w.querySelector('#kmRemoveSegment').addEventListener('click',function(){applyWaveEdit(w,'remove');});
   w.querySelector('#kmUndoEdit').addEventListener('click',function(){undoWaveEdit(w);});
