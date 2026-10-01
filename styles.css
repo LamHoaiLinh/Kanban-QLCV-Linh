@@ -1712,3 +1712,124 @@ body.kalo-open{overflow:hidden!important}
     grid-template-columns:1fr 1fr;
   }
 }
+
+/* ===== Đồng hồ full workspace + chỉnh sửa dòng v3.8 ===== */
+#clockDialog{
+  width:100vw;
+  max-width:none;
+  height:100dvh;
+  max-height:none;
+  padding:16px;
+  border:0;
+  background:transparent;
+}
+#clockDialog::backdrop{
+  background:rgba(25,45,37,.48);
+  backdrop-filter:blur(4px);
+}
+.clock-modal{
+  width:calc(100vw - 32px)!important;
+  max-width:none!important;
+  height:calc(100dvh - 32px)!important;
+  max-height:none!important;
+  margin:0 auto!important;
+  overflow:auto;
+  border-radius:20px;
+}
+.clock-tab-panel{
+  min-height:0;
+}
+#clockSpecialPanel,
+#clockWorkPanel{
+  display:flex;
+  flex-direction:column;
+}
+#clockSpecialPanel[hidden],
+#clockWorkPanel[hidden]{
+  display:none!important;
+}
+.special-date-list,
+.work-date-list{
+  max-height:none!important;
+  overflow:visible;
+}
+.special-date-item{
+  grid-template-columns:44px minmax(0,1fr) auto;
+  cursor:default;
+}
+.special-date-copy{
+  cursor:pointer;
+}
+.special-date-row-actions{
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.special-date-edit{
+  min-width:46px;
+  height:30px;
+  padding:0 9px;
+  border:1px solid color-mix(in srgb,var(--green) 28%,var(--border));
+  border-radius:8px;
+  background:var(--green-soft);
+  color:var(--green-dark);
+  font-size:10px;
+  font-weight:850;
+  cursor:pointer;
+}
+.special-date-edit:hover{
+  border-color:var(--green);
+  background:color-mix(in srgb,var(--green-soft) 72%,var(--green));
+}
+.special-date-edit.work{
+  border-color:#c4dcec;
+  background:#edf6fc;
+  color:#326e95;
+}
+.special-date-edit.work:hover{
+  border-color:#6aa3c7;
+  background:#dfeff9;
+}
+.special-date-edit-actions{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.special-date-edit-actions .secondary-btn[hidden]{
+  display:none!important;
+}
+.special-date-item[data-special-date-id]:hover,
+.work-date-item[data-work-date-id]:hover{
+  border-color:color-mix(in srgb,var(--green) 30%,var(--border));
+  box-shadow:0 3px 10px rgba(32,78,58,.06);
+}
+
+@media(min-width:1100px){
+  .clock-modal{
+    padding:20px 24px;
+  }
+  #clockSpecialPanel .special-date-form,
+  #clockWorkPanel .work-date-form{
+    max-width:none;
+  }
+  .special-date-list,
+  .work-date-list{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px;
+  }
+  .special-date-empty{
+    grid-column:1/-1;
+  }
+}
+@media(max-width:760px){
+  #clockDialog{padding:0}
+  .clock-modal{
+    width:100vw!important;
+    height:100dvh!important;
+    border-radius:0!important;
+  }
+  .special-date-row-actions{gap:4px}
+  .special-date-edit{min-width:42px;padding:0 7px}
+}
