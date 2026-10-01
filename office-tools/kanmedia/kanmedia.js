@@ -52,8 +52,9 @@ function applyKmTooltips(){
     if(!tip&&b.dataset.cut==='remove')tip='Xóa đoạn giữa điểm đầu và điểm cuối, giữ hai phần còn lại.';
     if(!tip&&b.dataset.speed)tip='Xuất file với tốc độ '+b.textContent.trim()+'.';
     if(!tip)tip='Thực hiện: '+b.textContent.trim();
-    b.dataset.tooltip=tip;b.title=tip;
+    b.dataset.tooltip=tip;b.removeAttribute('title');
   });
+  kmHost.querySelectorAll('[title]').forEach(function(el){el.removeAttribute('title');});
 }
 function ensureKanMediaCss(){
   if(document.querySelector('link[data-kanmedia-css]'))return;
@@ -188,6 +189,7 @@ function startPolling(id,reconnected){
       setProgress(j.percent||0,mainText,parts.join(' · '));
       if(['done','error','cancelled'].includes(j.state)){
         clearInterval(kmState.poll);kmState.poll=null;kmState.jobId=null;setBusy(false);
+        if(kmState.tab==='edit')kmState.editUploadId=null;
         if(j.state==='done')notice(j.output?'Đã lưu: '+j.output:'Đã hoàn tất.','ok');
         else if(j.state==='cancelled')notice('Đã hủy tác vụ.','warn');
         else notice(j.error||'Tác vụ không hoàn tất.','warn');
@@ -236,7 +238,7 @@ function syncQualityUi(h){
     b.hidden=!!spec.lossless&&key!=='ultra';
     b.disabled=!!spec.lossless&&key!=='ultra';
     setQualityButton(b,x.title,x.note);
-    if(spec.tips&&spec.tips[key]){b.dataset.tooltip=spec.tips[key];b.title=spec.tips[key];}
+    if(spec.tips&&spec.tips[key]){b.dataset.tooltip=spec.tips[key];b.removeAttribute('title');}
   });
 }
 function formatMenu(kind){
@@ -389,50 +391,278 @@ function renderEdit(h){
   inp.addEventListener('change',function(){setFile(inp.files[0]);});drop.addEventListener('click',function(){inp.click();});drop.addEventListener('dragover',function(e){e.preventDefault();drop.classList.add('dragover');});drop.addEventListener('dragleave',function(){drop.classList.remove('dragover');});drop.addEventListener('drop',function(e){e.preventDefault();drop.classList.remove('dragover');setFile(Array.from(e.dataTransfer.files).find(function(f){return /^(audio|video)\//.test(f.type);}));});
   if(kmState.editFile)renderEditWork(h.querySelector('#kmEditWork'));bindCancel();
 }
-async function drawKmWaveform(file,canvas,media){
-  if(!file||!canvas||file.size>80*1024*1024)return;
+function uploadFileWithProgress(file,onProgress){
+  return new Promise(function(resolve,reject){
+    const xhr=new XMLHttpRequest();
+    xhr.open('POST',KANMEDIA_AGENT+'/media/upload',true);
+    Object.entries(KANMEDIA_HEADERS).forEach(function(kv){xhr.setRequestHeader(kv[0],kv[1]);});
+    xhr.setRequestHeader('Content-Type','application/octet-stream');
+    xhr.setRequestHeader('X-KanBan-File-Name',encodeURIComponent(file.name));
+    xhr.setRequestHeader('X-KanBan-File-Type',file.type||'');
+    xhr.upload.onprogress=function(e){if(e.lengthComputable&&onProgress)onProgress(Math.max(0,Math.min(100,e.loaded/e.total*100)));};
+    xhr.onerror=function(){reject(new Error('Không gửi được file tới KanMedia trên máy.'));};
+    xhr.onload=function(){
+      let data=null;try{data=JSON.parse(xhr.responseText||'{}');}catch(e){}
+      if(xhr.status>=200&&xhr.status<300&&data&&data.uploadId)resolve(data);
+      else reject(new Error(data&&data.error||('Không nhận được file. Mã '+xhr.status)));
+    };
+    xhr.send(file);
+  });
+}
+function editFileToken(file){return file?[file.name,file.size,file.lastModified].join('|'):'';}
+function cloneSegments(list){return (list||[]).map(function(x){return [Number(x[0]),Number(x[1])];});}
+function segmentsDuration(list){return (list||[]).reduce(function(sum,x){return sum+Math.max(0,Number(x[1])-Number(x[0]));},0);}
+function sliceSegments(list,from,to){
+  from=Math.max(0,Number(from)||0);to=Math.max(from,Number(to)||0);
+  const out=[];let cursor=0;
+  (list||[]).forEach(function(seg){
+    const a=Number(seg[0]),b=Number(seg[1]),len=Math.max(0,b-a);
+    const left=Math.max(from,cursor),right=Math.min(to,cursor+len);
+    if(right>left+0.001)out.push([a+(left-cursor),a+(right-cursor)]);
+    cursor+=len;
+  });
+  return out;
+}
+function currentToOriginal(list,t){
+  t=Math.max(0,Number(t)||0);let cursor=0;
+  for(const seg of (list||[])){
+    const a=Number(seg[0]),b=Number(seg[1]),len=Math.max(0,b-a);
+    if(t<=cursor+len+0.0001)return Math.min(b,a+Math.max(0,t-cursor));
+    cursor+=len;
+  }
+  const last=(list||[])[(list||[]).length-1];return last?Number(last[1]):0;
+}
+function originalToCurrent(list,t){
+  t=Number(t)||0;let cursor=0;
+  for(const seg of (list||[])){
+    const a=Number(seg[0]),b=Number(seg[1]),len=Math.max(0,b-a);
+    if(t>=a-0.02&&t<=b+0.02)return cursor+Math.max(0,Math.min(len,t-a));
+    cursor+=len;
+  }
+  return null;
+}
+function setWaveLoader(w,pct,text,sub){
+  const box=w&&w.querySelector('#kmWaveLoader');if(!box)return;
+  box.hidden=false;
+  const fill=box.querySelector('i'),num=box.querySelector('[data-wave-pct]'),msg=box.querySelector('[data-wave-msg]'),small=box.querySelector('[data-wave-sub]');
+  if(fill)fill.style.width=Math.max(0,Math.min(100,Number(pct)||0))+'%';
+  if(num)num.textContent=Math.round(Number(pct)||0)+'%';
+  if(msg)msg.textContent=text||'Đang chuẩn bị waveform…';
+  if(small)small.textContent=sub||'';
+}
+function hideWaveLoader(w){
+  const box=w&&w.querySelector('#kmWaveLoader');if(box)box.hidden=true;
+}
+function waveSelection(k){
+  const d=segmentsDuration(k.segments);let a=Math.max(0,Math.min(d,Number(k.selection&&k.selection[0])||0)),b=Math.max(a,Math.min(d,Number(k.selection&&k.selection[1])||d));
+  if(b-a<0.02)b=Math.min(d,a+0.02);
+  return [a,b];
+}
+function syncWaveControls(w,redraw){
+  const k=kmState.editWave;if(!k||!w)return;
+  const dur=segmentsDuration(k.segments),sel=waveSelection(k);k.selection=sel;
+  const start=w.querySelector('#kmStart'),end=w.querySelector('#kmEnd');
+  if(start)start.value=sel[0].toFixed(2);if(end)end.value=sel[1].toFixed(2);
+  const left=w.querySelector('#kmWaveShadeLeft'),right=w.querySelector('#kmWaveShadeRight'),selection=w.querySelector('#kmWaveSelection');
+  const hs=w.querySelector('#kmWaveStartHandle'),he=w.querySelector('#kmWaveEndHandle');
+  const ps=dur?sel[0]/dur*100:0,pe=dur?sel[1]/dur*100:100;
+  if(left)left.style.width=ps+'%';
+  if(right){right.style.left=pe+'%';right.style.width=Math.max(0,100-pe)+'%';}
+  if(selection){selection.style.left=ps+'%';selection.style.width=Math.max(0,pe-ps)+'%';}
+  if(hs){hs.style.left=ps+'%';const x=hs.querySelector('span');if(x)x.textContent=sel[0].toFixed(2)+'s';}
+  if(he){he.style.left=pe+'%';const x=he.querySelector('span');if(x)x.textContent=sel[1].toFixed(2)+'s';}
+  const d=w.querySelector('#kmTimelineDuration');if(d)d.textContent='Timeline: '+formatEditTime(dur);
+  if(redraw!==false)drawVirtualWaveform(w);
+}
+function formatEditTime(sec){
+  sec=Math.max(0,Number(sec)||0);const h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),s=Math.floor(sec%60);
+  return (h?h+':':'')+String(m).padStart(h?2:1,'0')+':'+String(s).padStart(2,'0');
+}
+function drawVirtualWaveform(w){
+  const k=kmState.editWave,canvas=w&&w.querySelector('#kmWaveform');if(!k||!canvas||!k.image||!k.image.complete)return;
+  const rect=canvas.getBoundingClientRect(),width=Math.max(360,Math.floor(rect.width||760)),height=118,dpr=Math.max(1,Math.min(2,window.devicePixelRatio||1));
+  canvas.width=width*dpr;canvas.height=height*dpr;
+  const g=canvas.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,width,height);
+  const duration=segmentsDuration(k.segments),origDur=k.originalDuration||duration;
+  g.fillStyle=getComputedStyle(canvas).backgroundColor||'#f8fbfa';g.fillRect(0,0,width,height);
+  if(duration<=0||origDur<=0)return;
+  const step=2;
+  for(let x=0;x<width;x+=step){
+    const t=(x/width)*duration,orig=currentToOriginal(k.segments,t),sx=Math.max(0,Math.min(k.image.width-2,(orig/origDur)*k.image.width));
+    let scale=1;
+    const fi=Math.max(0,Number(w.querySelector('#kmFadeIn')&&w.querySelector('#kmFadeIn').value)||0);
+    const fo=Math.max(0,Number(w.querySelector('#kmFadeOut')&&w.querySelector('#kmFadeOut').value)||0);
+    if(fi>0&&t<fi)scale=Math.min(scale,Math.max(.04,t/fi));
+    if(fo>0&&duration-t<fo)scale=Math.min(scale,Math.max(.04,(duration-t)/fo));
+    const dh=Math.max(4,height*scale),dy=(height-dh)/2;
+    g.drawImage(k.image,sx,0,Math.max(2,k.image.width/width*step),k.image.height,x,dy,step+1,dh);
+  }
+}
+function setupWaveDrag(w){
+  const wrap=w.querySelector('#kmWaveWrap');if(!wrap)return;
+  function bind(handle,which){
+    handle.addEventListener('pointerdown',function(e){
+      e.preventDefault();handle.setPointerCapture(e.pointerId);wrap.classList.add('dragging');
+      const move=function(ev){
+        const k=kmState.editWave;if(!k)return;const r=wrap.getBoundingClientRect(),dur=segmentsDuration(k.segments);
+        let t=Math.max(0,Math.min(dur,(ev.clientX-r.left)/Math.max(1,r.width)*dur));const sel=waveSelection(k);
+        if(which===0)t=Math.min(t,sel[1]-.02);else t=Math.max(t,sel[0]+.02);
+        k.selection=which===0?[t,sel[1]]:[sel[0],t];syncWaveControls(w,false);
+      };
+      const up=function(){wrap.classList.remove('dragging');handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',up);handle.removeEventListener('pointercancel',up);};
+      handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',up);handle.addEventListener('pointercancel',up);
+    });
+  }
+  bind(w.querySelector('#kmWaveStartHandle'),0);bind(w.querySelector('#kmWaveEndHandle'),1);
+  wrap.addEventListener('click',function(e){
+    if(e.target.closest('.km-wave-handle'))return;
+    const k=kmState.editWave;if(!k)return;const r=wrap.getBoundingClientRect(),dur=segmentsDuration(k.segments),t=Math.max(0,Math.min(dur,(e.clientX-r.left)/r.width*dur));
+    const orig=currentToOriginal(k.segments,t),p=w.querySelector('#kmPreview');if(p&&Number.isFinite(orig))p.currentTime=orig;
+  });
+}
+function applyWaveEdit(w,mode){
+  const k=kmState.editWave;if(!k)return;
+  const dur=segmentsDuration(k.segments),sel=waveSelection(k);
+  if(sel[1]-sel[0]<0.02)return notice('Đoạn chọn quá ngắn.','warn');
+  const before=cloneSegments(k.segments);
+  let next;
+  if(mode==='keep')next=sliceSegments(k.segments,sel[0],sel[1]);
+  else next=sliceSegments(k.segments,0,sel[0]).concat(sliceSegments(k.segments,sel[1],dur));
+  if(!next.length)return notice('Thao tác này sẽ xóa toàn bộ media. Hãy chọn lại đoạn.','warn');
+  k.undo=k.undo||[];k.undo.push(before);if(k.undo.length>30)k.undo.shift();
+  k.segments=next;k.selection=[0,segmentsDuration(next)];
+  syncWaveControls(w,true);
+  notice(mode==='keep'?'Đã giữ đoạn chọn trên timeline.':'Đã xóa đoạn chọn và ghép waveform còn lại.','ok');
+}
+function undoWaveEdit(w){
+  const k=kmState.editWave;if(!k||!k.undo||!k.undo.length)return;
+  k.segments=k.undo.pop();k.selection=[0,segmentsDuration(k.segments)];syncWaveControls(w,true);
+}
+function resetWaveEdit(w){
+  const k=kmState.editWave;if(!k)return;k.undo=[];k.segments=[[0,k.originalDuration]];k.selection=[0,k.originalDuration];syncWaveControls(w,true);
+}
+function playVirtualSelection(w){
+  const k=kmState.editWave,p=w.querySelector('#kmPreview');if(!k||!p)return;
+  const sel=waveSelection(k),pieces=sliceSegments(k.segments,sel[0],sel[1]);if(!pieces.length)return;
+  kmState.editPreview={pieces:pieces,index:0};p.currentTime=pieces[0][0];p.play().catch(function(){});
+}
+function setupVirtualPreview(w){
+  const p=w.querySelector('#kmPreview');if(!p)return;
+  p.addEventListener('timeupdate',function(){
+    const k=kmState.editWave;if(k){
+      const ct=originalToCurrent(k.segments,p.currentTime),line=w.querySelector('#kmWavePlayhead'),dur=segmentsDuration(k.segments);
+      if(line){if(ct==null){line.hidden=true;}else{line.hidden=false;line.style.left=(dur?ct/dur*100:0)+'%';}}
+    }
+    const preview=kmState.editPreview;if(!preview||!preview.pieces||!preview.pieces.length)return;
+    const cur=preview.pieces[preview.index];if(!cur)return;
+    if(p.currentTime>=cur[1]-.035){
+      preview.index++;
+      const next=preview.pieces[preview.index];
+      if(next){p.currentTime=next[0];}
+      else{kmState.editPreview=null;p.pause();}
+    }
+  });
+  p.addEventListener('pause',function(){if(kmState.editPreview&&!p.ended){}});
+}
+async function loadWaveformEditor(file,w){
+  const token=editFileToken(file),loader=w.querySelector('#kmWaveLoader');
   try{
-    const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
-    const ctx=new AC();const buf=await ctx.decodeAudioData(await file.arrayBuffer());const data=buf.getChannelData(0);
-    const dpr=Math.max(1,Math.min(2,window.devicePixelRatio||1));const rect=canvas.getBoundingClientRect();const width=Math.max(320,Math.floor(rect.width||700)),height=90;
-    canvas.width=width*dpr;canvas.height=height*dpr;const g=canvas.getContext('2d');g.scale(dpr,dpr);g.clearRect(0,0,width,height);
-    const style=getComputedStyle(canvas);g.strokeStyle=style.color||'#4b8d70';g.lineWidth=1;const buckets=Math.min(width,900),step=Math.max(1,Math.floor(data.length/buckets));g.beginPath();
-    for(let x=0;x<buckets;x++){let peak=0;const from=x*step,to=Math.min(data.length,from+step);for(let i=from;i<to;i++){const v=Math.abs(data[i]);if(v>peak)peak=v;}const px=x/buckets*width,amp=peak*(height*.46);g.moveTo(px,height/2-amp);g.lineTo(px,height/2+amp);}g.stroke();
-    canvas.onclick=function(e){if(!media||!Number.isFinite(media.duration))return;const r=canvas.getBoundingClientRect();const ratio=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));media.currentTime=ratio*media.duration;};
-    await ctx.close();
-  }catch(e){}
+    if(kmState.editWave&&kmState.editWave.fileToken===token&&kmState.editWave.imageSrc){
+      setWaveLoader(w,96,'Đang khôi phục waveform…','Không cần tải lại file.');
+      const img=new Image();img.src=kmState.editWave.imageSrc;await img.decode().catch(function(){});
+      kmState.editWave.image=img;hideWaveLoader(w);w.classList.add('wave-ready');syncWaveControls(w,true);return;
+    }
+    setWaveLoader(w,2,'Đang nhận file…','File chỉ chuyển tới KanMedia trên chính máy này.');
+    const up=await uploadFileWithProgress(file,function(p){setWaveLoader(w,2+p*.58,'Đang nhận file…',Math.round(p)+'% · '+bytes(file.size));});
+    kmState.editUploadId=up.uploadId;
+    let pseudo=62;
+    const timer=setInterval(function(){pseudo=Math.min(91,pseudo+1.5);setWaveLoader(w,pseudo,'Đang tạo waveform…','FFmpeg đang phân tích âm thanh trên máy.');},420);
+    let wave;
+    try{wave=await kmApi('/media/waveform',{method:'POST',json:{uploadId:up.uploadId},timeout:300000});}
+    finally{clearInterval(timer);}
+    setWaveLoader(w,94,'Đang dựng timeline…','Sắp hoàn tất.');
+    const img=new Image();img.src=wave.image;await img.decode().catch(function(){});
+    kmState.editWave={fileToken:token,imageSrc:wave.image,image:img,originalDuration:Number(wave.duration)||0,segments:[[0,Number(wave.duration)||0]],selection:[0,Number(wave.duration)||0],undo:[]};
+    const end=w.querySelector('#kmEnd');if(end)end.value=(Number(wave.duration)||0).toFixed(2);
+    setWaveLoader(w,100,'Waveform đã sẵn sàng','Bạn có thể kéo hai tay nắm để chọn đoạn.');
+    await new Promise(function(r){setTimeout(r,180);});hideWaveLoader(w);w.classList.add('wave-ready');syncWaveControls(w,true);
+  }catch(e){
+    setWaveLoader(w,100,'Không tạo được waveform',e.message||'Hãy thử file khác.');
+    const bar=loader&&loader.querySelector('.km-wave-loadbar');if(bar)bar.classList.add('error');
+    notice(e.message||'Không tạo được waveform.','warn');
+  }
 }
 function renderEditWork(w){
   const f=kmState.editFile;if(!f){w.innerHTML='';return;}
   const isVideo=f.type.indexOf('video/')===0||/\.(mp4|mkv|mov|avi|webm)$/i.test(f.name);
-  const media=isVideo?'<video id="kmPreview" src="'+kmState.editUrl+'" controls preload="metadata"></video>':'<audio id="kmPreview" src="'+kmState.editUrl+'" controls preload="metadata"></audio><canvas id="kmWaveform" class="km-waveform" data-tooltip="Waveform giúp bạn nhìn nhanh vùng có tiếng và bấm để nhảy tới vị trí cần cắt."></canvas>';
+  const media=isVideo?'<video id="kmPreview" src="'+kmState.editUrl+'" controls preload="metadata"></video>':'<audio id="kmPreview" src="'+kmState.editUrl+'" controls preload="metadata"></audio>';
   w.innerHTML=[
-    '<div class="km-edit-file"><strong>'+esc(f.name)+'</strong><span>'+bytes(f.size)+'</span></div><div class="km-preview">'+media+'</div>',
-    '<div class="km-time-box"><div class="km-row"><button class="office-btn" id="kmSetStart" type="button">Đặt điểm đầu</button><label>Bắt đầu <input id="kmStart" type="number" min="0" step="0.01" value="0"></label><button class="office-btn" id="kmSetEnd" type="button">Đặt điểm cuối</button><label>Kết thúc <input id="kmEnd" type="number" min="0" step="0.01" value="0"></label></div>',
-    '<div class="km-choice"><button data-cut="keep" class="active">Giữ đoạn này</button><button data-cut="remove">Xóa đoạn này</button></div></div>',
-    '<div class="km-edit-grid"><label><span>Âm lượng <b id="kmVolLabel">100%</b></span><input id="kmVolume" type="range" min="0" max="200" step="5" value="100"></label>',
-    '<label><span>Tốc độ</span><div class="km-choice km-speed"><button data-speed="0.5">0.5×</button><button data-speed="0.75">0.75×</button><button data-speed="1" class="active">1×</button><button data-speed="1.25">1.25×</button><button data-speed="1.5">1.5×</button><button data-speed="2">2×</button></div></label>',
-    '<label><span>Mờ âm đầu (giây)</span><input id="kmFadeIn" type="number" min="0" max="30" step="0.5" value="0"></label><label><span>Mờ âm cuối (giây)</span><input id="kmFadeOut" type="number" min="0" max="30" step="0.5" value="0"></label></div>',
-    '<div class="km-row"><label class="km-check"><input id="kmNormalize" type="checkbox"> Tự cân bằng âm lượng</label>',
-    isVideo?'<label class="km-check"><input id="kmMute" type="checkbox"> Xóa tiếng video</label><label class="km-check"><input id="kmExtract" type="checkbox"> Lấy âm thanh thành MP3</label>':'',
-    '</div><div class="km-row km-actions"><button class="office-btn" id="kmPreviewStart" type="button">Phát từ điểm đầu</button><button class="office-btn primary km-run" id="kmEditRun" type="button">Xuất file</button></div>'
+    '<div class="km-edit-file"><strong>'+esc(f.name)+'</strong><span>'+bytes(f.size)+'</span></div>',
+    '<div class="km-edit-work-shell">',
+      '<div class="km-wave-loader" id="kmWaveLoader"><div class="km-wave-loader-card"><div class="km-wave-loader-head"><strong data-wave-msg>Đang chuẩn bị waveform…</strong><b data-wave-pct>0%</b></div><div class="km-wave-loadbar"><i></i></div><small data-wave-sub>Vui lòng chờ để waveform sẵn sàng rồi mới chỉnh.</small></div></div>',
+      '<div class="km-preview">'+media+'</div>',
+      '<div class="km-wave-wrap" id="kmWaveWrap" data-tooltip="Kéo hai tay nắm để chọn đoạn. Bấm trên waveform để nhảy tới vị trí tương ứng.">',
+        '<canvas id="kmWaveform" class="km-waveform"></canvas>',
+        '<div class="km-wave-shade left" id="kmWaveShadeLeft"></div><div class="km-wave-shade right" id="kmWaveShadeRight"></div>',
+        '<div class="km-wave-selection" id="kmWaveSelection"></div><div class="km-wave-playhead" id="kmWavePlayhead" hidden></div>',
+        '<button type="button" class="km-wave-handle start" id="kmWaveStartHandle" data-tooltip="Kéo để đặt điểm đầu"><span>0.00s</span></button>',
+        '<button type="button" class="km-wave-handle end" id="kmWaveEndHandle" data-tooltip="Kéo để đặt điểm cuối"><span>0.00s</span></button>',
+      '</div>',
+      '<div class="km-wave-summary"><span id="kmTimelineDuration">Timeline: --</span><span>Kéo tay nắm hoặc nhập số chính xác bên dưới</span></div>',
+      '<div class="km-time-box">',
+        '<div class="km-time-row"><button class="office-btn" id="kmSetStart" type="button">Đặt điểm đầu</button><label>Bắt đầu <input id="kmStart" type="number" min="0" step="0.01" value="0"></label></div>',
+        '<div class="km-time-row"><button class="office-btn" id="kmSetEnd" type="button">Đặt điểm cuối</button><label>Kết thúc <input id="kmEnd" type="number" min="0" step="0.01" value="0"></label></div>',
+        '<div class="km-wave-actions"><button class="office-btn primary" id="kmKeepSegment" type="button" data-tooltip="Giữ đoạn đang chọn và bỏ hai phần bên ngoài">Giữ đoạn này</button><button class="office-btn" id="kmRemoveSegment" type="button" data-tooltip="Xóa đoạn đang chọn rồi ghép hai phần còn lại">Xóa đoạn này</button><button class="office-btn" id="kmUndoEdit" type="button">Hoàn tác</button><button class="office-btn" id="kmResetEdit" type="button">Đặt lại</button></div>',
+      '</div>',
+      '<div class="km-edit-grid"><label><span>Âm lượng <b id="kmVolLabel">100%</b></span><input id="kmVolume" type="range" min="0" max="200" step="5" value="100"></label>',
+      '<label><span>Tốc độ</span><div class="km-choice km-speed"><button data-speed="0.5">0.5×</button><button data-speed="0.75">0.75×</button><button data-speed="1" class="active">1×</button><button data-speed="1.25">1.25×</button><button data-speed="1.5">1.5×</button><button data-speed="2">2×</button></div></label>',
+      '<label><span>Mờ âm đầu (giây)</span><input id="kmFadeIn" type="number" min="0" max="30" step="0.5" value="0"></label><label><span>Mờ âm cuối (giây)</span><input id="kmFadeOut" type="number" min="0" max="30" step="0.5" value="0"></label></div>',
+      '<div class="km-row"><label class="km-check"><input id="kmNormalize" type="checkbox"> Tự cân bằng âm lượng</label>',
+      isVideo?'<label class="km-check"><input id="kmMute" type="checkbox"> Xóa tiếng video</label><label class="km-check"><input id="kmExtract" type="checkbox"> Lấy âm thanh thành MP3</label>':'',
+      '</div><div class="km-row km-actions"><button class="office-btn" id="kmPreviewStart" type="button">Phát đoạn chọn</button><button class="office-btn primary km-run" id="kmEditRun" type="button">Xuất file</button></div>',
+    '</div>'
   ].join('');
-  const p=w.querySelector('#kmPreview');kmState.edit={cut:'keep',speed:1};if(!isVideo)queueMicrotask(function(){drawKmWaveform(f,w.querySelector('#kmWaveform'),p);});
-  p.addEventListener('loadedmetadata',function(){w.querySelector('#kmEnd').value=Number.isFinite(p.duration)?p.duration.toFixed(2):0;});
-  w.querySelector('#kmSetStart').addEventListener('click',function(){w.querySelector('#kmStart').value=(p.currentTime||0).toFixed(2);});
-  w.querySelector('#kmSetEnd').addEventListener('click',function(){w.querySelector('#kmEnd').value=(p.currentTime||0).toFixed(2);});
-  w.querySelector('#kmPreviewStart').addEventListener('click',function(){p.currentTime=Math.max(0,Number(w.querySelector('#kmStart').value)||0);p.play().catch(function(){});});
-  w.querySelectorAll('[data-cut]').forEach(function(b){b.addEventListener('click',function(){kmState.edit.cut=b.dataset.cut;w.querySelectorAll('[data-cut]').forEach(function(x){x.classList.toggle('active',x===b);});});});
+  const p=w.querySelector('#kmPreview');kmState.edit={speed:1};kmState.editPreview=null;
+  setupWaveDrag(w);setupVirtualPreview(w);
+  w.querySelector('#kmSetStart').addEventListener('click',function(){const k=kmState.editWave;if(!k)return;const ct=originalToCurrent(k.segments,p.currentTime);if(ct==null)return notice('Vị trí đang phát nằm trong đoạn đã xóa.','warn');k.selection=[ct,waveSelection(k)[1]];syncWaveControls(w,false);});
+  w.querySelector('#kmSetEnd').addEventListener('click',function(){const k=kmState.editWave;if(!k)return;const ct=originalToCurrent(k.segments,p.currentTime);if(ct==null)return notice('Vị trí đang phát nằm trong đoạn đã xóa.','warn');k.selection=[waveSelection(k)[0],ct];syncWaveControls(w,false);});
+  ['#kmStart','#kmEnd'].forEach(function(sel){w.querySelector(sel).addEventListener('change',function(){const k=kmState.editWave;if(!k)return;let a=Number(w.querySelector('#kmStart').value)||0,b=Number(w.querySelector('#kmEnd').value)||0,d=segmentsDuration(k.segments);a=Math.max(0,Math.min(d,a));b=Math.max(a+.02,Math.min(d,b));k.selection=[a,b];syncWaveControls(w,false);});});
+  w.querySelector('#kmKeepSegment').addEventListener('click',function(){applyWaveEdit(w,'keep');});
+  w.querySelector('#kmRemoveSegment').addEventListener('click',function(){applyWaveEdit(w,'remove');});
+  w.querySelector('#kmUndoEdit').addEventListener('click',function(){undoWaveEdit(w);});
+  w.querySelector('#kmResetEdit').addEventListener('click',function(){resetWaveEdit(w);});
+  w.querySelector('#kmPreviewStart').addEventListener('click',function(){playVirtualSelection(w);});
   w.querySelectorAll('[data-speed]').forEach(function(b){b.addEventListener('click',function(){kmState.edit.speed=Number(b.dataset.speed);p.playbackRate=kmState.edit.speed;w.querySelectorAll('[data-speed]').forEach(function(x){x.classList.toggle('active',x===b);});});});
   w.querySelector('#kmVolume').addEventListener('input',function(e){w.querySelector('#kmVolLabel').textContent=e.target.value+'%';p.volume=Math.min(1,Number(e.target.value)/100);});
-  w.querySelector('#kmEditRun').addEventListener('click',startEdit);applyKmTooltips();
+  w.querySelector('#kmFadeIn').addEventListener('input',function(){drawVirtualWaveform(w);});
+  w.querySelector('#kmFadeOut').addEventListener('input',function(){drawVirtualWaveform(w);});
+  w.querySelector('#kmEditRun').addEventListener('click',startEdit);
+  applyKmTooltips();
+  queueMicrotask(function(){loadWaveformEditor(f,w);});
 }
 async function startEdit(){
   const w=kmHost.querySelector('#kmEditWork');if(!kmState.editFile||!w)return notice('Bạn hãy chọn file trước.','warn');
-  setBusy(true);setProgress(3,'Đang nhận file…','');
+  const wave=kmState.editWave;if(!wave||!wave.segments||!wave.segments.length)return notice('Waveform chưa sẵn sàng. Hãy chờ phân tích xong.','warn');
+  setBusy(true);setProgress(3,'Đang chuẩn bị file','');
   try{
-    const u=await uploadFile(kmState.editFile);
-    const payload={uploadId:u.uploadId,start:Number(w.querySelector('#kmStart').value)||0,end:Number(w.querySelector('#kmEnd').value)||0,cut:kmState.edit&&kmState.edit.cut||'keep',volume:(Number(w.querySelector('#kmVolume').value)||100)/100,normalize:w.querySelector('#kmNormalize').checked,speed:kmState.edit&&kmState.edit.speed||1,fadeIn:Number(w.querySelector('#kmFadeIn').value)||0,fadeOut:Number(w.querySelector('#kmFadeOut').value)||0,mute:!!(w.querySelector('#kmMute')&&w.querySelector('#kmMute').checked),extractMp3:!!(w.querySelector('#kmExtract')&&w.querySelector('#kmExtract').checked)};
+    let uploadId=kmState.editUploadId;
+    if(!uploadId){
+      const u=await uploadFile(kmState.editFile);uploadId=u.uploadId;kmState.editUploadId=uploadId;
+    }
+    const payload={
+      uploadId:uploadId,
+      segments:cloneSegments(wave.segments),
+      start:Number(w.querySelector('#kmStart').value)||0,
+      end:Number(w.querySelector('#kmEnd').value)||0,
+      volume:(Number(w.querySelector('#kmVolume').value)||100)/100,
+      normalize:w.querySelector('#kmNormalize').checked,
+      speed:kmState.edit&&kmState.edit.speed||1,
+      fadeIn:Number(w.querySelector('#kmFadeIn').value)||0,
+      fadeOut:Number(w.querySelector('#kmFadeOut').value)||0,
+      mute:!!(w.querySelector('#kmMute')&&w.querySelector('#kmMute').checked),
+      extractMp3:!!(w.querySelector('#kmExtract')&&w.querySelector('#kmExtract').checked)
+    };
     const r=await kmApi('/media/edit',{method:'POST',json:payload,timeout:5000});startPolling(r.jobId);
   }catch(e){setBusy(false);notice(e.message,'warn');}
 }
+
