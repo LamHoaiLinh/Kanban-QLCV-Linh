@@ -2,7 +2,7 @@
   'use strict';
 
   const STORAGE_KEY = 'linh_personal_kanban_v1';
-  const VERSION = 19;
+  const VERSION = 20;
   const DEFAULT_BACKGROUND_ID = 'bg6';
   const KAN_ALARM_AGENT = 'http://127.0.0.1:47632';
   const KAN_ALARM_HEADERS = {'X-KanBan-Agent':'linh-kanban-v1','Content-Type':'application/json'};
@@ -99,7 +99,7 @@
       'labelOptions','cardColumnSelect','deleteCardBtn','duplicateCardBtn','columnDialog','columnForm','columnDialogTitle','columnNameInput','columnColorOptions',
       'deleteColumnBtn','clearColumnContentBtn','duplicateColumnBtn','quickCaptureDialog','quickCaptureForm','quickCaptureTitleInput','quickCaptureColumnSelect','quickCaptureDestinationHint','backgroundDialog','backgroundOptions','guideDialog','settingsBtn','settingsDialog','settingsExportBtn','quickCaptureProjectName','quickCaptureDefaultColumnSelect','quickCaptureStatus','dailyMoveEnabled','dailyMoveProjectName','dailyMoveRules','addDailyMoveRuleBtn','dailyMoveStatus','openDeletedContentBtn','deletedContentCount','deletedContentDialog','deletedArchiveTabBtn','deletedTrashTabBtn','deletedArchivePanel','deletedTrashPanel','deletedArchiveCount','deletedTrashCount','deletedArchiveList','deletedTrashList','emptyTrashBtn','openResetDataBtn','resetDataDialog','resetDataForm','resetBackupBtn','resetConfirmInput','resetDeleteBtn','resetBackupStatus','confirmDialog','confirmTitle','confirmMessage','globalTooltip','toast',
       'clockCurrentTime','clockDayPeriod','clockWeekday','clockDate','clockLunarDate','timerDisplay','timerDialogDisplay','timerEndTime','timerAgentStatus','clockStatus','timerMinutesInput','timerSecondsInput','timerStartPauseBtn','timerResetBtn','timerStopAlarmBtn','timerTestAlarmBtn','timerLocalAlarmInput','timerRepeatAlarmInput','timerNotifyInput','deskClockWidget','deskClockControls','clockToggleBtn','quickStopAlarmBtn','clockDialog',
-      'clockAlarmTabBtn','clockSpecialTabBtn','clockWorkTabBtn','clockAlarmPanel','clockSpecialPanel','clockWorkPanel','specialDateNameInput','specialDateTypeSelect','specialBirthdayFields','specialBirthdayDateInput','specialMemorialFields','specialLunarDateInput','addSpecialDateBtn','cancelSpecialDateEditBtn','specialTickerSettingInput','specialDateSearchInput','specialDateMonthFilter','specialDateList','specialDateCount','specialDateEmpty','specialReminderBar','specialReminderText','specialReminderToggle','exportSpecialDatesBtn','importSpecialDatesBtn','importSpecialDatesFile','workDateTitleInput','workDateInput','addWorkDateBtn','cancelWorkDateEditBtn','workTickerSettingInput','workDateSearchInput','workDateMonthFilter','workDateList','workDateCount','workDateEmpty','workReminderBar','workReminderText','workReminderToggle'
+      'clockAlarmTabBtn','clockSpecialTabBtn','clockWorkTabBtn','clockAlarmPanel','clockSpecialPanel','clockWorkPanel','specialDateNameInput','specialDateTypeSelect','specialBirthdayFields','specialBirthdayDateInput','specialMemorialFields','specialLunarDateInput','addSpecialDateBtn','cancelSpecialDateEditBtn','specialTickerSettingInput','specialDateSearchInput','specialDateMonthFilter','specialDateList','specialDateCount','specialDateEmpty','specialReminderBar','specialReminderText','specialReminderToggle','exportSpecialDatesBtn','importSpecialDatesBtn','importSpecialDatesFile','workDateTitleInput','workDateInput','workRepeatMonthlyInput','workRepeatYearlyInput','addWorkDateBtn','cancelWorkDateEditBtn','workTickerSettingInput','workDateSearchInput','workDateMonthFilter','workDateList','workDateCount','workDateEmpty','workReminderBar','workReminderText','workReminderToggle'
     ].forEach(id => refs[id] = document.getElementById(id));
   }
 
@@ -1961,7 +1961,13 @@
       const [year,month,day]=date.split('-').map(Number);
       const parsed=new Date(year,month-1,day,12,0,0,0);
       if (parsed.getFullYear()!==year || parsed.getMonth()!==month-1 || parsed.getDate()!==day) return null;
-      return {id:String(item?.id || uid('workdate')),title,date};
+      return {
+        id:String(item?.id || uid('workdate')),
+        title,
+        date,
+        repeatMonthly:Boolean(item?.repeatMonthly),
+        repeatYearly:Boolean(item?.repeatYearly)
+      };
     }).filter(Boolean);
   }
 
@@ -2183,6 +2189,8 @@
     const clock=state.settings.clock || (state.settings.clock=createDefaultClockSettings());
     const title=refs.workDateTitleInput.value.trim();
     const date=refs.workDateInput.value;
+    const repeatMonthly=Boolean(refs.workRepeatMonthlyInput.checked);
+    const repeatYearly=Boolean(refs.workRepeatYearlyInput.checked);
     if (!title) {
       showToast('Bạn hãy nhập nội dung công việc.');
       refs.workDateTitleInput.focus();
@@ -2199,10 +2207,12 @@
       if (target) {
         target.title=title;
         target.date=date;
+        target.repeatMonthly=repeatMonthly;
+        target.repeatYearly=repeatYearly;
         showToast('Đã lưu thay đổi Lịch Công việc.');
       }
     } else {
-      clock.workDates.push({id:uid('workdate'),title,date});
+      clock.workDates.push({id:uid('workdate'),title,date,repeatMonthly,repeatYearly});
       showToast('Đã thêm vào Lịch Công việc.');
     }
     resetWorkDateEditor();
@@ -2218,6 +2228,8 @@
     editingWorkDateId=id;
     refs.workDateTitleInput.value=item.title || '';
     refs.workDateInput.value=item.date || '';
+    refs.workRepeatMonthlyInput.checked=Boolean(item.repeatMonthly);
+    refs.workRepeatYearlyInput.checked=Boolean(item.repeatYearly);
     refs.addWorkDateBtn.textContent='Lưu thay đổi';
     refs.cancelWorkDateEditBtn.hidden=false;
     refs.workDateTitleInput.focus();
@@ -2228,6 +2240,8 @@
     editingWorkDateId=null;
     refs.workDateTitleInput.value='';
     refs.workDateInput.value='';
+    refs.workRepeatMonthlyInput.checked=false;
+    refs.workRepeatYearlyInput.checked=false;
     refs.addWorkDateBtn.textContent='＋ Thêm vào lịch';
     refs.cancelWorkDateEditBtn.hidden=true;
   }
@@ -2260,6 +2274,38 @@
     return match ? `${match[3]}/${match[2]}/${match[1]}` : dateText;
   }
 
+  function workRepeatLabel(item) {
+    if (item.repeatMonthly && item.repeatYearly) return 'Hàng tháng + Hàng năm';
+    if (item.repeatMonthly) return 'Hàng tháng';
+    if (item.repeatYearly) return 'Hàng năm';
+    return '';
+  }
+
+  function workOccursOnDate(item,date) {
+    const [baseYear,baseMonth,baseDay]=String(item.date || '').split('-').map(Number);
+    if (!baseYear || !baseMonth || !baseDay) return false;
+    const candidate=new Date(date.getFullYear(),date.getMonth(),date.getDate(),12,0,0,0);
+    const base=new Date(baseYear,baseMonth-1,baseDay,12,0,0,0);
+    if (candidate<base) return false;
+
+    if (item.repeatMonthly) {
+      // Không dồn 29/30/31 sang cuối tháng nếu tháng hiện tại không có ngày đó.
+      if (candidate.getDate()===baseDay) return true;
+    }
+    if (item.repeatYearly) {
+      if (candidate.getMonth()+1===baseMonth && candidate.getDate()===baseDay) return true;
+    }
+    return !item.repeatMonthly && !item.repeatYearly && localDateStamp(candidate)===item.date;
+  }
+
+  function workRelevantToMonthFilter(item,monthValue,now) {
+    if (monthValue==='all') return true;
+    const targetMonth=monthValue==='current' ? now.getMonth()+1 : Number(monthValue);
+    if (item.repeatMonthly) return true;
+    const baseMonth=Number(String(item.date || '').slice(5,7));
+    return baseMonth===targetMonth;
+  }
+
   function renderWorkDateList() {
     const clock=state?.settings?.clock;
     if (!clock || !refs.workDateList) return;
@@ -2269,9 +2315,7 @@
     const now=new Date();
     const filtered=items.filter(item => {
       if (query && !foldSpecialSearch(item.title).includes(query)) return false;
-      const month=Number(item.date.slice(5,7));
-      if (monthValue==='current' && month!==now.getMonth()+1) return false;
-      if (monthValue!=='all' && monthValue!=='current' && month!==Number(monthValue)) return false;
+      if (!workRelevantToMonthFilter(item,monthValue,now)) return false;
       return true;
     });
     refs.workDateCount.textContent=filtered.length===items.length ? `${items.length} việc` : `${filtered.length}/${items.length} việc`;
@@ -2279,12 +2323,14 @@
     refs.workDateEmpty.textContent=items.length ? 'Không có công việc nào khớp bộ lọc.' : 'Chưa có công việc theo ngày nào.';
     const today=localDateStamp();
     refs.workDateList.innerHTML=filtered.map(item=>{
-      const past=item.date<today;
+      const recurring=Boolean(item.repeatMonthly || item.repeatYearly);
+      const past=!recurring && item.date<today;
+      const repeatLabel=workRepeatLabel(item);
       return `<div class="special-date-item work-date-item${past?' is-past':''}" data-work-date-id="${escapeAttr(item.id)}" data-tooltip="Nhấp kép để sửa">
         <span class="special-date-kind work">VIỆC</span>
         <div class="special-date-copy">
           <strong>${escapeHtml(item.title)}</strong>
-          <small>${escapeHtml(formatWorkDate(item.date))}${past?' · Đã qua':''}</small>
+          <small>${escapeHtml(formatWorkDate(item.date))}${repeatLabel?' · '+escapeHtml(repeatLabel):''}${past?' · Đã qua':''}</small>
         </div>
         <div class="special-date-row-actions">
           <button class="special-date-edit work" type="button" data-edit-work-date="${escapeAttr(item.id)}" data-tooltip="Sửa nội dung hoặc ngày">Sửa</button>
@@ -2310,11 +2356,12 @@
     const out=[];
     for (let offset=0;offset<=2;offset+=1) {
       const date=dateAtLocalNoon(baseDate,offset);
-      const stamp=localDateStamp(date);
       items.forEach(item=>{
-        if (item.date!==stamp) return;
+        if (!workOccursOnDate(item,date)) return;
         const when=offset===0?'Hôm nay':offset===1?'Ngày mai':'2 ngày nữa';
-        out.push({id:item.id,offset,text:`${when}: ${item.title}`});
+        const repeatLabel=workRepeatLabel(item);
+        const suffix=repeatLabel ? ` · ${repeatLabel}` : '';
+        out.push({id:item.id,offset,text:`${when}: ${item.title}${suffix}`});
       });
     }
     return out.sort((a,b)=>a.offset-b.offset);
