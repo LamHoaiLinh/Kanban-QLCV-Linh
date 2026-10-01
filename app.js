@@ -2,8 +2,10 @@
   'use strict';
 
   const STORAGE_KEY = 'linh_personal_kanban_v1';
-  const VERSION = 11;
+  const VERSION = 12;
   const DEFAULT_BACKGROUND_ID = 'bg6';
+  const KAN_ALARM_AGENT = 'http://127.0.0.1:47632';
+  const KAN_ALARM_HEADERS = {'X-KanBan-Agent':'linh-kanban-v1','Content-Type':'application/json'};
   const DEFAULT_COLUMN_TITLES = ['Đã hoàn thành','Việc cần làm/chưa sắp xếp','Việc hôm nay','Việc ngày mai','Mục tiêu/ý tưởng'];
   const BACKGROUNDS = [
     {id:'none',name:'Không dùng hình nền',file:null},
@@ -51,7 +53,10 @@
   let toastTimer = null;
   let saveTimer = null;
   let clockTickTimer = null;
+  let clockWorker = null;
   let alarmTimer = null;
+  let alarmTitleTimer = null;
+  let originalDocumentTitle = document.title;
   let audioContext = null;
   let lastObservedLocalDate = null;
   let deletedViewTab = 'archive';
@@ -89,7 +94,7 @@
       'cardDialog','cardForm','cardDialogTitle','cardTitleInput','cardDescriptionInput','checklistEditor','checklistEmpty','addChecklistBtn',
       'labelOptions','cardColumnSelect','deleteCardBtn','duplicateCardBtn','columnDialog','columnForm','columnDialogTitle','columnNameInput','columnColorOptions',
       'deleteColumnBtn','clearColumnContentBtn','duplicateColumnBtn','quickCaptureDialog','quickCaptureForm','quickCaptureTitleInput','quickCaptureColumnSelect','quickCaptureDestinationHint','backgroundDialog','backgroundOptions','guideDialog','settingsBtn','settingsDialog','settingsExportBtn','quickCaptureProjectName','quickCaptureDefaultColumnSelect','quickCaptureStatus','dailyMoveEnabled','dailyMoveProjectName','dailyMoveRules','addDailyMoveRuleBtn','dailyMoveStatus','openDeletedContentBtn','deletedContentCount','deletedContentDialog','deletedArchiveTabBtn','deletedTrashTabBtn','deletedArchivePanel','deletedTrashPanel','deletedArchiveCount','deletedTrashCount','deletedArchiveList','deletedTrashList','emptyTrashBtn','openResetDataBtn','resetDataDialog','resetDataForm','resetBackupBtn','resetConfirmInput','resetDeleteBtn','resetBackupStatus','confirmDialog','confirmTitle','confirmMessage','globalTooltip','toast',
-      'clockCurrentTime','clockDayPeriod','clockWeekday','clockDate','timerDisplay','clockStatus','timerMinutesInput','timerSecondsInput','timerStartPauseBtn','timerResetBtn','timerStopAlarmBtn','deskClockWidget','deskClockControls','clockToggleBtn'
+      'clockCurrentTime','clockDayPeriod','clockWeekday','clockDate','timerDisplay','timerDialogDisplay','timerEndTime','timerAgentStatus','clockStatus','timerMinutesInput','timerSecondsInput','timerStartPauseBtn','timerResetBtn','timerStopAlarmBtn','timerTestAlarmBtn','timerLocalAlarmInput','timerRepeatAlarmInput','timerNotifyInput','deskClockWidget','deskClockControls','clockToggleBtn','clockDialog'
     ].forEach(id => refs[id] = document.getElementById(id));
   }
 
@@ -177,14 +182,19 @@
     refs.exportBtn.addEventListener('click', exportData);
     refs.importBtn.addEventListener('click', () => refs.importFile.click());
     refs.importFile.addEventListener('change', importData);
-    refs.clockToggleBtn.addEventListener('click', toggleClockExpanded);
+    refs.clockToggleBtn.addEventListener('click', event => { event.stopPropagation(); openClockDialog(); });
+    refs.deskClockWidget.addEventListener('click', event => { if (!event.target.closest('button')) openClockDialog(); });
     refs.timerStartPauseBtn.addEventListener('click', toggleCountdown);
     refs.timerResetBtn.addEventListener('click', resetCountdown);
-    refs.timerStopAlarmBtn.addEventListener('click', stopAlarm);
+    refs.timerStopAlarmBtn.addEventListener('click', () => stopAlarm());
+    refs.timerTestAlarmBtn.addEventListener('click', testAlarmNow);
     refs.timerMinutesInput.addEventListener('change', handleTimerInputChange);
     refs.timerSecondsInput.addEventListener('change', handleTimerInputChange);
     refs.timerMinutesInput.addEventListener('input', syncTimerInputsSoft);
     refs.timerSecondsInput.addEventListener('input', syncTimerInputsSoft);
+    refs.timerLocalAlarmInput.addEventListener('change', handleAlarmOptionChange);
+    refs.timerRepeatAlarmInput.addEventListener('change', handleAlarmOptionChange);
+    refs.timerNotifyInput.addEventListener('change', handleAlarmOptionChange);
     document.querySelectorAll('.timer-preset').forEach(button => button.addEventListener('click', () => applyTimerPreset(Number(button.dataset.minutes || 0))));
     refs.openSidebarBtn.addEventListener('click', openSidebar);
     refs.closeSidebarBtn.addEventListener('click', closeSidebar);
@@ -1811,42 +1821,194 @@
   }
 
   function createDefaultClockSettings() {
-    return {durationSec:1500,remainingSec:1500,endAt:null,running:false,alarmActive:false,expanded:false};
+    return {
+      durationSec:1500,
+      remainingSec:1500,
+      endAt:null,
+      running:false,
+      alarmActive:false,
+      localAlarm:true,
+      repeatAlarm:true,
+      notify:true
+    };
   }
 
   function normalizeClockSettings(input) {
     const defaults = createDefaultClockSettings();
-    const durationSec = Number.isFinite(Number(input?.durationSec)) ? Math.max(1,Math.min(359999,Math.round(Number(input.durationSec)))) : defaults.durationSec;
-    let remainingSec = Number.isFinite(Number(input?.remainingSec)) ? Math.max(0,Math.min(359999,Math.round(Number(input.remainingSec)))) : durationSec;
-    const running = Boolean(input?.running && input?.endAt);
+    const durationSec = Number.isFinite(Number(input?.durationSec))
+      ? Math.max(1,Math.min(359999,Math.round(Number(input.durationSec))))
+      : defaults.durationSec;
+    let remainingSec = Number.isFinite(Number(input?.remainingSec))
+      ? Math.max(0,Math.min(359999,Math.round(Number(input.remainingSec))))
+      : durationSec;
+    const wantedRunning = Boolean(input?.running && input?.endAt);
     let endAt = null;
-    if (running) {
+    let expired = false;
+    if (wantedRunning) {
       const parsed = new Date(input.endAt).getTime();
       if (Number.isFinite(parsed)) {
         const rest = Math.ceil((parsed - Date.now()) / 1000);
         if (rest > 0) {
           remainingSec = rest;
-          endAt = new Date(Date.now() + rest * 1000).toISOString();
+          endAt = new Date(parsed).toISOString();
+        } else {
+          remainingSec = 0;
+          expired = true;
         }
       }
     }
-    return {durationSec,remainingSec: running && !endAt ? durationSec : remainingSec,endAt,running:Boolean(endAt),alarmActive:Boolean(input?.alarmActive),expanded:Boolean(input?.expanded)};
+    return {
+      durationSec,
+      remainingSec,
+      endAt,
+      running:Boolean(endAt),
+      alarmActive:Boolean(input?.alarmActive || expired),
+      localAlarm:input?.localAlarm !== false,
+      repeatAlarm:input?.repeatAlarm !== false,
+      notify:input?.notify !== false
+    };
   }
 
   function initClockWidget() {
     if (!state.settings.clock) state.settings.clock = createDefaultClockSettings();
-    if (!clockTickTimer) clockTickTimer = setInterval(updateClockWidget, 1000);
+    if (!clockWorker && 'Worker' in window) {
+      try {
+        const code = "setInterval(()=>postMessage(Date.now()),250)";
+        const url = URL.createObjectURL(new Blob([code],{type:'text/javascript'}));
+        clockWorker = new Worker(url);
+        clockWorker.onmessage = updateClockWidget;
+        setTimeout(() => URL.revokeObjectURL(url),1000);
+      } catch (error) {
+        console.warn('Clock worker:',error);
+      }
+    }
+    if (!clockWorker && !clockTickTimer) clockTickTimer = setInterval(updateClockWidget,500);
     updateClockWidget();
+    const clock = state.settings.clock;
+    if (clock.running && clock.endAt) scheduleLocalAlarm(clock);
+    if (clock.alarmActive) startAlarm();
   }
 
+  function openClockDialog() {
+    syncClockOptionsToUi();
+    updateClockWidget();
+    refreshAlarmAgentStatus();
+    if (!refs.clockDialog.open) refs.clockDialog.showModal();
+  }
 
   function toggleClockExpanded() {
-    const clock = state.settings.clock || (state.settings.clock = createDefaultClockSettings());
-    clock.expanded = !clock.expanded;
-    saveNow();
-    updateClockWidget();
+    openClockDialog();
   }
 
+  async function alarmAgentRequest(path,payload={},timeout=1800) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(),timeout);
+    try {
+      const response = await fetch(KAN_ALARM_AGENT+path,{
+        method:path === '/alarm/state' || path === '/health' ? 'GET' : 'POST',
+        headers:KAN_ALARM_HEADERS,
+        body:path === '/alarm/state' || path === '/health' ? undefined : JSON.stringify(payload||{}),
+        cache:'no-store',
+        signal:controller.signal,
+        targetAddressSpace:'loopback'
+      });
+      if (!response.ok) throw new Error('HTTP '+response.status);
+      return await response.json();
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async function refreshAlarmAgentStatus() {
+    if (!refs.timerAgentStatus) return;
+    try {
+      const health = await alarmAgentRequest('/health',{},2200);
+      if (health?.alarmReady) {
+        refs.timerAgentStatus.textContent = '✓ Báo thức Windows đã sẵn sàng — có thể reo khi bạn đang ở cửa sổ khác.';
+        refs.timerAgentStatus.classList.add('ready');
+      } else {
+        throw new Error('not-ready');
+      }
+    } catch (error) {
+      refs.timerAgentStatus.textContent = 'Báo thức trình duyệt đang dự phòng. Hãy cập nhật KanBan Tools để báo ngoài cửa sổ.';
+      refs.timerAgentStatus.classList.remove('ready');
+    }
+  }
+
+  async function scheduleLocalAlarm(clock) {
+    if (!clock?.localAlarm || !clock?.endAt) return false;
+    try {
+      await alarmAgentRequest('/alarm/schedule',{
+        deadlineMs:new Date(clock.endAt).getTime(),
+        durationSec:clock.remainingSec || clock.durationSec,
+        label:'KanBan — Hết giờ',
+        repeat:clock.repeatAlarm,
+        sound:true,
+        notify:clock.notify
+      },2600);
+      return true;
+    } catch (error) {
+      console.warn('KanAlarm schedule:',error);
+      return false;
+    }
+  }
+
+  async function stopLocalAlarm() {
+    try {
+      await alarmAgentRequest('/alarm/stop',{},1200);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  async function testAlarmNow() {
+    const clock = state.settings.clock || (state.settings.clock = createDefaultClockSettings());
+    syncClockOptionsFromUi(clock);
+    primeAudio();
+    if (clock.localAlarm) {
+      try {
+        await alarmAgentRequest('/alarm/test',{
+          durationSec:3,
+          label:'KanBan — Thử chuông',
+          repeat:false,
+          sound:true,
+          notify:clock.notify
+        },2200);
+        showToast('Đã phát thử báo thức Windows.');
+        setTimeout(() => stopLocalAlarm(),4200);
+        return;
+      } catch (error) {
+        refreshAlarmAgentStatus();
+      }
+    }
+    playAlarmPattern();
+    showWebNotification('KanBan — Thử chuông','Báo thức trình duyệt đang hoạt động.');
+  }
+
+  function syncClockOptionsToUi() {
+    const clock = state.settings.clock || (state.settings.clock = createDefaultClockSettings());
+    if (refs.timerLocalAlarmInput) refs.timerLocalAlarmInput.checked = clock.localAlarm !== false;
+    if (refs.timerRepeatAlarmInput) refs.timerRepeatAlarmInput.checked = clock.repeatAlarm !== false;
+    if (refs.timerNotifyInput) refs.timerNotifyInput.checked = clock.notify !== false;
+  }
+
+  function syncClockOptionsFromUi(clock) {
+    if (refs.timerLocalAlarmInput) clock.localAlarm = refs.timerLocalAlarmInput.checked;
+    if (refs.timerRepeatAlarmInput) clock.repeatAlarm = refs.timerRepeatAlarmInput.checked;
+    if (refs.timerNotifyInput) clock.notify = refs.timerNotifyInput.checked;
+  }
+
+  function handleAlarmOptionChange() {
+    const clock = state.settings.clock || (state.settings.clock = createDefaultClockSettings());
+    syncClockOptionsFromUi(clock);
+    saveNow();
+    if (clock.running && clock.endAt) {
+      stopLocalAlarm().finally(() => scheduleLocalAlarm(clock));
+    }
+    if (clock.notify) requestNotificationPermission();
+    refreshAlarmAgentStatus();
+  }
 
   function updateClockWidget() {
     const now = new Date();
@@ -1865,25 +2027,46 @@
 
     const clock = state.settings.clock || (state.settings.clock = createDefaultClockSettings());
     if (clock.running && clock.endAt) {
-      const remain = Math.max(0, Math.ceil((new Date(clock.endAt).getTime() - Date.now()) / 1000));
+      const remain = Math.max(0,Math.ceil((new Date(clock.endAt).getTime()-Date.now())/1000));
       clock.remainingSec = remain;
       if (remain <= 0) finishCountdown();
     }
-    refs.timerDisplay.textContent = formatCountdown(clock.remainingSec);
-    if (!clock.running) {
-      refs.timerMinutesInput.value = Math.floor(clock.durationSec / 60);
-      refs.timerSecondsInput.value = clock.durationSec % 60;
+    const shown = formatCountdown(clock.remainingSec);
+    refs.timerDisplay.textContent = shown;
+    if (refs.timerDialogDisplay) refs.timerDialogDisplay.textContent = shown;
+    if (refs.timerEndTime) {
+      refs.timerEndTime.textContent = clock.running && clock.endAt
+        ? formatTimerEndTime(new Date(clock.endAt))
+        : '—';
     }
-    refs.timerStartPauseBtn.textContent = clock.running ? 'Tạm dừng' : (clock.remainingSec > 0 && clock.remainingSec !== clock.durationSec ? 'Tiếp tục' : 'Bắt đầu');
-    refs.clockStatus.textContent = clock.alarmActive ? 'Đã hết giờ' : clock.running ? 'Đang tập trung' : clock.remainingSec !== clock.durationSec && clock.remainingSec > 0 ? 'Đang tạm dừng' : 'Sẵn sàng';
+    if (!clock.running) {
+      refs.timerMinutesInput.value = Math.floor(clock.durationSec/60);
+      refs.timerSecondsInput.value = clock.durationSec%60;
+    }
+    refs.timerStartPauseBtn.textContent = clock.running
+      ? 'Tạm dừng'
+      : (clock.remainingSec>0 && clock.remainingSec!==clock.durationSec ? 'Tiếp tục' : 'Bắt đầu');
+    refs.clockStatus.textContent = clock.alarmActive
+      ? 'Đã hết giờ'
+      : clock.running
+        ? 'Đang chạy'
+        : clock.remainingSec!==clock.durationSec && clock.remainingSec>0
+          ? 'Đang tạm dừng'
+          : 'Sẵn sàng';
     refs.timerStopAlarmBtn.hidden = !clock.alarmActive;
-    refs.deskClockControls.hidden = !clock.expanded;
-    refs.clockToggleBtn.setAttribute('aria-expanded', String(clock.expanded));
-    refs.clockToggleBtn.setAttribute('aria-label', clock.expanded ? 'Thu gọn hẹn giờ' : 'Mở hẹn giờ');
-    refs.clockToggleBtn.textContent = clock.expanded ? '▴' : '▾';
-    refs.clockToggleBtn.dataset.tooltip = clock.expanded ? 'Thu gọn phần hẹn giờ' : 'Mở rộng phần hẹn giờ';
-    refs.deskClockWidget.classList.toggle('expanded', clock.expanded);
-    refs.deskClockWidget.classList.toggle('alarm-active', clock.alarmActive);
+    refs.clockToggleBtn.setAttribute('aria-label','Mở đồng hồ và báo thức');
+    refs.clockToggleBtn.textContent = '⏱';
+    refs.clockToggleBtn.dataset.tooltip = 'Mở đồng hồ và báo thức';
+    refs.deskClockWidget.classList.toggle('alarm-active',clock.alarmActive);
+    syncClockOptionsToUi();
+  }
+
+  function formatTimerEndTime(date) {
+    if (!(date instanceof Date) || !Number.isFinite(date.getTime())) return '—';
+    const today = localDateStamp();
+    const day = localDateStamp(date);
+    const hhmm = `${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}:${String(date.getSeconds()).padStart(2,'0')}`;
+    return day === today ? hhmm : `${String(date.getDate()).padStart(2,'0')}/${String(date.getMonth()+1).padStart(2,'0')} ${hhmm}`;
   }
 
   function syncTimerInputsSoft() {
@@ -1906,52 +2089,61 @@
     const seconds = sanitizeInteger(refs.timerSecondsInput.value,0,59);
     refs.timerMinutesInput.value = minutes;
     refs.timerSecondsInput.value = seconds;
-    return Math.max(1, minutes * 60 + seconds);
+    return Math.max(1,minutes*60+seconds);
   }
 
-  function applyTimerPreset(minutes) {
-    const safeMinutes = Math.max(0, Math.min(999, Math.round(minutes || 0)));
+  async function applyTimerPreset(minutes) {
+    const safeMinutes = Math.max(0,Math.min(999,Math.round(minutes||0)));
     refs.timerMinutesInput.value = safeMinutes;
     refs.timerSecondsInput.value = 0;
-    stopAlarm();
+    await stopAlarm(false);
     const clock = state.settings.clock || (state.settings.clock = createDefaultClockSettings());
-    clock.durationSec = Math.max(1, safeMinutes * 60);
+    clock.durationSec = Math.max(1,safeMinutes*60);
     clock.remainingSec = clock.durationSec;
     clock.endAt = null;
     clock.running = false;
+    clock.alarmActive = false;
     saveNow();
     updateClockWidget();
     showToast(`Đã đặt nhanh ${safeMinutes} phút.`);
   }
 
-  function toggleCountdown() {
+  async function toggleCountdown() {
     const clock = state.settings.clock || (state.settings.clock = createDefaultClockSettings());
-    stopAlarm();
+    syncClockOptionsFromUi(clock);
+    primeAudio();
+    if (clock.alarmActive) await stopAlarm(false);
     if (clock.running) {
-      clock.remainingSec = Math.max(0, Math.ceil((new Date(clock.endAt).getTime() - Date.now()) / 1000));
+      clock.remainingSec = Math.max(0,Math.ceil((new Date(clock.endAt).getTime()-Date.now())/1000));
       clock.endAt = null;
       clock.running = false;
+      await stopLocalAlarm();
       saveNow();
       updateClockWidget();
       return;
     }
-    if (clock.remainingSec <= 0 || clock.remainingSec === clock.durationSec) {
+    if (clock.remainingSec<=0 || clock.remainingSec===clock.durationSec) {
       clock.durationSec = getTimerInputSeconds();
       clock.remainingSec = clock.durationSec;
     }
-    clock.endAt = new Date(Date.now() + clock.remainingSec * 1000).toISOString();
+    clock.endAt = new Date(Date.now()+clock.remainingSec*1000).toISOString();
     clock.running = true;
+    clock.alarmActive = false;
+    if (clock.notify) requestNotificationPermission();
     saveNow();
     updateClockWidget();
+    scheduleLocalAlarm(clock).then(ok => { if (!ok && clock.localAlarm) refreshAlarmAgentStatus(); });
   }
 
-  function resetCountdown() {
-    stopAlarm();
+  async function resetCountdown() {
+    await stopAlarm(false);
     const clock = state.settings.clock || (state.settings.clock = createDefaultClockSettings());
+    syncClockOptionsFromUi(clock);
     clock.durationSec = getTimerInputSeconds();
     clock.remainingSec = clock.durationSec;
     clock.endAt = null;
     clock.running = false;
+    clock.alarmActive = false;
     saveNow();
     updateClockWidget();
     showToast('Đã đặt lại bộ đếm ngược.');
@@ -1964,22 +2156,32 @@
     clock.endAt = null;
     clock.running = false;
     clock.alarmActive = true;
-    clock.expanded = true;
     startAlarm();
     saveNow();
     updateClockWidget();
-    showToast('Đã hết giờ làm việc.');
+    showToast('Đã hết giờ — báo thức đang reo.');
   }
 
   function startAlarm() {
-    stopAlarm(false);
-    playBeep();
-    alarmTimer = setInterval(playBeep, 1300);
+    stopWebAlarm();
+    playAlarmPattern();
+    const clock = state.settings.clock || createDefaultClockSettings();
+    if (clock.repeatAlarm) alarmTimer = setInterval(playAlarmPattern,1500);
+    if (clock.notify) showWebNotification('KanBan — Hết giờ','Bộ đếm ngược đã kết thúc. Bấm Tắt chuông trong KanBan khi bạn đã xử lý xong.');
+    startAlarmTitleFlash();
   }
 
-  function stopAlarm(update=true) {
+  function stopWebAlarm() {
     if (alarmTimer) clearInterval(alarmTimer);
     alarmTimer = null;
+    if (alarmTitleTimer) clearInterval(alarmTitleTimer);
+    alarmTitleTimer = null;
+    document.title = originalDocumentTitle;
+  }
+
+  async function stopAlarm(update=true) {
+    stopWebAlarm();
+    await stopLocalAlarm();
     const clock = state?.settings?.clock;
     if (clock) clock.alarmActive = false;
     if (update) {
@@ -1988,25 +2190,61 @@
     }
   }
 
-  function playBeep() {
+  function primeAudio() {
     try {
-      if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      if (!audioContext) audioContext = new (window.AudioContext||window.webkitAudioContext)();
       if (audioContext.state === 'suspended') audioContext.resume();
-      const now = audioContext.currentTime;
-      const osc = audioContext.createOscillator();
-      const gain = audioContext.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, now);
-      gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.exponentialRampToValueAtTime(0.18, now + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
-      osc.connect(gain);
-      gain.connect(audioContext.destination);
-      osc.start(now);
-      osc.stop(now + 0.36);
+    } catch (error) {}
+  }
+
+  function playAlarmPattern() {
+    try {
+      primeAudio();
+      if (!audioContext) return;
+      const t = audioContext.currentTime;
+      [[880,0,.18],[1175,.24,.2],[988,.52,.22]].forEach(([freq,offset,duration]) => {
+        const osc = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq,t+offset);
+        gain.gain.setValueAtTime(0.0001,t+offset);
+        gain.gain.exponentialRampToValueAtTime(0.2,t+offset+.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001,t+offset+duration);
+        osc.connect(gain);gain.connect(audioContext.destination);
+        osc.start(t+offset);osc.stop(t+offset+duration+.02);
+      });
     } catch (error) {
-      console.warn('Audio alarm:', error);
+      console.warn('Audio alarm:',error);
     }
+  }
+
+  function playBeep() {
+    playAlarmPattern();
+  }
+
+  function requestNotificationPermission() {
+    if (!('Notification' in window) || Notification.permission !== 'default') return;
+    Notification.requestPermission().catch(() => {});
+  }
+
+  function showWebNotification(title,body) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready
+        .then(reg => reg.showNotification(title,{body,tag:'kanban-timer',renotify:true}))
+        .catch(() => { try { new Notification(title,{body,tag:'kanban-timer'}); } catch (e) {} });
+    } else {
+      try { new Notification(title,{body,tag:'kanban-timer'}); } catch (error) {}
+    }
+  }
+
+  function startAlarmTitleFlash() {
+    if (alarmTitleTimer) clearInterval(alarmTitleTimer);
+    let flip = false;
+    alarmTitleTimer = setInterval(() => {
+      flip = !flip;
+      document.title = flip ? '⏰ HẾT GIỜ — KanBan' : originalDocumentTitle;
+    },700);
   }
 
   function formatCountdown(totalSeconds) {
