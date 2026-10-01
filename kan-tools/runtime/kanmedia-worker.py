@@ -462,77 +462,135 @@ def edit_one(meta: dict, p: dict) -> str:
     types = stream_types(src)
     has_video = "video" in types
     has_audio = "audio" in types
-    start = max(0.0, float(p.get("start") or 0))
-    end = float(p.get("end") or 0)
-    if end <= 0 or (dur > 0 and end > dur):
-        end = dur
-    speed = float(p.get("speed") or 1)
-    speed = min(2.0, max(0.5, speed))
+    if not has_video and not has_audio:
+        raise RuntimeError("Không nhận diện được audio/video trong file.")
+
+    speed = min(2.0, max(0.5, float(p.get("speed") or 1)))
     vol = max(0.0, float(p.get("volume") if p.get("volume") is not None else 1))
     extract = bool(p.get("extractMp3"))
     mute = bool(p.get("mute"))
     normalize = bool(p.get("normalize"))
     fade_in = max(0.0, float(p.get("fadeIn") or 0))
     fade_out = max(0.0, float(p.get("fadeOut") or 0))
-    cut = str(p.get("cut") or "keep")
+
+    segments: list[tuple[float, float]] = []
+    raw_segments = p.get("segments")
+    if isinstance(raw_segments, list):
+        for pair in raw_segments:
+            try:
+                if not isinstance(pair, (list, tuple)) or len(pair) < 2:
+                    continue
+                a = max(0.0, float(pair[0]))
+                b = min(dur, float(pair[1])) if dur > 0 else float(pair[1])
+                if b > a + 0.005:
+                    segments.append((a, b))
+            except Exception:
+                continue
+
+    # Tương thích request cũ nếu frontend chưa gửi timeline nhiều đoạn.
+    if not segments:
+        start = max(0.0, float(p.get("start") or 0))
+        end = float(p.get("end") or 0)
+        if end <= 0 or (dur > 0 and end > dur):
+            end = dur
+        cut = str(p.get("cut") or "keep")
+        if cut == "remove" and end > start:
+            if start > 0.005:
+                segments.append((0.0, start))
+            if dur > end + 0.005:
+                segments.append((end, dur))
+        elif end > start:
+            segments.append((start, end))
+        else:
+            segments.append((0.0, dur))
+
+    if not segments:
+        raise RuntimeError("Không còn đoạn media nào để xuất.")
 
     base_name = safe_name(Path(str(meta.get("name") or src.name)).stem)
     audio_only = extract or (has_audio and not has_video)
     ext = ".mp3" if audio_only else ".mp4"
     dst = unique_path(DOWNLOADS, base_name + " - edited", ext)
 
-    opts: list[str] = []
-    out_dur = dur
-    if cut == "keep" and end > start:
-        opts += ["-ss", str(start), "-to", str(end)]
-        out_dur = max(0.0, end - start)
+    original_out_dur = sum(max(0.0, b - a) for a, b in segments)
+    out_dur = original_out_dur / speed if speed > 0 else original_out_dur
 
-    vf: list[str] = []
-    af: list[str] = []
-    if speed != 1:
-        if has_video and not extract:
-            vf.append(f"setpts=PTS/{speed}")
-        if has_audio:
-            af.append(f"atempo={speed}")
-        if out_dur:
-            out_dur /= speed
+    want_video = has_video and not extract
+    want_audio = has_audio and not mute
 
-    if has_audio and not mute:
+    filters: list[str] = []
+    vlabels: list[str] = []
+    alabels: list[str] = []
+    for i, (seg_a, seg_b) in enumerate(segments):
+        if want_video:
+            v = f"v{i}"
+            filters.append(
+                f"[0:v]trim=start={seg_a:.6f}:end={seg_b:.6f},setpts=PTS-STARTPTS[{v}]"
+            )
+            vlabels.append(v)
+        if want_audio:
+            a_label = f"a{i}"
+            filters.append(
+                f"[0:a]atrim=start={seg_a:.6f}:end={seg_b:.6f},asetpts=PTS-STARTPTS[{a_label}]"
+            )
+            alabels.append(a_label)
+
+    video_base = ""
+    audio_base = ""
+    if want_video:
+        if len(vlabels) == 1:
+            video_base = vlabels[0]
+        elif want_audio and len(alabels) == len(vlabels):
+            inputs = "".join(f"[{vlabels[i]}][{alabels[i]}]" for i in range(len(vlabels)))
+            filters.append(f"{inputs}concat=n={len(vlabels)}:v=1:a=1[vcat][acat]")
+            video_base = "vcat"
+            audio_base = "acat"
+        else:
+            inputs = "".join(f"[{x}]" for x in vlabels)
+            filters.append(f"{inputs}concat=n={len(vlabels)}:v=1:a=0[vcat]")
+            video_base = "vcat"
+
+    if want_audio and not audio_base:
+        if len(alabels) == 1:
+            audio_base = alabels[0]
+        else:
+            inputs = "".join(f"[{x}]" for x in alabels)
+            filters.append(f"{inputs}concat=n={len(alabels)}:v=0:a=1[acat]")
+            audio_base = "acat"
+
+    video_out = ""
+    if want_video:
+        video_out = "vout"
+        if speed != 1:
+            filters.append(f"[{video_base}]setpts=PTS/{speed:.8f}[{video_out}]")
+        else:
+            filters.append(f"[{video_base}]null[{video_out}]")
+
+    audio_out = ""
+    if want_audio:
+        audio_filters: list[str] = []
+        if speed != 1:
+            audio_filters.append(f"atempo={speed:.8f}")
         if normalize:
-            af.append("loudnorm=I=-16:TP=-1.5:LRA=11")
+            audio_filters.append("loudnorm=I=-16:TP=-1.5:LRA=11")
         elif vol != 1:
-            af.append(f"volume={vol}")
+            audio_filters.append(f"volume={vol:.6f}")
         if fade_in > 0:
-            af.append(f"afade=t=in:st=0:d={fade_in}")
+            audio_filters.append(f"afade=t=in:st=0:d={fade_in:.6f}")
         if fade_out > 0 and out_dur > 0:
-            fo = max(0.0, out_dur - fade_out)
-            af.append(f"afade=t=out:st={fo}:d={fade_out}")
+            fade_start = max(0.0, out_dur - fade_out)
+            audio_filters.append(f"afade=t=out:st={fade_start:.6f}:d={fade_out:.6f}")
+        audio_out = "aout"
+        chain = ",".join(audio_filters) if audio_filters else "anull"
+        filters.append(f"[{audio_base}]{chain}[{audio_out}]")
 
-    if cut == "remove" and end > start:
-        filters: list[str] = []
-        if has_video and not extract:
-            chain = f"[0:v]select=not(between(t\\,{start}\\,{end})),setpts=N/FRAME_RATE/TB"
-            if vf:
-                chain += "," + ",".join(vf)
-            filters.append(chain + "[v]")
-        if has_audio and not mute:
-            chain = f"[0:a]aselect=not(between(t\\,{start}\\,{end})),asetpts=N/SR/TB"
-            if af:
-                chain += "," + ",".join(af)
-            filters.append(chain + "[a]")
-        if filters:
-            opts += ["-filter_complex", ";".join(filters)]
-            if has_video and not extract:
-                opts += ["-map", "[v]"]
-            if has_audio and not mute:
-                opts += ["-map", "[a]"]
-        if dur:
-            out_dur = max(0.0, dur - (end - start)) / speed
-    else:
-        if vf:
-            opts += ["-vf", ",".join(vf)]
-        if af and not mute:
-            opts += ["-af", ",".join(af)]
+    opts: list[str] = []
+    if filters:
+        opts += ["-filter_complex", ";".join(filters)]
+    if want_video and video_out:
+        opts += ["-map", f"[{video_out}]"]
+    if want_audio and audio_out:
+        opts += ["-map", f"[{audio_out}]"]
 
     if extract or audio_only:
         if not has_audio:
@@ -544,8 +602,6 @@ def edit_one(meta: dict, p: dict) -> str:
             opts += ["-an"]
         else:
             opts += ["-c:a", "aac", "-b:a", "160k"]
-    else:
-        raise RuntimeError("Không nhận diện được audio/video trong file.")
 
     label = f"Đang chỉnh “{meta.get('name', src.name)}”"
     ffmpeg_run(src, opts, dst, out_dur, 5, 94, label, str(meta.get("name", src.name)), 1, 1)
