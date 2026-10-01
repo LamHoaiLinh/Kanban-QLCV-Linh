@@ -2078,7 +2078,7 @@
     if (key===lastSpecialReminderKey && !force) return;
     lastSpecialReminderKey=key;
     refs.specialReminderBar.classList.toggle('ticker-off',!enabled);
-    refs.specialReminderText.textContent=enabled ? text : 'Nhắc ngày đặc biệt đang tắt';
+    refs.specialReminderText.textContent=enabled ? text : '';
     refs.specialReminderText.classList.toggle('moving',enabled);
   }
 
