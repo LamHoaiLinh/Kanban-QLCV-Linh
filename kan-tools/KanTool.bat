@@ -49,22 +49,31 @@ mkdir "%TMP%" >nul 2>nul
 copy /y "%~f0" "%ROOT%\KanTool.bat" >nul 2>nul
 
 echo [1/8] Dung KanMedia cu neu dang chay...
-powershell -NoProfile -Command "$h=@{'X-KanBan-Agent'='linh-kanban-v1'};try{Invoke-RestMethod -Method Post -Headers $h -ContentType 'application/json' -Body '{}' -Uri 'http://127.0.0.1:47632/shutdown' -TimeoutSec 1|Out-Null}catch{}" >nul 2>nul
+powershell -NoProfile -Command "$h=@{'X-KanBan-Agent'='linh-kanban-v1'};try{Invoke-RestMethod -Method Post -Headers $h -ContentType 'application/json' -Body '{}' -Uri 'http://127.0.0.1:47632/shutdown' -TimeoutSec 1|Out-Null}catch{};Start-Sleep -Milliseconds 500;Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.CommandLine -like '*kanmedia-server.py*' -or $_.CommandLine -like '*kanmedia-server.ps1*'}|ForEach-Object{Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue}" >nul 2>nul
 timeout /t 1 /nobreak >nul
 
 echo [2/8] Tai runtime KanMedia tu repo KanBan...
 powershell -NoProfile -Command ^
  "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';" ^
- "Invoke-WebRequest -UseBasicParsing -Uri '%REPO%/kan-tools/runtime/kanmedia-server.ps1?ts=%RANDOM%' -OutFile '%RUNTIME%\kanmedia-server.ps1';" ^
- "Invoke-WebRequest -UseBasicParsing -Uri '%REPO%/kan-tools/runtime/kanmedia-worker.ps1?ts=%RANDOM%' -OutFile '%RUNTIME%\kanmedia-worker.ps1';"
+ "Invoke-WebRequest -UseBasicParsing -Uri '%REPO%/kan-tools/runtime/kanmedia-server.py?ts=%RANDOM%' -OutFile '%RUNTIME%\kanmedia-server.py';" ^
+ "Invoke-WebRequest -UseBasicParsing -Uri '%REPO%/kan-tools/runtime/kanmedia-worker.ps1?ts=%RANDOM%' -OutFile '%RUNTIME%\kanmedia-worker.ps1';" ^
+ "if((Get-Item '%RUNTIME%\kanmedia-server.py').Length -lt 8000){throw 'Runtime KanMedia server khong hop le'};" ^
+ "if((Get-Item '%RUNTIME%\kanmedia-worker.ps1').Length -lt 8000){throw 'Runtime KanMedia worker khong hop le'};"
 if errorlevel 1 goto :FAIL_RUNTIME
 
-echo [3/8] Chuan bi Python rieng cho yt-dlp va ky so...
+echo [3/8] Chuan bi Python cho KanBan Tools...
 set "PY_CMD="
 where py.exe >nul 2>nul
 if not errorlevel 1 (
-  py -3.13 -c "import sys" >nul 2>nul
-  if not errorlevel 1 set "PY_CMD=py -3.13"
+  py -3.14 -c "import sys" >nul 2>nul
+  if not errorlevel 1 set "PY_CMD=py -3.14"
+)
+if not defined PY_CMD (
+  where py.exe >nul 2>nul
+  if not errorlevel 1 (
+    py -3.13 -c "import sys" >nul 2>nul
+    if not errorlevel 1 set "PY_CMD=py -3.13"
+  )
 )
 if not defined PY_CMD (
   where py.exe >nul 2>nul
@@ -74,17 +83,42 @@ if not defined PY_CMD (
   )
 )
 if not defined PY_CMD (
-  echo Dang cai Python 3.13 theo pham vi nguoi dung...
-  where winget.exe >nul 2>nul
-  if errorlevel 1 goto :FAIL_PYTHON
-  winget install -e --id Python.Python.3.13 --scope user --accept-package-agreements --accept-source-agreements
-  if errorlevel 1 goto :FAIL_PYTHON
-  if exist "%LOCALAPPDATA%\Programs\Python\Python313\python.exe" (
-    set "PY_CMD=%LOCALAPPDATA%\Programs\Python\Python313\python.exe"
-  ) else (
-    set "PY_CMD=py -3.13"
+  where python.exe >nul 2>nul
+  if not errorlevel 1 (
+    python -c "import sys;raise SystemExit(0 if sys.version_info >= (3,12) else 1)" >nul 2>nul
+    if not errorlevel 1 set "PY_CMD=python"
   )
 )
+if not defined PY_CMD (
+  echo     May chua co Python phu hop. Dang tu cai Python theo pham vi nguoi dung...
+  where winget.exe >nul 2>nul
+  if not errorlevel 1 (
+    winget install -e --id Python.Python.3.13 --scope user --accept-package-agreements --accept-source-agreements
+  )
+  if exist "%LOCALAPPDATA%\Programs\Python\Python313\python.exe" set "PY_CMD=\"%LOCALAPPDATA%\Programs\Python\Python313\python.exe\""
+  if not defined PY_CMD (
+    where py.exe >nul 2>nul
+    if not errorlevel 1 (
+      py -3.13 -c "import sys" >nul 2>nul
+      if not errorlevel 1 set "PY_CMD=py -3.13"
+    )
+  )
+)
+if not defined PY_CMD (
+  echo     Winget khong co/khong cai duoc. Dang tai Python 3.13.16 chinh thuc tu python.org...
+  set "PYINST=%TMP%\python-3.13.16-amd64.exe"
+  powershell -NoProfile -Command ^
+   "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$u='https://www.python.org/ftp/python/3.13.16/python-3.13.16-amd64.exe';" ^
+   "Invoke-WebRequest -UseBasicParsing -Uri $u -OutFile '%PYINST%';" ^
+   "$sig=Get-AuthenticodeSignature -FilePath '%PYINST%';if($sig.Status -ne 'Valid'){throw 'Chu ky so Python installer khong hop le'};" ^
+   "if($sig.SignerCertificate.Subject -notmatch 'Python Software Foundation'){throw 'Python installer khong dung nha phat hanh'};"
+  if errorlevel 1 goto :FAIL_PYTHON
+  start /wait "" "%PYINST%" /quiet InstallAllUsers=0 Include_launcher=0 Include_pip=1 Include_test=0 PrependPath=0 Shortcuts=0 TargetDir="%ROOT%\python"
+  if errorlevel 1 goto :FAIL_PYTHON
+  if exist "%ROOT%\python\python.exe" set "PY_CMD=\"%ROOT%\python\python.exe\""
+)
+if not defined PY_CMD goto :FAIL_PYTHON
+
 %PY_CMD% -c "import sys;print(sys.version)" >nul 2>nul
 if errorlevel 1 goto :FAIL_PYTHON
 
@@ -180,13 +214,19 @@ if errorlevel 1 (
 )
 
 echo [8/8] Dang ky KanMedia chay cung Windows...
+if not exist "%ROOT%\logs" mkdir "%ROOT%\logs"
+del /q "%ROOT%\logs\kanmedia-server.log" >nul 2>nul
 powershell -NoProfile -Command ^
- "$ErrorActionPreference='Stop';$run='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run';$ps='%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe';$server='%RUNTIME%\kanmedia-server.ps1';" ^
- "$cmd='\"'+$ps+'\" -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"'+$server+'\"';New-ItemProperty $run -Name 'KanBanMedia' -Value $cmd -PropertyType String -Force|Out-Null;"
+ "$ErrorActionPreference='Stop';$run='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run';$pyw='%ROOT%\.venv\Scripts\pythonw.exe';$server='%RUNTIME%\kanmedia-server.py';" ^
+ "if(-not(Test-Path $pyw)){throw 'Khong tim thay pythonw.exe cua KanBan Tools'};if(-not(Test-Path $server)){throw 'Khong tim thay kanmedia-server.py'};" ^
+ "New-ItemProperty $run -Name 'KanBanMedia' -Value ('\"'+$pyw+'\" \"'+$server+'\"') -PropertyType String -Force|Out-Null;"
 if errorlevel 1 goto :FAIL_RUNTIME
-start "" /min powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%RUNTIME%\kanmedia-server.ps1"
-timeout /t 2 /nobreak >nul
-powershell -NoProfile -Command "$h=@{'X-KanBan-Agent'='linh-kanban-v1'};try{$r=Invoke-RestMethod -Headers $h -Uri 'http://127.0.0.1:47632/health' -TimeoutSec 4;if(-not $r.mediaReady){exit 1};Write-Host ('KanMedia san sang - yt-dlp '+$r.ytDlp)}catch{exit 1}"
+
+start "" /min "%ROOT%\.venv\Scripts\pythonw.exe" "%RUNTIME%\kanmedia-server.py"
+powershell -NoProfile -Command ^
+ "$h=@{'X-KanBan-Agent'='linh-kanban-v1'};$ok=$false;" ^
+ "for($i=0;$i -lt 30;$i++){try{$r=Invoke-RestMethod -Headers $h -Uri 'http://127.0.0.1:47632/health' -TimeoutSec 2;if($r.ok){if($r.mediaReady){Write-Host ('KanMedia san sang - yt-dlp '+$r.ytDlp+' - Node '+$r.node);$ok=$true;break}else{Write-Host ('KanMedia dang chay nhung thieu: '+(($r.errors|ForEach-Object{$_}) -join '; '))}}}catch{};Start-Sleep -Milliseconds 300};" ^
+ "if(-not $ok){exit 1}"
 if errorlevel 1 goto :FAIL_START
 
 rmdir /s /q "%TMP%" >nul 2>nul
@@ -222,6 +262,14 @@ echo [LOI] Khong tai/giai nen duoc FFmpeg.
 goto :FAIL
 :FAIL_START
 echo [LOI] KanMedia da cai file nhung dich vu local chua san sang.
+echo.
+echo ---- Chan doan KanMedia ----
+if exist "%ROOT%\logs\kanmedia-server.log" (
+  powershell -NoProfile -Command "Get-Content -LiteralPath '%ROOT%\logs\kanmedia-server.log' -Tail 25"
+) else (
+  echo Chua tao duoc log KanMedia. Runtime co the chua khoi dong.
+)
+echo ----------------------------
 goto :FAIL
 :FAIL
 echo.
