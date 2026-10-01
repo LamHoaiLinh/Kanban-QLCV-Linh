@@ -1057,3 +1057,14 @@ body.kalo-open{overflow:hidden!important}
 @media(max-width:560px){
   .desk-clock-actions{position:absolute;top:10px;right:10px}
 }
+
+/* ===== Âm lịch Việt Nam trên đồng hồ v3.2 ===== */
+.clock-lunar-date{
+  margin-top:4px;
+  color:var(--green-dark);
+  font-size:10px;
+  font-weight:750;
+  line-height:1.15;
+  white-space:nowrap;
+}
+:root[data-theme="dark"] .clock-lunar-date{color:#8fd1b3}
