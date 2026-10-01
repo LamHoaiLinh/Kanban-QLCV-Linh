@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "kanToolVersion": "2.3.1",
+  "kanToolVersion": "2.4.0",
   "installerVersion": "2.0.3",
   "pythonFallback": {
     "version": "3.13.16",
@@ -8,7 +8,7 @@
   },
   "components": {
     "runtime": {
-      "version": "1.6.1",
+      "version": "1.7.0",
       "files": [
         "kan-tools/runtime/kanmedia-server.py",
         "kan-tools/runtime/kanmedia-worker.py"
