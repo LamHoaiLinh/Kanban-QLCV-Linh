@@ -1278,3 +1278,100 @@ body.kalo-open{overflow:hidden!important}
   .special-date-form-actions .primary-btn{width:100%}
   .special-reminder-toggle span{display:none}
 }
+
+/* ===== Special dates v3.4: unified date input, filters, colored reminders ===== */
+.special-lunar-date-input{
+  width:100%;
+  min-height:46px;
+  padding:10px 13px;
+  border:1px solid var(--border);
+  border-radius:11px;
+  background:var(--panel);
+  color:var(--text);
+  font:inherit;
+  font-weight:700;
+  letter-spacing:.02em;
+}
+.special-lunar-date-input:focus{
+  outline:none;
+  border-color:color-mix(in srgb,var(--green) 55%,var(--border));
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--green) 14%,transparent);
+}
+.special-lunar-fields,
+.special-leap-check{
+  display:none!important;
+}
+
+.special-date-filterbar{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 170px;
+  gap:9px;
+  margin-top:14px;
+}
+.special-date-search{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  min-width:0;
+  min-height:42px;
+  padding:0 11px;
+  border:1px solid var(--border);
+  border-radius:11px;
+  background:var(--panel);
+}
+.special-date-search>span{
+  color:var(--muted);
+  font-size:15px;
+}
+.special-date-search input{
+  width:100%;
+  min-width:0;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:var(--text);
+  font:inherit;
+}
+.special-date-month-filter{
+  display:grid;
+  grid-template-columns:auto 1fr;
+  align-items:center;
+  gap:7px;
+  min-height:42px;
+  padding:0 9px 0 11px;
+  border:1px solid var(--border);
+  border-radius:11px;
+  background:var(--panel);
+  color:var(--muted);
+  font-size:11px;
+  font-weight:800;
+}
+.special-date-month-filter select{
+  width:100%;
+  border:0;
+  outline:0;
+  background:transparent;
+  color:var(--text);
+  font:inherit;
+  font-weight:750;
+}
+
+.special-reminder-text{
+  display:inline-flex;
+  align-items:center;
+  gap:11px;
+}
+.special-reminder-event{
+  color:hsl(var(--event-hue) 46% 38%);
+  font-weight:900;
+}
+.special-reminder-sep{
+  color:var(--muted);
+  font-weight:700;
+}
+:root[data-theme="dark"] .special-reminder-event{
+  color:hsl(var(--event-hue) 58% 70%);
+}
+@media(max-width:700px){
+  .special-date-filterbar{grid-template-columns:1fr}
+}
