@@ -51,6 +51,7 @@ copy /y "%~f0" "%ROOT%\KanTool.bat" >nul 2>nul
 echo [1/8] Dung KanMedia cu neu dang chay...
 powershell -NoProfile -Command "$h=@{'X-KanBan-Agent'='linh-kanban-v1'};try{Invoke-RestMethod -Method Post -Headers $h -ContentType 'application/json' -Body '{}' -Uri 'http://127.0.0.1:47632/shutdown' -TimeoutSec 1|Out-Null}catch{};Start-Sleep -Milliseconds 500;Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.CommandLine -like '*kanmedia-server.py*' -or $_.CommandLine -like '*kanmedia-server.ps1*' -or $_.CommandLine -like '*kanmedia-worker.py*' -or $_.CommandLine -like '*kanmedia-worker.ps1*'}|ForEach-Object{Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue}" >nul 2>nul
 timeout /t 1 /nobreak >nul
+del /q "%JOBS%\*.status.json" "%JOBS%\*.request.json" "%JOBS%\*.cancel" "%JOBS%\*.worker.log" "%JOBS%\*.launcher.log" >nul 2>nul
 
 echo [2/8] Tai runtime KanMedia tu repo KanBan...
 powershell -NoProfile -Command ^
