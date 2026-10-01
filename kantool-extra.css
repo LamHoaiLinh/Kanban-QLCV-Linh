@@ -1,1 +1,7 @@
 .kantool-card{max-width:560px}.kantool-card .capture-setup-mark{font-weight:900}.kantool-list{display:grid;gap:7px;margin:12px 0}.kantool-row{display:flex;justify-content:space-between;gap:16px;padding:9px 10px;border-radius:10px;background:rgba(255,255,255,.56);font-size:13px}.kantool-row strong.ok{color:#28714d}.kantool-row strong.miss{color:#9a6722}
+.kantool-diagnostics{margin:10px 0;padding:10px;border:1px solid #dce8e2;border-radius:10px;background:#f8fbfa;display:grid;gap:6px;font-size:12px}
+.kantool-diag-row{display:grid;grid-template-columns:minmax(130px,.8fr) minmax(0,1.2fr);gap:10px;align-items:start}
+.kantool-diag-row small{color:#687b72;word-break:break-word}
+.kantool-diagnostics strong{margin-top:4px;color:#36594a}
+[data-theme=dark] .kantool-diagnostics{background:#17201d;border-color:#384a43}
+[data-theme=dark] .kantool-diag-row small{color:#aebdb6}
