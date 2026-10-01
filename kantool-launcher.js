@@ -3,9 +3,26 @@
 'use strict';
 const toolBtn=document.querySelector('.office-suite-launch-btn');if(!toolBtn)return;
 const MEDIA='http://127.0.0.1:47632',CAPTURE='http://127.0.0.1:47631',SIGN='http://127.0.0.1:8765',HEAD={'X-KanBan-Agent':'linh-kanban-v1'};
+const RAW_BAT='https://raw.githubusercontent.com/LamHoaiLinh/Kanban-QLCV-Linh/main/kan-tools/KanTool.bat';
 let panel=null,lastDiagnostics=null;
 async function probe(url,headers,timeout){const c=new AbortController(),t=setTimeout(function(){c.abort();},timeout||1100);try{const r=await fetch(url,{headers:headers||{},cache:'no-store',signal:c.signal,targetAddressSpace:'loopback'});return r.ok?await r.json().catch(function(){return {ok:true};}):null;}catch(e){return null;}finally{clearTimeout(t);}}
-function downloadBat(){const a=document.createElement('a');a.href='kan-tools/KanTool.bat?t='+Date.now();a.download='KanTool.bat';document.body.appendChild(a);a.click();a.remove();}
+async function downloadBat(){
+  const status=panel&&panel.querySelector('[data-status]');
+  if(status)status.textContent='Đang lấy KanTool.bat mới nhất từ GitHub…';
+  try{
+    const r=await fetch(RAW_BAT+'?t='+Date.now(),{cache:'no-store'});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const text=await r.text();
+    if(text.length<700||!text.toUpperCase().includes('KANBAN TOOLS'))throw new Error('File không hợp lệ');
+    const url=URL.createObjectURL(new Blob([text],{type:'application/octet-stream'}));
+    const a=document.createElement('a');a.href=url;a.download='KanTool.bat';document.body.appendChild(a);a.click();a.remove();
+    setTimeout(function(){URL.revokeObjectURL(url);},1500);
+    if(status)status.textContent='Đã tải KanTool.bat mới nhất trực tiếp từ GitHub.';
+  }catch(e){
+    const a=document.createElement('a');a.href='kan-tools/KanTool.bat?t='+Date.now();a.download='KanTool.bat';document.body.appendChild(a);a.click();a.remove();
+    if(status)status.textContent='Đã dùng bản GitHub Pages dự phòng.';
+  }
+}
 function esc(v){return String(v==null?'':v).replace(/[&<>\"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c];});}
 function row(name,ok){return '<div class="kantool-row"><span>'+esc(name)+'</span><strong class="'+(ok?'ok':'miss')+'">'+(ok?'✓ Sẵn sàng':'— Chưa sẵn sàng')+'</strong></div>';}
 function ensurePanel(){
@@ -44,7 +61,7 @@ function ensurePanel(){
    try{
      const r=await fetch(MEDIA+'/system/repair',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},HEAD),body:'{}',targetAddressSpace:'loopback'});
      if(!r.ok)throw new Error('repair');
-     panel.querySelector('[data-status]').textContent='Đã mở chế độ sửa KanBan Tools. Chờ cửa sổ cài đặt hoàn tất.';
+     panel.querySelector('[data-status]').textContent='Đã mở bản KanTool.bat mới nhất để kiểm tra & sửa. Chờ cửa sổ hoàn tất rồi bấm Kiểm tra lại.';
    }catch(e){panel.querySelector('[data-status]').textContent='Không tự sửa được. Hãy tải bộ cài mới nhất và chạy lại.';}
  });
  panel.querySelector('[data-copy-diag]').addEventListener('click',async function(){
@@ -55,15 +72,22 @@ function ensurePanel(){
    try{await navigator.clipboard.writeText(lines.join('\\n'));panel.querySelector('[data-status]').textContent='Đã sao chép chẩn đoán.';}
    catch(e){panel.querySelector('[data-status]').textContent='Trình duyệt không cho sao chép tự động.';}
  });
- panel.querySelector('[data-update]').addEventListener('click',async function(){const b=panel.querySelector('[data-update]');if(b.disabled)return;try{const r=await fetch(MEDIA+'/system/update',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},HEAD),body:'{}',targetAddressSpace:'loopback'});if(!r.ok)throw new Error('offline');panel.querySelector('[data-status]').textContent='Đã mở bộ cập nhật mới nhất trên máy.';}catch(e){panel.querySelector('[data-status]').textContent='KanBan Tools chưa chạy. Hãy dùng nút xanh “Tải bộ cài mới nhất”.';}});
+ panel.querySelector('[data-update]').addEventListener('click',async function(){const b=panel.querySelector('[data-update]');if(b.disabled)return;try{const r=await fetch(MEDIA+'/system/update',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},HEAD),body:'{}',targetAddressSpace:'loopback'});if(!r.ok)throw new Error('offline');panel.querySelector('[data-status]').textContent='Đã mở KanTool.bat mới nhất từ GitHub để cập nhật máy. Khi cửa sổ hoàn tất, bấm Kiểm tra lại.';}catch(e){panel.querySelector('[data-status]').textContent='KanBan Tools chưa chạy. Hãy dùng nút xanh “Tải bộ cài mới nhất”.';}});
  return panel;
 }
 async function refresh(){
  ensurePanel();const status=panel.querySelector('[data-status]'),list=panel.querySelector('[data-list]');status.textContent='Đang kiểm tra…';
- const result=await Promise.all([probe(CAPTURE+'/ping'),probe(MEDIA+'/health',HEAD,1700),probe(SIGN+'/health',HEAD,1700)]);
- const cap=result[0],media=result[1],sign=result[2];list.innerHTML=row('Chụp màn hình',!!cap)+row('KanMedia',!!(media&&media.mediaReady))+row('Ký số PDF',!!(sign&&sign.ok));
- const updateBtn=panel.querySelector('[data-update]');if(updateBtn){updateBtn.disabled=!media;updateBtn.title=media?'Cập nhật bộ KanBan Tools đã cài trên máy.':'Chỉ dùng khi KanBan Tools đang chạy; nếu chưa chạy hãy tải bộ cài mới nhất.';}
- const ready=!!cap&&!!(media&&media.mediaReady)&&!!(sign&&sign.ok);status.textContent=ready?'KanBan Tools đã sẵn sàng.':'Thiếu một hoặc nhiều thành phần; chạy KanTool.bat để cài/sửa/cập nhật.';status.classList.toggle('ready',ready);
+ const result=await Promise.all([probe(CAPTURE+'/ping'),probe(MEDIA+'/health',HEAD,1700),probe(SIGN+'/health',HEAD,1700),probe(MEDIA+'/system/version',HEAD,3500)]);
+ const cap=result[0],media=result[1],sign=result[2],ver=result[3];list.innerHTML=row('Chụp màn hình',!!cap)+row('KanMedia',!!(media&&media.mediaReady))+row('Ký số PDF',!!(sign&&sign.ok));
+ const updateBtn=panel.querySelector('[data-update]');if(updateBtn){updateBtn.disabled=!media;updateBtn.dataset.tooltip=media?'Cập nhật máy bằng KanTool.bat mới nhất trực tiếp từ GitHub.':'Chỉ dùng khi KanBan Tools đang chạy; nếu chưa chạy hãy tải bộ cài mới nhất.';updateBtn.removeAttribute('title');}
+ const downloadBtn=panel.querySelector('[data-download]');
+ if(downloadBtn&&ver&&ver.latestVersion)downloadBtn.textContent='⬇ Tải KanTool.bat '+ver.latestVersion;
+ const ready=!!cap&&!!(media&&media.mediaReady)&&!!(sign&&sign.ok);
+ if(ver&&ver.latestVersion){
+   if(ver.updateAvailable)status.textContent='Có bản mới '+ver.latestVersion+' · máy đang '+(ver.currentVersion||'chưa xác định')+'.';
+   else status.textContent='Đã là bản mới nhất '+ver.latestVersion+' trên máy.';
+ }else status.textContent=ready?'KanBan Tools đã sẵn sàng.':'Thiếu một hoặc nhiều thành phần; chạy KanTool.bat để cài/sửa/cập nhật.';
+ status.classList.toggle('ready',ready&&!(ver&&ver.updateAvailable));
 }
 toolBtn.addEventListener('contextmenu',function(e){e.preventDefault();ensurePanel().hidden=false;refresh();});
 toolBtn.addEventListener('auxclick',function(e){if(e.button===1){e.preventDefault();ensurePanel().hidden=false;refresh();}});
