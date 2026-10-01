@@ -94,7 +94,7 @@
       'cardDialog','cardForm','cardDialogTitle','cardTitleInput','cardDescriptionInput','checklistEditor','checklistEmpty','addChecklistBtn',
       'labelOptions','cardColumnSelect','deleteCardBtn','duplicateCardBtn','columnDialog','columnForm','columnDialogTitle','columnNameInput','columnColorOptions',
       'deleteColumnBtn','clearColumnContentBtn','duplicateColumnBtn','quickCaptureDialog','quickCaptureForm','quickCaptureTitleInput','quickCaptureColumnSelect','quickCaptureDestinationHint','backgroundDialog','backgroundOptions','guideDialog','settingsBtn','settingsDialog','settingsExportBtn','quickCaptureProjectName','quickCaptureDefaultColumnSelect','quickCaptureStatus','dailyMoveEnabled','dailyMoveProjectName','dailyMoveRules','addDailyMoveRuleBtn','dailyMoveStatus','openDeletedContentBtn','deletedContentCount','deletedContentDialog','deletedArchiveTabBtn','deletedTrashTabBtn','deletedArchivePanel','deletedTrashPanel','deletedArchiveCount','deletedTrashCount','deletedArchiveList','deletedTrashList','emptyTrashBtn','openResetDataBtn','resetDataDialog','resetDataForm','resetBackupBtn','resetConfirmInput','resetDeleteBtn','resetBackupStatus','confirmDialog','confirmTitle','confirmMessage','globalTooltip','toast',
-      'clockCurrentTime','clockDayPeriod','clockWeekday','clockDate','timerDisplay','timerDialogDisplay','timerEndTime','timerAgentStatus','clockStatus','timerMinutesInput','timerSecondsInput','timerStartPauseBtn','timerResetBtn','timerStopAlarmBtn','timerTestAlarmBtn','timerLocalAlarmInput','timerRepeatAlarmInput','timerNotifyInput','deskClockWidget','deskClockControls','clockToggleBtn','clockDialog'
+      'clockCurrentTime','clockDayPeriod','clockWeekday','clockDate','timerDisplay','timerDialogDisplay','timerEndTime','timerAgentStatus','clockStatus','timerMinutesInput','timerSecondsInput','timerStartPauseBtn','timerResetBtn','timerStopAlarmBtn','timerTestAlarmBtn','timerLocalAlarmInput','timerRepeatAlarmInput','timerNotifyInput','deskClockWidget','deskClockControls','clockToggleBtn','quickStopAlarmBtn','clockDialog'
     ].forEach(id => refs[id] = document.getElementById(id));
   }
 
@@ -183,6 +183,11 @@
     refs.importBtn.addEventListener('click', () => refs.importFile.click());
     refs.importFile.addEventListener('change', importData);
     refs.clockToggleBtn.addEventListener('click', event => { event.stopPropagation(); openClockDialog(); });
+    refs.quickStopAlarmBtn.addEventListener('click', async event => {
+      event.stopPropagation();
+      await stopAlarm();
+      showToast('Đã tắt chuông.');
+    });
     refs.deskClockWidget.addEventListener('click', event => { if (!event.target.closest('button')) openClockDialog(); });
     refs.timerStartPauseBtn.addEventListener('click', toggleCountdown);
     refs.timerResetBtn.addEventListener('click', resetCountdown);
@@ -267,8 +272,13 @@
     initTooltips();
     window.addEventListener('beforeunload', saveNow);
     window.addEventListener('resize', fitProjectLabels);
-    window.addEventListener('focus', checkDailyMoveAfterResume);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) checkDailyMoveAfterResume(); });
+    window.addEventListener('focus', () => { checkDailyMoveAfterResume(); syncAlarmFromAgent(); });
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        checkDailyMoveAfterResume();
+        syncAlarmFromAgent();
+      }
+    });
   }
 
   function createDefaultDailyMoveSettings() {
@@ -1884,6 +1894,7 @@
     }
     if (!clockWorker && !clockTickTimer) clockTickTimer = setInterval(updateClockWidget,500);
     updateClockWidget();
+    setTimeout(syncAlarmFromAgent,350);
     const clock = state.settings.clock;
     if (clock.running && clock.endAt) scheduleLocalAlarm(clock);
     if (clock.alarmActive) startAlarm();
@@ -1917,6 +1928,27 @@
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  async function syncAlarmFromAgent() {
+    try {
+      const local = await alarmAgentRequest('/alarm/state',{},1200);
+      const clock = state?.settings?.clock;
+      if (!clock || !local) return;
+      if (local.active) {
+        clock.running = false;
+        clock.endAt = null;
+        clock.remainingSec = 0;
+        clock.alarmActive = true;
+        saveNow();
+        updateClockWidget();
+      } else if (clock.alarmActive && !alarmTimer) {
+        // Chuông local đã được tắt từ nơi khác: đồng bộ lại nút nhanh.
+        clock.alarmActive = false;
+        saveNow();
+        updateClockWidget();
+      }
+    } catch (error) {}
   }
 
   async function refreshAlarmAgentStatus() {
@@ -2054,6 +2086,7 @@
           ? 'Đang tạm dừng'
           : 'Sẵn sàng';
     refs.timerStopAlarmBtn.hidden = !clock.alarmActive;
+    refs.quickStopAlarmBtn.hidden = !clock.alarmActive;
     refs.clockToggleBtn.setAttribute('aria-label','Mở đồng hồ và báo thức');
     refs.clockToggleBtn.textContent = '⏱';
     refs.clockToggleBtn.dataset.tooltip = 'Mở đồng hồ và báo thức';
