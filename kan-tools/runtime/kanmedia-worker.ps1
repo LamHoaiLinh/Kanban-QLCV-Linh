@@ -67,20 +67,20 @@ function Download-One([string]$url,[string]$kind,[string]$format,[string]$qualit
  if(-not $script:file){$guess=Get-ChildItem $Downloads -File|Sort-Object LastWriteTime -Descending|Select-Object -First 1;if($guess){$script:file=$guess.FullName}}
  if($script:file){$script:file=Rename-FromMetadata $script:file};return $script:file
 }
-function Ffmpeg-Run([string]$input,[string[]]$args,[double]$duration,[double]$base,[double]$slice,[string]$label,[switch]$AllowFail){
+function Ffmpeg-Run([string]$input,[string[]]$args,[double]$duration,[double]$base,[double]$slice,[string]$label,[string]$current='',[int]$index=0,[int]$total=0,[switch]$AllowFail){
  $out=[string]$args[$args.Count-1];$opts=@();if($args.Count -gt 1){$opts=@($args[0..($args.Count-2)])};$all=@('-hide_banner','-y','-i',$input)+$opts+@('-progress','pipe:1','-nostats',$out)
- $code=Run-Lines $Ffmpeg $all {param($line)if($line -match '^out_time_(ms|us)=([0-9]+)$' -and $duration -gt 0){$p=[Math]::Min(99,([double]$Matches[2]/($duration*1000000))*100);Set-Status 'running' ($base+$slice*$p/100) ($label+' — '+[Math]::Round($p)+'%')}elseif($line -eq 'progress=end'){Set-Status 'running' ($base+$slice) ($label+' — 100%')}} -AllowFail:$AllowFail
+ $code=Run-Lines $Ffmpeg $all {param($line)if($line -match '^out_time_(ms|us)=([0-9]+)$' -and $duration -gt 0){$p=[Math]::Min(99,([double]$Matches[2]/($duration*1000000))*100);Set-Status 'running' ($base+$slice*$p/100) ($label+' — '+[Math]::Round($p)+'%') $current $index $total}elseif($line -eq 'progress=end'){Set-Status 'running' ($base+$slice) ($label+' — 100%') $current $index $total}} -AllowFail:$AllowFail
  return $code
 }
 function Convert-One($meta,[string]$format,[string]$quality,[double]$base,[double]$slice,[int]$index,[int]$total){
  $src=[string]$meta.path;$name=Safe ([IO.Path]::GetFileNameWithoutExtension([string]$meta.name));$ext='.'+$format;$dst=Unique-Path $Downloads $name $ext;$dur=Duration $src;$label='Đang chuyển “'+[string]$meta.name+'”';Set-Status 'running' $base $label ([string]$meta.name) $index $total
  if($format -in @('mp4','mkv','webm')){
-  $copyArgs=@('-map','0?','-c','copy',$dst);$code=Ffmpeg-Run $src $copyArgs $dur $base $slice $label -AllowFail
+  $copyArgs=@('-map','0?','-c','copy',$dst);$code=Ffmpeg-Run $src $copyArgs $dur $base $slice $label ([string]$meta.name) $index $total -AllowFail
   if($code -eq 0 -and (Test-Path $dst)){return $dst};Remove-Item $dst -Force -ErrorAction SilentlyContinue
   $crf='23';if($quality -eq 'high'){$crf='18'};if($quality -eq 'light'){$crf='29'}
   if($format -eq 'webm'){$a=@('-c:v','libvpx-vp9','-crf',$crf,'-b:v','0','-c:a','libopus','-b:a','128k',$dst)}
   else{$a=@('-c:v','libx264','-preset','medium','-crf',$crf,'-c:a','aac','-b:a','160k',$dst)}
-  Ffmpeg-Run $src $a $dur $base $slice $label|Out-Null
+  Ffmpeg-Run $src $a $dur $base $slice $label ([string]$meta.name) $index $total|Out-Null
  }else{
   if($format -eq 'wav'){$a=@('-vn','-c:a','pcm_s16le',$dst)}
   elseif($format -eq 'flac'){$a=@('-vn','-c:a','flac',$dst)}
@@ -115,7 +115,7 @@ function Edit-One($meta,$p){
  if($extract){$args.Add('-vn');$args.Add('-c:a');$args.Add('libmp3lame');$args.Add('-q:a');$args.Add('0')}
  elseif($isAudio){$args.Add('-c:a');$args.Add('libmp3lame');$args.Add('-q:a');$args.Add('2')}
  else{$args.Add('-c:v');$args.Add('libx264');$args.Add('-preset');$args.Add('medium');$args.Add('-crf');$args.Add('20');if($mute){$args.Add('-an')}else{$args.Add('-c:a');$args.Add('aac');$args.Add('-b:a');$args.Add('160k')}}
- $args.Add($dst);Ffmpeg-Run $src $args $outDur 5 94 ('Đang chỉnh “'+[string]$meta.name+'”')|Out-Null;return (Rename-FromMetadata $dst)
+ $args.Add($dst);Ffmpeg-Run $src $args $outDur 5 94 ('Đang chỉnh “'+[string]$meta.name+'”') ([string]$meta.name) 1 1|Out-Null;return (Rename-FromMetadata $dst)
 }
 try{
  if(-not(Test-Path $RequestPath)){throw 'Không tìm thấy yêu cầu tác vụ.'};$req=Get-Content -Raw $RequestPath|ConvertFrom-Json;$mode=[string]$req.mode;$p=$req.payload
