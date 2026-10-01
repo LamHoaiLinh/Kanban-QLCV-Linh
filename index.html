@@ -90,12 +90,12 @@
               <button id="addProjectNoteBtn" class="project-note-add" type="button" aria-label="Thêm ghi chú" data-tooltip="Tạo một ghi chú văn bản mới cho dự án">＋</button>
             </div>
           </div>
-          <section id="deskClockWidget" class="desk-clock" aria-label="Đồng hồ làm việc" data-tooltip="Đồng hồ làm việc: xem giờ hiện tại và dùng bộ đếm ngược để đo thời gian tập trung.">
+          <section id="deskClockWidget" class="desk-clock desk-clock-clickable" aria-label="Đồng hồ làm việc" data-tooltip="Bấm để mở đồng hồ và hẹn giờ. Báo thức Windows vẫn hoạt động khi bạn chuyển sang cửa sổ khác.">
             <div class="desk-clock-head">
               <div class="desk-clock-face">
                 <div class="desk-clock-main">
                   <div id="clockDayPeriod" class="clock-day-period">Sáng</div>
-                  <div id="clockCurrentTime" class="clock-current-time">08:00</div>
+                  <div id="clockCurrentTime" class="clock-current-time">08:00:00</div>
                   <div class="clock-date-line"><span id="clockWeekday">Thứ Hai</span><span id="clockDate">01/01/2026</span></div>
                 </div>
                 <div class="desk-clock-side">
@@ -104,23 +104,7 @@
                   <div id="clockStatus" class="clock-status">Sẵn sàng</div>
                 </div>
               </div>
-              <button id="clockToggleBtn" class="icon-btn clock-toggle-btn" type="button" aria-label="Mở hẹn giờ" aria-expanded="false" aria-controls="deskClockControls" data-tooltip="Mở rộng hoặc thu gọn phần hẹn giờ">▾</button>
-            </div>
-            <div id="deskClockControls" class="desk-clock-controls" hidden>
-              <div class="timer-input-group" data-tooltip="Thiết lập thời lượng đếm ngược tùy chỉnh">
-                <label><span>Phút</span><input id="timerMinutesInput" type="number" min="0" max="999" step="1" value="25"></label>
-                <label><span>Giây</span><input id="timerSecondsInput" type="number" min="0" max="59" step="1" value="0"></label>
-              </div>
-              <div class="timer-button-row">
-                <button id="timerStartPauseBtn" class="primary-btn compact-btn" type="button" data-tooltip="Bắt đầu hoặc tạm dừng bộ đếm ngược">Bắt đầu</button>
-                <button id="timerResetBtn" class="secondary-btn compact-btn" type="button" data-tooltip="Đặt lại bộ đếm ngược theo thời lượng đã nhập">Đặt lại</button>
-                <button id="timerStopAlarmBtn" class="danger-btn compact-btn" type="button" hidden data-tooltip="Tắt chuông báo khi hết giờ">Tắt chuông</button>
-              </div>
-              <div class="timer-presets" aria-label="Thời gian mẫu">
-                <button class="ghost-btn timer-preset" type="button" data-minutes="25" data-tooltip="Đặt nhanh 25 phút">25p</button>
-                <button class="ghost-btn timer-preset" type="button" data-minutes="50" data-tooltip="Đặt nhanh 50 phút">50p</button>
-                <button class="ghost-btn timer-preset" type="button" data-minutes="90" data-tooltip="Đặt nhanh 90 phút">90p</button>
-              </div>
+              <button id="clockToggleBtn" class="icon-btn clock-toggle-btn" type="button" aria-label="Mở đồng hồ" data-tooltip="Mở cài đặt đồng hồ và báo thức">⏱</button>
             </div>
           </section>
           <div class="header-actions">
@@ -395,7 +379,59 @@
     </form>
   </dialog>
 
-  <dialog id="deletedContentDialog" class="modal">
+    <dialog id="clockDialog" class="modal">
+    <form method="dialog" class="modal-card clock-modal">
+      <div class="modal-header">
+        <div>
+          <div class="eyebrow">ĐỒNG HỒ & BÁO THỨC</div>
+          <h2>Hẹn giờ làm việc</h2>
+          <div id="timerAgentStatus" class="clock-agent-status">Đang kiểm tra báo thức Windows…</div>
+        </div>
+        <button class="icon-btn" data-close="clockDialog" type="button" aria-label="Đóng">×</button>
+      </div>
+      <div class="clock-dialog-display">
+        <div>
+          <span>Còn lại</span>
+          <strong id="timerDialogDisplay">25:00</strong>
+        </div>
+        <div>
+          <span>Kết thúc dự kiến</span>
+          <strong id="timerEndTime">—</strong>
+        </div>
+      </div>
+      <div id="deskClockControls" class="desk-clock-controls clock-dialog-controls">
+        <div class="timer-input-group" data-tooltip="Thiết lập thời lượng đếm ngược tùy chỉnh">
+          <label><span>Phút</span><input id="timerMinutesInput" type="number" min="0" max="999" step="1" value="25"></label>
+          <label><span>Giây</span><input id="timerSecondsInput" type="number" min="0" max="59" step="1" value="0"></label>
+        </div>
+        <div class="timer-presets clock-presets" aria-label="Thời gian mẫu">
+          <button class="ghost-btn timer-preset" type="button" data-minutes="1">1p</button>
+          <button class="ghost-btn timer-preset" type="button" data-minutes="3">3p</button>
+          <button class="ghost-btn timer-preset" type="button" data-minutes="5">5p</button>
+          <button class="ghost-btn timer-preset" type="button" data-minutes="10">10p</button>
+          <button class="ghost-btn timer-preset" type="button" data-minutes="15">15p</button>
+          <button class="ghost-btn timer-preset" type="button" data-minutes="25">25p</button>
+          <button class="ghost-btn timer-preset" type="button" data-minutes="50">50p</button>
+          <button class="ghost-btn timer-preset" type="button" data-minutes="90">90p</button>
+        </div>
+        <div class="timer-button-row clock-primary-actions">
+          <button id="timerStartPauseBtn" class="primary-btn compact-btn" type="button">Bắt đầu</button>
+          <button id="timerResetBtn" class="secondary-btn compact-btn" type="button">Đặt lại</button>
+          <button id="timerStopAlarmBtn" class="danger-btn compact-btn" type="button" hidden>Tắt chuông</button>
+          <button id="timerTestAlarmBtn" class="secondary-btn compact-btn" type="button">Thử chuông</button>
+        </div>
+        <div class="clock-options">
+          <label class="clock-option"><input id="timerLocalAlarmInput" type="checkbox" checked><span><strong>Báo thức Windows</strong><small>Reo cả khi KanBan đang ở cửa sổ nền.</small></span></label>
+          <label class="clock-option"><input id="timerRepeatAlarmInput" type="checkbox" checked><span><strong>Lặp đến khi tắt</strong><small>Không để bạn bỏ lỡ vì đang tập trung việc khác.</small></span></label>
+          <label class="clock-option"><input id="timerNotifyInput" type="checkbox" checked><span><strong>Thông báo</strong><small>Hiện notification hệ thống khi hết giờ.</small></span></label>
+        </div>
+        <div class="clock-hint">Bộ đếm dùng deadline tuyệt đối nên không cộng sai số theo từng giây. Khi KanTool đã cài, deadline còn được giao cho Windows để báo ngoài trình duyệt.</div>
+      </div>
+      <div class="modal-actions right-actions"><button class="primary-btn" value="close">Xong</button></div>
+    </form>
+  </dialog>
+
+<dialog id="deletedContentDialog" class="modal">
     <form method="dialog" class="modal-card deleted-content-modal">
       <div class="modal-header">
         <div><div class="eyebrow">LƯU TRỮ GỌN</div><h2>Nội dung đã xóa</h2></div>
