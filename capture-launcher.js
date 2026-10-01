@@ -87,7 +87,7 @@
         <button type="button" data-capture-download-bat class="primary">⬇ Tải / cập nhật KanTool.bat</button>
         <button type="button" data-capture-retry>↻ Kiểm tra lại</button>
       </div>
-      <div class="capture-security-note">KanTool không tắt Windows Security. Capture ưu tiên gói đã kiểm SHA256; nếu EXE bị Windows chặn, bộ cài có thể dùng mã nguồn Python thay thế.</div>
+      <div class="capture-security-note">KanTool không tắt Windows Security. Trong bộ cài chung, Capture chạy từ source Python của chính repo KanBan để giảm cảnh báo nhầm của antivirus.</div>
     </section>`;
     document.body.appendChild(panel);
 
