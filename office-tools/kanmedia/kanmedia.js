@@ -19,6 +19,39 @@ export function renderKanMediaTool(host){
   checkKanMediaAgent();
   renderKmTab();
 }
+function applyKmTooltips(){
+  if(!kmHost)return;
+  const tips={
+    kmUpdateBtn:'Kiểm tra và cập nhật KanBan Tools cùng lõi tải Media.',
+    kmClearUrls:'Xóa toàn bộ link đang dán.',
+    kmOpenFolder:'Mở thư mục Downloads\\KanMedia.',
+    kmDownload:'Bắt đầu tải các link đã nhận.',
+    kmCancel:'Hủy tác vụ Media đang chạy.',
+    kmConvertRun:'Chuyển toàn bộ file đã chọn sang định dạng và chất lượng đang chọn.',
+    kmSetStart:'Lấy thời điểm đang phát làm điểm bắt đầu.',
+    kmSetEnd:'Lấy thời điểm đang phát làm điểm kết thúc.',
+    kmPreviewStart:'Phát thử từ điểm bắt đầu đã chọn.',
+    kmEditRun:'Xuất một file mới; file gốc luôn được giữ nguyên.'
+  };
+  kmHost.querySelectorAll('button').forEach(function(b){
+    if(b.dataset.tooltip)return;
+    let tip=tips[b.id]||'';
+    if(!tip&&b.dataset.kmTab==='download')tip='Tải audio hoặc video từ link.';
+    if(!tip&&b.dataset.kmTab==='convert')tip='Đổi định dạng file audio/video trên máy.';
+    if(!tip&&b.dataset.kmTab==='edit')tip='Cắt và chỉnh nhanh audio/video.';
+    if(!tip&&b.dataset.kind==='audio')tip='Chọn tải âm thanh; rê chuột để chọn MP3, M4A, OPUS, FLAC hoặc WAV.';
+    if(!tip&&b.dataset.kind==='video')tip='Chọn tải video; rê chuột để chọn MP4, MKV hoặc WebM.';
+    if(!tip&&b.dataset.format)tip='Chọn định dạng '+b.dataset.format.toUpperCase()+'.';
+    if(!tip&&b.dataset.quality)tip='Chọn mức chất lượng '+b.textContent.trim()+'.';
+    if(!tip&&b.dataset.out)tip='Chuyển file thành '+b.dataset.out.toUpperCase()+'.';
+    if(!tip&&b.dataset.cq)tip='Chọn mức dung lượng/chất lượng '+b.textContent.trim()+'.';
+    if(!tip&&b.dataset.cut==='keep')tip='Chỉ giữ lại đoạn giữa điểm đầu và điểm cuối.';
+    if(!tip&&b.dataset.cut==='remove')tip='Xóa đoạn giữa điểm đầu và điểm cuối, giữ hai phần còn lại.';
+    if(!tip&&b.dataset.speed)tip='Xuất file với tốc độ '+b.textContent.trim()+'.';
+    if(!tip)tip='Thực hiện: '+b.textContent.trim();
+    b.dataset.tooltip=tip;b.title=tip;
+  });
+}
 function ensureKanMediaCss(){
   if(document.querySelector('link[data-kanmedia-css]'))return;
   const l=document.createElement('link');l.rel='stylesheet';l.href='office-tools/kanmedia/kanmedia.css?v=1.0.0';l.dataset.kanmediaCss='1';document.head.appendChild(l);
@@ -32,6 +65,7 @@ function renderKmTab(){
   if(kmState.tab==='download')renderDownload(h);
   else if(kmState.tab==='convert')renderConvert(h);
   else renderEdit(h);
+  applyKmTooltips();
 }
 async function kmApi(path,opt){
   opt=opt||{};const headers=Object.assign({},KANMEDIA_HEADERS,opt.headers||{});
@@ -208,7 +242,7 @@ function renderEditWork(w){
     '<div class="km-choice"><button data-cut="keep" class="active">Giữ đoạn này</button><button data-cut="remove">Xóa đoạn này</button></div></div>',
     '<div class="km-edit-grid"><label><span>Âm lượng <b id="kmVolLabel">100%</b></span><input id="kmVolume" type="range" min="0" max="200" step="5" value="100"></label>',
     '<label><span>Tốc độ</span><div class="km-choice km-speed"><button data-speed="0.5">0.5×</button><button data-speed="0.75">0.75×</button><button data-speed="1" class="active">1×</button><button data-speed="1.25">1.25×</button><button data-speed="1.5">1.5×</button><button data-speed="2">2×</button></div></label>',
-    '<label><span>Fade đầu (giây)</span><input id="kmFadeIn" type="number" min="0" max="30" step="0.5" value="0"></label><label><span>Fade cuối (giây)</span><input id="kmFadeOut" type="number" min="0" max="30" step="0.5" value="0"></label></div>',
+    '<label><span>Mờ âm đầu (giây)</span><input id="kmFadeIn" type="number" min="0" max="30" step="0.5" value="0"></label><label><span>Mờ âm cuối (giây)</span><input id="kmFadeOut" type="number" min="0" max="30" step="0.5" value="0"></label></div>',
     '<div class="km-row"><label class="km-check"><input id="kmNormalize" type="checkbox"> Tự cân bằng âm lượng</label>',
     isVideo?'<label class="km-check"><input id="kmMute" type="checkbox"> Xóa tiếng video</label><label class="km-check"><input id="kmExtract" type="checkbox"> Lấy âm thanh thành MP3</label>':'',
     '</div><div class="km-row km-actions"><button class="office-btn" id="kmPreviewStart" type="button">Phát từ điểm đầu</button><button class="office-btn primary km-run" id="kmEditRun" type="button">Xuất file</button></div>'
@@ -221,7 +255,7 @@ function renderEditWork(w){
   w.querySelectorAll('[data-cut]').forEach(function(b){b.addEventListener('click',function(){kmState.edit.cut=b.dataset.cut;w.querySelectorAll('[data-cut]').forEach(function(x){x.classList.toggle('active',x===b);});});});
   w.querySelectorAll('[data-speed]').forEach(function(b){b.addEventListener('click',function(){kmState.edit.speed=Number(b.dataset.speed);p.playbackRate=kmState.edit.speed;w.querySelectorAll('[data-speed]').forEach(function(x){x.classList.toggle('active',x===b);});});});
   w.querySelector('#kmVolume').addEventListener('input',function(e){w.querySelector('#kmVolLabel').textContent=e.target.value+'%';p.volume=Math.min(1,Number(e.target.value)/100);});
-  w.querySelector('#kmEditRun').addEventListener('click',startEdit);
+  w.querySelector('#kmEditRun').addEventListener('click',startEdit);applyKmTooltips();
 }
 async function startEdit(){
   const w=kmHost.querySelector('#kmEditWork');if(!kmState.editFile||!w)return notice('Bạn hãy chọn file trước.','warn');
