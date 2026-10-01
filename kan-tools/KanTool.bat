@@ -49,7 +49,7 @@ mkdir "%TMP%" >nul 2>nul
 copy /y "%~f0" "%ROOT%\KanTool.bat" >nul 2>nul
 
 echo [1/8] Dung KanMedia cu neu dang chay...
-powershell -NoProfile -Command "$h=@{'X-KanBan-Agent'='linh-kanban-v1'};try{Invoke-RestMethod -Method Post -Headers $h -ContentType 'application/json' -Body '{}' -Uri 'http://127.0.0.1:47632/shutdown' -TimeoutSec 1|Out-Null}catch{};Start-Sleep -Milliseconds 500;Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.CommandLine -like '*kanmedia-server.py*' -or $_.CommandLine -like '*kanmedia-server.ps1*' -or $_.CommandLine -like '*kanmedia-worker.py*' -or $_.CommandLine -like '*kanmedia-worker.ps1*'}|ForEach-Object{Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue}" >nul 2>nul
+powershell -NoProfile -Command "$h=@{'X-KanBan-Agent'='linh-kanban-v1'};try{Invoke-RestMethod -Method Post -Headers $h -ContentType 'application/json' -Body '{}' -Uri 'http://127.0.0.1:47632/shutdown' -TimeoutSec 1|Out-Null}catch{};Start-Sleep -Milliseconds 500;Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.ProcessId -ne $PID -and ($_.CommandLine -like '*kanmedia-server.py*' -or $_.CommandLine -like '*kanmedia-server.ps1*' -or $_.CommandLine -like '*kanmedia-worker.py*' -or $_.CommandLine -like '*kanmedia-worker.ps1*')}|ForEach-Object{Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue}" >nul 2>nul
 timeout /t 1 /nobreak >nul
 del /q "%JOBS%\*.status.json" "%JOBS%\*.request.json" "%JOBS%\*.cancel" "%JOBS%\*.worker.log" "%JOBS%\*.launcher.log" >nul 2>nul
 
@@ -167,7 +167,7 @@ echo     Dung ban Capture cu neu dang chay...
 powershell -NoProfile -Command "try{Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:47631/quit' -TimeoutSec 1|Out-Null}catch{}" >nul 2>nul
 timeout /t 1 /nobreak >nul
 taskkill /IM KanbanCapture.exe /F >nul 2>nul
-powershell -NoProfile -Command "Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.CommandLine -like '*capture_agent.py*'}|ForEach-Object{Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue}" >nul 2>nul
+powershell -NoProfile -Command "Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.ProcessId -ne $PID -and $_.CommandLine -like '*capture_agent.py*'}|ForEach-Object{Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue}" >nul 2>nul
 
 echo     Tai source Capture tu repo KanBan...
 powershell -NoProfile -Command ^
@@ -199,7 +199,7 @@ if errorlevel 1 echo [CANH BAO] Capture chua phan hoi. Hay chay lai KanTool.bat 
 
 
 echo [7/8] Cai Signing Agent dung chung...
-powershell -NoProfile -Command "Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.CommandLine -like '*kanban_signing_agent.py*'}|ForEach-Object{Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue}" >nul 2>nul
+powershell -NoProfile -Command "Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.ProcessId -ne $PID -and $_.CommandLine -like '*kanban_signing_agent.py*'}|ForEach-Object{Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue}" >nul 2>nul
 powershell -NoProfile -Command ^
  "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';" ^
  "Invoke-WebRequest -UseBasicParsing -Uri '%REPO%/office-tools/signing-agent/package/kanban_signing_agent.py?ts=%RANDOM%' -OutFile '%SIGNING%\kanban_signing_agent.py';" ^
@@ -250,7 +250,7 @@ exit /b 0
 echo [LOI] Khong tai/cai duoc runtime KanMedia.
 goto :FAIL
 :FAIL_PYTHON
-echo [LOI] Khong cai/khong tim thay Python 3.12/3.13.
+echo [LOI] Khong cai/khong tim thay Python 3.12/3.13/3.14.
 goto :FAIL
 :FAIL_NODE
 echo [LOI] Khong tai/xac minh duoc Node.js portable.
