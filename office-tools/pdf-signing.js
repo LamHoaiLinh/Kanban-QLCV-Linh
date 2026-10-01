@@ -14,7 +14,6 @@ const SIGN_DB_STORE = 'secrets';
 const PERSONAL_SECRET_KEY = 'personal-secret-v2';
 const LEGACY_PERSONAL_P12_KEY = 'personal-p12';
 const AGENT_URL = 'http://127.0.0.1:8765';
-const AGENT_DOWNLOAD = './kan-tools/KanTool.bat';
 const SIGN_LIBS = {
   forge: 'https://unpkg.com/node-forge@1.3.1/dist/forge.min.js',
 };
@@ -197,7 +196,8 @@ function identityCard(){
     ${extraFieldsHtml('enterprise',st.enterprise.extraFields)}
     <div class="office-sign-agent-panel">
       <div><b id="agentStatus">${agentOnline?`✓ Đã kết nối ${esc(st.agent.version||'KanBan Signing Agent')}`:'Chưa kết nối Agent tại 127.0.0.1:8765'}</b><span>${agentOnline?'USB Token/chứng thư được xử lý cục bộ trên Windows.':'KanTool.bat cài một lần cho Chụp, KanMedia và hỗ trợ ký số; sau đó chỉ cần cắm Token.'}</span></div>
-      <div class="office-toolbar"><a class="office-btn primary" href="${AGENT_DOWNLOAD}" download>Tải / cập nhật KanTool.bat</a><button class="office-btn" id="agentCheck">Kiểm tra kết nối</button><button class="office-btn" id="agentCertRefresh" ${agentOnline?'':'disabled'}>Đọc chứng thư</button></div>
+      <div class="office-toolbar"><button class="office-btn" id="agentCheck">Kiểm tra kết nối</button><button class="office-btn" id="agentCertRefresh" ${agentOnline?'':'disabled'}>Đọc chứng thư</button></div>
+      <div class="office-sign-security-note">Ký số không có bộ cài riêng. Nếu chưa kết nối, hãy chuột phải <b>CÔNG CỤ</b> và cài/cập nhật bộ <b>KanBan Tools</b> duy nhất.</div>
     </div>
     <div class="office-grid">
       <label class="office-field"><span>Chứng thư Windows</span><select id="esCert" ${agentOnline?'':'disabled'}>${certificateOptions()}</select><small>Ứng dụng ưu tiên certificate khớp tên/MST; tránh certificate localhost/test.</small></label>
@@ -766,7 +766,7 @@ async function loadPersonalRecordQuiet(){
 }
 
 async function checkAgent(show=true){
-  try{const r=await fetch(`${AGENT_URL}/health`,{method:'GET',headers:{'X-KanBan-Agent':'linh-kanban-v1'},cache:'no-store',targetAddressSpace:'loopback'});if(!r.ok)throw new Error(`HTTP ${r.status}`);const j=await r.json();st.agent.online=true;st.agent.version=j.version||'KanBan Signing Agent';if(show)alert(`Đã kết nối ${st.agent.version}.`);render();await refreshAgentCertificates();return true;}catch(e){st.agent.online=false;st.agent.certificates=[];if(show)alert('Chưa kết nối Signing Agent. Hãy tải/cài Agent, mở Agent rồi thử lại.');render();return false;}
+  try{const r=await fetch(`${AGENT_URL}/health`,{method:'GET',headers:{'X-KanBan-Agent':'linh-kanban-v1'},cache:'no-store',targetAddressSpace:'loopback'});if(!r.ok)throw new Error(`HTTP ${r.status}`);const j=await r.json();st.agent.online=true;st.agent.version=j.version||'KanBan Signing Agent';if(show)alert(`Đã kết nối ${st.agent.version}.`);render();await refreshAgentCertificates();return true;}catch(e){st.agent.online=false;st.agent.certificates=[];if(show)alert('Chưa kết nối bộ hỗ trợ ký số. Hãy chuột phải CÔNG CỤ, cài/cập nhật KanBan Tools rồi thử lại.');render();return false;}
 }
 async function refreshAgentCertificates(){
   if(!st.agent.online){await checkAgent(false);if(!st.agent.online)return;}
