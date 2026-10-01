@@ -2,7 +2,7 @@
   'use strict';
 
   const STORAGE_KEY = 'linh_personal_kanban_v1';
-  const VERSION = 12;
+  const VERSION = 13;
   const DEFAULT_BACKGROUND_ID = 'bg6';
   const KAN_ALARM_AGENT = 'http://127.0.0.1:47632';
   const KAN_ALARM_HEADERS = {'X-KanBan-Agent':'linh-kanban-v1','Content-Type':'application/json'};
@@ -195,8 +195,17 @@
     refs.timerTestAlarmBtn.addEventListener('click', testAlarmNow);
     refs.timerMinutesInput.addEventListener('change', handleTimerInputChange);
     refs.timerSecondsInput.addEventListener('change', handleTimerInputChange);
-    refs.timerMinutesInput.addEventListener('input', syncTimerInputsSoft);
-    refs.timerSecondsInput.addEventListener('input', syncTimerInputsSoft);
+    refs.timerMinutesInput.addEventListener('input', handleTimerDraftInput);
+    refs.timerSecondsInput.addEventListener('input', handleTimerDraftInput);
+    [refs.timerMinutesInput,refs.timerSecondsInput].forEach(input => {
+      input.addEventListener('focus', () => input.select());
+      input.addEventListener('keydown', event => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          input.blur();
+        }
+      });
+    });
     refs.timerLocalAlarmInput.addEventListener('change', handleAlarmOptionChange);
     refs.timerRepeatAlarmInput.addEventListener('change', handleAlarmOptionChange);
     refs.timerNotifyInput.addEventListener('change', handleAlarmOptionChange);
@@ -2072,8 +2081,11 @@
         : '—';
     }
     if (!clock.running) {
-      refs.timerMinutesInput.value = Math.floor(clock.durationSec/60);
-      refs.timerSecondsInput.value = clock.durationSec%60;
+      const editingTimer = document.activeElement === refs.timerMinutesInput || document.activeElement === refs.timerSecondsInput;
+      if (!editingTimer) {
+        refs.timerMinutesInput.value = Math.floor(clock.durationSec/60);
+        refs.timerSecondsInput.value = clock.durationSec%60;
+      }
     }
     refs.timerStartPauseBtn.textContent = clock.running
       ? 'Tạm dừng'
@@ -2102,9 +2114,31 @@
     return day === today ? hhmm : `${String(date.getDate()).padStart(2,'0')}/${String(date.getMonth()+1).padStart(2,'0')} ${hhmm}`;
   }
 
+  function handleTimerDraftInput(event) {
+    const input = event?.target;
+    if (!input) return;
+    // Cho phép ô trống tạm thời khi người dùng xóa số cũ để gõ số mới.
+    if (input.value === '') return;
+    const max = input === refs.timerMinutesInput ? 999 : 59;
+    const raw = String(input.value).replace(/[^0-9]/g,'');
+    if (raw === '') { input.value = ''; return; }
+    const value = Math.max(0,Math.min(max,Number.parseInt(raw,10) || 0));
+    input.value = String(value);
+    updateTimerDraftPreview();
+  }
+
+  function updateTimerDraftPreview() {
+    if (!refs.timerDialogDisplay) return;
+    const minutes = refs.timerMinutesInput.value === '' ? 0 : sanitizeInteger(refs.timerMinutesInput.value,0,999);
+    const seconds = refs.timerSecondsInput.value === '' ? 0 : sanitizeInteger(refs.timerSecondsInput.value,0,59);
+    refs.timerDialogDisplay.textContent = formatCountdown(Math.max(0,minutes*60+seconds));
+  }
+
   function syncTimerInputsSoft() {
-    refs.timerMinutesInput.value = sanitizeInteger(refs.timerMinutesInput.value,0,999);
-    refs.timerSecondsInput.value = sanitizeInteger(refs.timerSecondsInput.value,0,59);
+    const minutes = refs.timerMinutesInput.value === '' ? 0 : sanitizeInteger(refs.timerMinutesInput.value,0,999);
+    const seconds = refs.timerSecondsInput.value === '' ? 0 : sanitizeInteger(refs.timerSecondsInput.value,0,59);
+    refs.timerMinutesInput.value = String(minutes);
+    refs.timerSecondsInput.value = String(seconds);
   }
 
   function handleTimerInputChange() {
