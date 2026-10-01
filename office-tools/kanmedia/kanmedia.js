@@ -387,7 +387,7 @@ function renderEdit(h){
     '<div id="kmEditWork"></div></div>',progressCard(),'</div>'
   ].join('');
   const inp=h.querySelector('#kmEditInput'),drop=h.querySelector('#kmEditDrop');
-  function setFile(f){if(!f)return;kmState.editFile=f;if(kmState.editUrl)URL.revokeObjectURL(kmState.editUrl);kmState.editUrl=URL.createObjectURL(f);renderEditWork(h.querySelector('#kmEditWork'));}
+  function setFile(f){if(!f)return;kmState.editFile=f;kmState.editWave=null;kmState.editUploadId=null;kmState.editPreview=null;if(kmState.editUrl)URL.revokeObjectURL(kmState.editUrl);kmState.editUrl=URL.createObjectURL(f);renderEditWork(h.querySelector('#kmEditWork'));}
   inp.addEventListener('change',function(){setFile(inp.files[0]);});drop.addEventListener('click',function(){inp.click();});drop.addEventListener('dragover',function(e){e.preventDefault();drop.classList.add('dragover');});drop.addEventListener('dragleave',function(){drop.classList.remove('dragover');});drop.addEventListener('drop',function(e){e.preventDefault();drop.classList.remove('dragover');setFile(Array.from(e.dataTransfer.files).find(function(f){return /^(audio|video)\//.test(f.type);}));});
   if(kmState.editFile)renderEditWork(h.querySelector('#kmEditWork'));bindCancel();
 }
