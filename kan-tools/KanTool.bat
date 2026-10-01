@@ -165,23 +165,6 @@ powershell -NoProfile -Command "try{$r=Invoke-WebRequest -UseBasicParsing -Uri '
 if errorlevel 1 echo [CANH BAO] Capture chua phan hoi. Hay chay lai KanTool.bat neu Alt+C chua hoat dong.
 :CAPTURE_DONE
 
-:CAPTURE_SOURCE
-taskkill /IM KanbanCapture.exe /F >nul 2>nul
-echo     Capture EXE khong chay duoc. Dang dung ban source Python thay the...
-if not exist "%ROOT%\capture" mkdir "%ROOT%\capture"
-powershell -NoProfile -Command ^
- "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';" ^
- "Invoke-WebRequest -UseBasicParsing -Uri '%REPO%/capture-agent/capture_agent.py?ts=%RANDOM%' -OutFile '%ROOT%\capture\capture_agent.py';" ^
- "$pyw='%ROOT%\.venv\Scripts\pythonw.exe';$src='%ROOT%\capture\capture_agent.py';$baseKey='HKCU:\Software\Classes\kanbancapture';" ^
- "New-Item $baseKey -Force|Out-Null;Set-Item $baseKey -Value 'URL:Kanban Capture';New-ItemProperty $baseKey -Name 'URL Protocol' -Value '' -PropertyType String -Force|Out-Null;" ^
- "$cmdKey=$baseKey+'\shell\open\command';New-Item $cmdKey -Force|Out-Null;$pct=[char]37;Set-Item $cmdKey -Value ('\"'+$pyw+'\" \"'+$src+'\" \"'+$pct+'1\"');" ^
- "$run='HKCU:\Software\Microsoft\Windows\CurrentVersion\Run';New-ItemProperty $run -Name 'KanbanCapture' -Value ('\"'+$pyw+'\" \"'+$src+'\" --background') -PropertyType String -Force|Out-Null;"
-if errorlevel 1 (
- echo [CANH BAO] Cong cu Chup chua cai duoc. KanMedia van duoc cai tiep.
-) else (
- start "" /min "%ROOT%\.venv\Scripts\pythonw.exe" "%ROOT%\capture\capture_agent.py" --background
-)
-:CAPTURE_DONE
 
 echo [7/8] Cai Signing Agent dung chung...
 powershell -NoProfile -Command "Get-CimInstance Win32_Process -ErrorAction SilentlyContinue|Where-Object{$_.CommandLine -like '*kanban_signing_agent.py*'}|ForEach-Object{Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue}" >nul 2>nul
@@ -242,10 +225,9 @@ echo [LOI] KanMedia da cai file nhung dich vu local chua san sang.
 goto :FAIL
 :FAIL
 echo.
-echo Windows Security van duoc giu nguyen. Neu Capture.exe bi canh bao, hay chi cho
-echo phep sau khi ban xac minh file duoc tai tu repo KanBan cua chinh minh.
-echo Cach giam canh bao ben vung nhat cho EXE tuy bien la ky ma bang certificate
-echo code-signing; bo cai nay khong tu dong bo qua SmartScreen/Defender.
+echo Windows Security van duoc giu nguyen; bo cai khong tao Defender exclusion.
+echo Capture trong KanTool chay bang Python chinh thuc + source cong khai cua repo KanBan.
+echo Node va FFmpeg duoc tai tu nguon cong khai; KanTool khong giai ma EXE an trong BAT.
 echo.
 rmdir /s /q "%TMP%" >nul 2>nul
 pause
