@@ -283,17 +283,21 @@ New-Item $cmdKey -Force|Out-Null
 Set-Item $cmdKey -Value ('"'+$pyw+'" "'+$capture+'" "%1"')
 
 if($needCapture -or -not (Test-Url "http://127.0.0.1:47631/ping")){
-  Start-Process -FilePath $pyw -ArgumentList @($capture,"--background") -WindowStyle Hidden
+  Start-Process -FilePath $pyw -ArgumentList ('"'+$capture+'" --background') -WindowStyle Hidden
 }
 if($needSigning -or -not (Test-Url "http://127.0.0.1:8765/health" @{"X-KanBan-Agent"="linh-kanban-v1"})){
-  Start-Process -FilePath $pyw -ArgumentList @($signAgent) -WindowStyle Hidden
+  Start-Process -FilePath $pyw -ArgumentList ('"'+$signAgent+'"') -WindowStyle Hidden
 }
-Start-Process -FilePath $pyw -ArgumentList @((Join-Path $Runtime "kanmedia-server.py")) -WindowStyle Hidden
+$mediaServer=Join-Path $Runtime "kanmedia-server.py"
+Start-Process -FilePath $pyw -ArgumentList ('"'+$mediaServer+'"') -WindowStyle Hidden
 
 Write-Step "Kiểm tra sau cài đặt"
 $mediaOk=$false
 for($i=0;$i -lt 30;$i++){
-  if(Test-Url "http://127.0.0.1:47632/health" @{"X-KanBan-Agent"="linh-kanban-v1"} 2){$mediaOk=$true;break}
+  try{
+    $h=Invoke-RestMethod -Headers @{"X-KanBan-Agent"="linh-kanban-v1"} -Uri "http://127.0.0.1:47632/health" -TimeoutSec 2
+    if($h.ok -and $h.mediaReady){$mediaOk=$true;break}
+  }catch{}
   Start-Sleep -Milliseconds 300
 }
 if(-not $mediaOk){
