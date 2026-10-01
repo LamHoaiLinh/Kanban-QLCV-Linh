@@ -105,7 +105,7 @@ powershell -NoProfile -Command ^
  "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';$node='%NODEDIR%\node.exe';" ^
  "if(Test-Path $node){try{$v=(& $node --version).Trim().TrimStart('v').Split('.')[0];if([int]$v -ge 22){exit 0}}catch{}};" ^
  "$base='https://nodejs.org/dist/latest-v24.x/';$sum=Invoke-WebRequest -UseBasicParsing -Uri ($base+'SHASUMS256.txt');" ^
- "$line=($sum.Content -split '\r?\n'|Where-Object{$_ -match ' node-v.+-win-x64.zip ^
+ "$line=($sum.Content -split '\r?\n'|Where-Object{$_ -like '*win-x64.zip'}|Select-Object -First 1);if(-not $line){throw 'Khong tim thay Node Windows x64'};" ^
  "$parts=$line -split '\s+';$sha=$parts[0].ToLowerInvariant();$name=$parts[-1];$zip='%TMP%\node.zip';$out='%TMP%\node';" ^
  "Invoke-WebRequest -UseBasicParsing -Uri ($base+$name) -OutFile $zip;if((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne $sha){throw 'SHA256 Node khong khop'};" ^
  "Expand-Archive $zip $out -Force;$src=Get-ChildItem $out -Recurse -Filter node.exe|Select-Object -First 1;if(-not $src){throw 'Khong tim thay node.exe'};" ^
