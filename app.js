@@ -2,7 +2,7 @@
   'use strict';
 
   const STORAGE_KEY = 'linh_personal_kanban_v1';
-  const VERSION = 20;
+  const VERSION = 21;
   const DEFAULT_BACKGROUND_ID = 'bg6';
   const KAN_ALARM_AGENT = 'http://127.0.0.1:47632';
   const KAN_ALARM_HEADERS = {'X-KanBan-Agent':'linh-kanban-v1','Content-Type':'application/json'};
@@ -2289,8 +2289,10 @@
     if (candidate<base) return false;
 
     if (item.repeatMonthly) {
-      // Không dồn 29/30/31 sang cuối tháng nếu tháng hiện tại không có ngày đó.
-      if (candidate.getDate()===baseDay) return true;
+      // Nếu tháng hiện tại không có ngày gốc (29/30/31), dùng ngày cuối tháng.
+      const lastDayOfMonth=new Date(candidate.getFullYear(),candidate.getMonth()+1,0,12,0,0,0).getDate();
+      const effectiveDay=Math.min(baseDay,lastDayOfMonth);
+      if (candidate.getDate()===effectiveDay) return true;
     }
     if (item.repeatYearly) {
       if (candidate.getMonth()+1===baseMonth && candidate.getDate()===baseDay) return true;
