@@ -60,7 +60,7 @@ function CancelJob([string]$id){
  $sp=JobPath $id;if(-not(Test-Path $sp)){return $false};New-Item -ItemType File -Force (Join-Path $Jobs ($id+'.cancel'))|Out-Null
  try{$j=Get-Content -Raw $sp|ConvertFrom-Json;foreach($procId in @($j.childPid,$j.workerPid)){if([int]$procId -gt 0){Start-Process taskkill.exe -ArgumentList ('/PID '+[int]$procId+' /T /F') -WindowStyle Hidden -Wait -ErrorAction SilentlyContinue|Out-Null}}}catch{};return $true
 }
-$listener=New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback,$Port)
+$listener=[Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,$Port)
 try{$listener.Start()}catch{exit 0}
 while(-not $script:StopServer){
  try{$client=$listener.AcceptTcpClient()}catch{if($script:StopServer){break}else{continue}};$stream=$client.GetStream()
