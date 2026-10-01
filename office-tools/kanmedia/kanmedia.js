@@ -232,10 +232,23 @@ function renderEdit(h){
   inp.addEventListener('change',function(){setFile(inp.files[0]);});drop.addEventListener('click',function(){inp.click();});drop.addEventListener('dragover',function(e){e.preventDefault();drop.classList.add('dragover');});drop.addEventListener('dragleave',function(){drop.classList.remove('dragover');});drop.addEventListener('drop',function(e){e.preventDefault();drop.classList.remove('dragover');setFile(Array.from(e.dataTransfer.files).find(function(f){return /^(audio|video)\//.test(f.type);}));});
   if(kmState.editFile)renderEditWork(h.querySelector('#kmEditWork'));bindCancel();
 }
+async function drawKmWaveform(file,canvas,media){
+  if(!file||!canvas||file.size>80*1024*1024)return;
+  try{
+    const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
+    const ctx=new AC();const buf=await ctx.decodeAudioData(await file.arrayBuffer());const data=buf.getChannelData(0);
+    const dpr=Math.max(1,Math.min(2,window.devicePixelRatio||1));const rect=canvas.getBoundingClientRect();const width=Math.max(320,Math.floor(rect.width||700)),height=90;
+    canvas.width=width*dpr;canvas.height=height*dpr;const g=canvas.getContext('2d');g.scale(dpr,dpr);g.clearRect(0,0,width,height);
+    const style=getComputedStyle(canvas);g.strokeStyle=style.color||'#4b8d70';g.lineWidth=1;const buckets=Math.min(width,900),step=Math.max(1,Math.floor(data.length/buckets));g.beginPath();
+    for(let x=0;x<buckets;x++){let peak=0;const from=x*step,to=Math.min(data.length,from+step);for(let i=from;i<to;i++){const v=Math.abs(data[i]);if(v>peak)peak=v;}const px=x/buckets*width,amp=peak*(height*.46);g.moveTo(px,height/2-amp);g.lineTo(px,height/2+amp);}g.stroke();
+    canvas.onclick=function(e){if(!media||!Number.isFinite(media.duration))return;const r=canvas.getBoundingClientRect();const ratio=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));media.currentTime=ratio*media.duration;};
+    await ctx.close();
+  }catch(e){}
+}
 function renderEditWork(w){
   const f=kmState.editFile;if(!f){w.innerHTML='';return;}
   const isVideo=f.type.indexOf('video/')===0||/\.(mp4|mkv|mov|avi|webm)$/i.test(f.name);
-  const media=isVideo?'<video id="kmPreview" src="'+kmState.editUrl+'" controls preload="metadata"></video>':'<audio id="kmPreview" src="'+kmState.editUrl+'" controls preload="metadata"></audio>';
+  const media=isVideo?'<video id="kmPreview" src="'+kmState.editUrl+'" controls preload="metadata"></video>':'<audio id="kmPreview" src="'+kmState.editUrl+'" controls preload="metadata"></audio><canvas id="kmWaveform" class="km-waveform" data-tooltip="Waveform giúp bạn nhìn nhanh vùng có tiếng và bấm để nhảy tới vị trí cần cắt."></canvas>';
   w.innerHTML=[
     '<div class="km-edit-file"><strong>'+esc(f.name)+'</strong><span>'+bytes(f.size)+'</span></div><div class="km-preview">'+media+'</div>',
     '<div class="km-time-box"><div class="km-row"><button class="office-btn" id="kmSetStart" type="button">Đặt điểm đầu</button><label>Bắt đầu <input id="kmStart" type="number" min="0" step="0.01" value="0"></label><button class="office-btn" id="kmSetEnd" type="button">Đặt điểm cuối</button><label>Kết thúc <input id="kmEnd" type="number" min="0" step="0.01" value="0"></label></div>',
@@ -247,7 +260,7 @@ function renderEditWork(w){
     isVideo?'<label class="km-check"><input id="kmMute" type="checkbox"> Xóa tiếng video</label><label class="km-check"><input id="kmExtract" type="checkbox"> Lấy âm thanh thành MP3</label>':'',
     '</div><div class="km-row km-actions"><button class="office-btn" id="kmPreviewStart" type="button">Phát từ điểm đầu</button><button class="office-btn primary km-run" id="kmEditRun" type="button">Xuất file</button></div>'
   ].join('');
-  const p=w.querySelector('#kmPreview');kmState.edit={cut:'keep',speed:1};
+  const p=w.querySelector('#kmPreview');kmState.edit={cut:'keep',speed:1};if(!isVideo)queueMicrotask(function(){drawKmWaveform(f,w.querySelector('#kmWaveform'),p);});
   p.addEventListener('loadedmetadata',function(){w.querySelector('#kmEnd').value=Number.isFinite(p.duration)?p.duration.toFixed(2):0;});
   w.querySelector('#kmSetStart').addEventListener('click',function(){w.querySelector('#kmStart').value=(p.currentTime||0).toFixed(2);});
   w.querySelector('#kmSetEnd').addEventListener('click',function(){w.querySelector('#kmEnd').value=(p.currentTime||0).toFixed(2);});
