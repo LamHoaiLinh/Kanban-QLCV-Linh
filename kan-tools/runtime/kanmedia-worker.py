@@ -228,13 +228,14 @@ def resolve_height(formats: list[dict], quality: str) -> int:
 
 def download_one(url: str, kind: str, fmt: str, quality: str,
                  index: int, total: int, base: float, slice_pct: float) -> str:
+    status("running", base, f"Đang đọc thông tin link {index}/{total}…", "", index, total)
     info = yt_info(url)
     title = str(info.get("title") or f"Media {index}")
     status("running", base, f"Đang tải “{title}” — 0%", title, index, total)
     tmpl = str(DOWNLOADS / "%(title).180B [%(id)s].%(ext)s")
     args = [
         sys.executable, "-m", "yt_dlp",
-        "--js-runtimes", "node", "--no-playlist", "--newline", "--no-overwrites",
+        "--js-runtimes", "node", "--no-playlist", "--newline", "--progress", "--no-overwrites",
         "--embed-metadata", "--ffmpeg-location", str(BIN), "-o", tmpl,
         "--progress-template", "download:KM_PROGRESS:%(progress._percent_str)s",
         "--print", "after_move:KM_FILE:%(filepath)s",
