@@ -183,7 +183,7 @@ function Get-LiveMediaJob(){
 Write-Host "============================================================"
 Write-Host "  KANBAN TOOLS - CAI DAT / CAP NHAT THONG MINH"
 Write-Host "============================================================"
-Write-Host "  Chup man hinh - KanMedia - Ho tro ky so PDF"
+Write-Host "  Chup man hinh - KanMedia - Bao thuc Windows - Ho tro ky so PDF"
 Write-Host "  Mot bo cai duy nhat, cap nhat theo tung thanh phan."
 Write-Host "============================================================"
 
