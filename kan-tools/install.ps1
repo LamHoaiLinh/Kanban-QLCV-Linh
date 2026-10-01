@@ -53,6 +53,29 @@ function Download-File([string]$Relative,[string]$Target){
   Invoke-WebRequest -UseBasicParsing -Uri $u -OutFile $Target
   if(-not (Test-Path $Target) -or (Get-Item $Target).Length -lt 100){ throw "File tai ve khong hop le: $Relative" }
 }
+function Stage-LatestBootstrapper(){
+  try{
+    $stamp=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    $pending=Join-Path $Root "KanTool.pending.bat"
+    $dest=Join-Path $Root "KanTool.bat"
+    $url=("{0}/kan-tools/KanTool.bat?ts={1}" -f $Repo.TrimEnd("/"),$stamp)
+    Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $pending
+    if(-not(Test-Path $pending) -or (Get-Item $pending).Length -lt 700){
+      throw "KanTool.bat moi khong hop le."
+    }
+    $head=Get-Content -LiteralPath $pending -Raw
+    if($head.ToUpperInvariant() -notmatch "KANBAN TOOLS"){
+      throw "KanTool.bat moi khong dung dinh dang."
+    }
+    $parentPid=(Get-CimInstance Win32_Process -Filter "ProcessId=$PID").ParentProcessId
+    $pendingEsc=$pending.Replace("'","''")
+    $destEsc=$dest.Replace("'","''")
+    $cmd="`$p=$parentPid;while(Get-Process -Id `$p -ErrorAction SilentlyContinue){Start-Sleep -Milliseconds 350};Move-Item -LiteralPath '$pendingEsc' -Destination '$destEsc' -Force"
+    Start-Process powershell.exe -WindowStyle Hidden -ArgumentList @("-NoProfile","-ExecutionPolicy","Bypass","-Command",$cmd) | Out-Null
+  }catch{
+    Write-Host "  Khong dong bo duoc KanTool.bat luu tren may: $($_.Exception.Message)" -ForegroundColor Yellow
+  }
+}
 function Stop-Matching([string]$Pattern){
   Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
     Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -like $Pattern } |
@@ -309,6 +332,7 @@ if(-not $mediaOk){
 
 # Ghi dung manifest da cai de lan sau chi cap nhat thanh phan thay doi.
 Copy-Item -LiteralPath $ManifestPath -Destination $InstalledPath -Force
+Stage-LatestBootstrapper
 try{ Copy-Item -LiteralPath $MyInvocation.MyCommand.Path -Destination (Join-Path $Root "install.ps1") -Force }catch{}
 Remove-Item -Recurse -Force $TempDir -ErrorAction SilentlyContinue
 
