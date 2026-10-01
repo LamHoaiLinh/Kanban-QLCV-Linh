@@ -62,49 +62,47 @@ powershell -NoProfile -Command ^
 if errorlevel 1 goto :FAIL_RUNTIME
 
 echo [3/8] Chuan bi Python cho KanBan Tools...
-set "PY_CMD="
+set "PY_EXE="
+
 where py.exe >nul 2>nul
 if not errorlevel 1 (
-  py -3.14 -c "import sys" >nul 2>nul
-  if not errorlevel 1 set "PY_CMD=py -3.14"
+  for /f "usebackq delims=" %%P in (`py -3.14 -c "import sys;print(sys.executable)" 2^>nul`) do set "PY_EXE=%%P"
 )
-if not defined PY_CMD (
+if not defined PY_EXE (
   where py.exe >nul 2>nul
   if not errorlevel 1 (
-    py -3.13 -c "import sys" >nul 2>nul
-    if not errorlevel 1 set "PY_CMD=py -3.13"
+    for /f "usebackq delims=" %%P in (`py -3.13 -c "import sys;print(sys.executable)" 2^>nul`) do set "PY_EXE=%%P"
   )
 )
-if not defined PY_CMD (
+if not defined PY_EXE (
   where py.exe >nul 2>nul
   if not errorlevel 1 (
-    py -3.12 -c "import sys" >nul 2>nul
-    if not errorlevel 1 set "PY_CMD=py -3.12"
+    for /f "usebackq delims=" %%P in (`py -3.12 -c "import sys;print(sys.executable)" 2^>nul`) do set "PY_EXE=%%P"
   )
 )
-if not defined PY_CMD (
+if not defined PY_EXE (
   where python.exe >nul 2>nul
   if not errorlevel 1 (
-    python -c "import sys;raise SystemExit(0 if sys.version_info >= (3,12) else 1)" >nul 2>nul
-    if not errorlevel 1 set "PY_CMD=python"
+    for /f "usebackq delims=" %%P in (`python -c "import sys;print(sys.executable if sys.version_info >= (3,12) else '')" 2^>nul`) do if not "%%P"=="" set "PY_EXE=%%P"
   )
 )
-if not defined PY_CMD (
+
+if not defined PY_EXE (
   echo     May chua co Python phu hop. Dang tu cai Python theo pham vi nguoi dung...
   where winget.exe >nul 2>nul
   if not errorlevel 1 (
     winget install -e --id Python.Python.3.13 --scope user --accept-package-agreements --accept-source-agreements
   )
-  if exist "%LOCALAPPDATA%\Programs\Python\Python313\python.exe" set "PY_CMD=\"%LOCALAPPDATA%\Programs\Python\Python313\python.exe\""
-  if not defined PY_CMD (
+  if exist "%LOCALAPPDATA%\Programs\Python\Python313\python.exe" set "PY_EXE=%LOCALAPPDATA%\Programs\Python\Python313\python.exe"
+  if not defined PY_EXE (
     where py.exe >nul 2>nul
     if not errorlevel 1 (
-      py -3.13 -c "import sys" >nul 2>nul
-      if not errorlevel 1 set "PY_CMD=py -3.13"
+      for /f "usebackq delims=" %%P in (`py -3.13 -c "import sys;print(sys.executable)" 2^>nul`) do set "PY_EXE=%%P"
     )
   )
 )
-if not defined PY_CMD (
+
+if not defined PY_EXE (
   echo     Winget khong co/khong cai duoc. Dang tai Python 3.13.16 chinh thuc tu python.org...
   set "PYINST=%TMP%\python-3.13.16-amd64.exe"
   powershell -NoProfile -Command ^
@@ -115,15 +113,14 @@ if not defined PY_CMD (
   if errorlevel 1 goto :FAIL_PYTHON
   start /wait "" "%PYINST%" /quiet InstallAllUsers=0 Include_launcher=0 Include_pip=1 Include_test=0 PrependPath=0 Shortcuts=0 TargetDir="%ROOT%\python"
   if errorlevel 1 goto :FAIL_PYTHON
-  if exist "%ROOT%\python\python.exe" set "PY_CMD=\"%ROOT%\python\python.exe\""
+  if exist "%ROOT%\python\python.exe" set "PY_EXE=%ROOT%\python\python.exe"
 )
-if not defined PY_CMD goto :FAIL_PYTHON
 
-%PY_CMD% -c "import sys;print(sys.version)" >nul 2>nul
+if not defined PY_EXE goto :FAIL_PYTHON
+"%PY_EXE%" -c "import sys;print(sys.version)" >nul 2>nul
 if errorlevel 1 goto :FAIL_PYTHON
-
 if not exist "%ROOT%\.venv\Scripts\python.exe" (
-  %PY_CMD% -m venv "%ROOT%\.venv"
+  "%PY_EXE%" -m venv "%ROOT%\.venv"
   if errorlevel 1 goto :FAIL_PYTHON
 )
 "%ROOT%\.venv\Scripts\python.exe" -m pip install --disable-pip-version-check --upgrade pip setuptools wheel
