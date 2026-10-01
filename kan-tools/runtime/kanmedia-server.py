@@ -70,6 +70,7 @@ ALLOWED_ORIGINS = {
 LOCAL_ORIGIN_RE = re.compile(r"^http://(?:localhost|127\.0\.0\.1)(?::\d+)?$", re.I)
 CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000 if os.name == "nt" else 0)
 CREATE_NEW_CONSOLE = getattr(subprocess, "CREATE_NEW_CONSOLE", 0x00000010 if os.name == "nt" else 0)
+YTDLP_LAST_SELF_UPDATE = 0.0
 
 def log(message: str) -> None:
     try:
@@ -506,7 +507,7 @@ def health() -> dict:
     ready = bool(yt and nv and ff and FFPROBE.exists() and WORKER.exists())
     return {
         "ok": True,
-        "version": "KanMedia Agent 1.5.0",
+        "version": "KanMedia Agent 1.6.0",
         "mediaReady": ready,
         "ytDlp": yt,
         "ffmpeg": ff,
@@ -638,6 +639,40 @@ def cancel_job(job_id: str) -> bool:
     json_dump(status_path, data)
     return True
 
+def server_ytdlp_breakage(text: str) -> bool:
+    low = str(text or "").lower()
+    blocked = (
+        "private video", "members-only", "members only", "sign in to confirm",
+        "age-restricted", "age restricted", "not available in your country",
+        "geo-restricted", "copyright", "video unavailable", "login required",
+    )
+    if any(x in low for x in blocked):
+        return False
+    signals = (
+        "signature extraction failed", "nsig extraction failed",
+        "unable to extract", "failed to extract", "extractorerror",
+        "challenge solving failed", "player response",
+        "http error 403", "forbidden",
+    )
+    return any(x in low for x in signals)
+
+def server_update_ytdlp() -> bool:
+    global YTDLP_LAST_SELF_UPDATE
+    now = time.time()
+    if now - YTDLP_LAST_SELF_UPDATE < 300:
+        return False
+    YTDLP_LAST_SELF_UPDATE = now
+    try:
+        code, out, err = run_text([
+            sys.executable, "-m", "pip", "install",
+            "--disable-pip-version-check", "-U", "--pre", "yt-dlp[default]"
+        ], 240)
+        log("yt-dlp auto-update from probe: " + (out or err or ""))
+        return code == 0
+    except Exception as exc:
+        log("yt-dlp auto-update from probe failed: " + repr(exc))
+        return False
+
 def probe(payload: dict) -> dict:
     urls = []
     for u in payload.get("urls") or []:
@@ -660,8 +695,12 @@ def probe(payload: dict) -> dict:
         else:
             args += ["--no-playlist", "-J", url]
         code, out, err = run_text(args, 90)
+        combined = (out or "") + "\n" + (err or "")
+        if code != 0 and re.search(r"(?:youtube\\.com|youtu\\.be)", url, re.I) and server_ytdlp_breakage(combined):
+            if server_update_ytdlp():
+                code, out, err = run_text(args, 90)
         if code != 0 or not out:
-            raise RuntimeError(err or "Không đọc được thông tin nguồn.")
+            raise RuntimeError(err or out or "Không đọc được thông tin nguồn.")
         info = json.loads(out)
         if all_playlist and (info.get("_type") == "playlist" or info.get("entries")):
             entries = [x for x in (info.get("entries") or []) if x]
