@@ -289,6 +289,70 @@ def _probe_http(url: str, headers: dict | None = None, timeout: float = 1.2) -> 
     except Exception:
         return False
 
+def remote_json(url: str, timeout: float = 5.0) -> dict:
+    stamp = int(time.time() * 1000)
+    sep = "&" if "?" in url else "?"
+    req = urllib.request.Request(
+        f"{url}{sep}ts={stamp}",
+        headers={"User-Agent": "KanBanTools/1.0", "Cache-Control": "no-cache"},
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        raw = r.read(1024 * 1024)
+    return json.loads(raw.decode("utf-8-sig"))
+
+def version_tuple(value: str) -> tuple:
+    parts = re.findall(r"\d+", str(value or ""))
+    return tuple(int(x) for x in parts[:4]) if parts else (0,)
+
+def version_status() -> dict:
+    try:
+        installed = json_load(ROOT / "installed.json") if (ROOT / "installed.json").exists() else {}
+    except Exception:
+        installed = {}
+    latest = {}
+    error = ""
+    try:
+        latest = remote_json(REMOTE_MANIFEST, 5.0)
+    except Exception as exc:
+        error = str(exc)
+    current_v = str(installed.get("kanToolVersion") or installed.get("installerVersion") or "")
+    latest_v = str(latest.get("kanToolVersion") or latest.get("installerVersion") or "")
+    update_available = bool(latest_v and (not current_v or version_tuple(current_v) < version_tuple(latest_v)))
+    return {
+        "ok": not bool(error),
+        "currentVersion": current_v,
+        "latestVersion": latest_v,
+        "updateAvailable": update_available,
+        "error": error,
+    }
+
+def fetch_latest_kantool() -> Path:
+    target = ROOT / "KanTool.latest.bat"
+    stamp = int(time.time() * 1000)
+    req = urllib.request.Request(
+        f"{REMOTE_KANTOOL}?ts={stamp}",
+        headers={"User-Agent": "KanBanTools/1.0", "Cache-Control": "no-cache"},
+    )
+    with urllib.request.urlopen(req, timeout=15.0) as r:
+        raw = r.read(1024 * 1024)
+    if len(raw) < 700 or b"KANBAN TOOLS" not in raw.upper():
+        raise RuntimeError("KanTool.bat mới tải về không hợp lệ.")
+    tmp = target.with_suffix(".tmp")
+    tmp.write_bytes(raw)
+    tmp.replace(target)
+    return target
+
+def launch_latest_kantool(mode: str) -> Path:
+    if os.name != "nt":
+        raise RuntimeError("Cập nhật KanBan Tools hiện chỉ hỗ trợ Windows.")
+    latest = fetch_latest_kantool()
+    subprocess.Popen(
+        [os.environ.get("COMSPEC", "cmd.exe"), "/c", str(latest), mode],
+        cwd=str(ROOT),
+        creationflags=CREATE_NEW_CONSOLE,
+    )
+    return latest
+
 def diagnostics() -> dict:
     checks = []
     def add(key: str, label: str, ok: bool, detail: str = ""):
@@ -334,11 +398,21 @@ def diagnostics() -> dict:
         installed = json_load(ROOT / "installed.json") if (ROOT / "installed.json").exists() else {}
     except Exception:
         installed = {}
+    versions = version_status()
+    version_ok = bool(versions.get("latestVersion")) and not bool(versions.get("updateAvailable"))
+    version_detail = ""
+    if versions.get("latestVersion"):
+        version_detail = ("Máy " + (versions.get("currentVersion") or "chưa xác định") +
+                          " / mới nhất " + versions.get("latestVersion"))
+    elif versions.get("error"):
+        version_detail = "Chưa kiểm tra được GitHub: " + str(versions.get("error"))
+    add("version", "Phiên bản KanBan Tools", version_ok, version_detail)
     return {
         "ok": True,
         "allOk": all(x["ok"] for x in checks),
         "checks": checks,
         "installed": installed,
+        "versions": versions,
         "activeJob": active_job(),
     }
 
@@ -377,7 +451,7 @@ def health() -> dict:
     ready = bool(yt and nv and ff and FFPROBE.exists() and WORKER.exists())
     return {
         "ok": True,
-        "version": "KanMedia Agent 1.4",
+        "version": "KanMedia Agent 1.4.1",
         "mediaReady": ready,
         "ytDlp": yt,
         "ffmpeg": ff,
@@ -634,6 +708,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/system/diagnostics":
                 self._json(diagnostics())
                 return
+            if path == "/system/version":
+                self._json(version_status())
+                return
             m = re.fullmatch(r"/jobs/([a-f0-9]{32})", path)
             if m:
                 p = job_path(m.group(1))
@@ -699,32 +776,16 @@ class Handler(BaseHTTPRequestHandler):
                 if running_jobs():
                     self._error("Hãy chờ tác vụ Media hiện tại hoàn tất rồi sửa công cụ.", 409)
                     return
-                if not INSTALLER.exists():
-                    self._error("Không tìm thấy KanTool.bat.", 404)
-                    return
-                if os.name == "nt":
-                    subprocess.Popen(
-                        [os.environ.get("COMSPEC", "cmd.exe"), "/c", str(INSTALLER), "/repair"],
-                        cwd=str(ROOT),
-                        creationflags=CREATE_NEW_CONSOLE,
-                    )
-                self._json({"ok": True})
+                latest = launch_latest_kantool("/repair")
+                self._json({"ok": True, "bootstrap": str(latest), "source": "github-main"})
                 return
             if path == "/system/update":
                 self._read_json()
                 if running_jobs():
                     self._error("Hãy chờ tác vụ Media hiện tại hoàn tất rồi cập nhật.", 409)
                     return
-                if not INSTALLER.exists():
-                    self._error("Không tìm thấy KanTool.bat.", 404)
-                    return
-                if os.name == "nt":
-                    subprocess.Popen(
-                        [os.environ.get("COMSPEC", "cmd.exe"), "/c", str(INSTALLER), "/update"],
-                        cwd=str(ROOT),
-                        creationflags=CREATE_NEW_CONSOLE,
-                    )
-                self._json({"ok": True})
+                latest = launch_latest_kantool("/update")
+                self._json({"ok": True, "bootstrap": str(latest), "source": "github-main"})
                 return
             if path == "/shutdown":
                 self._read_json()
