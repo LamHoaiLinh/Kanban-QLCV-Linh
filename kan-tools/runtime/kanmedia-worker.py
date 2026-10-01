@@ -29,6 +29,7 @@ LOG = JOBS / f"{JOB_ID}.worker.log"
 CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000 if os.name == "nt" else 0)
 
 DOWNLOADS.mkdir(parents=True, exist_ok=True)
+YTDLP_REPAIR_ATTEMPTED = False
 
 def log(msg: str) -> None:
     try:
@@ -62,7 +63,7 @@ def status(state: str, percent: float, message: str, current: str = "", index: i
         "eta": eta,
         "stage": stage,
         "updatedAt": time.time(),
-        "workerVersion": "1.5.0",
+        "workerVersion": "1.6.0",
         "workerPid": os.getpid(),
         "childPid": child_pid,
     })
@@ -205,13 +206,75 @@ def rename_from_metadata(path: Path) -> Path:
         log("Metadata rename skipped: " + repr(exc))
     return path
 
+def is_youtube_url(url: str) -> bool:
+    return bool(re.search(r"(?:youtube\.com|youtu\.be)", str(url or ""), re.I))
+
+def looks_like_ytdlp_breakage(text: str) -> bool:
+    low = str(text or "").lower()
+    access_errors = (
+        "private video", "members-only", "members only", "sign in to confirm",
+        "age-restricted", "age restricted", "not available in your country",
+        "geo-restricted", "copyright", "this video is unavailable",
+        "video unavailable", "login required",
+    )
+    if any(x in low for x in access_errors):
+        return False
+    breakage = (
+        "signature extraction failed", "nsig extraction failed",
+        "unable to extract", "failed to extract", "extractorerror",
+        "challenge solving failed", "player response",
+        "http error 403", "forbidden",
+    )
+    return any(x in low for x in breakage)
+
+def auto_update_ytdlp(reason: str) -> bool:
+    global YTDLP_REPAIR_ATTEMPTED
+    if YTDLP_REPAIR_ATTEMPTED:
+        return False
+    YTDLP_REPAIR_ATTEMPTED = True
+    try:
+        current = {}
+        try:
+            if STATUS.exists():
+                current = load_json(STATUS)
+        except Exception:
+            current = {}
+        pct = float(current.get("percent") or 1)
+        status("running", pct, "YouTube vừa thay đổi. Đang tự cập nhật bộ tải…",
+               str(current.get("current") or ""), int(current.get("index") or 0),
+               int(current.get("total") or 0), stage="selfrepair")
+        log("yt-dlp self-heal triggered: " + str(reason))
+        before_code, before = run_capture([sys.executable, "-m", "yt_dlp", "--version"], 20)
+        code, output = run_capture([
+            sys.executable, "-m", "pip", "install",
+            "--disable-pip-version-check", "-U", "--pre", "yt-dlp[default]"
+        ], 240)
+        if code != 0:
+            log("yt-dlp self-heal failed: " + output)
+            return False
+        after_code, after = run_capture([sys.executable, "-m", "yt_dlp", "--version"], 20)
+        log("yt-dlp self-heal version: " + before.strip() + " -> " + after.strip())
+        status("running", pct, "Đã cập nhật bộ tải. Đang thử lại tự động…",
+               str(current.get("current") or ""), int(current.get("index") or 0),
+               int(current.get("total") or 0), stage="selfrepair")
+        return after_code == 0
+    except KeyboardInterrupt:
+        raise
+    except Exception as exc:
+        log("yt-dlp self-heal exception: " + repr(exc))
+        return False
+
 def yt_info(url: str) -> dict:
-    code, out = run_capture([
+    args = [
         sys.executable, "-m", "yt_dlp",
         "--no-playlist", "--skip-download", "--js-runtimes", "node", "-J", url
-    ], 90)
+    ]
+    code, out = run_capture(args, 90)
+    if code != 0 and is_youtube_url(url) and looks_like_ytdlp_breakage(out):
+        if auto_update_ytdlp(out):
+            code, out = run_capture(args, 90)
     if code != 0:
-        raise RuntimeError("Không đọc được thông tin video.")
+        raise RuntimeError("Không đọc được thông tin video. " + (out.strip().splitlines()[-1] if out.strip() else ""))
     return json.loads(out)
 
 def resolve_height(formats: list[dict], quality: str) -> int:
@@ -354,7 +417,17 @@ def download_one(url: str, kind: str, fmt: str, quality: str,
         elif line.startswith("KM_FILE:"):
             output_file["path"] = line.split(":", 1)[1].strip()
 
-    run_lines(args, line_cb)
+    try:
+        run_lines(args, line_cb)
+    except RuntimeError as exc:
+        detail = str(exc)
+        if is_youtube_url(url) and looks_like_ytdlp_breakage(detail) and auto_update_ytdlp(detail):
+            output_file["path"] = ""
+            status("running", base, "Đang thử tải lại sau khi tự cập nhật…",
+                   playlist_state["title"] or title, index, total, stage="selfrepair")
+            run_lines(args, line_cb)
+        else:
+            raise
     shown = playlist_state["title"] or title
     status("running", base + slice_pct * 0.995, f"Đang hoàn tất file “{shown}”", shown,
            playlist_state["item"] or index, playlist_state["count"] or total)
