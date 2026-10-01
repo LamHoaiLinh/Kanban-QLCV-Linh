@@ -2288,7 +2288,22 @@
       const raw=extractImportedSpecialDates(parsed);
       if (!Array.isArray(raw)) throw new Error('missing-special-dates');
 
-      const incoming=normalizeSpecialDates(raw);
+      const incoming=raw.map(item=>{
+        const type=item?.type==='memorial' ? 'memorial' : item?.type==='birthday' ? 'birthday' : null;
+        const name=String(item?.name || '').trim().slice(0,80);
+        const day=Number.parseInt(item?.day,10);
+        const month=Number.parseInt(item?.month,10);
+        const yearRaw=item?.year===null || item?.year==='' || item?.year===undefined ? null : Number.parseInt(item.year,10);
+        if (!type || !name || !Number.isFinite(day) || !Number.isFinite(month)) return null;
+        if (day<1 || day>(type==='memorial'?30:31) || month<1 || month>12) return null;
+        if (yearRaw!==null && (!Number.isFinite(yearRaw) || yearRaw<1800 || yearRaw>2200)) return null;
+        if (type==='birthday') {
+          const checkYear=yearRaw || 2000;
+          const test=new Date(checkYear,month-1,day,12,0,0,0);
+          if (test.getFullYear()!==checkYear || test.getMonth()!==month-1 || test.getDate()!==day) return null;
+        }
+        return {id:uid('date'),type,name,day,month,year:yearRaw,leap:false};
+      }).filter(Boolean);
       if (!incoming.length) {
         showToast('File không có Sinh nhật / Ngày giỗ hợp lệ.');
         return;
