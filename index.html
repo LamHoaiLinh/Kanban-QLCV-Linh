@@ -301,7 +301,7 @@
         <div><strong>14. Sinh nhật / Ngày giỗ:</strong> trong cửa sổ Đồng hồ, mở tab “Sinh nhật / Ngày giỗ”. Sinh nhật dùng dương lịch, ngày giỗ dùng âm lịch; nhập dd/mm hoặc dd/mm/yyyy nếu biết năm. Có thể tìm theo tên hoặc lọc theo tháng.</div>
         <div><strong>15. Dải nhắc ngày đặc biệt:</strong> KanBan nhắc trước 2 ngày, ngày mai và hôm nay. Có thể bỏ tick “Nhắc” ngay trên dải để ẩn chữ chạy.</div>
         <div><strong>16. Sao lưu lịch nhắc:</strong> danh sách sinh nhật/ngày giỗ và Lịch Công việc đều được lưu chung trong “Xuất bản sao JSON” và được khôi phục khi nhập lại file backup.</div>
-        <div><strong>17. Lịch Công việc:</strong> trong cửa sổ Đồng hồ, mở tab “Lịch Công việc”, nhập nội dung và ngày thực hiện. KanBan sẽ nhắc trước 2 ngày, ngày mai và hôm nay bằng dải màu riêng.</div>
+        <div><strong>17. Lịch Công việc:</strong> trong cửa sổ Đồng hồ, mở tab “Lịch Công việc”, nhập nội dung và ngày thực hiện. Có thể chọn lặp hàng tháng hoặc hàng năm; KanBan vẫn nhắc trước 2 ngày, ngày mai và hôm nay bằng dải màu riêng.</div>
         <div><strong>18. Năm sinh/năm giỗ:</strong> có thể nhập dd/mm nếu không nhớ năm; nếu biết năm thì nhập dd/mm/yyyy. Việc nhắc vẫn lặp hằng năm theo ngày/tháng.</div>
         <div><strong>19. Chia sẻ ngày gia đình:</strong> trong tab “Sinh nhật / Ngày giỗ”, dùng “Xuất JSON” để tạo file riêng và gửi cho người khác. “Nhập JSON” sẽ gộp thêm vào danh sách hiện có và tự bỏ qua mục trùng.</div>
       </div>
@@ -532,7 +532,7 @@
       <div id="clockWorkPanel" class="clock-tab-panel" hidden>
         <div class="work-date-intro">
           <strong>Lịch Công việc · Nhắc trước 2 ngày</strong>
-          <span>Công việc là lịch một lần theo ngày dương cụ thể. Chỉ chạy chữ nhắc, không phát chuông.</span>
+          <span>Có thể dùng một lần, lặp hàng tháng hoặc lặp hàng năm. Chỉ chạy chữ nhắc, không phát chuông.</span>
         </div>
 
         <div class="work-date-form">
@@ -544,6 +544,16 @@
             <span>Ngày thực hiện</span>
             <input id="workDateInput" type="date">
           </label>
+          <div class="work-repeat-options">
+            <label class="work-repeat-option">
+              <input id="workRepeatMonthlyInput" type="checkbox">
+              <span><strong>Lặp lại hàng tháng</strong><small>Cùng ngày mỗi tháng, tự tiếp tục qua các năm.</small></span>
+            </label>
+            <label class="work-repeat-option">
+              <input id="workRepeatYearlyInput" type="checkbox">
+              <span><strong>Lặp lại hàng năm</strong><small>Cùng ngày/tháng mỗi năm.</small></span>
+            </label>
+          </div>
           <div class="work-date-form-actions">
             <div class="special-date-edit-actions">
               <button id="addWorkDateBtn" class="primary-btn work-primary-btn" type="button">＋ Thêm vào lịch</button>
