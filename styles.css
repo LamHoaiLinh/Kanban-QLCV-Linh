@@ -1375,3 +1375,170 @@ body.kalo-open{overflow:hidden!important}
 @media(max-width:700px){
   .special-date-filterbar{grid-template-columns:1fr}
 }
+
+/* ===== Clock header compact v3.5 =====
+   Desktop: clock ends level with Notes, lunar date lives in countdown cell,
+   and vertical chrome is reduced to give the board more working height. */
+@media(min-width:901px){
+  .topbar{
+    padding:10px 18px 7px;
+  }
+  .topbar-main{
+    gap:8px;
+  }
+  .project-notes-bar{
+    min-height:34px;
+    margin-top:4px;
+    padding:0;
+  }
+  .project-note-tabs{padding:1px}
+  .project-note-tab{
+    height:30px;
+    padding:0 12px;
+    font-size:12px;
+  }
+  .project-note-add{
+    width:30px;
+    height:30px;
+    font-size:19px;
+  }
+
+  .desk-clock{
+    align-self:flex-end;
+    min-width:336px;
+    max-width:390px;
+    padding:5px 7px;
+    border-radius:14px;
+  }
+  .desk-clock-head{
+    grid-template-columns:minmax(0,1fr) auto;
+    gap:5px;
+    align-items:start;
+  }
+  .desk-clock-face{
+    grid-template-columns:minmax(0,1fr) 112px;
+    gap:6px;
+    align-items:stretch;
+  }
+  .desk-clock-main{
+    min-width:0;
+    padding:6px 9px;
+    border-radius:12px;
+  }
+  .desk-clock-side{
+    min-width:0;
+    min-height:0;
+    padding:6px 8px;
+    gap:2px;
+    border-radius:11px;
+    align-content:center;
+  }
+  .clock-day-period{
+    margin-bottom:1px;
+    font-size:9px;
+    line-height:1.05;
+  }
+  .clock-current-time{
+    display:block;
+    width:100%;
+    overflow:visible;
+    white-space:nowrap;
+    font-size:clamp(25px,2.05vw,34px);
+    line-height:.96;
+    letter-spacing:-.065em;
+  }
+  .clock-date-line{
+    margin-top:4px;
+    gap:6px;
+    font-size:9px;
+    line-height:1.05;
+  }
+  .clock-side-title{
+    font-size:8.5px;
+    line-height:1;
+  }
+  .timer-display{
+    white-space:nowrap;
+    font-size:clamp(19px,1.45vw,23px);
+    line-height:1;
+    letter-spacing:-.055em;
+  }
+  .clock-status{
+    font-size:9px;
+    line-height:1.05;
+  }
+  .clock-lunar-date{
+    margin-top:1px;
+    font-size:8.5px;
+    line-height:1.05;
+    white-space:nowrap;
+  }
+  .desk-clock-actions{
+    gap:4px;
+  }
+  .clock-toggle-btn{
+    width:29px;
+    height:29px;
+    min-width:29px;
+    min-height:29px;
+    font-size:13px;
+  }
+  .quick-stop-alarm{
+    min-width:29px;
+    height:24px;
+    padding:0 4px;
+    border-radius:7px;
+    font-size:8px;
+  }
+
+  .special-reminder-bar{
+    min-height:24px;
+    margin-top:4px;
+    padding:1px 4px 1px 7px;
+    border-radius:8px;
+  }
+  .special-reminder-track{height:18px}
+  .special-reminder-text{
+    top:1px;
+    font-size:10px;
+    line-height:16px;
+  }
+  .special-reminder-toggle{
+    height:18px;
+    font-size:8px;
+  }
+  .topbar-sub{
+    margin-top:5px;
+    gap:9px;
+  }
+  .search-box{
+    height:36px;
+    border-radius:11px;
+  }
+  .stat-pill{
+    height:29px;
+    font-size:11px;
+  }
+  .board{
+    padding-top:12px;
+  }
+}
+
+@media(min-width:901px) and (max-width:1200px){
+  .desk-clock{
+    min-width:310px;
+    max-width:345px;
+  }
+  .desk-clock-face{
+    grid-template-columns:minmax(0,1fr) 103px;
+  }
+  .clock-current-time{
+    font-size:clamp(23px,2.25vw,30px)!important;
+  }
+  .timer-display{
+    font-size:19px!important;
+  }
+  .clock-lunar-date{
+    font-size:8px;
+  }
+}
