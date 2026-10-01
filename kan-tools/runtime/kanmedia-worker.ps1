@@ -19,7 +19,7 @@ function Run-Lines([string]$exe,[string[]]$args,[scriptblock]$onLine,[switch]$Al
  Check-Cancel;$parts=New-Object System.Collections.Generic.List[string];$parts.Add((Q $exe));foreach($a in $args){$parts.Add((Q ([string]$a)))}
  $cmd=($parts -join ' ')+' 2>&1';$q=[char]34
  $psi=New-Object Diagnostics.ProcessStartInfo;$psi.FileName=$env:ComSpec;$psi.Arguments='/d /s /c '+$q+$cmd+$q;$psi.UseShellExecute=$false;$psi.CreateNoWindow=$true;$psi.RedirectStandardOutput=$true
- $p=New-Object Diagnostics.Process;$p.StartInfo=$psi;[void]$p.Start();$script:ChildPid=$p.Id;Set-Status 'running' 1 'Đang xử lý…'
+ $p=New-Object Diagnostics.Process;$p.StartInfo=$psi;[void]$p.Start();$script:ChildPid=$p.Id
  while(-not $p.StandardOutput.EndOfStream){$line=$p.StandardOutput.ReadLine();if($line){& $onLine $line};Check-Cancel}
  $p.WaitForExit();$code=$p.ExitCode;$script:ChildPid=0;Check-Cancel
  if($code -ne 0 -and -not $AllowFail){throw 'Tiến trình xử lý kết thúc với mã '+$code+'.'};return $code
