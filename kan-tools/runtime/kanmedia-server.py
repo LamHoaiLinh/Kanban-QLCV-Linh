@@ -258,7 +258,62 @@ def waveform_preview(payload: dict) -> dict:
         "name": str(meta.get("name") or src.name),
     }
 
+def process_alive(pid: int) -> bool:
+    pid = int(pid or 0)
+    if pid <= 0:
+        return False
+    if pid == os.getpid():
+        return True
+    if os.name == "nt":
+        try:
+            import ctypes
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            handle = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+            if handle:
+                ctypes.windll.kernel32.CloseHandle(handle)
+                return True
+            return False
+        except Exception:
+            return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except Exception:
+        return False
+
+def mark_orphan_job(path: Path, data: dict, reason: str) -> dict:
+    out = dict(data or {})
+    out.update({
+        "ok": False,
+        "state": "error",
+        "message": "Tác vụ cũ đã dừng.",
+        "error": reason,
+        "childPid": 0,
+        "updatedAt": time.time(),
+    })
+    json_dump(path, out)
+    return out
+
+def reconcile_jobs() -> None:
+    now = time.time()
+    for path in JOBS.glob("*.status.json"):
+        try:
+            data = json_load(path)
+            state = str(data.get("state", ""))
+            if state not in {"queued", "running"}:
+                continue
+            pid = int(data.get("workerPid") or 0)
+            age = max(0.0, now - path.stat().st_mtime)
+            if pid > 0:
+                if not process_alive(pid):
+                    mark_orphan_job(path, data, "Bộ xử lý của tác vụ này không còn chạy. KanMedia đã tự dọn trạng thái treo.")
+            elif age > 20:
+                mark_orphan_job(path, data, "Tác vụ không khởi động được worker trong thời gian cho phép.")
+        except Exception:
+            pass
+
 def active_job() -> dict | None:
+    reconcile_jobs()
     candidates = []
     for p in JOBS.glob("*.status.json"):
         try:
@@ -451,7 +506,7 @@ def health() -> dict:
     ready = bool(yt and nv and ff and FFPROBE.exists() and WORKER.exists())
     return {
         "ok": True,
-        "version": "KanMedia Agent 1.4.1",
+        "version": "KanMedia Agent 1.5.0",
         "mediaReady": ready,
         "ytDlp": yt,
         "ffmpeg": ff,
@@ -466,6 +521,7 @@ def job_path(job_id: str) -> Path:
     return JOBS / f"{job_id}.status.json"
 
 def running_jobs() -> bool:
+    reconcile_jobs()
     for path in JOBS.glob("*.status.json"):
         try:
             state = str(json_load(path).get("state", ""))
@@ -486,8 +542,8 @@ def start_job(mode: str, payload: dict) -> dict:
     req = {"jobId": job_id, "mode": mode, "created": time.strftime("%Y-%m-%dT%H:%M:%S"), "payload": payload}
     json_dump(JOBS / f"{job_id}.request.json", req)
     json_dump(job_path(job_id), {
-        "ok": True, "state": "queued", "percent": 0, "message": "Đang chuẩn bị…",
-        "workerPid": 0, "childPid": 0, "mode": mode,
+        "ok": True, "state": "queued", "percent": 0, "message": "Đang khởi động bộ xử lý…",
+        "workerPid": 0, "childPid": 0, "mode": mode, "updatedAt": time.time(),
     })
     creation = CREATE_NO_WINDOW if os.name == "nt" else 0
     worker_log = JOBS / f"{job_id}.launcher.log"
@@ -503,6 +559,13 @@ def start_job(mode: str, payload: dict) -> dict:
         encoding="utf-8",
         errors="replace",
     )
+    try:
+        queued = json_load(job_path(job_id))
+        queued["workerPid"] = proc.pid
+        queued["updatedAt"] = time.time()
+        json_dump(job_path(job_id), queued)
+    except Exception:
+        pass
     def watch():
         code = proc.wait()
         try:
@@ -513,7 +576,7 @@ def start_job(mode: str, payload: dict) -> dict:
             current = json_load(job_path(job_id))
         except Exception:
             current = {}
-        if code != 0 and str(current.get("state", "")) not in {"done", "error", "cancelled"}:
+        if str(current.get("state", "")) not in {"done", "error", "cancelled"}:
             detail = ""
             for candidate in (JOBS / f"{job_id}.worker.log", worker_log):
                 try:
@@ -532,30 +595,47 @@ def start_job(mode: str, payload: dict) -> dict:
                 "index": int(current.get("index") or 0),
                 "total": int(current.get("total") or 0),
                 "output": "",
-                "error": detail or f"Worker kết thúc với mã {code}.",
+                "error": detail or (f"Worker kết thúc với mã {code}." if code != 0 else "Worker đã thoát nhưng chưa trả trạng thái hoàn tất."),
                 "workerPid": proc.pid,
                 "childPid": 0,
+                "updatedAt": time.time(),
             })
     threading.Thread(target=watch, daemon=True).start()
     return {"ok": True, "jobId": job_id, "workerPid": proc.pid}
 
 def cancel_job(job_id: str) -> bool:
-    status = job_path(job_id)
-    if not status.exists():
+    status_path = job_path(job_id)
+    if not status_path.exists():
         return False
     (JOBS / f"{job_id}.cancel").touch()
     try:
-        data = json_load(status)
-        for key in ("childPid", "workerPid"):
-            pid = int(data.get(key) or 0)
-            if pid > 0 and os.name == "nt":
-                subprocess.run(
-                    ["taskkill.exe", "/PID", str(pid), "/T", "/F"],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                    creationflags=CREATE_NO_WINDOW,
-                )
+        data = json_load(status_path)
     except Exception:
-        pass
+        data = {}
+    for key in ("childPid", "workerPid"):
+        try:
+            pid = int(data.get(key) or 0)
+            if pid > 0 and process_alive(pid):
+                if os.name == "nt":
+                    subprocess.run(
+                        ["taskkill.exe", "/PID", str(pid), "/T", "/F"],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                        creationflags=CREATE_NO_WINDOW,
+                        timeout=8,
+                    )
+                else:
+                    os.kill(pid, 9)
+        except Exception:
+            pass
+    data.update({
+        "ok": True,
+        "state": "cancelled",
+        "percent": float(data.get("percent") or 0),
+        "message": "Đã hủy tác vụ.",
+        "childPid": 0,
+        "updatedAt": time.time(),
+    })
+    json_dump(status_path, data)
     return True
 
 def probe(payload: dict) -> dict:
@@ -829,6 +909,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     cleanup_stale_files()
+    reconcile_jobs()
     log(f"START Python={sys.executable} port={PORT}")
     try:
         server = KanMediaHTTPServer((HOST, PORT), Handler)
