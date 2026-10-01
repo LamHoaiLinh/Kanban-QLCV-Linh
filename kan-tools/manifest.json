@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "kanToolVersion": "2.1.1",
-  "installerVersion": "2.0.2",
+  "kanToolVersion": "2.1.2",
+  "installerVersion": "2.0.3",
   "pythonFallback": {
     "version": "3.13.16",
     "url": "https://www.python.org/ftp/python/3.13.16/python-3.13.16-amd64.exe"
