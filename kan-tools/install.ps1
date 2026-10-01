@@ -152,6 +152,34 @@ function Ensure-Python(){
   return $venvPy
 }
 
+function Get-LiveMediaJob(){
+  if(-not (Test-Path $Jobs)){ return $null }
+  foreach($file in Get-ChildItem $Jobs -Filter "*.status.json" -ErrorAction SilentlyContinue){
+    try{
+      $j=Get-Content $file.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+      if($j.state -ne "queued" -and $j.state -ne "running"){ continue }
+      $pidValue=0
+      try{$pidValue=[int]$j.workerPid}catch{}
+      $age=((Get-Date)-(Get-Item $file.FullName).LastWriteTime).TotalSeconds
+      $alive=$false
+      if($pidValue -gt 0){
+        $alive=[bool](Get-Process -Id $pidValue -ErrorAction SilentlyContinue)
+      }
+      if($alive){ return $file }
+      if($pidValue -le 0 -and $age -le 20){ return $file }
+
+      $j.state="error"
+      $j.ok=$false
+      $j.message="Tac vu cu da dung."
+      $j.error="Installer da tu dong don job KanMedia mo coi truoc khi cap nhat."
+      $j.childPid=0
+      $j | ConvertTo-Json -Depth 8 -Compress | Set-Content -LiteralPath $file.FullName -Encoding UTF8
+      Write-Host "  Da don job KanMedia cu: $($file.BaseName)" -ForegroundColor DarkGray
+    }catch{}
+  }
+  return $null
+}
+
 Write-Host "============================================================"
 Write-Host "  KANBAN TOOLS - CAI DAT / CAP NHAT THONG MINH"
 Write-Host "============================================================"
@@ -159,17 +187,14 @@ Write-Host "  Chup man hinh - KanMedia - Ho tro ky so PDF"
 Write-Host "  Mot bo cai duy nhat, cap nhat theo tung thanh phan."
 Write-Host "============================================================"
 
-# Khong update giua luc dang co job Media.
-if(-not $Force -and (Test-Path $Jobs)){
-  $running = Get-ChildItem $Jobs -Filter "*.status.json" -ErrorAction SilentlyContinue | ForEach-Object {
-    try{
-      $j=Get-Content $_.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
-      if($j.state -eq "queued" -or $j.state -eq "running"){ $_ }
-    }catch{}
-  } | Select-Object -First 1
+# Chi chan cap nhat neu worker KanMedia thuc su con song.
+if(-not $Force){
+  $running=Get-LiveMediaJob
   if($running){
-    throw "KanMedia dang co tac vu chay. Hay cho hoan tat hoac dung che do sua chua."
+    throw "KanMedia dang co tac vu that su dang chay. Hay cho hoan tat hoac bam Huy truoc khi cap nhat."
   }
+}else{
+  Get-LiveMediaJob | Out-Null
 }
 
 Write-Step "Dung KanMedia cu"
