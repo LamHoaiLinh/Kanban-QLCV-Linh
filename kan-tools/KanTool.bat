@@ -150,6 +150,7 @@ if errorlevel 1 goto :CAPTURE_SOURCE
 goto :CAPTURE_DONE
 
 :CAPTURE_SOURCE
+taskkill /IM KanbanCapture.exe /F >nul 2>nul
 echo     Capture EXE khong chay duoc. Dang dung ban source Python thay the...
 if not exist "%ROOT%\capture" mkdir "%ROOT%\capture"
 powershell -NoProfile -Command ^
