@@ -48,9 +48,10 @@ function Need-Component([string]$Name,[string[]]$RequiredFiles=@()){
   return $false
 }
 function Download-File([string]$Relative,[string]$Target){
-  $u = "$Repo/$Relative?ts=$([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())"
+  $stamp = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+  $u = "{0}/{1}?ts={2}" -f $Repo.TrimEnd("/"), $Relative.TrimStart("/"), $stamp
   Invoke-WebRequest -UseBasicParsing -Uri $u -OutFile $Target
-  if(-not (Test-Path $Target) -or (Get-Item $Target).Length -lt 100){ throw "File tải về không hợp lệ: $Relative" }
+  if(-not (Test-Path $Target) -or (Get-Item $Target).Length -lt 100){ throw "File tai về khong hop lệ: $Relative" }
 }
 function Stop-Matching([string]$Pattern){
   Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
@@ -95,7 +96,7 @@ function Ensure-Python(){
 
   $base = Find-BasePython
   if(-not $base){
-    Write-Host "  Máy chưa có Python phù hợp. Đang thử cài tự động..."
+    Write-Host "  May chua có Python phu hop. Dang thu cai tu dong..."
     $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
     if($winget){
       try{
@@ -108,23 +109,23 @@ function Ensure-Python(){
     $ver=[string]$Manifest.pythonFallback.version
     $url=[string]$Manifest.pythonFallback.url
     $installer=Join-Path $TempDir "python-$ver-amd64.exe"
-    Write-Host "  Đang tải Python $ver chính thức từ python.org..."
+    Write-Host "  Dang tai Python $ver chinh thuc tu python.org..."
     Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $installer
     $sig=Get-AuthenticodeSignature -FilePath $installer
     if($sig.Status -ne "Valid" -or $sig.SignerCertificate.Subject -notmatch "Python Software Foundation"){
-      throw "Chữ ký số Python installer không hợp lệ."
+      throw "Chữ ky so Python installer khong hop lệ."
     }
     $target=Join-Path $Root "python"
     $proc=Start-Process -FilePath $installer -ArgumentList @(
       "/quiet","InstallAllUsers=0","Include_launcher=0","Include_pip=1","Include_test=0","PrependPath=0","Shortcuts=0","TargetDir=$target"
     ) -Wait -PassThru
-    if($proc.ExitCode -ne 0){ throw "Không cài được Python. Mã lỗi: $($proc.ExitCode)" }
+    if($proc.ExitCode -ne 0){ throw "Khong cai duoc Python. Mã loi: $($proc.ExitCode)" }
     $base=Join-Path $target "python.exe"
   }
-  if(-not (Test-Path $base)){ throw "Không tìm thấy Python sau khi cài." }
+  if(-not (Test-Path $base)){ throw "Khong tìm thấy Python sau khi cai." }
   if(Test-Path (Join-Path $Root ".venv")){ Remove-Item -Recurse -Force (Join-Path $Root ".venv") -ErrorAction SilentlyContinue }
   & $base -m venv (Join-Path $Root ".venv")
-  if($LASTEXITCODE -ne 0){ throw "Không tạo được môi trường Python riêng." }
+  if($LASTEXITCODE -ne 0){ throw "Khong tạo duoc moi truong Python rieng." }
   return $venvPy
 }
 
@@ -135,7 +136,7 @@ Write-Host "  Chup man hinh - KanMedia - Ho tro ky so PDF"
 Write-Host "  Mot bo cai duy nhat, cap nhat theo tung thanh phan."
 Write-Host "============================================================"
 
-# Không update giữa lúc đang có job Media.
+# Khong update giua lúc dang có job Media.
 if(-not $Force -and (Test-Path $Jobs)){
   $running = Get-ChildItem $Jobs -Filter "*.status.json" -ErrorAction SilentlyContinue | ForEach-Object {
     try{
@@ -144,11 +145,11 @@ if(-not $Force -and (Test-Path $Jobs)){
     }catch{}
   } | Select-Object -First 1
   if($running){
-    throw "KanMedia đang có tác vụ chạy. Hãy chờ hoàn tất hoặc dùng chế độ sửa chữa."
+    throw "KanMedia dang có tac vu chay. Hay cho hoàn tat hoac dung chế độ sua chua."
   }
 }
 
-Write-Step "Dừng KanMedia cũ"
+Write-Step "Dung KanMedia cũ"
 $head=@{"X-KanBan-Agent"="linh-kanban-v1"}
 try{Invoke-RestMethod -Method Post -Headers $head -ContentType "application/json" -Body "{}" -Uri "http://127.0.0.1:47632/shutdown" -TimeoutSec 1|Out-Null}catch{}
 Start-Sleep -Milliseconds 500
@@ -161,24 +162,24 @@ $pyw = Join-Path $Root ".venv\Scripts\pythonw.exe"
 
 $needPackages = Need-Component "pythonPackages" @()
 if($needPackages){
-  Write-Step "Cập nhật thư viện Python dùng chung"
+  Write-Step "Cap nhat thu vien Python dung chung"
   & $venvPy -m pip install --disable-pip-version-check --upgrade pip setuptools wheel
-  if($LASTEXITCODE -ne 0){ throw "Không cập nhật được pip." }
+  if($LASTEXITCODE -ne 0){ throw "Khong cap nhat duoc pip." }
   & $venvPy -m pip install --disable-pip-version-check -U pillow cryptography pyhanko reportlab
-  if($LASTEXITCODE -ne 0){ throw "Không cài đủ thư viện KanBan Tools." }
+  if($LASTEXITCODE -ne 0){ throw "Khong cai du thu vien KanBan Tools." }
 }else{
-  Write-Host "  Thư viện Python: đã đúng phiên bản." -ForegroundColor DarkGray
+  Write-Host "  Thư vien Python: đã dung phien ban." -ForegroundColor DarkGray
 }
 
 $needYt = Need-Component "ytDlp" @()
 $ytOk=$false
 try{ & $venvPy -m yt_dlp --version | Out-Null; if($LASTEXITCODE -eq 0){$ytOk=$true} }catch{}
 if($needYt -or -not $ytOk){
-  Write-Step "Cập nhật lõi tải yt-dlp"
+  Write-Step "Cap nhat loi tai yt-dlp"
   & $venvPy -m pip install --disable-pip-version-check -U --pre "yt-dlp[default]"
-  if($LASTEXITCODE -ne 0){ throw "Không cập nhật được yt-dlp." }
+  if($LASTEXITCODE -ne 0){ throw "Khong cap nhat duoc yt-dlp." }
 }else{
-  Write-Host "  yt-dlp: giữ bản đang chạy tốt." -ForegroundColor DarkGray
+  Write-Host "  yt-dlp: giu ban dang chay tot." -ForegroundColor DarkGray
 }
 
 $runtimeFiles=@(
@@ -186,11 +187,11 @@ $runtimeFiles=@(
   (Join-Path $Runtime "kanmedia-worker.py")
 )
 if(Need-Component "runtime" $runtimeFiles){
-  Write-Step "Cập nhật runtime KanMedia"
+  Write-Step "Cap nhat runtime KanMedia"
   Download-File "kan-tools/runtime/kanmedia-server.py" $runtimeFiles[0]
   Download-File "kan-tools/runtime/kanmedia-worker.py" $runtimeFiles[1]
 }else{
-  Write-Host "  Runtime KanMedia: không đổi." -ForegroundColor DarkGray
+  Write-Host "  Runtime KanMedia: khong doi." -ForegroundColor DarkGray
 }
 
 $nodeExe=Join-Path $NodeDir "node.exe"
@@ -202,72 +203,72 @@ if(-not $nodeNeed){
   }catch{$nodeNeed=$true}
 }
 if($nodeNeed){
-  Write-Step "Cập nhật Node.js portable"
+  Write-Step "Cap nhat Node.js portable"
   Remove-Item -Recurse -Force $NodeDir -ErrorAction SilentlyContinue
   New-Item -ItemType Directory -Force -Path $NodeDir|Out-Null
   $channel=[string]$Manifest.components.node.channel
   $base="https://nodejs.org/dist/$channel/"
   $sum=Invoke-WebRequest -UseBasicParsing -Uri ($base+"SHASUMS256.txt")
   $line=($sum.Content -split "\r?\n"|Where-Object{$_ -like "*win-x64.zip"}|Select-Object -First 1)
-  if(-not $line){throw "Không tìm thấy gói Node Windows x64."}
+  if(-not $line){throw "Khong tìm thấy goi Node Windows x64."}
   $parts=$line -split "\s+";$sha=$parts[0].ToLowerInvariant();$name=$parts[-1]
   $zip=Join-Path $TempDir "node.zip";$out=Join-Path $TempDir "node"
   Invoke-WebRequest -UseBasicParsing -Uri ($base+$name) -OutFile $zip
-  if((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne $sha){throw "SHA256 Node không khớp."}
+  if((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne $sha){throw "SHA256 Node khong khop."}
   Expand-Archive $zip $out -Force
   $src=Get-ChildItem $out -Recurse -Filter node.exe|Select-Object -First 1
-  if(-not $src){throw "Không tìm thấy node.exe."}
+  if(-not $src){throw "Khong tìm thấy node.exe."}
   Copy-Item (Join-Path $src.Directory.FullName "*") $NodeDir -Recurse -Force
 }else{
-  Write-Host "  Node.js: không đổi." -ForegroundColor DarkGray
+  Write-Host "  Node.js: khong doi." -ForegroundColor DarkGray
 }
 
 $ffmpeg=Join-Path $Media "ffmpeg.exe"
 $ffprobe=Join-Path $Media "ffprobe.exe"
 if(Need-Component "ffmpeg" @($ffmpeg,$ffprobe)){
-  Write-Step "Cập nhật FFmpeg / FFprobe"
+  Write-Step "Cap nhat FFmpeg / FFprobe"
   $rel=Invoke-RestMethod -Headers @{"User-Agent"="KanBanTools"} -Uri "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest"
   $a=$rel.assets|Where-Object{$_.name -eq "ffmpeg-master-latest-win64-gpl.zip"}|Select-Object -First 1
-  if(-not $a){throw "Không tìm thấy FFmpeg Windows."}
+  if(-not $a){throw "Khong tìm thấy FFmpeg Windows."}
   $zip=Join-Path $TempDir "ffmpeg.zip";$out=Join-Path $TempDir "ffmpeg"
   Invoke-WebRequest -UseBasicParsing -Uri $a.browser_download_url -OutFile $zip
-  if((Get-Item $zip).Length -lt 50000000){throw "Gói FFmpeg không hợp lệ."}
+  if((Get-Item $zip).Length -lt 50000000){throw "Gói FFmpeg khong hop lệ."}
   if($a.digest -and $a.digest -match "^sha256:(.+)$"){
-    if((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne $Matches[1].ToLowerInvariant()){throw "SHA256 FFmpeg không khớp."}
+    if((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne $Matches[1].ToLowerInvariant()){throw "SHA256 FFmpeg khong khop."}
   }
   Expand-Archive $zip $out -Force
   $ff=Get-ChildItem $out -Recurse -Filter ffmpeg.exe|Select-Object -First 1
   $fp=Get-ChildItem $out -Recurse -Filter ffprobe.exe|Select-Object -First 1
-  if(-not $ff -or -not $fp){throw "Không tìm thấy ffmpeg/ffprobe."}
+  if(-not $ff -or -not $fp){throw "Khong tìm thấy ffmpeg/ffprobe."}
   Copy-Item $ff.FullName $ffmpeg -Force
   Copy-Item $fp.FullName $ffprobe -Force
 }else{
-  Write-Host "  FFmpeg: không đổi." -ForegroundColor DarkGray
+  Write-Host "  FFmpeg: khong doi." -ForegroundColor DarkGray
 }
 
 $capture=Join-Path $CaptureDir "capture_agent.py"
 $needCapture=Need-Component "capture" @($capture)
 if($needCapture){
-  Write-Step "Cập nhật công cụ Chụp"
+  Write-Step "Cap nhat cong cu Chup"
   Download-File ([string]$Manifest.components.capture.source) $capture
-  if((Get-Item $capture).Length -lt 20000){throw "Source Capture không hợp lệ."}
+  if((Get-Item $capture).Length -lt 20000){throw "Source Capture khong hop lệ."}
   try{Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:47631/quit" -TimeoutSec 1|Out-Null}catch{}
   Stop-Matching "*capture_agent.py*"
 }else{
-  Write-Host "  Capture: không đổi." -ForegroundColor DarkGray
+  Write-Host "  Capture: khong doi." -ForegroundColor DarkGray
 }
 
 $signAgent=Join-Path $Signing "kanban_signing_agent.py"
 $needSigning=Need-Component "signing" @($signAgent)
 if($needSigning){
-  Write-Step "Cập nhật bộ hỗ trợ ký số"
+  Write-Step "Cap nhat bộ ho tro ky so"
   Download-File ([string]$Manifest.components.signing.source) $signAgent
   Stop-Matching "*kanban_signing_agent.py*"
 }else{
-  Write-Host "  Ký số: không đổi." -ForegroundColor DarkGray
+  Write-Host "  Ký so: khong doi." -ForegroundColor DarkGray
 }
 
-Write-Step "Đăng ký chạy cùng Windows"
+Write-Step "Dang ky chay cùng Windows"
 $run="HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
 New-Item -Path $run -Force|Out-Null
 New-ItemProperty $run -Name "KanbanCapture" -Value ('"'+$pyw+'" "'+$capture+'" --background') -PropertyType String -Force|Out-Null
@@ -291,7 +292,7 @@ if($needSigning -or -not (Test-Url "http://127.0.0.1:8765/health" @{"X-KanBan-Ag
 $mediaServer=Join-Path $Runtime "kanmedia-server.py"
 Start-Process -FilePath $pyw -ArgumentList ('"'+$mediaServer+'"') -WindowStyle Hidden
 
-Write-Step "Kiểm tra sau cài đặt"
+Write-Step "Kiem tra sau cai dat"
 $mediaOk=$false
 for($i=0;$i -lt 30;$i++){
   try{
@@ -303,10 +304,10 @@ for($i=0;$i -lt 30;$i++){
 if(-not $mediaOk){
   $log=Join-Path $Logs "kanmedia-server.log"
   if(Test-Path $log){ Get-Content $log -Tail 25 }
-  throw "KanMedia chưa khởi động được."
+  throw "KanMedia chua khởi dong duoc."
 }
 
-# Ghi đúng manifest đã cài để lần sau chỉ cập nhật thành phần thay đổi.
+# Ghi dung manifest đã cai để lần sau chỉ cap nhat thanh phan thay doi.
 Copy-Item -LiteralPath $ManifestPath -Destination $InstalledPath -Force
 try{ Copy-Item -LiteralPath $MyInvocation.MyCommand.Path -Destination (Join-Path $Root "install.ps1") -Force }catch{}
 Remove-Item -Recurse -Force $TempDir -ErrorAction SilentlyContinue
