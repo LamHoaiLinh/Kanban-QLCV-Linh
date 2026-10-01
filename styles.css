@@ -1542,3 +1542,126 @@ body.kalo-open{overflow:hidden!important}
     font-size:8px;
   }
 }
+
+/* ===== Lịch Công việc + ngày đặc biệt không bắt buộc năm v3.6 ===== */
+.clock-tabs{
+  flex-wrap:wrap;
+}
+.clock-tab-work.active{
+  border-color:#8db9d8;
+  background:#edf6fc;
+  color:#326e95;
+}
+:root[data-theme="dark"] .clock-tab-work.active{
+  background:#183346;
+  color:#9ed3f3;
+  border-color:#396f90;
+}
+
+.special-date-free-input{
+  width:100%;
+  min-height:46px;
+  padding:10px 13px;
+  border:1px solid var(--border);
+  border-radius:11px;
+  background:var(--panel);
+  color:var(--text);
+  font:inherit;
+  font-weight:700;
+  letter-spacing:.02em;
+}
+.special-date-free-input:focus{
+  outline:none;
+  border-color:color-mix(in srgb,var(--green) 55%,var(--border));
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--green) 14%,transparent);
+}
+
+.work-date-intro{
+  display:grid;
+  gap:4px;
+  margin-top:14px;
+  padding:12px 14px;
+  border-radius:13px;
+  background:#edf6fc;
+  color:#326e95;
+  border:1px solid #d5e8f5;
+}
+.work-date-intro strong{font-size:13px}
+.work-date-intro span{font-size:11px;line-height:1.5}
+:root[data-theme="dark"] .work-date-intro{
+  background:#183346;
+  color:#a9d8f3;
+  border-color:#315d78;
+}
+
+.work-date-form{
+  display:grid;
+  grid-template-columns:minmax(0,1.45fr) minmax(190px,.55fr);
+  gap:10px;
+  margin-top:12px;
+  padding:13px;
+  border:1px solid #d5e8f5;
+  border-radius:14px;
+  background:color-mix(in srgb,#edf6fc 55%,var(--panel-soft));
+}
+.work-title-field{min-width:0}
+.work-date-form-actions{
+  grid-column:1/-1;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+.work-primary-btn{
+  background:#5a9ac3;
+  border-color:#5a9ac3;
+}
+.work-primary-btn:hover{
+  background:#4d8db7;
+  border-color:#4d8db7;
+}
+.special-date-kind.work{
+  background:#e5f2fb;
+  color:#33749d;
+}
+.work-date-item.is-past{
+  opacity:.62;
+}
+.work-date-item.is-past .special-date-copy strong{
+  text-decoration:line-through;
+  text-decoration-thickness:1px;
+}
+
+.work-reminder-bar{
+  border-color:#c9e1f1;
+  background:#eff7fc;
+}
+.work-reminder-text,
+.work-reminder-event{
+  color:#2f709a;
+  font-weight:900;
+}
+.work-reminder-toggle{
+  border-left-color:#c9e1f1;
+}
+.work-reminder-toggle input{
+  accent-color:#4f95bf;
+}
+.work-reminder-bar.ticker-off{
+  background:color-mix(in srgb,var(--panel-soft) 92%,transparent);
+  border-color:var(--border);
+}
+:root[data-theme="dark"] .work-reminder-bar{
+  background:#162f40;
+  border-color:#315b76;
+}
+:root[data-theme="dark"] .work-reminder-text,
+:root[data-theme="dark"] .work-reminder-event{
+  color:#9bd0ef;
+}
+
+@media(max-width:700px){
+  .work-date-form{grid-template-columns:1fr}
+  .work-date-form-actions{flex-direction:column;align-items:stretch}
+  .work-date-form-actions .primary-btn{width:100%}
+}
