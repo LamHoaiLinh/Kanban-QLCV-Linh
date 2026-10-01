@@ -49,7 +49,7 @@ function Yt-Info([string]$url){$old=$env:PATH;$node=if(Test-Path $LocalNode){$Lo
 function Download-One([string]$url,[string]$kind,[string]$format,[string]$quality,[int]$index,[int]$total,[double]$base,[double]$slice){
  $info=Yt-Info $url;$title=[string]$info.title;if(-not $title){$title='Media '+$index};Set-Status 'running' $base ('Đang tải “'+$title+'” — 0%') $title $index $total
  $tmpl=Join-Path $Downloads '%(title).180B [%(id)s].%(ext)s'
- $args=@('-m','yt_dlp','--js-runtimes','node','--no-playlist','--newline','--no-overwrites','--embed-metadata','--embed-thumbnail','--ffmpeg-location',$Bin,'-o',$tmpl,'--progress-template','download:KM_PROGRESS:%(progress._percent_str)s','--print','after_move:KM_FILE:%(filepath)s')
+ $args=@('-m','yt_dlp','--js-runtimes','node','--no-playlist','--newline','--no-overwrites','--embed-metadata','--ffmpeg-location',$Bin,'-o',$tmpl,'--progress-template','download:KM_PROGRESS:%(progress._percent_str)s','--print','after_move:KM_FILE:%(filepath)s')
  if($kind -eq 'audio'){
   $codec=$format;if($codec -eq 'm4a'){$codec='m4a'}elseif($codec -eq 'opus'){$codec='opus'}elseif($codec -eq 'flac'){$codec='flac'}elseif($codec -eq 'wav'){$codec='wav'}else{$codec='mp3'}
   $args+=@('-f','bestaudio/best','-x','--audio-format',$codec)
@@ -68,7 +68,7 @@ function Download-One([string]$url,[string]$kind,[string]$format,[string]$qualit
  if($script:file){$script:file=Rename-FromMetadata $script:file};return $script:file
 }
 function Ffmpeg-Run([string]$input,[string[]]$args,[double]$duration,[double]$base,[double]$slice,[string]$label,[switch]$AllowFail){
- $all=@('-hide_banner','-y','-i',$input)+$args+@('-progress','pipe:1','-nostats')
+ $out=[string]$args[$args.Count-1];$opts=@();if($args.Count -gt 1){$opts=@($args[0..($args.Count-2)])};$all=@('-hide_banner','-y','-i',$input)+$opts+@('-progress','pipe:1','-nostats',$out)
  $code=Run-Lines $Ffmpeg $all {param($line)if($line -match '^out_time_(ms|us)=([0-9]+)$' -and $duration -gt 0){$p=[Math]::Min(99,([double]$Matches[2]/($duration*1000000))*100);Set-Status 'running' ($base+$slice*$p/100) ($label+' — '+[Math]::Round($p)+'%')}elseif($line -eq 'progress=end'){Set-Status 'running' ($base+$slice) ($label+' — 100%')}} -AllowFail:$AllowFail
  return $code
 }
@@ -94,8 +94,8 @@ function Convert-One($meta,[string]$format,[string]$quality,[double]$base,[doubl
 function Edit-One($meta,$p){
  $src=[string]$meta.path;$dur=Duration $src;$start=[double]$p.start;$end=[double]$p.end;if($end -le 0 -or $end -gt $dur){$end=$dur};if($start -lt 0){$start=0}
  $extract=[bool]$p.extractMp3;$mute=[bool]$p.mute;$speed=[double]$p.speed;if($speed -le 0){$speed=1};$vol=[double]$p.volume;if($vol -lt 0){$vol=1}
- $baseName=Safe ([IO.Path]::GetFileNameWithoutExtension([string]$meta.name));$ext=if($extract){'.mp3'}else{[IO.Path]::GetExtension([string]$meta.name)};if(-not $ext){$ext='.mp4'};$dst=Unique-Path $Downloads ($baseName+' - edited') $ext
- $isAudio=([string]$meta.type).StartsWith('audio/');$outDur=$dur
+ $baseName=Safe ([IO.Path]::GetFileNameWithoutExtension([string]$meta.name));$isAudio=([string]$meta.type).StartsWith('audio/');$ext=if($extract -or $isAudio){'.mp3'}else{'.mp4'};$dst=Unique-Path $Downloads ($baseName+' - edited') $ext
+ $outDur=$dur
  $args=New-Object System.Collections.Generic.List[string]
  if([string]$p.cut -eq 'keep' -and $end -gt $start){$args.Add('-ss');$args.Add([string]$start);$args.Add('-to');$args.Add([string]$end);$outDur=$end-$start}
  $vf=New-Object System.Collections.Generic.List[string];$af=New-Object System.Collections.Generic.List[string]
