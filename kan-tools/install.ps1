@@ -51,7 +51,7 @@ function Download-File([string]$Relative,[string]$Target){
   $stamp = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
   $u = "{0}/{1}?ts={2}" -f $Repo.TrimEnd("/"), $Relative.TrimStart("/"), $stamp
   Invoke-WebRequest -UseBasicParsing -Uri $u -OutFile $Target
-  if(-not (Test-Path $Target) -or (Get-Item $Target).Length -lt 100){ throw "File tai về khong hop lệ: $Relative" }
+  if(-not (Test-Path $Target) -or (Get-Item $Target).Length -lt 100){ throw "File tai ve khong hop le: $Relative" }
 }
 function Stop-Matching([string]$Pattern){
   Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
@@ -96,7 +96,7 @@ function Ensure-Python(){
 
   $base = Find-BasePython
   if(-not $base){
-    Write-Host "  May chua có Python phu hop. Dang thu cai tu dong..."
+    Write-Host "  May chua co Python phu hop. Dang thu cai tu dong..."
     $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
     if($winget){
       try{
@@ -113,19 +113,19 @@ function Ensure-Python(){
     Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $installer
     $sig=Get-AuthenticodeSignature -FilePath $installer
     if($sig.Status -ne "Valid" -or $sig.SignerCertificate.Subject -notmatch "Python Software Foundation"){
-      throw "Chữ ky so Python installer khong hop lệ."
+      throw "Chu ky so Python installer khong hop le."
     }
     $target=Join-Path $Root "python"
     $proc=Start-Process -FilePath $installer -ArgumentList @(
       "/quiet","InstallAllUsers=0","Include_launcher=0","Include_pip=1","Include_test=0","PrependPath=0","Shortcuts=0","TargetDir=$target"
     ) -Wait -PassThru
-    if($proc.ExitCode -ne 0){ throw "Khong cai duoc Python. Mã loi: $($proc.ExitCode)" }
+    if($proc.ExitCode -ne 0){ throw "Khong cai duoc Python. Ma loi: $($proc.ExitCode)" }
     $base=Join-Path $target "python.exe"
   }
-  if(-not (Test-Path $base)){ throw "Khong tìm thấy Python sau khi cai." }
+  if(-not (Test-Path $base)){ throw "Khong tim thay Python sau khi cai." }
   if(Test-Path (Join-Path $Root ".venv")){ Remove-Item -Recurse -Force (Join-Path $Root ".venv") -ErrorAction SilentlyContinue }
   & $base -m venv (Join-Path $Root ".venv")
-  if($LASTEXITCODE -ne 0){ throw "Khong tạo duoc moi truong Python rieng." }
+  if($LASTEXITCODE -ne 0){ throw "Khong tao duoc moi truong Python rieng." }
   return $venvPy
 }
 
@@ -136,7 +136,7 @@ Write-Host "  Chup man hinh - KanMedia - Ho tro ky so PDF"
 Write-Host "  Mot bo cai duy nhat, cap nhat theo tung thanh phan."
 Write-Host "============================================================"
 
-# Khong update giua lúc dang có job Media.
+# Khong update giua luc dang co job Media.
 if(-not $Force -and (Test-Path $Jobs)){
   $running = Get-ChildItem $Jobs -Filter "*.status.json" -ErrorAction SilentlyContinue | ForEach-Object {
     try{
@@ -145,11 +145,11 @@ if(-not $Force -and (Test-Path $Jobs)){
     }catch{}
   } | Select-Object -First 1
   if($running){
-    throw "KanMedia dang có tac vu chay. Hay cho hoàn tat hoac dung chế độ sua chua."
+    throw "KanMedia dang co tac vu chay. Hay cho hoan tat hoac dung che do sua chua."
   }
 }
 
-Write-Step "Dung KanMedia cũ"
+Write-Step "Dung KanMedia cu"
 $head=@{"X-KanBan-Agent"="linh-kanban-v1"}
 try{Invoke-RestMethod -Method Post -Headers $head -ContentType "application/json" -Body "{}" -Uri "http://127.0.0.1:47632/shutdown" -TimeoutSec 1|Out-Null}catch{}
 Start-Sleep -Milliseconds 500
@@ -168,7 +168,7 @@ if($needPackages){
   & $venvPy -m pip install --disable-pip-version-check -U pillow cryptography pyhanko reportlab
   if($LASTEXITCODE -ne 0){ throw "Khong cai du thu vien KanBan Tools." }
 }else{
-  Write-Host "  Thư vien Python: đã dung phien ban." -ForegroundColor DarkGray
+  Write-Host "  Thu vien Python: da dung phien ban." -ForegroundColor DarkGray
 }
 
 $needYt = Need-Component "ytDlp" @()
@@ -210,14 +210,14 @@ if($nodeNeed){
   $base="https://nodejs.org/dist/$channel/"
   $sum=Invoke-WebRequest -UseBasicParsing -Uri ($base+"SHASUMS256.txt")
   $line=($sum.Content -split "\r?\n"|Where-Object{$_ -like "*win-x64.zip"}|Select-Object -First 1)
-  if(-not $line){throw "Khong tìm thấy goi Node Windows x64."}
+  if(-not $line){throw "Khong tim thay goi Node Windows x64."}
   $parts=$line -split "\s+";$sha=$parts[0].ToLowerInvariant();$name=$parts[-1]
   $zip=Join-Path $TempDir "node.zip";$out=Join-Path $TempDir "node"
   Invoke-WebRequest -UseBasicParsing -Uri ($base+$name) -OutFile $zip
   if((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne $sha){throw "SHA256 Node khong khop."}
   Expand-Archive $zip $out -Force
   $src=Get-ChildItem $out -Recurse -Filter node.exe|Select-Object -First 1
-  if(-not $src){throw "Khong tìm thấy node.exe."}
+  if(-not $src){throw "Khong tim thay node.exe."}
   Copy-Item (Join-Path $src.Directory.FullName "*") $NodeDir -Recurse -Force
 }else{
   Write-Host "  Node.js: khong doi." -ForegroundColor DarkGray
@@ -229,17 +229,17 @@ if(Need-Component "ffmpeg" @($ffmpeg,$ffprobe)){
   Write-Step "Cap nhat FFmpeg / FFprobe"
   $rel=Invoke-RestMethod -Headers @{"User-Agent"="KanBanTools"} -Uri "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest"
   $a=$rel.assets|Where-Object{$_.name -eq "ffmpeg-master-latest-win64-gpl.zip"}|Select-Object -First 1
-  if(-not $a){throw "Khong tìm thấy FFmpeg Windows."}
+  if(-not $a){throw "Khong tim thay FFmpeg Windows."}
   $zip=Join-Path $TempDir "ffmpeg.zip";$out=Join-Path $TempDir "ffmpeg"
   Invoke-WebRequest -UseBasicParsing -Uri $a.browser_download_url -OutFile $zip
-  if((Get-Item $zip).Length -lt 50000000){throw "Gói FFmpeg khong hop lệ."}
+  if((Get-Item $zip).Length -lt 50000000){throw "Goi FFmpeg khong hop le."}
   if($a.digest -and $a.digest -match "^sha256:(.+)$"){
     if((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne $Matches[1].ToLowerInvariant()){throw "SHA256 FFmpeg khong khop."}
   }
   Expand-Archive $zip $out -Force
   $ff=Get-ChildItem $out -Recurse -Filter ffmpeg.exe|Select-Object -First 1
   $fp=Get-ChildItem $out -Recurse -Filter ffprobe.exe|Select-Object -First 1
-  if(-not $ff -or -not $fp){throw "Khong tìm thấy ffmpeg/ffprobe."}
+  if(-not $ff -or -not $fp){throw "Khong tim thay ffmpeg/ffprobe."}
   Copy-Item $ff.FullName $ffmpeg -Force
   Copy-Item $fp.FullName $ffprobe -Force
 }else{
@@ -251,7 +251,7 @@ $needCapture=Need-Component "capture" @($capture)
 if($needCapture){
   Write-Step "Cap nhat cong cu Chup"
   Download-File ([string]$Manifest.components.capture.source) $capture
-  if((Get-Item $capture).Length -lt 20000){throw "Source Capture khong hop lệ."}
+  if((Get-Item $capture).Length -lt 20000){throw "Source Capture khong hop le."}
   try{Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:47631/quit" -TimeoutSec 1|Out-Null}catch{}
   Stop-Matching "*capture_agent.py*"
 }else{
@@ -261,14 +261,14 @@ if($needCapture){
 $signAgent=Join-Path $Signing "kanban_signing_agent.py"
 $needSigning=Need-Component "signing" @($signAgent)
 if($needSigning){
-  Write-Step "Cap nhat bộ ho tro ky so"
+  Write-Step "Cap nhat bo ho tro ky so"
   Download-File ([string]$Manifest.components.signing.source) $signAgent
   Stop-Matching "*kanban_signing_agent.py*"
 }else{
-  Write-Host "  Ký so: khong doi." -ForegroundColor DarkGray
+  Write-Host "  Ky so: khong doi." -ForegroundColor DarkGray
 }
 
-Write-Step "Dang ky chay cùng Windows"
+Write-Step "Dang ky chay cung Windows"
 $run="HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
 New-Item -Path $run -Force|Out-Null
 New-ItemProperty $run -Name "KanbanCapture" -Value ('"'+$pyw+'" "'+$capture+'" --background') -PropertyType String -Force|Out-Null
@@ -304,10 +304,10 @@ for($i=0;$i -lt 30;$i++){
 if(-not $mediaOk){
   $log=Join-Path $Logs "kanmedia-server.log"
   if(Test-Path $log){ Get-Content $log -Tail 25 }
-  throw "KanMedia chua khởi dong duoc."
+  throw "KanMedia chua khoi dong duoc."
 }
 
-# Ghi dung manifest đã cai để lần sau chỉ cap nhat thanh phan thay doi.
+# Ghi dung manifest da cai de lan sau chi cap nhat thanh phan thay doi.
 Copy-Item -LiteralPath $ManifestPath -Destination $InstalledPath -Force
 try{ Copy-Item -LiteralPath $MyInvocation.MyCommand.Path -Destination (Join-Path $Root "install.ps1") -Force }catch{}
 Remove-Item -Recurse -Force $TempDir -ErrorAction SilentlyContinue
