@@ -38,3 +38,26 @@ Các tệp người dùng chọn không được gửi đến các địa chỉ 
 - Original author: Simon M. Laroche
 - License: MIT
 - Used as a gameplay/visual reference for the embedded Tetris module. The original MIT license is included at `tetris-game/LICENSE.txt`.
+
+
+## yt-dlp
+- Mục đích: đọc thông tin nguồn và tải media cho KanMedia.
+- Nguồn: dự án `yt-dlp/yt-dlp`.
+- Giấy phép: Unlicense.
+- KanBan không nhúng binary yt-dlp vào mã web; `KanTool.bat` tạo môi trường Python cục bộ và cài/cập nhật yt-dlp từ PyPI.
+
+## FFmpeg / FFprobe
+- Mục đích: ghép luồng, chuyển đổi định dạng, cắt/chỉnh audio-video và đọc metadata.
+- Nguồn tải runtime: `BtbN/FFmpeg-Builds`, gói Windows x64 GPL static.
+- KanTool ưu tiên kiểm SHA256 từ trường `digest` của GitHub Release khi trường này có sẵn.
+- FFmpeg là phần mềm bên thứ ba với giấy phép phụ thuộc cấu hình build; gói KanMedia đang chọn biến thể GPL. Xem thông tin giấy phép đi kèm dự án FFmpeg/BtbN khi phân phối lại.
+
+## Node.js
+- Mục đích: JavaScript runtime cho khả năng trích xuất YouTube hiện đại của yt-dlp.
+- Nguồn: `nodejs.org`, nhánh portable Windows x64 v24.
+- Giấy phép chính của Node.js: MIT; các thành phần đi kèm có thể có giấy phép riêng.
+- KanTool kiểm SHA256 theo `SHASUMS256.txt` chính thức trước khi giải nén.
+
+## KanMedia runtime
+- `kanmedia-server.ps1` và `kanmedia-worker.ps1` là mã nguồn của chính dự án KanBan, chạy cục bộ trên `127.0.0.1`.
+- KanTool không tắt Windows Security, không thêm Defender exclusion và không nhúng executable dưới dạng Base64/obfuscation.
