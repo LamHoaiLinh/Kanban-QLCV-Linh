@@ -485,7 +485,10 @@
           </div>
 
           <div class="special-date-form-actions">
-            <button id="addSpecialDateBtn" class="primary-btn" type="button">＋ Thêm vào danh sách</button>
+            <div class="special-date-edit-actions">
+              <button id="addSpecialDateBtn" class="primary-btn" type="button">＋ Thêm vào danh sách</button>
+              <button id="cancelSpecialDateEditBtn" class="secondary-btn" type="button" hidden>Hủy sửa</button>
+            </div>
             <label class="special-ticker-setting"><input id="specialTickerSettingInput" type="checkbox" checked><span>Hiện dải nhắc trên bảng</span></label>
           </div>
         </div>
@@ -542,7 +545,10 @@
             <input id="workDateInput" type="date">
           </label>
           <div class="work-date-form-actions">
-            <button id="addWorkDateBtn" class="primary-btn work-primary-btn" type="button">＋ Thêm vào lịch</button>
+            <div class="special-date-edit-actions">
+              <button id="addWorkDateBtn" class="primary-btn work-primary-btn" type="button">＋ Thêm vào lịch</button>
+              <button id="cancelWorkDateEditBtn" class="secondary-btn" type="button" hidden>Hủy sửa</button>
+            </div>
             <label class="special-ticker-setting"><input id="workTickerSettingInput" type="checkbox" checked><span>Hiện dải nhắc công việc</span></label>
           </div>
         </div>
