@@ -104,6 +104,11 @@ function parseUrls(text){
   const list=(String(text||'').match(/https?:\/\/[^\s,;<>"']+/gi)||[]).map(function(x){return x.replace(/[)\].!?]+$/g,'');});
   const out=[],seen=new Set();list.forEach(function(u){try{const x=new URL(u);if(!/^https?:$/.test(x.protocol))return;if(!seen.has(x.href)){seen.add(x.href);out.push(x.href);}}catch(e){}});return out;
 }
+function isPurePlaylistUrl(u){
+  try{
+    const x=new URL(u);return /(?:^|\.)youtube\.com$/i.test(x.hostname)&&x.pathname==='/playlist'&&!!x.searchParams.get('list');
+  }catch(e){return false;}
+}
 function progressCard(){
   return [
     '<div class="km-card km-progress-card"><div class="km-section-title">Tiến độ</div>',
@@ -206,6 +211,7 @@ async function probeDownload(){
 }
 async function startDownload(){
   if(!kmState.urls.length)return notice('Bạn hãy dán ít nhất một link hợp lệ.','warn');
+  if(!kmState.allPlaylist&&kmState.urls.some(isPurePlaylistUrl))return notice('Link playlist thuần không có bài cụ thể. Hãy tick “Tải toàn bộ playlist” hoặc dán link của một bài trong playlist.','warn');
   setProgress(1,'Đang chuẩn bị…','');setBusy(true);
   try{
     const r=await kmApi('/media/download',{method:'POST',json:{urls:kmState.urls,kind:kmState.kind,format:kmState.format,quality:kmState.quality,allPlaylist:!!kmState.allPlaylist},timeout:5000});
