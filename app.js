@@ -1947,7 +1947,12 @@
 
   function formatLunarDateDraft(event) {
     const input = event?.target || refs.specialLunarDateInput;
-    const digits = String(input.value || '').replace(/\D/g,'').slice(0,8);
+    const raw=String(input.value || '');
+    if (raw.includes('/')) {
+      input.value=raw.replace(/[^0-9/]/g,'').replace(/\/{2,}/g,'/').slice(0,10);
+      return;
+    }
+    const digits = raw.replace(/\D/g,'').slice(0,8);
     let out = digits.slice(0,2);
     if (digits.length > 2) out += '/' + digits.slice(2,4);
     if (digits.length > 4) out += '/' + digits.slice(4,8);
