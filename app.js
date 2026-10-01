@@ -2,7 +2,7 @@
   'use strict';
 
   const STORAGE_KEY = 'linh_personal_kanban_v1';
-  const VERSION = 17;
+  const VERSION = 18;
   const DEFAULT_BACKGROUND_ID = 'bg6';
   const KAN_ALARM_AGENT = 'http://127.0.0.1:47632';
   const KAN_ALARM_HEADERS = {'X-KanBan-Agent':'linh-kanban-v1','Content-Type':'application/json'};
@@ -97,7 +97,7 @@
       'labelOptions','cardColumnSelect','deleteCardBtn','duplicateCardBtn','columnDialog','columnForm','columnDialogTitle','columnNameInput','columnColorOptions',
       'deleteColumnBtn','clearColumnContentBtn','duplicateColumnBtn','quickCaptureDialog','quickCaptureForm','quickCaptureTitleInput','quickCaptureColumnSelect','quickCaptureDestinationHint','backgroundDialog','backgroundOptions','guideDialog','settingsBtn','settingsDialog','settingsExportBtn','quickCaptureProjectName','quickCaptureDefaultColumnSelect','quickCaptureStatus','dailyMoveEnabled','dailyMoveProjectName','dailyMoveRules','addDailyMoveRuleBtn','dailyMoveStatus','openDeletedContentBtn','deletedContentCount','deletedContentDialog','deletedArchiveTabBtn','deletedTrashTabBtn','deletedArchivePanel','deletedTrashPanel','deletedArchiveCount','deletedTrashCount','deletedArchiveList','deletedTrashList','emptyTrashBtn','openResetDataBtn','resetDataDialog','resetDataForm','resetBackupBtn','resetConfirmInput','resetDeleteBtn','resetBackupStatus','confirmDialog','confirmTitle','confirmMessage','globalTooltip','toast',
       'clockCurrentTime','clockDayPeriod','clockWeekday','clockDate','clockLunarDate','timerDisplay','timerDialogDisplay','timerEndTime','timerAgentStatus','clockStatus','timerMinutesInput','timerSecondsInput','timerStartPauseBtn','timerResetBtn','timerStopAlarmBtn','timerTestAlarmBtn','timerLocalAlarmInput','timerRepeatAlarmInput','timerNotifyInput','deskClockWidget','deskClockControls','clockToggleBtn','quickStopAlarmBtn','clockDialog',
-      'clockAlarmTabBtn','clockSpecialTabBtn','clockWorkTabBtn','clockAlarmPanel','clockSpecialPanel','clockWorkPanel','specialDateNameInput','specialDateTypeSelect','specialBirthdayFields','specialBirthdayDateInput','specialMemorialFields','specialLunarDateInput','addSpecialDateBtn','specialTickerSettingInput','specialDateSearchInput','specialDateMonthFilter','specialDateList','specialDateCount','specialDateEmpty','specialReminderBar','specialReminderText','specialReminderToggle','workDateTitleInput','workDateInput','addWorkDateBtn','workTickerSettingInput','workDateSearchInput','workDateMonthFilter','workDateList','workDateCount','workDateEmpty','workReminderBar','workReminderText','workReminderToggle'
+      'clockAlarmTabBtn','clockSpecialTabBtn','clockWorkTabBtn','clockAlarmPanel','clockSpecialPanel','clockWorkPanel','specialDateNameInput','specialDateTypeSelect','specialBirthdayFields','specialBirthdayDateInput','specialMemorialFields','specialLunarDateInput','addSpecialDateBtn','specialTickerSettingInput','specialDateSearchInput','specialDateMonthFilter','specialDateList','specialDateCount','specialDateEmpty','specialReminderBar','specialReminderText','specialReminderToggle','exportSpecialDatesBtn','importSpecialDatesBtn','importSpecialDatesFile','workDateTitleInput','workDateInput','addWorkDateBtn','workTickerSettingInput','workDateSearchInput','workDateMonthFilter','workDateList','workDateCount','workDateEmpty','workReminderBar','workReminderText','workReminderToggle'
     ].forEach(id => refs[id] = document.getElementById(id));
   }
 
@@ -225,6 +225,9 @@
     refs.specialDateSearchInput.addEventListener('input', renderSpecialDateList);
     refs.specialDateMonthFilter.addEventListener('change', renderSpecialDateList);
     refs.specialDateList.addEventListener('click', handleSpecialDateListClick);
+    refs.exportSpecialDatesBtn.addEventListener('click', exportSpecialDatesJson);
+    refs.importSpecialDatesBtn.addEventListener('click', () => refs.importSpecialDatesFile.click());
+    refs.importSpecialDatesFile.addEventListener('change', importSpecialDatesJson);
     refs.specialTickerSettingInput.addEventListener('change', event => setReminderTickerEnabled(event.target.checked));
     refs.specialReminderToggle.addEventListener('change', event => setReminderTickerEnabled(event.target.checked));
     refs.addWorkDateBtn.addEventListener('click', addWorkDate);
@@ -2225,6 +2228,108 @@
       ? reminders.map((item,index)=>`<span class="work-reminder-event">${escapeHtml(item.text)}</span>${index<reminders.length-1?'<span class="special-reminder-sep">•</span>':''}`).join('')
       : '';
     refs.workReminderText.classList.toggle('moving',enabled);
+  }
+
+  function specialDateShareKey(item) {
+    return [
+      item?.type === 'memorial' ? 'memorial' : 'birthday',
+      foldSpecialSearch(item?.name || ''),
+      Number(item?.day) || 0,
+      Number(item?.month) || 0
+    ].join('|');
+  }
+
+  function exportSpecialDatesJson() {
+    const items=normalizeSpecialDates(state?.settings?.clock?.specialDates || []);
+    if (!items.length) {
+      showToast('Chưa có Sinh nhật / Ngày giỗ để xuất.');
+      return;
+    }
+    const payload={
+      app:'KanBan Ngày đặc biệt',
+      format:'kanban-special-dates',
+      version:1,
+      exportedAt:nowIso(),
+      count:items.length,
+      specialDates:items.map(item=>({
+        type:item.type,
+        name:item.name,
+        day:item.day,
+        month:item.month,
+        year:item.year ?? null
+      }))
+    };
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement('a');
+    link.href=url;
+    link.download=`kanban-sinh-nhat-ngay-gio-${dateStamp()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    showToast(`Đã xuất ${items.length} ngày Sinh nhật / Ngày giỗ.`);
+  }
+
+  function extractImportedSpecialDates(parsed) {
+    if (Array.isArray(parsed)) return parsed;
+    if (Array.isArray(parsed?.specialDates)) return parsed.specialDates;
+    if (Array.isArray(parsed?.data?.settings?.clock?.specialDates)) return parsed.data.settings.clock.specialDates;
+    if (Array.isArray(parsed?.settings?.clock?.specialDates)) return parsed.settings.clock.specialDates;
+    return null;
+  }
+
+  async function importSpecialDatesJson(event) {
+    const file=event.target.files?.[0];
+    event.target.value='';
+    if (!file) return;
+    try {
+      const parsed=JSON.parse(await file.text());
+      const raw=extractImportedSpecialDates(parsed);
+      if (!Array.isArray(raw)) throw new Error('missing-special-dates');
+
+      const incoming=normalizeSpecialDates(raw);
+      if (!incoming.length) {
+        showToast('File không có Sinh nhật / Ngày giỗ hợp lệ.');
+        return;
+      }
+
+      const clock=state.settings.clock || (state.settings.clock=createDefaultClockSettings());
+      clock.specialDates=normalizeSpecialDates(clock.specialDates || []);
+      const existingByKey=new Map(clock.specialDates.map(item=>[specialDateShareKey(item),item]));
+      let added=0,updated=0,skipped=0;
+
+      incoming.forEach(item=>{
+        const key=specialDateShareKey(item);
+        const existing=existingByKey.get(key);
+        if (!existing) {
+          const fresh={...item,id:uid('date')};
+          clock.specialDates.push(fresh);
+          existingByKey.set(key,fresh);
+          added+=1;
+          return;
+        }
+        if (!existing.year && item.year) {
+          existing.year=item.year;
+          updated+=1;
+        } else {
+          skipped+=1;
+        }
+      });
+
+      saveNow();
+      renderSpecialDateList();
+      renderSpecialReminderBar(new Date(),true);
+
+      const parts=[];
+      if (added) parts.push(`thêm ${added}`);
+      if (updated) parts.push(`bổ sung năm ${updated}`);
+      if (skipped) parts.push(`bỏ qua ${skipped} mục trùng`);
+      showToast(parts.length ? `Đã nhập: ${parts.join(', ')}.` : 'Không có dữ liệu mới để nhập.');
+    } catch (error) {
+      console.error(error);
+      showToast('File JSON Sinh nhật / Ngày giỗ không hợp lệ.');
+    }
   }
 
   function setReminderTickerEnabled(enabled) {
