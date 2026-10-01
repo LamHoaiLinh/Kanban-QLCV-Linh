@@ -173,12 +173,22 @@ function startPolling(id,reconnected){
       const parts=[];
       if(j.current)parts.push(j.current);
       if(j.index&&j.total)parts.push(j.index+'/'+j.total);
+      if(j.state==='running'&&Number.isFinite(Number(j.percent)))parts.push(Math.round(Number(j.percent))+'%');
       if(j.speed)parts.push(j.speed);
       if(j.eta&&j.eta!=='NA')parts.push('còn khoảng '+j.eta);
-      setProgress(j.percent||0,j.message||'Đang xử lý…',parts.join(' · '));
+      let mainText=j.message||'Đang xử lý';
+      if(j.state==='done')mainText='Hoàn tất';
+      else if(j.state==='cancelled')mainText='Đã hủy';
+      else if(j.state==='error')mainText='Có lỗi';
+      else if(j.stage==='download')mainText=(j.index&&j.total)?'Đang tải bài '+j.index+'/'+j.total:'Đang tải';
+      else if(j.stage==='merge')mainText='Đang ghép hình và tiếng';
+      else if(j.stage==='metadata')mainText='Đang ghi thông tin file';
+      else if(j.stage==='convert')mainText='Đang chuyển định dạng';
+      else if(j.stage==='ffmpeg')mainText=String(j.message||'Đang xử lý').replace(/“[^”]*”/g,'').replace(/—.*$/,'').trim();
+      setProgress(j.percent||0,mainText,parts.join(' · '));
       if(['done','error','cancelled'].includes(j.state)){
         clearInterval(kmState.poll);kmState.poll=null;kmState.jobId=null;setBusy(false);
-        if(j.state==='done')notice(j.output?'Hoàn tất. File đã lưu tại '+j.output:'Hoàn tất.','ok');
+        if(j.state==='done')notice(j.output?'Đã lưu: '+j.output:'Đã hoàn tất.','ok');
         else if(j.state==='cancelled')notice('Đã hủy tác vụ.','warn');
         else notice(j.error||'Tác vụ không hoàn tất.','warn');
       }
