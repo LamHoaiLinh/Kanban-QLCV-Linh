@@ -362,3 +362,69 @@
 [data-theme=dark] .km-fade-btn.active{background:#1d3329;border-color:#58a37f}
 [data-theme=dark] .km-fade-btn small{background:#243129;color:#b6c7bf}
 [data-theme=dark] .km-fade-btn.active small{background:#254537;color:#9fe0bf}
+
+/* KanMedia 1.5.1 - precision trim handles: large hit target, thin visible rail */
+.km-wave-handle{
+  width:18px;
+  margin-left:-9px;
+  top:-8px;
+  bottom:-8px;
+  padding:0;
+  border:0;
+  border-radius:0;
+  background:
+    radial-gradient(circle at 50% 7px,
+      #4fae84 0 4px,
+      #ffffff 4.5px 6px,
+      rgba(79,174,132,.28) 6.5px 7.5px,
+      transparent 8px),
+    radial-gradient(circle at 50% calc(100% - 7px),
+      #4fae84 0 4px,
+      #ffffff 4.5px 6px,
+      rgba(79,174,132,.28) 6.5px 7.5px,
+      transparent 8px),
+    linear-gradient(#4fae84,#4fae84) center 12px / 3px calc(100% - 24px) no-repeat;
+  box-shadow:none;
+  cursor:ew-resize;
+  overflow:visible;
+}
+.km-wave-handle::after{
+  content:none;
+}
+.km-wave-handle:hover,
+.km-wave-wrap.dragging .km-wave-handle{
+  background:
+    radial-gradient(circle at 50% 7px,
+      #329c70 0 4.5px,
+      #ffffff 5px 6.5px,
+      rgba(50,156,112,.32) 7px 8.5px,
+      transparent 9px),
+    radial-gradient(circle at 50% calc(100% - 7px),
+      #329c70 0 4.5px,
+      #ffffff 5px 6.5px,
+      rgba(50,156,112,.32) 7px 8.5px,
+      transparent 9px),
+    linear-gradient(#329c70,#329c70) center 12px / 3px calc(100% - 24px) no-repeat;
+  box-shadow:none;
+}
+.km-wave-handle span{
+  top:-24px;
+  min-width:52px;
+  padding:2px 5px;
+  font-size:9px;
+  border-radius:6px;
+}
+[data-theme=dark] .km-wave-handle{
+  background:
+    radial-gradient(circle at 50% 7px,
+      #66c89b 0 4px,
+      #152019 4.5px 6px,
+      rgba(102,200,155,.35) 6.5px 7.5px,
+      transparent 8px),
+    radial-gradient(circle at 50% calc(100% - 7px),
+      #66c89b 0 4px,
+      #152019 4.5px 6px,
+      rgba(102,200,155,.35) 6.5px 7.5px,
+      transparent 8px),
+    linear-gradient(#66c89b,#66c89b) center 12px / 3px calc(100% - 24px) no-repeat;
+}
