@@ -16,8 +16,8 @@ set "UPLOADS=%ROOT%\uploads"
 set "TMP=%ROOT%\temp-install"
 set "REPO=https://raw.githubusercontent.com/LamHoaiLinh/Kanban-QLCV-Linh/main"
 set "SELF_UPDATE_GUARD=%~2"
+set "LATEST_BAT=%TEMP%\KanTool_update_%RANDOM%%RANDOM%.bat"
 if /I "%MODE%"=="/update" if /I not "%SELF_UPDATE_GUARD%"=="/self" (
-  set "LATEST_BAT=%TEMP%\KanTool_update_%RANDOM%%RANDOM%.bat"
   powershell -NoProfile -Command "$ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue';Invoke-WebRequest -UseBasicParsing -Uri '%REPO%/kan-tools/KanTool.bat?ts=%RANDOM%' -OutFile '%LATEST_BAT%'" >nul 2>nul
   if exist "%LATEST_BAT%" (
     start "" "%LATEST_BAT%" /update /self
