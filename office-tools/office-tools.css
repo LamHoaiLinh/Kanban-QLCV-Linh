@@ -393,3 +393,32 @@
   .office-kanpaint-toolbar{padding:7px 8px}
   .office-kanpaint-actions .office-btn{padding:7px 8px;font-size:11px}
 }
+
+/* v5.0 - Bộ CÔNG CỤ mở full màn hình để thao tác dễ hơn */
+.office-tools-dialog{
+  position:fixed !important;
+  inset:0 !important;
+  width:100vw !important;
+  max-width:100vw !important;
+  height:100dvh !important;
+  max-height:100dvh !important;
+  margin:0 !important;
+  padding:0 !important;
+}
+.office-tools-dialog .office-shell{
+  width:100%;
+  height:100%;
+  border:0;
+  border-radius:0;
+  box-shadow:none;
+}
+.office-tools-dialog .office-main{
+  padding:16px 20px 24px;
+}
+@media(max-width:760px){
+  .office-tools-dialog{
+    width:100vw !important;
+    height:100dvh !important;
+    max-height:100dvh !important;
+  }
+}
