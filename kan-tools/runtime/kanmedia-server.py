@@ -696,7 +696,7 @@ def probe(payload: dict) -> dict:
             args += ["--no-playlist", "-J", url]
         code, out, err = run_text(args, 90)
         combined = (out or "") + "\n" + (err or "")
-        if code != 0 and re.search(r"(?:youtube\\.com|youtu\\.be)", url, re.I) and server_ytdlp_breakage(combined):
+        if code != 0 and re.search(r"(?:youtube\.com|youtu\.be)", url, re.I) and server_ytdlp_breakage(combined):
             if server_update_ytdlp():
                 code, out, err = run_text(args, 90)
         if code != 0 or not out:
