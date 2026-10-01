@@ -11,8 +11,8 @@
     agentReady=!!ready;
     button.classList.toggle('capture-agent-ready',agentReady);
     const tip=agentReady
-      ? 'Chụp nhanh Alt+C · Chụp dài Alt+X · Chuột phải: Cài đặt / cập nhật KanBan Tools'
-      : 'Chụp nhanh Alt+C · Chụp dài Alt+X · Chuột phải: Cài đặt / tải KanBan Tools';
+      ? 'Chụp nhanh Alt+C · Chụp dài Alt+X · Chuột phải: Cài đặt JPG/PNG'
+      : 'Chụp chưa sẵn sàng · Hãy cài KanBan Tools từ nút CÔNG CỤ';
     button.dataset.tooltip=tip;
     button.title=tip;
     refreshPanel();
@@ -36,18 +36,7 @@
     }
   }
 
-  function downloadInstallerBat(){
-    const a=document.createElement('a');
-    a.href=`kan-tools/KanTool.bat?t=${Date.now()}`;
-    a.download='KanTool.bat';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  }
-
-  function hidePanel(){
-    if(panel)panel.hidden=true;
-  }
+  function hidePanel(){if(panel)panel.hidden=true;}
 
   function refreshPanel(){
     if(!panel)return;
@@ -55,13 +44,13 @@
     const desc=panel.querySelector('[data-capture-description]');
     const settingsBtn=panel.querySelector('[data-capture-agent-settings]');
     if(status){
-      status.textContent=agentReady?'Đã kết nối · KanBan Tools đang chạy':'Chưa kết nối với KanBan Tools';
+      status.textContent=agentReady?'Đã kết nối · Chụp sẵn sàng':'Chụp chưa sẵn sàng';
       status.classList.toggle('ready',agentReady);
     }
     if(desc){
       desc.innerHTML=agentReady
-        ? 'Bạn có thể mở cài đặt JPG/PNG hoặc tải <strong>KanTool.bat</strong> để cập nhật lên bản mới nhất. BAT sẽ tự dừng bản cũ, tải Agent đã đóng gói sẵn, kiểm tra SHA256, ghi đè và khởi động lại.'
-        : 'Tải <strong>KanTool.bat</strong> rồi mở file vừa tải. <strong>Bạn không cần tự cài Python hay FFmpeg</strong>; KanTool tự chuẩn bị các thành phần cần thiết.';
+        ? 'Thiết lập định dạng ảnh chụp tại đây. Việc cài/cập nhật toàn bộ công cụ Windows được quản lý tập trung ở <strong>CÔNG CỤ → KanBan Tools</strong>.'
+        : 'Không có bộ cài riêng cho Chụp. Hãy <strong>chuột phải nút CÔNG CỤ</strong> và dùng bộ <strong>KanBan Tools</strong> duy nhất.';
     }
     if(settingsBtn)settingsBtn.disabled=!agentReady;
   }
@@ -75,82 +64,44 @@
       <button class="capture-setup-close" type="button" aria-label="Đóng">×</button>
       <div class="capture-setup-mark">✂</div>
       <h3 id="captureControlTitle">Cài đặt Chụp nhanh</h3>
-      <div class="capture-agent-status" data-capture-status>Đang kiểm tra KanBan Tools...</div>
+      <div class="capture-agent-status" data-capture-status>Đang kiểm tra...</div>
       <p data-capture-description>Đang kiểm tra trạng thái...</p>
-      <div class="capture-setup-steps">
-        <span>1</span><b>Tải KanTool.bat</b>
-        <span>2</span><b>Mở file BAT — không cần Python, tự ghi đè bản cũ</b>
-        <span>3</span><b>Alt+C chụp nhanh · Alt+X chụp dài theo khung cố định</b>
-      </div>
       <div class="capture-control-actions">
         <button type="button" data-capture-agent-settings>Mở cài đặt JPG/PNG</button>
-        <button type="button" data-capture-download-bat class="primary">⬇ Tải / cập nhật KanTool.bat</button>
         <button type="button" data-capture-retry>↻ Kiểm tra lại</button>
       </div>
-      <div class="capture-security-note">KanTool không tắt Windows Security. Trong bộ cài chung, Capture chạy từ source Python của chính repo KanBan để giảm cảnh báo nhầm của antivirus.</div>
+      <div class="capture-security-note">KanBan chỉ dùng một bộ cài chung: KanBan Tools. Chụp không còn tải/cài Agent riêng.</div>
     </section>`;
     document.body.appendChild(panel);
-
-    panel.addEventListener('click',event=>{
-      if(event.target===panel||event.target.closest('.capture-setup-close'))hidePanel();
-    });
-    panel.querySelector('[data-capture-download-bat]').addEventListener('click',downloadInstallerBat);
-    panel.querySelector('[data-capture-agent-settings]').addEventListener('click',async()=>{
-      if(await request('settings',1600))hidePanel();
-    });
+    panel.addEventListener('click',event=>{if(event.target===panel||event.target.closest('.capture-setup-close'))hidePanel();});
+    panel.querySelector('[data-capture-agent-settings]').addEventListener('click',async()=>{if(await request('settings',1600))hidePanel();});
     panel.querySelector('[data-capture-retry]').addEventListener('click',()=>request('ping',1200));
     return panel;
   }
 
   async function showControlPanel(){
-    ensurePanel();
-    panel.hidden=false;
-    refreshPanel();
-    await request('ping',800);
-    refreshPanel();
+    ensurePanel();panel.hidden=false;refreshPanel();await request('ping',800);refreshPanel();
   }
 
   function protocolFallback(action){
     return new Promise(resolve=>{
       let settled=false,timer=null;
-      const done=value=>{
-        if(settled)return;
-        settled=true;
-        window.removeEventListener('blur',onBlur,true);
-        if(timer)clearTimeout(timer);
-        resolve(value);
-      };
+      const done=value=>{if(settled)return;settled=true;window.removeEventListener('blur',onBlur,true);if(timer)clearTimeout(timer);resolve(value);};
       const onBlur=()=>done(true);
       window.addEventListener('blur',onBlur,true);
-      const iframe=document.createElement('iframe');
-      iframe.hidden=true;
-      iframe.src=`kanbancapture://${action}`;
-      document.body.appendChild(iframe);
-      setTimeout(()=>iframe.remove(),1600);
-      timer=setTimeout(()=>done(false),900);
+      const iframe=document.createElement('iframe');iframe.hidden=true;iframe.src=`kanbancapture://${action}`;document.body.appendChild(iframe);
+      setTimeout(()=>iframe.remove(),1600);timer=setTimeout(()=>done(false),900);
     });
   }
 
   async function invokeCapture(){
     if(await request('capture',1800))return;
-    if(await protocolFallback('capture')){
-      setReady(true);
-      return;
-    }
+    if(await protocolFallback('capture')){setReady(true);return;}
     await showControlPanel();
   }
 
   button.addEventListener('click',invokeCapture);
-  button.addEventListener('contextmenu',event=>{
-    event.preventDefault();
-    showControlPanel();
-  });
-  button.addEventListener('auxclick',event=>{
-    if(event.button===1){
-      event.preventDefault();
-      showControlPanel();
-    }
-  });
-
+  button.addEventListener('contextmenu',event=>{event.preventDefault();showControlPanel();});
+  button.addEventListener('auxclick',event=>{if(event.button===1){event.preventDefault();showControlPanel();}});
   request('ping',700);
 })();
