@@ -1,4 +1,4 @@
-const CACHE_NAME='linh-kanban-static-v788-office-sidebar';;
+const CACHE_NAME='linh-kanban-static-v788-office-sidebar';
 const ASSETS=[
   './','./index.html','./styles.css?v=6.39','./dragdrop.js?v=3.3','./app.js?v=5.0','./music-player.js?v=3.3','./kalo-launcher.js?v=1.0.5','./capture-launcher.js?v=1.5.0','./kantool-launcher.js?v=1.4.0','./kantool-extra.css?v=1.2.0',
   './office-tools/office-tools.css?v=5.0.1','./office-tools/worksheet-editor.css?v=1.2.0','./office-tools/office-tools.js?v=5.9.0','./office-tools/kanmedia/kanmedia.js?v=1.5.3','./office-tools/kanmedia/kanmedia.css?v=1.5.3','./office-tools/vba-extractor.mjs?v=2.0.0','./office-tools/worksheet-editor.js?v=1.2.0','./office-tools/pdf-signing.js?v=1.5.1','./office-tools/excel-ai-analysis.mjs?v=1.0.0','./office-tools/vendor/jszip.min.js',
