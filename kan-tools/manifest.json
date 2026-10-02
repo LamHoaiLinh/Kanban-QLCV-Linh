@@ -1,14 +1,14 @@
 {
   "schema": 1,
-  "kanToolVersion": "2.4.0",
-  "installerVersion": "2.0.3",
+  "kanToolVersion": "2.5.0",
+  "installerVersion": "2.1.0",
   "pythonFallback": {
     "version": "3.13.16",
     "url": "https://www.python.org/ftp/python/3.13.16/python-3.13.16-amd64.exe"
   },
   "components": {
     "runtime": {
-      "version": "1.7.0",
+      "version": "1.8.0",
       "files": [
         "kan-tools/runtime/kanmedia-server.py",
         "kan-tools/runtime/kanmedia-worker.py"
@@ -37,5 +37,6 @@
       "version": "2026.10.01.1",
       "source": "BtbN/FFmpeg-Builds"
     }
-  }
+  },
+  "bootstrapVersion": "2.1.0"
 }
