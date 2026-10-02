@@ -19,6 +19,8 @@ $Logs = Join-Path $Root "logs"
 $TempDir = Join-Path $Root "temp-install"
 $InstalledPath = Join-Path $Root "installed.json"
 $Repo = "https://raw.githubusercontent.com/LamHoaiLinh/Kanban-QLCV-Linh/main"
+$Mode = [string]$Mode
+if($Mode -notin @("/install","/update","/repair")){ $Mode = "/install" }
 $Force = ($Mode -ieq "/repair")
 
 $dirs = @($Root,$Runtime,$Media,$NodeDir,$Signing,$CaptureDir,$Jobs,$Uploads,$Logs,$TempDir)
@@ -89,9 +91,29 @@ function Test-Url([string]$Url,[hashtable]$Headers=$null,[int]$Timeout=2){
     return ($r.StatusCode -ge 200 -and $r.StatusCode -lt 300)
   }catch{return $false}
 }
+function Test-PythonExe([string]$Path){
+  if(-not $Path -or -not (Test-Path -LiteralPath $Path)){ return "" }
+  try{
+    $p = & $Path -c "import sys,struct;print(sys.executable if sys.version_info >= (3,12) and struct.calcsize('P')*8 == 64 else '')" 2>$null
+    if($LASTEXITCODE -eq 0 -and $p){
+      $resolved=[string]($p | Select-Object -First 1)
+      if($resolved -and (Test-Path -LiteralPath $resolved)){ return $resolved }
+    }
+  }catch{}
+  return ""
+}
 function Find-BasePython(){
-  $candidates=@()
-  if(Test-Path (Join-Path $Root "python\python.exe")){ $candidates += (Join-Path $Root "python\python.exe") }
+  $direct=@()
+  $direct += (Join-Path $Root "python\python.exe")
+  foreach($v in @("314","313","312")){
+    if($env:LOCALAPPDATA){ $direct += (Join-Path $env:LOCALAPPDATA "Programs\Python\Python$v\python.exe") }
+    if($env:ProgramFiles){ $direct += (Join-Path $env:ProgramFiles "Python$v\python.exe") }
+    $direct += "C:\Python$v\python.exe"
+  }
+  foreach($p in ($direct | Select-Object -Unique)){
+    $ok=Test-PythonExe $p
+    if($ok){ return $ok }
+  }
   foreach($cmd in @(
     @("py.exe","-3.14"),
     @("py.exe","-3.13"),
@@ -101,14 +123,16 @@ function Find-BasePython(){
     try{
       $exe=$cmd[0];$arg=$cmd[1]
       if($arg){
-        $p=& $exe $arg -c "import sys;print(sys.executable if sys.version_info >= (3,12) else '')" 2>$null
+        $p=& $exe $arg -c "import sys,struct;print(sys.executable if sys.version_info >= (3,12) and struct.calcsize('P')*8 == 64 else '')" 2>$null
       }else{
-        $p=& $exe -c "import sys;print(sys.executable if sys.version_info >= (3,12) else '')" 2>$null
+        $p=& $exe -c "import sys,struct;print(sys.executable if sys.version_info >= (3,12) and struct.calcsize('P')*8 == 64 else '')" 2>$null
       }
-      if($p){ $candidates += [string]$p }
+      if($LASTEXITCODE -eq 0 -and $p){
+        $candidate=[string]($p | Select-Object -First 1)
+        if($candidate -and (Test-Path -LiteralPath $candidate)){ return $candidate }
+      }
     }catch{}
   }
-  foreach($p in $candidates){ if($p -and (Test-Path $p)){ return $p } }
   return ""
 }
 function Ensure-Python(){
@@ -118,6 +142,7 @@ function Ensure-Python(){
   }
 
   $base = Find-BasePython
+  if($base){ Write-Host "  Da tim thay Python phu hop: $base" -ForegroundColor DarkGray }
   if(-not $base){
     Write-Host "  May chua co Python phu hop. Dang thu cai tu dong..."
     $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
@@ -126,6 +151,7 @@ function Ensure-Python(){
         & winget install -e --id Python.Python.3.13 --scope user --accept-package-agreements --accept-source-agreements
       }catch{}
       $base = Find-BasePython
+      if($base){ Write-Host "  Da nhan Python moi cai: $base" -ForegroundColor DarkGray }
     }
   }
   if(-not $base){
