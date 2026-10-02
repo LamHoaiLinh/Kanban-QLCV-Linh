@@ -383,11 +383,17 @@ def version_status() -> dict:
         error = str(exc)
     current_v = str(installed.get("kanToolVersion") or installed.get("installerVersion") or "")
     latest_v = str(latest.get("kanToolVersion") or latest.get("installerVersion") or "")
-    update_available = bool(latest_v and (not current_v or version_tuple(current_v) < version_tuple(latest_v)))
+    current_installer = str(installed.get("installerVersion") or "")
+    latest_installer = str(latest.get("installerVersion") or "")
+    tool_newer = bool(latest_v and (not current_v or version_tuple(current_v) < version_tuple(latest_v)))
+    installer_newer = bool(latest_installer and (not current_installer or version_tuple(current_installer) < version_tuple(latest_installer)))
+    update_available = tool_newer or installer_newer
     return {
         "ok": not bool(error),
         "currentVersion": current_v,
         "latestVersion": latest_v,
+        "currentInstallerVersion": current_installer,
+        "latestInstallerVersion": latest_installer,
         "updateAvailable": update_available,
         "error": error,
     }
@@ -471,6 +477,9 @@ def diagnostics() -> dict:
     if versions.get("latestVersion"):
         version_detail = ("Máy " + (versions.get("currentVersion") or "chưa xác định") +
                           " / mới nhất " + versions.get("latestVersion"))
+        if versions.get("latestInstallerVersion"):
+            version_detail += (" · Installer " + (versions.get("currentInstallerVersion") or "chưa xác định") +
+                               " / " + versions.get("latestInstallerVersion"))
     elif versions.get("error"):
         version_detail = "Chưa kiểm tra được GitHub: " + str(versions.get("error"))
     add("version", "Phiên bản KanBan Tools", version_ok, version_detail)
