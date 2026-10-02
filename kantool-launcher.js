@@ -26,7 +26,7 @@ async function downloadBat(manual){
     const url=URL.createObjectURL(new Blob([text],{type:'application/octet-stream'}));
     const a=document.createElement('a');a.href=url;a.download='KanTool.bat';document.body.appendChild(a);a.click();a.remove();
     setTimeout(function(){URL.revokeObjectURL(url);},1500);
-    if(status)status.textContent=manual?'Đã tải KanTool.bat mới nhất.':'KanBan Tools chưa chạy. Đã tải bộ cài mới nhất — hãy mở KanTool.bat vừa tải.';
+    if(status)status.textContent=manual?'Đã tải KanTool.bat mới nhất.':'KanBan Tools chưa chạy. Đã tải bộ cài mới nhất — chỉ cần mở KanTool.bat một lần, các bước còn lại tự động.';
     return true;
   }catch(e){
     try{
@@ -58,7 +58,7 @@ async function getDiagnostics(show){
     lastDiagnostics=null;
     if(show){
       const box=panel.querySelector('[data-diagnostics]');
-      box.hidden=false;box.textContent='KanBan Tools chưa chạy nên chưa thể chẩn đoán. Nút chính sẽ tự tải bộ cài mới nhất.';
+      box.hidden=false;box.textContent='KanBan Tools chưa chạy nên chưa thể chẩn đoán. Nút chính sẽ tải bộ cài mới nhất; mở KanTool.bat một lần để tự cài.';
     }
     return null;
   }
@@ -104,7 +104,7 @@ function ensurePanel(){
     '<p>Bạn chỉ cần dùng <strong>một nút</strong>. KanBan tự kiểm tra, cập nhật hoặc sửa thành phần cần thiết.</p>'+
     '<div class="kantool-list" data-list></div>'+
     '<button type="button" data-smart class="kantool-smart-btn">↻ Cập nhật / sửa KanBan Tools</button>'+
-    '<div class="kantool-smart-note">Nếu chưa cài, nút này tự tải KanTool.bat mới nhất. Nếu đã cài, nó tự cập nhật hoặc sửa lỗi.</div>'+
+    '<div class="kantool-smart-note">Nếu chưa cài, nút này tải KanTool.bat mới nhất; mở file một lần là tự cài. Nếu đã cài, KanBan tự cập nhật hoặc sửa lỗi bằng cùng một bộ cài.</div>'+
     '<details class="kantool-advanced"><summary>Tùy chọn nâng cao</summary>'+
       '<div class="capture-control-actions kantool-secondary-actions">'+
         '<button type="button" data-retry>Kiểm tra lại</button>'+
