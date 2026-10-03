@@ -57,8 +57,14 @@ jobs:
               revealed=manager.get_item(item['id'], reveal=True)
               assert revealed['password']=='secret-B'
               assert revealed['history'][0]['password']=='secret-A'
+              tax_item=manager.save_item({'title':'Thuế - Bình Tân','service':'Thuế điện tử','company':'CÔNG TY TNHH ĐÀO TẠO LÁI XE BÌNH TÂN','tax_id':'0319460837','username':'tax-user','password':'tax-secret','field_order':'tax_id,password'})
+              guessed=manager._guess_login_fields({'title':'MBBank Digital Banking Corp - Google Chrome','exe':'chrome.exe'}, ['0319460837','linh-user'])
+              assert guessed['service']=='MB Bank'
+              assert guessed['company_id']=='0319460837'
+              assert guessed['username']=='linh-user'
+              assert guessed['company']=='CÔNG TY TNHH ĐÀO TẠO LÁI XE BÌNH TÂN'
               assert manager.export_backup()['encrypted'] is True
-              print('KanPass KDBX + DPAPI OK')
+              print('KanPass KDBX + DPAPI + compact inference OK')
           finally:
               shutil.rmtree(root, ignore_errors=True)
           '@ | python -
