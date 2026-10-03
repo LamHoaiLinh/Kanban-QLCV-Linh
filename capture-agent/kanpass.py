@@ -992,19 +992,20 @@ class KanPassManager:
         user = _clean(guessed.get("username"), 250).casefold()
         ranked = []
         for item in matches:
-            score = int(item.get("_score") or 0)
+            base = int(item.get("_score") or 0)
+            evidence = 0
             if cid and _clean(item.get("company_id"), 100).casefold() == cid:
-                score += 20
+                evidence += 20
             if tax and _clean(item.get("tax_id"), 40).casefold() == tax:
-                score += 20
+                evidence += 20
             if user and _clean(item.get("username"), 250).casefold() == user:
-                score += 8
-            ranked.append((score, item))
+                evidence += 8
+            ranked.append((base + evidence, evidence, item))
         ranked.sort(key=lambda pair: -pair[0])
-        if not ranked:
+        if not ranked or ranked[0][1] <= 0:
             return None
         if len(ranked) == 1 or ranked[0][0] >= ranked[1][0] + 8:
-            return ranked[0][1]
+            return ranked[0][2]
         return None
 
     def hotkey_save_update(self):
@@ -1079,7 +1080,8 @@ class KanPassManager:
         account_frame.columnconfigure(0, weight=1)
         account_name = ttk.Label(account_frame, textvariable=title_var, font=("Segoe UI", 11, "bold"))
         account_name.grid(row=0, column=0, sticky="w")
-        if len(choices) > 2:
+        needs_choice = bool(matches) and preferred is None
+        if len(matches) > 1 or needs_choice:
             combo = ttk.Combobox(account_frame, textvariable=pick, values=labels, state="readonly", width=34)
             combo.grid(row=0, column=1, sticky="e", padx=(10, 0))
         else:
@@ -1173,6 +1175,8 @@ class KanPassManager:
                 advanced.grid_remove()
                 detail_btn.configure(text="Chi tiết…")
             win.update_idletasks()
+            target_h = max(245, min(590, win.winfo_reqheight()))
+            win.geometry(f"500x{target_h}")
 
         actions = ttk.Frame(outer)
         actions.grid(row=8, column=0, sticky="ew", pady=(5, 0))
