@@ -2,7 +2,7 @@ name: Check KanBan Tools
 
 on:
   push:
-    branches: [ main, 'feature/**' ]
+    branches: [ main, 'feature/**', 'fix/**' ]
     paths:
       - 'kan-tools/**'
       - 'capture-agent/**'
