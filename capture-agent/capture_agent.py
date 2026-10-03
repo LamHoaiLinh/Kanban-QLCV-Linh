@@ -41,6 +41,8 @@ def install():
     send('quit')
     time.sleep(.45)
     if src!=target: shutil.copy2(src,target)
+    kanpass_src=src.with_name('kanpass.py'); kanpass_target=DIR/'kanpass.py'
+    if kanpass_src.exists() and kanpass_src.resolve()!=kanpass_target.resolve(): shutil.copy2(kanpass_src,kanpass_target)
     pyw=Path(sys.executable).with_name('pythonw.exe'); pyw=pyw if pyw.exists() else Path(sys.executable)
     base=r'Software\Classes\kanbancapture'
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER,base) as k: winreg.SetValueEx(k,None,0,winreg.REG_SZ,'URL:Kanban Capture'); winreg.SetValueEx(k,'URL Protocol',0,winreg.REG_SZ,'')
