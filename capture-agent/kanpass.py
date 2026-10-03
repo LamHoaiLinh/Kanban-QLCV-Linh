@@ -507,13 +507,10 @@ class KanPassManager:
             raise ValueError("Dữ liệu KDBX trong backup bị lỗi.") from exc
         if len(raw) < 100:
             raise ValueError("Dữ liệu KDBX quá ngắn.")
-        supplied = str((payload or {}).get("masterPassword") or "")
         candidates = []
-        if supplied:
-            candidates.append(supplied)
         try:
             cached = self._load_master()
-            if cached and cached not in candidates:
+            if cached:
                 candidates.append(cached)
         except Exception:
             pass
@@ -530,7 +527,15 @@ class KanPassManager:
                 except Exception:
                     pass
             if verified is None:
-                return {"ok": False, "needPassword": True, "message": "Cần mật khẩu chính của file KanPass này."}
+                master = self._ask_master_sync()
+                if master is None:
+                    return {"ok": False, "cancelled": True, "message": "Đã hủy nhập KanPass."}
+                try:
+                    probe = PyKeePass(str(tmp), password=master)
+                    _ = len(probe.entries)
+                    verified = master
+                except Exception:
+                    return {"ok": False, "needPassword": True, "message": "Mật khẩu chính KanPass không đúng."}
             backup = self.db_path.with_suffix(".before-import.kdbx")
             if self.db_path.exists():
                 try:
@@ -546,6 +551,141 @@ class KanPassManager:
                 tmp.unlink(missing_ok=True)
             except Exception:
                 pass
+
+    def _ask_master_sync(self):
+        result = {"value": None}
+        done = threading.Event()
+
+        def ask():
+            try:
+                result["value"] = simpledialog.askstring(
+                    "KanPass - Khôi phục",
+                    "Nhập mật khẩu chính của file KanPass backup:",
+                    show="*",
+                    parent=self.root
+                )
+            finally:
+                done.set()
+
+        self.root.after(0, ask)
+        if not done.wait(300):
+            return None
+        return result.get("value")
+
+    def _copy_secret(self, value: str):
+        try:
+            self.root.clipboard_clear()
+            self.root.clipboard_append(value)
+            self.root.update_idletasks()
+            def clear():
+                try:
+                    if self.root.clipboard_get() == value:
+                        self.root.clipboard_clear()
+                except Exception:
+                    pass
+            self.root.after(20000, clear)
+        except Exception:
+            pass
+
+    def show_secret_window(self, entry_id: str):
+        try:
+            item = self.get_item(entry_id, reveal=True)
+        except Exception as exc:
+            messagebox.showerror("KanPass", str(exc), parent=self.root)
+            return
+        win = tk.Toplevel(self.root)
+        win.title("KanPass - Xem mật khẩu")
+        win.attributes("-topmost", True)
+        win.geometry("620x500")
+        frame = ttk.Frame(win, padding=14)
+        frame.pack(fill="both", expand=True)
+        ttk.Label(frame, text=item.get("title") or "Tài khoản", font=("Segoe UI", 12, "bold")).pack(anchor="w")
+        info = " · ".join(x for x in [item.get("company"), item.get("tax_id"), item.get("username")] if x)
+        if info:
+            ttk.Label(frame, text=info, foreground="#61706a").pack(anchor="w", pady=(2, 10))
+        ttk.Label(frame, text="Mật khẩu hiện tại").pack(anchor="w")
+        current = ttk.Entry(frame, show="●")
+        current.insert(0, item.get("password") or "")
+        current.configure(state="readonly")
+        current.pack(fill="x", pady=(4, 6))
+        buttons = ttk.Frame(frame)
+        buttons.pack(fill="x")
+        revealed = {"value": False}
+        def toggle():
+            revealed["value"] = not revealed["value"]
+            current.configure(show="" if revealed["value"] else "●")
+            for ent in history_entries:
+                ent.configure(show="" if revealed["value"] else "●")
+        ttk.Button(buttons, text="Hiện / Ẩn", command=toggle).pack(side="left")
+        ttk.Button(buttons, text="Sao chép mật khẩu hiện tại (tự xóa 20 giây)", command=lambda:self._copy_secret(item.get("password") or "")).pack(side="right")
+        ttk.Separator(frame).pack(fill="x", pady=12)
+        ttk.Label(frame, text=f"Lịch sử mật khẩu gần nhất ({len(item.get('history') or [])}/{MAX_HISTORY})", font=("Segoe UI", 10, "bold")).pack(anchor="w")
+        history_box = ttk.Frame(frame)
+        history_box.pack(fill="both", expand=True, pady=(6, 0))
+        history_entries = []
+        history = item.get("history") or []
+        if not history:
+            ttk.Label(history_box, text="Chưa có lịch sử đổi mật khẩu.", foreground="#61706a").pack(anchor="w")
+        for index, old in enumerate(history):
+            row = ttk.Frame(history_box)
+            row.pack(fill="x", pady=3)
+            ttk.Label(row, text=f"{index+1}. {old.get('changed_at') or ''}", width=28).pack(side="left")
+            ent = ttk.Entry(row, show="●")
+            ent.insert(0, str(old.get("password") or ""))
+            ent.configure(state="readonly")
+            ent.pack(side="left", fill="x", expand=True, padx=(6, 0))
+            history_entries.append(ent)
+        ttk.Button(frame, text="Đóng", command=win.destroy).pack(anchor="e", pady=(12, 0))
+        win.focus_force()
+
+    def password_dialog(self, entry_id: str):
+        try:
+            item = self.get_item(entry_id, reveal=False)
+        except Exception as exc:
+            messagebox.showerror("KanPass", str(exc), parent=self.root)
+            return
+        win = tk.Toplevel(self.root)
+        win.title("KanPass - Đặt / đổi mật khẩu")
+        win.attributes("-topmost", True)
+        win.resizable(False, False)
+        frame = ttk.Frame(win, padding=14)
+        frame.pack(fill="both", expand=True)
+        ttk.Label(frame, text=item.get("title") or "Tài khoản", font=("Segoe UI", 11, "bold")).grid(row=0, column=0, columnspan=2, sticky="w")
+        ttk.Label(frame, text="Mật khẩu mới").grid(row=1, column=0, sticky="w", pady=(12, 4))
+        password = tk.StringVar()
+        confirm = tk.StringVar()
+        p1 = ttk.Entry(frame, textvariable=password, show="●", width=42)
+        p1.grid(row=1, column=1, sticky="ew", pady=(12, 4))
+        ttk.Label(frame, text="Nhập lại").grid(row=2, column=0, sticky="w", pady=4)
+        ttk.Entry(frame, textvariable=confirm, show="●", width=42).grid(row=2, column=1, sticky="ew", pady=4)
+        frame.columnconfigure(1, weight=1)
+        actions = ttk.Frame(frame)
+        actions.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(12, 0))
+        ttk.Button(actions, text="Hủy", command=win.destroy).pack(side="left")
+        def save():
+            new = password.get()
+            if not new:
+                messagebox.showinfo("KanPass", "Hãy nhập mật khẩu mới.", parent=win)
+                return
+            if new != confirm.get():
+                messagebox.showwarning("KanPass", "Mật khẩu nhập lại chưa khớp.", parent=win)
+                return
+            reuse = self.password_reuse_info(entry_id, new)
+            if reuse and reuse.get("kind") == "history":
+                when = reuse.get("changed_at") or "trước đây"
+                if not messagebox.askyesno("KanPass", f"Mật khẩu này đã từng được sử dụng ({when}).\nMột số ngân hàng không cho dùng lại mật khẩu cũ.\n\nVẫn lưu?", parent=win):
+                    return
+            payload = dict(item)
+            payload["password"] = new
+            try:
+                self.save_item(payload)
+                messagebox.showinfo("KanPass", "Đã cập nhật mật khẩu.", parent=win)
+                win.destroy()
+            except Exception as exc:
+                messagebox.showerror("KanPass", str(exc), parent=win)
+        ttk.Button(actions, text="Lưu mật khẩu", command=save).pack(side="right")
+        p1.focus_set()
+        win.focus_force()
 
     def _context_matches(self, item: dict, ctx: dict) -> int:
         title = str(ctx.get("title") or "").lower()
@@ -747,13 +887,20 @@ class KanPassManager:
             if path == "/kanpass/list" and method == "GET":
                 return 200, {"ok": True, "items": self.list_items((query or {}).get("q", ""))}
             if path == "/kanpass/item" and method == "GET":
-                reveal = str((query or {}).get("reveal", "")).lower() in ("1", "true", "yes")
-                return 200, {"ok": True, "item": self.get_item((query or {}).get("id", ""), reveal=reveal)}
+                return 200, {"ok": True, "item": self.get_item((query or {}).get("id", ""), reveal=False)}
+            if path == "/kanpass/show" and method == "POST":
+                entry_id = str((body or {}).get("id") or "")
+                self.get_item(entry_id, reveal=False)
+                self.root.after(0, lambda eid=entry_id: self.show_secret_window(eid))
+                return 200, {"ok": True, "shown": True}
+            if path == "/kanpass/password-dialog" and method == "POST":
+                entry_id = str((body or {}).get("id") or "")
+                self.get_item(entry_id, reveal=False)
+                self.root.after(0, lambda eid=entry_id: self.password_dialog(eid))
+                return 200, {"ok": True, "shown": True}
             if path == "/kanpass/save" and method == "POST":
-                payload = body or {}
-                reuse = self.password_reuse_info(str(payload.get("id") or ""), str(payload.get("password") or ""))
-                if reuse and reuse.get("kind") == "history" and not bool(payload.get("allowReuse")):
-                    return 409, {"ok": False, "reuse": True, "changed_at": reuse.get("changed_at") or "", "message": "Mật khẩu này đã từng được sử dụng."}
+                payload = dict(body or {})
+                payload["password"] = ""
                 return 200, {"ok": True, "item": self.save_item(payload)}
             if path == "/kanpass/delete" and method == "POST":
                 return 200, self.delete_item(str((body or {}).get("id") or ""))
