@@ -489,3 +489,30 @@
 .kanpass-detail-summary>span{display:grid;gap:3px;min-width:0}.kanpass-detail-summary strong{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.kanpass-detail-summary small{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.kanpass-detail-summary>b{font-size:24px;line-height:1;color:var(--green-dark)}
 .kanpass-detail-card.collapsed:hover{border-color:var(--green);background:var(--green-soft)}
 @media(max-width:950px){.kanpass-layout.detail-collapsed{grid-template-columns:1fr}.kanpass-detail-card.collapsed{max-width:none}}
+
+
+/* ===== KanBackup / Kopia ===== */
+.kanbackup-panel{max-width:1180px;margin:0 auto}
+.kanbackup-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.kanbackup-kpi{display:grid;gap:5px;min-width:0;padding:14px;border:2px solid var(--border);border-radius:14px;background:var(--panel-soft)}
+.kanbackup-kpi>span,.office-field-label{font-size:12px;font-weight:800;color:var(--muted)}
+.kanbackup-kpi>strong{font-size:16px;overflow:hidden;text-overflow:ellipsis}
+.kanbackup-kpi>small{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kanbackup-config-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:18px;margin-top:14px}
+.kanbackup-source-list,.kanbackup-snapshot-list{display:grid;gap:8px;margin:8px 0 10px}
+.kanbackup-source-row,.kanbackup-path-row,.kanbackup-snapshot-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border:2px solid var(--border);border-radius:12px;background:var(--panel-soft)}
+.kanbackup-source-row code,.kanbackup-path-row code{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kanbackup-path-row{margin-top:8px}
+.kanbackup-snapshot-row{justify-content:space-between}
+.kanbackup-snapshot-main{display:grid;min-width:0;gap:3px}
+.kanbackup-snapshot-main span,.kanbackup-snapshot-main small{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kanbackup-snapshot-actions{display:flex;gap:7px;flex:0 0 auto}
+.kanbackup-panel .office-info,.kanbackup-panel .office-warning{margin-top:12px}
+.kanbackup-panel .office-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.office-empty.compact{padding:10px}
+@media(max-width:780px){
+  .kanbackup-summary,.kanbackup-config-grid{grid-template-columns:1fr}
+  .kanbackup-snapshot-row{align-items:flex-start;flex-direction:column}
+  .kanbackup-snapshot-actions{width:100%}
+  .kanbackup-snapshot-actions .office-btn{flex:1}
+}
