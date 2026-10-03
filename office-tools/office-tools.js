@@ -14,6 +14,8 @@ const OFFICE_SETTINGS_KEY = 'linh_kanban_office_settings_v1';
 const KANPAINT_URL = 'https://lamhoailinh.github.io/KanPaint/';
 const KANPASS_API = 'http://127.0.0.1:47631';
 const KANPASS_HEADERS = {'X-KanBan-Agent':'linh-kanpass-v1','Content-Type':'application/json'};
+const KANBACKUP_API = 'http://127.0.0.1:47634';
+const KANBACKUP_HEADERS = {'X-KanBan-Agent':'linh-kanbackup-v1','Content-Type':'application/json'};
 const KANPAINT_BUILD_ID = '20260927-csp-hotfix';
 const PINNED_LIBS = {
   pdfLib: 'https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js',
@@ -31,6 +33,8 @@ const state = {
 };
 let dialog, mainHost, statusText, progressFill;
 let pdfjsLib = null;
+let backupDraft = null;
+let backupRefreshTimer = null;
 
 init();
 
@@ -69,6 +73,7 @@ function injectDialog(){
         ${navButton('worksheet','PDF/IMG','Nhập đề và làm bài trực tiếp','Nhập liệu PDF/IMG')}
         ${navButton('rename','Rename','Đổi tên hàng loạt')}
         ${navButton('excel','Excel','Đọc và gộp Excel')}
+        ${navButton('backup','BK','Backup tăng dần, dedup và khôi phục bằng Kopia','Backup')}
         ${navButton('kanpass','PASS','Quản lý tài khoản và mật khẩu mã hóa','KanPass')}
         ${navButton('kanpaint','KP','Chỉnh ảnh chuyên sâu bằng KanPaint','KanPaint')}
         ${navButton('kanmedia','KM','Tải, chuyển đổi và chỉnh nhanh audio/video','KanMedia')}
@@ -93,7 +98,7 @@ function injectDialog(){
 function navButton(id,label,title,displayLabel=label){return `<button type="button" data-office-nav="${id}" title="${escapeHtml(title)}"><span class="office-btn-mark">${label}</span><span>${displayLabel}</span></button>`;}
 
 function openOffice(tool='pdf'){
-  state.tool=['pdf','image','rename','excel','kanpass','kanpaint','kanmedia'].includes(tool)?tool:'pdf';
+  state.tool=['pdf','image','rename','excel','backup','kanpass','kanpaint','kanmedia'].includes(tool)?tool:'pdf';
   if(!dialog.open) dialog.showModal();
   renderTool();
 }
@@ -107,6 +112,7 @@ function renderTool(){
     image:['Công cụ hình ảnh','Chuyển đổi, crop, ghép, đóng dấu và tạo ảnh dài từ nội dung dán.'],
     rename:['Đổi tên hàng loạt','Xem trước tên mới trước khi tạo bản sao hoặc đổi tên tại chỗ.'],
     excel:['Công cụ Excel','Đọc giá trị/công thức, xuất JSON và gộp sheet hoặc workbook.'],
+    backup:['Backup','Backup tăng dần bằng Kopia, chạy lịch nền và khôi phục theo snapshot.'],
     kanpass:['KanPass','Kho tài khoản offline mã hóa. Alt+A tự điền, Alt+P lưu hoặc cập nhật từ bất kỳ cửa sổ Windows nào.'],
     kanpaint:['KanPaint','Chỉnh ảnh chuyên sâu, layer, mask, Skin Retouch, script và xuất asset ngay trong KanBan.'],
     kanmedia:['KanMedia','Tải, chuyển đổi và chỉnh nhanh audio/video với ít thao tác.']
@@ -116,14 +122,94 @@ function renderTool(){
   if(state.tool==='image')renderImageTool();
   if(state.tool==='rename')renderRenameTool();
   if(state.tool==='excel')renderExcelTool();
+  if(state.tool==='backup')void renderBackupTool();
   if(state.tool==='kanpass')void renderKanPassTool();
   if(state.tool==='kanpaint')renderKanPaintTool();
   if(state.tool==='kanmedia')renderKanMediaTool(mainHost,{setStatus});
   setStatus(state.tool==='kanpaint'?'KanPaint đang chạy trực tiếp trong KanBan.':'Sẵn sàng.',0);
 }
-function cleanupTransient(){ state.abort=false; if(isWorksheetEditorOpen())closeWorksheetEditor(); revokeAllPreviews(); }
+function cleanupTransient(){ state.abort=false; if(backupRefreshTimer){clearTimeout(backupRefreshTimer);backupRefreshTimer=null;} if(isWorksheetEditorOpen())closeWorksheetEditor(); revokeAllPreviews(); }
 function revokeAllPreviews(){ document.querySelectorAll('[data-object-url]').forEach(el=>{try{URL.revokeObjectURL(el.dataset.objectUrl)}catch{};}); }
 
+
+
+async function backupFetch(path,options={}){
+  const init={method:options.method||'GET',headers:{...KANBACKUP_HEADERS,...(options.headers||{})},cache:'no-store',targetAddressSpace:'loopback'};
+  if(options.body!==undefined)init.body=JSON.stringify(options.body);
+  let response;
+  try{response=await fetch(KANBACKUP_API+path,init)}catch(error){throw new Error('KanBackup chưa chạy. Chuột phải CÔNG CỤ → Cập nhật / sửa KanBan Tools.')}
+  let data={};try{data=await response.json()}catch{}
+  if(!response.ok)throw new Error(data.message||('KanBackup trả lỗi '+response.status));
+  return data;
+}
+function backupSize(value){
+  let n=Number(value||0);if(!n)return '—';
+  const u=['B','KB','MB','GB','TB'];let i=0;while(n>=1024&&i<4){n/=1024;i++}
+  return n.toFixed(i<2?0:(n>=10?1:2))+' '+u[i];
+}
+function backupWhen(value){
+  if(!value)return 'Chưa có';
+  const d=new Date(value);return Number.isNaN(d.getTime())?String(value):d.toLocaleString('vi-VN',{hour12:false});
+}
+function backupSourceRows(host){
+  const list=host.querySelector('#kbSources');if(!list)return;
+  const rows=backupDraft.sources||[];
+  list.innerHTML=rows.length?rows.map(function(p,i){
+    return '<div class="kanbackup-source-row"><code title="'+escapeHtml(p)+'">'+escapeHtml(p)+'</code><button class="office-btn danger" data-kb-remove="'+i+'" type="button">Xóa</button></div>';
+  }).join(''):'<div class="office-empty compact">Chưa chọn thư mục nguồn.</div>';
+  list.querySelectorAll('[data-kb-remove]').forEach(function(btn){btn.onclick=function(){backupDraft.sources.splice(Number(btn.dataset.kbRemove),1);backupSourceRows(host);};});
+}
+async function renderBackupTool(){
+  if(backupRefreshTimer){clearTimeout(backupRefreshTimer);backupRefreshTimer=null}
+  mainHost.innerHTML='<section class="office-tool-panel active kanbackup-panel"><div class="office-tool-head"><div><h3>Backup máy chủ / thư mục</h3><p>Kopia snapshot tăng dần + dedup. Lịch vẫn chạy khi đóng KanBan.</p></div><span class="office-recommend-badge">Kopia</span></div><div id="kbHost"><div class="office-card"><div class="office-empty">Đang kết nối KanBackup…</div></div></div></section>';
+  const host=mainHost.querySelector('#kbHost');
+  try{
+    const status=await backupFetch('/status'),cfg=status.config||{},st=status.state||{},ret=cfg.retention||{};
+    backupDraft={sources:Array.isArray(cfg.sources)?cfg.sources.slice():[],repository:String(cfg.repository||''),scheduleHours:Number(cfg.scheduleHours==null?2:cfg.scheduleHours),retention:{hourly:Number(ret.hourly||24),daily:Number(ret.daily||30),weekly:Number(ret.weekly||8),monthly:Number(ret.monthly||12),annual:Number(ret.annual||3)}};
+    const running=Boolean(st.running),configured=Boolean(status.configured);
+    const options=[0,1,2,3,6,12,24].map(function(h){return '<option value="'+h+'" '+(backupDraft.scheduleHours===h?'selected':'')+'>'+(h?(h===1?'Mỗi 1 giờ':'Mỗi '+h+' giờ'):'Tắt lịch')+'</option>';}).join('');
+    host.innerHTML='<div class="kanbackup-summary">'+
+      '<div class="kanbackup-kpi"><span>Trạng thái</span><strong>'+(running?'Đang backup…':(st.lastOk===true?'An toàn':st.lastOk===false?'Lần gần nhất lỗi':configured?'Chưa chạy backup':'Chưa thiết lập'))+'</strong><small>'+escapeHtml(status.kopiaVersion||'Kopia')+'</small></div>'+
+      '<div class="kanbackup-kpi"><span>Backup cuối</span><strong>'+escapeHtml(backupWhen(st.lastRun))+'</strong><small>'+escapeHtml(st.lastMessage||'Chưa có kết quả')+'</small></div>'+
+      '<div class="kanbackup-kpi"><span>Ổ backup còn trống</span><strong>'+escapeHtml(backupSize(status.repositoryFreeBytes))+'</strong><small>'+(backupDraft.scheduleHours?'Mỗi '+backupDraft.scheduleHours+' giờ':'Tắt lịch')+'</small></div></div>'+
+      '<div class="office-card"><h4>Thiết lập nguồn và nơi lưu</h4><p class="office-card-note">Nên lưu repository trên ổ/NAS khác dữ liệu nguồn. Mật khẩu Kopia chỉ nhập trong cửa sổ Windows.</p>'+
+      '<div class="kanbackup-config-grid"><div><div class="office-field-label">Thư mục cần backup</div><div id="kbSources" class="kanbackup-source-list"></div><button class="office-btn" id="kbAdd" type="button">＋ Thêm thư mục nguồn</button></div>'+
+      '<div><div class="office-field-label">Ổ / thư mục / NAS lưu backup</div><div class="kanbackup-path-row"><code id="kbRepo">'+escapeHtml(backupDraft.repository||'Chưa chọn')+'</code><button class="office-btn" id="kbRepoPick" type="button">Chọn…</button></div><label class="office-field"><span>Lịch tự động</span><select id="kbSchedule">'+options+'</select></label></div></div>'+
+      '<div class="office-info">Giữ mặc định: '+backupDraft.retention.hourly+' bản giờ · '+backupDraft.retention.daily+' bản ngày · '+backupDraft.retention.weekly+' bản tuần · '+backupDraft.retention.monthly+' bản tháng · '+backupDraft.retention.annual+' bản năm.</div>'+
+      '<div class="office-warning">Hãy lưu mật khẩu repository ở nơi an toàn. Mất mật khẩu có thể khiến không khôi phục được backup.</div>'+
+      '<div class="office-toolbar"><button class="office-btn primary" id="kbSave" type="button">Lưu thiết lập</button><span class="spacer"></span><button class="office-btn primary" id="kbNow" type="button" '+(configured&&!running?'':'disabled')+'>'+(running?'Đang backup…':'Backup ngay')+'</button></div></div>'+
+      '<div class="office-card"><div class="office-card-head"><div><h4>Lịch sử snapshot</h4><p class="office-card-note">Khôi phục luôn tạo thư mục KanRestore mới, không đè dữ liệu đang dùng.</p></div><button class="office-btn" id="kbRefresh" type="button">↻ Làm mới</button></div><div id="kbSnapshots" class="kanbackup-snapshot-list"><div class="office-empty">'+(configured?'Đang đọc lịch sử…':'Lưu thiết lập trước để tạo snapshot.')+'</div></div></div>';
+    backupSourceRows(host);
+    host.querySelector('#kbSchedule').onchange=function(e){backupDraft.scheduleHours=Number(e.target.value||0);};
+    host.querySelector('#kbAdd').onclick=async function(){try{const r=await backupFetch('/pick-folder',{method:'POST',body:{kind:'source'}});if(r.path&&!backupDraft.sources.includes(r.path)){backupDraft.sources.push(r.path);backupSourceRows(host)}}catch(e){setStatus(e.message)}};
+    host.querySelector('#kbRepoPick').onclick=async function(){try{const r=await backupFetch('/pick-folder',{method:'POST',body:{kind:'repository',current:backupDraft.repository}});if(r.path){backupDraft.repository=r.path;host.querySelector('#kbRepo').textContent=r.path}}catch(e){setStatus(e.message)}};
+    host.querySelector('#kbSave').onclick=async function(){try{if(!backupDraft.sources.length)throw new Error('Hãy chọn ít nhất một thư mục nguồn.');if(!backupDraft.repository)throw new Error('Hãy chọn nơi lưu backup.');setStatus('Đang thiết lập Kopia…');const r=await backupFetch('/setup',{method:'POST',body:backupDraft});setStatus(r.message||'Đã lưu thiết lập.',100);await renderBackupTool()}catch(e){setStatus(e.message)}};
+    host.querySelector('#kbNow').onclick=async function(){try{const r=await backupFetch('/backup-now',{method:'POST',body:{}});setStatus(r.message||'Đã bắt đầu backup.');await renderBackupTool()}catch(e){setStatus(e.message)}};
+    host.querySelector('#kbRefresh').onclick=function(){void renderBackupTool();};
+    if(configured)void loadBackupSnapshots(host);
+    if(running)scheduleBackupRefresh();
+  }catch(error){
+    host.innerHTML='<div class="office-card"><h4>KanBackup chưa sẵn sàng</h4><p class="office-card-note">'+escapeHtml(error.message)+'</p><button class="office-btn primary" id="kbRetry">Thử lại</button></div>';
+    host.querySelector('#kbRetry').onclick=function(){void renderBackupTool();};
+  }
+}
+function scheduleBackupRefresh(){
+  if(backupRefreshTimer)clearTimeout(backupRefreshTimer);
+  backupRefreshTimer=setTimeout(async function(){
+    backupRefreshTimer=null;if(state.tool!=='backup'||!dialog?.open)return;
+    try{const s=await backupFetch('/status');if(s.state?.running){setStatus('Kopia đang backup…');scheduleBackupRefresh()}else{setStatus(s.state?.lastMessage||'Backup đã kết thúc.',s.state?.lastOk?100:0);await renderBackupTool()}}catch(e){setStatus(e.message)}
+  },2200);
+}
+async function loadBackupSnapshots(host){
+  const box=host.querySelector('#kbSnapshots');if(!box)return;
+  try{
+    const data=await backupFetch('/snapshots'),rows=Array.isArray(data.snapshots)?data.snapshots:[];
+    if(!rows.length){box.innerHTML='<div class="office-empty">Chưa có snapshot nào.</div>';return}
+    box.innerHTML=rows.map(function(x,i){return '<div class="kanbackup-snapshot-row"><div class="kanbackup-snapshot-main"><strong>'+escapeHtml(backupWhen(x.startTime))+'</strong><span title="'+escapeHtml(x.source||'')+'">'+escapeHtml(x.source||'Không rõ nguồn')+'</span><small>'+Number(x.files||0).toLocaleString('vi-VN')+' file · '+escapeHtml(backupSize(x.bytes))+(Number(x.newPackedBytes||0)>0?' · lưu mới '+escapeHtml(backupSize(x.newPackedBytes)):'')+'</small></div><div class="kanbackup-snapshot-actions"><button class="office-btn" data-kb-verify="'+i+'" type="button">Kiểm tra</button><button class="office-btn primary" data-kb-restore="'+i+'" type="button">Khôi phục…</button></div></div>';}).join('');
+    box.querySelectorAll('[data-kb-verify]').forEach(function(btn){btn.onclick=async function(){const x=rows[Number(btn.dataset.kbVerify)];try{btn.disabled=true;setStatus('Đang kiểm tra snapshot…');const r=await backupFetch('/verify',{method:'POST',body:{snapshotId:x.id}});setStatus(r.message||'Kiểm tra hoàn tất.',100)}catch(e){setStatus(e.message)}finally{btn.disabled=false}};});
+    box.querySelectorAll('[data-kb-restore]').forEach(function(btn){btn.onclick=async function(){const x=rows[Number(btn.dataset.kbRestore)];try{const p=await backupFetch('/pick-folder',{method:'POST',body:{kind:'restore'}});if(!p.path)return;if(!confirm('Khôi phục snapshot '+backupWhen(x.startTime)+'?\\n\\nKanBackup sẽ tạo thư mục KanRestore mới trong:\\n'+p.path+'\\n\\nDữ liệu hiện tại không bị ghi đè.'))return;btn.disabled=true;setStatus('Đang khôi phục…');const r=await backupFetch('/restore',{method:'POST',body:{snapshotId:x.id,rootObjectId:x.rootObjectId,targetParent:p.path}});setStatus(r.message||('Đã khôi phục vào '+r.target),100)}catch(e){setStatus(e.message)}finally{btn.disabled=false}};});
+  }catch(error){box.innerHTML='<div class="office-empty">'+escapeHtml(error.message)+'</div>'}
+}
 
 async function kanPassFetch(path,options={}){
   const init={method:options.method||'GET',headers:{...KANPASS_HEADERS,...(options.headers||{})},cache:'no-store'};
