@@ -1539,26 +1539,18 @@
 
   async function importKanPassSection(payload) {
     if (!payload?.available || !payload?.kdbxBase64) return false;
-    const send=async(masterPassword='')=>{
+    try{
       const response=await fetch(KANPASS_API+'/kanpass/import',{
         method:'POST',headers:KANPASS_HEADERS,cache:'no-store',
-        body:JSON.stringify({...payload,masterPassword})
+        body:JSON.stringify(payload)
       });
       let data={};try{data=await response.json()}catch{}
-      if(response.ok)return data;
-      if(response.status===409 && data?.needPassword)return data;
+      if(response.ok)return Boolean(data?.ok);
+      if(response.status===409 && data?.cancelled)return false;
       throw new Error(data?.message || 'Không nhập được KanPass.');
-    };
-    let result;
-    try{result=await send()}
-    catch(error){throw new Error('Không kết nối được KanPass trên máy này. Hãy cập nhật KanBan Tools trước. '+error.message)}
-    if(result?.needPassword){
-      const master=window.prompt('Nhập mật khẩu chính của KanPass trong file backup:');
-      if(master===null)return false;
-      result=await send(master);
+    }catch(error){
+      throw new Error('Không nhập được KanPass: '+(error?.message || 'Windows Agent không phản hồi. Hãy cập nhật KanBan Tools trước.'));
     }
-    if(!result?.ok)throw new Error(result?.message || 'Mật khẩu chính KanPass không đúng.');
-    return true;
   }
 
   function availableImportSections(parsed,raw) {
