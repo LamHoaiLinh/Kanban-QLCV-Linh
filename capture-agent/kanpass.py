@@ -7,6 +7,7 @@ import os
 import tempfile
 import threading
 import time
+import urllib.parse
 from ctypes import wintypes
 from datetime import datetime
 from pathlib import Path
@@ -304,6 +305,10 @@ class KanPassManager:
         self._kp = None
         self._master = None
         self._lock = threading.RLock()
+        self.web_bridge = None
+
+    def attach_web_bridge(self, bridge):
+        self.web_bridge = bridge
 
     def status(self) -> dict:
         return {
@@ -1230,10 +1235,175 @@ class KanPassManager:
         win.geometry(f"{width}x{height}")
         win.focus_force()
 
+    @staticmethod
+    def _host_from_url(url: str) -> str:
+        try:
+            return (urllib.parse.urlsplit(str(url or "")).hostname or "").lower()
+        except Exception:
+            return ""
+
+    def _web_ranked_matches(self, candidate: dict):
+        service = _clean(candidate.get("service"), 80).casefold()
+        host = _clean(candidate.get("host"), 180).casefold() or self._host_from_url(candidate.get("url"))
+        company_id = _clean(candidate.get("company_id"), 100).casefold()
+        tax_id = _clean(candidate.get("tax_id"), 40).casefold()
+        username = _clean(candidate.get("username"), 250).casefold()
+        ranked = []
+        for item in self.list_items():
+            item_host = self._host_from_url(item.get("url"))
+            item_service = _clean(item.get("service"), 80).casefold()
+            item_company_id = _clean(item.get("company_id"), 100).casefold()
+            item_tax_id = _clean(item.get("tax_id"), 40).casefold()
+            item_username = _clean(item.get("username"), 250).casefold()
+
+            # Có định danh mạnh mà khác nhau thì loại ngay để không update nhầm công ty.
+            if company_id and item_company_id and company_id != item_company_id:
+                continue
+            if tax_id and item_tax_id and tax_id != item_tax_id:
+                continue
+
+            score = 0
+            strong = 0
+            if host and item_host and host == item_host:
+                score += 8
+            if service and item_service and service == item_service:
+                score += 5
+            if company_id and item_company_id == company_id:
+                score += 30
+                strong += 1
+            if tax_id and item_tax_id == tax_id:
+                score += 30
+                strong += 1
+            if username and item_username == username:
+                score += 14
+                strong += 1
+            if score:
+                ranked.append((score, strong, item))
+        ranked.sort(key=lambda x: (-x[0], -x[1], (x[2].get("title") or "").casefold()))
+        return ranked
+
+    def _merge_web_candidate(self, current: dict | None, candidate: dict) -> dict:
+        payload = dict(current or {})
+        for key in ("title", "service", "company", "company_id", "tax_id", "username", "url", "window_match", "app_exe", "field_order"):
+            value = candidate.get(key)
+            if value not in (None, "", []):
+                if key in ("company", "title") and payload.get(key):
+                    continue
+                payload[key] = value
+        payload["password"] = str(candidate.get("password") or "")
+        if not payload.get("title"):
+            payload["title"] = _display_name(payload)
+        return payload
+
+    def _save_web_candidate(self, candidate: dict, entry_id: str = ""):
+        current = self.get_item(entry_id, reveal=False) if entry_id else None
+        payload = self._merge_web_candidate(current, candidate)
+        if entry_id:
+            payload["id"] = entry_id
+        return self.save_item(payload)
+
+    def _choose_web_match(self, candidate: dict, ranked: list):
+        win = tk.Toplevel(self.root)
+        win.title("KanPass - Chọn tài khoản")
+        win.attributes("-topmost", True)
+        win.resizable(False, False)
+        frame = ttk.Frame(win, padding=14)
+        frame.pack(fill="both", expand=True)
+        ttk.Label(frame, text="KanPass chưa chắc đây là tài khoản nào", font=("Segoe UI", 11, "bold")).pack(anchor="w")
+        ttk.Label(
+            frame,
+            text="Chỉ cần chọn đúng công ty/tài khoản lần này. Lần sau KanPass sẽ nhận diện bằng MST / Company ID / username.",
+            foreground="#61706a",
+            wraplength=470
+        ).pack(anchor="w", pady=(3, 10))
+        choices = [(x[2].get("title") or x[2].get("username") or "Tài khoản", x[2].get("id") or "") for x in ranked[:8]]
+        choices.append(("＋ Lưu thành tài khoản mới", ""))
+        labels = [x[0] for x in choices]
+        id_map = {label: entry_id for label, entry_id in choices}
+        selected = tk.StringVar(value=labels[0])
+        combo = ttk.Combobox(frame, textvariable=selected, values=labels, state="readonly", width=54)
+        combo.pack(fill="x")
+        buttons = ttk.Frame(frame)
+        buttons.pack(fill="x", pady=(12, 0))
+        ttk.Button(buttons, text="Không lưu", command=win.destroy).pack(side="left")
+        def save():
+            try:
+                entry_id = id_map.get(selected.get(), "")
+                self._save_web_candidate(candidate, entry_id)
+                win.destroy()
+            except Exception as exc:
+                messagebox.showerror("KanPass", str(exc), parent=win)
+        ttk.Button(buttons, text="Lưu / cập nhật", command=save).pack(side="right")
+        win.bind("<Escape>", lambda _e: win.destroy())
+        win.bind("<Return>", lambda _e: save())
+        combo.focus_set()
+        win.focus_force()
+
+    def web_login_candidate(self, candidate: dict):
+        """Called only after the dedicated CDP bridge judges the login form submitted successfully."""
+        if not isinstance(candidate, dict):
+            return
+        password = str(candidate.get("password") or "")
+        if not password:
+            return
+        try:
+            ranked = self._web_ranked_matches(candidate)
+            chosen = None
+            if ranked:
+                top_score, top_strong, top_item = ranked[0]
+                if len(ranked) == 1:
+                    if top_score >= 8:
+                        chosen = top_item
+                else:
+                    second_score = ranked[1][0]
+                    if top_strong > 0 and top_score >= second_score + 8:
+                        chosen = top_item
+
+            if chosen:
+                revealed = self.get_item(chosen.get("id") or "", reveal=True)
+                current_password = str(revealed.get("password") or "")
+                if current_password == password:
+                    return
+                title = chosen.get("title") or candidate.get("title") or candidate.get("service") or "tài khoản"
+                if messagebox.askyesno(
+                    "KanPass",
+                    f"Cập nhật mật khẩu cho “{title}”?",
+                    parent=self.root
+                ):
+                    self._save_web_candidate(candidate, chosen.get("id") or "")
+                return
+
+            # Nhiều hồ sơ cùng Web/username mà chưa đủ định danh mạnh: hỏi chọn thay vì đoán.
+            if len(ranked) > 1 and ranked[0][0] >= 8:
+                self._choose_web_match(candidate, ranked)
+                return
+
+            title = candidate.get("title") or _display_name(candidate)
+            if messagebox.askyesno(
+                "KanPass",
+                f"Lưu mật khẩu cho “{title}”?",
+                parent=self.root
+            ):
+                self._save_web_candidate(candidate)
+        except Exception as exc:
+            messagebox.showerror("KanPass", f"Không thể lưu mật khẩu Web: {exc}", parent=self.root)
+
     def handle_api(self, method: str, path: str, query: dict, body: dict) -> tuple[int, dict]:
         try:
             if path == "/kanpass/status" and method == "GET":
                 return 200, self.status()
+            if path == "/kanpass/web/status" and method == "GET":
+                if not self.web_bridge:
+                    return 503, {"ok": False, "message": "KanPass Web Bridge chưa sẵn sàng."}
+                return 200, self.web_bridge.status()
+            if path == "/kanpass/web/open" and method == "POST":
+                if not self.web_bridge:
+                    return 503, {"ok": False, "message": "KanPass Web Bridge chưa sẵn sàng."}
+                return 200, self.web_bridge.open_url(str((body or {}).get("url") or ""))
+            if path == "/kanpass/web/stop" and method == "POST":
+                if not self.web_bridge:
+                    return 200, {"ok": True}
+                return 200, self.web_bridge.stop_browser()
             if path == "/kanpass/setup" and method == "POST":
                 if self.db_path.exists():
                     return 200, self.status()
