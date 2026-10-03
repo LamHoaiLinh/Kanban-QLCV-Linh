@@ -1400,6 +1400,18 @@ class KanPassManager:
                 if not self.web_bridge:
                     return 503, {"ok": False, "message": "KanPass Web Bridge chưa sẵn sàng."}
                 return 200, self.web_bridge.open_url(str((body or {}).get("url") or ""))
+            if path == "/kanpass/web/dom-submit" and method == "POST":
+                if not self.web_bridge:
+                    return 503, {"ok": False, "message": "KanPass Web Bridge chưa sẵn sàng."}
+                payload = body or {}
+                if payload.get("loginSuccess") is not True:
+                    return 400, {"ok": False, "message": "Chỉ nhận credential sau khi tool Web xác nhận đăng nhập thành công."}
+                snapshot = payload.get("snapshot") if isinstance(payload.get("snapshot"), dict) else {}
+                candidate = self.web_bridge.parse_dom_candidate(snapshot)
+                if not candidate or not candidate.get("password"):
+                    return 400, {"ok": False, "message": "Không tìm thấy credential hợp lệ trong DOM snapshot."}
+                self.root.after(0, lambda c=candidate: self.web_login_candidate(c))
+                return 200, {"ok": True, "queued": True}
             if path == "/kanpass/web/stop" and method == "POST":
                 if not self.web_bridge:
                     return 200, {"ok": True}
