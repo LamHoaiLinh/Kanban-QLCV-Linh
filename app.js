@@ -2774,6 +2774,7 @@
     if (refs.timerLocalAlarmInput) clock.localAlarm = refs.timerLocalAlarmInput.checked;
     if (refs.timerRepeatAlarmInput) clock.repeatAlarm = refs.timerRepeatAlarmInput.checked;
     if (refs.timerNotifyInput) clock.notify = refs.timerNotifyInput.checked;
+    if (refs.timerLabelInput) clock.timerLabel = String(refs.timerLabelInput.value || '').trim().slice(0,80);
   }
 
   function handleAlarmOptionChange() {
@@ -3014,6 +3015,7 @@
     if (!clock.running) clock.remainingSec = durationSec;
     saveNow();
     updateClockWidget();
+    renderTimerPresets();
   }
 
   function getTimerInputSeconds() {
