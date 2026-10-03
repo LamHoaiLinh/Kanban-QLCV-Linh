@@ -259,11 +259,52 @@ function renderKanPassSetup(host){
   });
   bindKanPassJsonButtons(host,{allowExport:false});
 }
+async function refreshKanPassWebBridge(host){
+  const statusEl=host.querySelector('#kanPassWebStatus');
+  const openBtn=host.querySelector('#kanPassWebOpen');
+  try{
+    const status=await kanPassFetch('/kanpass/web/status');
+    const ok=Boolean(status.available);
+    if(openBtn)openBtn.disabled=!ok;
+    if(statusEl){
+      if(!status.websocket)statusEl.textContent='Thiếu thành phần Web Bridge. Hãy cập nhật / sửa KanBan Tools.';
+      else if(!status.browserFound)statusEl.textContent='Không tìm thấy Chrome / Edge / Brave / Vivaldi trên máy.';
+      else statusEl.textContent=(status.running?'Đang theo dõi Web':'Sẵn sàng')+' · '+(status.browser||'Chromium')+' · DOM/CDP cục bộ, không ghi request body/password ra file.';
+    }
+    return status;
+  }catch(error){
+    if(openBtn)openBtn.disabled=true;
+    if(statusEl)statusEl.textContent=error.message;
+    return null;
+  }
+}
+function bindKanPassWebBridge(host){
+  const urlInput=host.querySelector('#kanPassWebUrl');
+  const openBtn=host.querySelector('#kanPassWebOpen');
+  openBtn?.addEventListener('click',async()=>{
+    const url=(urlInput?.value||'').trim();
+    if(!url){setStatus('Hãy nhập địa chỉ Web cần mở.');urlInput?.focus();return}
+    try{
+      setStatus('Đang mở Web bằng KanPass Browser…');
+      const data=await kanPassFetch('/kanpass/web/open',{method:'POST',body:{url}});
+      setStatus('Đã mở '+(data.browser||'trình duyệt')+'. KanPass sẽ tự hỏi Save/Update sau khi đăng nhập thành công.');
+      await refreshKanPassWebBridge(host);
+    }catch(error){setStatus(error.message)}
+  });
+  urlInput?.addEventListener('keydown',event=>{
+    if(event.key==='Enter'){event.preventDefault();openBtn?.click()}
+  });
+  void refreshKanPassWebBridge(host);
+}
 function kanPassBlankItem(){
   return {id:'',title:'',service:'',company:'',company_id:'',tax_id:'',username:'',password:'',url:'',window_match:'',app_exe:'',field_order:['username','password'],history:[],history_count:0};
 }
 function renderKanPassManager(host,status){
-  host.innerHTML=`<div class="kanpass-json-bar">
+  host.innerHTML=`<div class="kanpass-web-bar">
+      <div class="kanpass-web-copy"><strong>Web tự Save / Update</strong><span>Mở Web bằng profile KanPass riêng. Agent đọc DOM bằng CDP trong RAM; sau khi đăng nhập thành công chỉ hỏi Lưu/Cập nhật như Google Password Manager.</span><small id="kanPassWebStatus">Đang kiểm tra Web Bridge…</small></div>
+      <div class="kanpass-web-open"><input id="kanPassWebUrl" type="url" placeholder="https://..."><button class="office-btn primary" id="kanPassWebOpen" type="button">Mở Web bằng KanPass</button></div>
+    </div>
+    <div class="kanpass-json-bar">
       <div><strong>Sao lưu riêng KanPass</strong><span>JSON này chỉ chứa mật khẩu KanPass dạng KDBX đã mã hóa, không liên quan công việc/sinh nhật.</span></div>
       <div class="kanpass-json-buttons"><button class="office-btn" id="kanPassExportJson" type="button">↑ Xuất JSON KanPass</button><button class="office-btn" id="kanPassImportJson" type="button">↓ Nhập JSON KanPass</button></div>
     </div>
@@ -294,6 +335,7 @@ function renderKanPassManager(host,status){
   search.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(()=>void loadList(),180)});
   host.querySelector('#kanPassNew').addEventListener('click',()=>{currentId='';renderKanPassDetail(detail,kanPassBlankItem(),{loadList,onSelected:(x)=>{currentId=x||''}});void loadList()});
   bindKanPassJsonButtons(host,{allowExport:true});
+  bindKanPassWebBridge(host);
   void loadList();
 }
 function renderKanPassDetail(host,item,ctx){
