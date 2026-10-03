@@ -8,7 +8,7 @@
   <title>Kanban Cá Nhân</title>
   <link rel="manifest" href="manifest.webmanifest?v=3.2">
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=6.39">
+  <link rel="stylesheet" href="styles.css?v=6.40">
   <link rel="stylesheet" href="office-tools/office-tools.css?v=5.0.1">
   <link rel="stylesheet" href="office-tools/worksheet-editor.css?v=1.2.0">
   <link rel="stylesheet" href="kantool-extra.css?v=1.2.0">
@@ -440,16 +440,59 @@
           <div class="timer-input-group" data-tooltip="Thiết lập thời lượng đếm ngược tùy chỉnh">
             <label><span>Phút</span><input id="timerMinutesInput" type="number" min="0" max="999" step="1" value="25"></label>
             <label><span>Giây</span><input id="timerSecondsInput" type="number" min="0" max="59" step="1" value="0"></label>
+            <label class="timer-label-field"><span>Nội dung nhắc</span><input id="timerLabelInput" type="text" maxlength="80" placeholder="Ví dụ: Pha trà nước 1"></label>
           </div>
           <div class="timer-presets clock-presets" aria-label="Thời gian mẫu">
-            <button class="ghost-btn timer-preset" type="button" data-minutes="1">1p</button>
-            <button class="ghost-btn timer-preset" type="button" data-minutes="3">3p</button>
-            <button class="ghost-btn timer-preset" type="button" data-minutes="5">5p</button>
-            <button class="ghost-btn timer-preset" type="button" data-minutes="10">10p</button>
-            <button class="ghost-btn timer-preset" type="button" data-minutes="15">15p</button>
-            <button class="ghost-btn timer-preset" type="button" data-minutes="25">25p</button>
-            <button class="ghost-btn timer-preset" type="button" data-minutes="50">50p</button>
-            <button class="ghost-btn timer-preset" type="button" data-minutes="90">90p</button>
+            <div class="timer-preset-slot">
+              <button class="ghost-btn timer-preset" type="button" data-preset-index="0"><span class="timer-preset-time">1p</span></button>
+              <button class="timer-preset-edit" type="button" data-preset-edit="0" aria-label="Sửa nút 1 phút" title="Sửa nút 1 phút">✎</button>
+            </div>
+            <div class="timer-preset-slot">
+              <button class="ghost-btn timer-preset" type="button" data-preset-index="1"><span class="timer-preset-time">3p</span></button>
+              <button class="timer-preset-edit" type="button" data-preset-edit="1" aria-label="Sửa nút 3 phút" title="Sửa nút 3 phút">✎</button>
+            </div>
+            <div class="timer-preset-slot">
+              <button class="ghost-btn timer-preset" type="button" data-preset-index="2"><span class="timer-preset-time">5p</span></button>
+              <button class="timer-preset-edit" type="button" data-preset-edit="2" aria-label="Sửa nút 5 phút" title="Sửa nút 5 phút">✎</button>
+            </div>
+            <div class="timer-preset-slot">
+              <button class="ghost-btn timer-preset" type="button" data-preset-index="3"><span class="timer-preset-time">10p</span></button>
+              <button class="timer-preset-edit" type="button" data-preset-edit="3" aria-label="Sửa nút 10 phút" title="Sửa nút 10 phút">✎</button>
+            </div>
+            <div class="timer-preset-slot">
+              <button class="ghost-btn timer-preset" type="button" data-preset-index="4"><span class="timer-preset-time">15p</span></button>
+              <button class="timer-preset-edit" type="button" data-preset-edit="4" aria-label="Sửa nút 15 phút" title="Sửa nút 15 phút">✎</button>
+            </div>
+            <div class="timer-preset-slot">
+              <button class="ghost-btn timer-preset" type="button" data-preset-index="5"><span class="timer-preset-time">25p</span></button>
+              <button class="timer-preset-edit" type="button" data-preset-edit="5" aria-label="Sửa nút 25 phút" title="Sửa nút 25 phút">✎</button>
+            </div>
+            <div class="timer-preset-slot">
+              <button class="ghost-btn timer-preset" type="button" data-preset-index="6"><span class="timer-preset-time">50p</span></button>
+              <button class="timer-preset-edit" type="button" data-preset-edit="6" aria-label="Sửa nút 50 phút" title="Sửa nút 50 phút">✎</button>
+            </div>
+            <div class="timer-preset-slot">
+              <button class="ghost-btn timer-preset" type="button" data-preset-index="7"><span class="timer-preset-time">90p</span></button>
+              <button class="timer-preset-edit" type="button" data-preset-edit="7" aria-label="Sửa nút 90 phút" title="Sửa nút 90 phút">✎</button>
+            </div>
+          </div>
+          <div class="timer-preset-hint">Bấm nút để dùng nhanh · bấm <strong>✎</strong> để sửa thời gian và tên nhắc.</div>
+          <div id="timerPresetEditor" class="timer-preset-editor" hidden>
+            <div class="timer-preset-editor-head">
+              <strong id="timerPresetEditTitle">Tùy chỉnh nút nhanh</strong>
+              <span>Ví dụ: 30 giây · Pha trà nước 1</span>
+            </div>
+            <div class="timer-preset-editor-grid">
+              <label class="timer-preset-name"><span>Tên nhắc</span><input id="timerPresetLabelInput" type="text" maxlength="48" placeholder="Pha trà nước 1"></label>
+              <label><span>Phút</span><input id="timerPresetMinutesInput" type="number" min="0" max="999" step="1" value="1"></label>
+              <label><span>Giây</span><input id="timerPresetSecondsInput" type="number" min="0" max="59" step="1" value="0"></label>
+            </div>
+            <div class="timer-preset-editor-actions">
+              <button id="resetTimerPresetBtn" class="secondary-btn compact-btn" type="button">Khôi phục mặc định</button>
+              <span class="spacer"></span>
+              <button id="cancelTimerPresetEditBtn" class="secondary-btn compact-btn" type="button">Hủy</button>
+              <button id="saveTimerPresetBtn" class="primary-btn compact-btn" type="button">Lưu nút</button>
+            </div>
           </div>
           <div class="timer-button-row clock-primary-actions">
             <button id="timerStartPauseBtn" class="primary-btn compact-btn" type="button">Bắt đầu</button>
@@ -686,7 +729,7 @@
   <div id="globalTooltip" class="global-tooltip" role="tooltip" hidden></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="dragdrop.js?v=3.3"></script>
-  <script src="app.js?v=5.0"></script>
+  <script src="app.js?v=5.1"></script>
   <script src="music-player.js?v=3.3"></script>
   <script src="kalo-launcher.js?v=1.0.5"></script>
   <script src="capture-launcher.js?v=1.5.0"></script>
