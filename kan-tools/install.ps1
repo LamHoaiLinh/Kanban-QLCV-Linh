@@ -80,10 +80,10 @@ function Download-File([string]$Relative,[string]$Target){
   $u = "{0}/{1}?ts={2}" -f $Repo.TrimEnd("/"), $Relative.TrimStart("/"), $stamp
   Download-Url $u $Target 100 4
 }
-function Invoke-PipRetry([string[]]$Args,[string]$Label){
+function Invoke-PipRetry([string[]]$PipArgs,[string]$Label){
   for($i=1;$i -le 4;$i++){
     Write-Host ("  " + $Label + " - lan " + $i + "/4") -ForegroundColor DarkGray
-    & $venvPy -m pip @Args
+    & $venvPy -m pip @PipArgs
     if($LASTEXITCODE -eq 0){ return }
     if($i -lt 4){ Start-Sleep -Seconds ([Math]::Min(3*$i,9)) }
   }
