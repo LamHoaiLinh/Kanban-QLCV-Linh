@@ -1457,6 +1457,10 @@
     const specialDateCount=state.settings?.clock?.specialDates?.length || 0;
     const workDateCount=state.settings?.clock?.workDates?.length || 0;
     const kanpass=await fetchKanPassBackup();
+    if(kanpass?.exportError){
+      const proceed=await askConfirm('KanPass chưa được sao lưu','KanBan không kết nối được Windows Agent nên file này sẽ KHÔNG chứa mật khẩu KanPass. Bạn có thể hủy, cập nhật/sửa KanBan Tools rồi xuất lại. Vẫn xuất phần dữ liệu còn lại?');
+      if(!proceed)return null;
+    }
     const localPreferences={
       musicSettings:readJsonPreference(MUSIC_SETTINGS_KEY),
       officeSettings:readJsonPreference(OFFICE_SETTINGS_KEY)
@@ -1628,13 +1632,17 @@
       const available=availableImportSections(parsed,raw);
       const selected=await chooseImportSections(available);
       if(!selected.length)return;
+      let passImported=false,passError='';
+      if(selected.includes('kanpass')){
+        try{passImported=await importKanPassSection(parsed.kanpass)}
+        catch(error){passError=error?.message || 'Không nhập được KanPass.'}
+      }
       if(selected.some(id=>id!=='kanpass' && id!=='preferences'))captureUndo('Nhập dữ liệu chọn lọc');
       const result=applyImportedSections(imported,parsed,selected);
-      let passImported=false;
-      if(selected.includes('kanpass'))passImported=await importKanPassSection(parsed.kanpass);
-      const labels=IMPORT_SECTION_DEFS.filter(x=>selected.includes(x.id)).map(x=>x.label);
-      showToast(`Đã nhập: ${labels.join(' · ')}${selected.includes('kanpass')&&!passImported?' (KanPass đã bỏ qua)':''}.`);
-      if(result.reloadNeeded)setTimeout(()=>location.reload(),700);
+      const labels=IMPORT_SECTION_DEFS.filter(x=>selected.includes(x.id) && (x.id!=='kanpass' || passImported)).map(x=>x.label);
+      const skipped=selected.includes('kanpass')&&!passImported ? ` · KanPass bỏ qua${passError?': '+passError:''}` : '';
+      showToast(`Đã nhập: ${labels.join(' · ') || 'không có nhóm dữ liệu thường'}${skipped}.`);
+      if(result.reloadNeeded)setTimeout(()=>location.reload(),900);
     } catch (error) {
       console.error(error);
       showToast(error?.message || 'Tệp JSON không hợp lệ hoặc sai cấu trúc.');
@@ -1953,7 +1961,12 @@
   }
 
   async function exportBackupBeforeReset() {
-    await exportData();
+    const result=await exportData();
+    if(!result){
+      refs.resetBackupStatus.textContent = 'Chưa xuất backup.';
+      refs.resetBackupStatus.className = 'reset-backup-status';
+      return;
+    }
     refs.resetBackupStatus.textContent = 'Đã tạo file backup JSON. Hãy kiểm tra thư mục tải xuống trước khi xóa.';
     refs.resetBackupStatus.className = 'reset-backup-status success';
   }
