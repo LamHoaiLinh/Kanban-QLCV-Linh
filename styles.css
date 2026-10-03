@@ -1945,3 +1945,21 @@ body.kalo-open{overflow:hidden!important}
 :root[data-theme="dark"] .work-reminder-event.work-tone-orange{
   color:#f0a34a!important;
 }
+
+
+/* ===== Đồng hồ v3.9: tăng độ rõ đường viền =====
+   Giữ nguyên màu/theme hiện tại, chỉ tăng độ dày để phân tách chức năng rõ hơn. */
+#clockDialog *{border-width:1.5px}
+#clockDialog .clock-tabs{border-bottom-width:2px}
+#clockDialog .clock-tab{border-width:2px}
+#clockDialog .clock-dialog-display>div{border-width:1.5px}
+#clockDialog .timer-presets .timer-preset{border-width:1.5px}
+#clockDialog .timer-preset-editor{border-width:1.5px}
+#clockDialog .clock-option{border-width:1.5px}
+#clockDialog .special-date-form,
+#clockDialog .work-date-form,
+#clockDialog .special-date-item,
+#clockDialog .special-date-free-input,
+#clockDialog .work-date-intro,
+#clockDialog .special-date-sharebar{border-width:1.5px}
+#clockDialog .clock-tab.active{box-shadow:inset 0 0 0 .5px currentColor}
