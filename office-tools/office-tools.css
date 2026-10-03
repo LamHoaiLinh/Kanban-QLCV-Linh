@@ -424,3 +424,19 @@
     max-height:100dvh !important;
   }
 }
+
+
+/* ===== Office Tools v5.0.2: đường viền rõ hơn =====
+   Tăng độ dày đồng đều cho khung, input, bảng và các tab nhưng không đổi màu/theme. */
+.office-tools-dialog *{border-width:1.5px}
+.office-tools-dialog .office-nav button,
+.office-tools-dialog .office-subtab{border-width:2px}
+.office-tools-dialog .office-dropzone{border-width:2px}
+.office-tools-dialog .office-shell{border-width:1.5px}
+.office-tools-dialog .office-header{border-bottom-width:1.5px}
+.office-tools-dialog .office-nav{border-right-width:1.5px}
+.office-tools-dialog .office-status-bar{border-top-width:1.5px}
+.office-tools-dialog .office-table th,
+.office-tools-dialog .office-table td{border-bottom-width:1.25px}
+.office-tools-dialog .office-subtab.active,
+.office-tools-dialog .office-nav button.active{box-shadow:inset 0 0 0 .5px currentColor}
