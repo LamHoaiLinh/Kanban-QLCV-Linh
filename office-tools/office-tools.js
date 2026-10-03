@@ -225,7 +225,22 @@ function renderKanPassDetail(host,item,ctx){
     const body={id:value('kpId'),title:value('kpTitle'),service:value('kpService'),company:value('kpCompany'),company_id:value('kpCompanyId'),tax_id:value('kpTaxId'),username:value('kpUsername'),url:value('kpUrl'),window_match:value('kpWindow'),app_exe:value('kpExe'),field_order:value('kpOrder')};
     try{
       setStatus('Đang lưu KanPass…');
-      const data=await kanPassFetch('/kanpass/save',{method:'POST',body});
+      let data;
+      try{data=await kanPassFetch('/kanpass/save',{method:'POST',body})}
+      catch(error){
+        if(error.status===409 && error.data?.duplicate){
+          const name=error.data.duplicateTitle||'tài khoản đã có';
+          if(confirm('Đã có “'+name+'” cùng dịch vụ và cùng định danh.\n\nOK = cập nhật tài khoản đã có.\nCancel = không cập nhật tài khoản đó.')){
+            body.id=error.data.duplicateId;
+            data=await kanPassFetch('/kanpass/save',{method:'POST',body});
+          }else if(confirm('Bạn có thực sự muốn tạo thêm một hồ sơ mới dù định danh bị trùng?')){
+            data=await kanPassFetch('/kanpass/save',{method:'POST',body:{...body,createDuplicate:true}});
+          }else{
+            setStatus('Chưa lưu để tránh tạo tài khoản trùng.');
+            return;
+          }
+        }else throw error;
+      }
       ctx.onSelected(data.item.id);setStatus('Đã lưu '+(data.item.title||'tài khoản')+'.');await ctx.loadList();
       const refreshed=await kanPassFetch('/kanpass/item?id='+encodeURIComponent(data.item.id));renderKanPassDetail(host,refreshed.item,ctx);
     }catch(error){setStatus(error.message)}
