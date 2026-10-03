@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import base64
+import importlib.util
 import os
 import re
 import shutil
@@ -694,46 +695,32 @@ def alarm_scheduler_loop() -> None:
         ALARM_WAKE.clear()
 
 def health() -> dict:
-    yt = ""
-    ff = ""
-    nv = ""
+    # Keep this endpoint lightweight. The previous implementation launched
+    # yt-dlp, node and ffmpeg on every health request; on slower Windows PCs
+    # that could take longer than the browser/installer timeout and falsely
+    # report that KanMedia was broken.
     errors: list[str] = []
-    try:
-        code, out, err = run_text([sys.executable, "-m", "yt_dlp", "--version"], 12)
-        if code == 0:
-            yt = out.splitlines()[0].strip() if out else ""
-        else:
-            errors.append("yt-dlp chưa sẵn sàng")
-    except Exception as exc:
-        errors.append(f"yt-dlp: {exc}")
-    try:
-        n = node_path()
-        if n:
-            code, out, _ = run_text([n, "--version"], 8)
-            if code == 0:
-                nv = out.strip()
-        if not nv:
-            errors.append("Node.js chưa sẵn sàng")
-    except Exception as exc:
-        errors.append(f"Node.js: {exc}")
-    try:
-        if FFMPEG.exists():
-            code, out, _ = run_text([str(FFMPEG), "-version"], 8)
-            if code == 0 and out:
-                ff = out.splitlines()[0].strip()
-        if not ff or not FFPROBE.exists():
-            errors.append("FFmpeg/FFprobe chưa sẵn sàng")
-    except Exception as exc:
-        errors.append(f"FFmpeg: {exc}")
-    ready = bool(yt and nv and ff and FFPROBE.exists() and WORKER.exists())
+    yt_ok = importlib.util.find_spec("yt_dlp") is not None
+    node_ok = NODE.exists()
+    ff_ok = FFMPEG.exists() and FFPROBE.exists()
+    worker_ok = WORKER.exists()
+    if not yt_ok:
+        errors.append("yt-dlp chưa sẵn sàng")
+    if not node_ok:
+        errors.append("Node.js chưa sẵn sàng")
+    if not ff_ok:
+        errors.append("FFmpeg/FFprobe chưa sẵn sàng")
+    if not worker_ok:
+        errors.append("Worker KanMedia chưa sẵn sàng")
+    ready = bool(yt_ok and node_ok and ff_ok and worker_ok)
     return {
         "ok": True,
-        "version": "KanMedia Agent 1.7.0",
+        "version": "KanMedia Agent 1.8.1",
         "mediaReady": ready,
-        "ytDlp": yt,
-        "ffmpeg": ff,
-        "node": nv,
-        "worker": WORKER.exists(),
+        "ytDlp": "installed" if yt_ok else "",
+        "ffmpeg": str(FFMPEG) if ff_ok else "",
+        "node": str(NODE) if node_ok else "",
+        "worker": worker_ok,
         "alarmReady": os.name == "nt",
         "alarm": _alarm_snapshot(),
         "downloads": str(get_downloads()),
@@ -1041,6 +1028,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         path = urlparse(self.path).path
         try:
+            if path == "/ping":
+                self._json({"ok": True, "service": "KanMedia", "port": PORT})
+                return
             if path == "/health":
                 self._json(health())
                 return
