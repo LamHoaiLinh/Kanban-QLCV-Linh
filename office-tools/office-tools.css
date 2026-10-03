@@ -479,3 +479,12 @@
 .kanpass-web-copy{display:grid;gap:4px;min-width:0}.kanpass-web-copy strong{font-size:12.5px;color:var(--text)}.kanpass-web-copy span{font-size:10.8px;line-height:1.45;color:var(--muted)}.kanpass-web-copy small{font-size:10.2px;color:var(--green-dark);overflow-wrap:anywhere}
 .kanpass-web-open{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}.kanpass-web-open input{width:100%;min-height:38px;border:1.5px solid var(--border);border-radius:10px;background:var(--panel);color:var(--text);padding:8px 10px;font:inherit}
 @media(max-width:900px){.kanpass-web-bar{grid-template-columns:1fr}.kanpass-web-open{grid-template-columns:1fr}.kanpass-web-open .office-btn{width:100%}}
+
+
+/* ===== v5.2.1 KanPass detail auto-collapse ===== */
+.kanpass-layout.detail-collapsed{grid-template-columns:minmax(330px,1fr) minmax(220px,300px)}
+.kanpass-detail-card.collapsed{padding:7px 8px;min-height:0}
+.kanpass-detail-summary{width:100%;min-height:52px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 9px;border:0;background:transparent;color:var(--text);text-align:left;cursor:pointer}
+.kanpass-detail-summary>span{display:grid;gap:3px;min-width:0}.kanpass-detail-summary strong{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.kanpass-detail-summary small{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.kanpass-detail-summary>b{font-size:24px;line-height:1;color:var(--green-dark)}
+.kanpass-detail-card.collapsed:hover{border-color:var(--green);background:var(--green-soft)}
+@media(max-width:950px){.kanpass-layout.detail-collapsed{grid-template-columns:1fr}.kanpass-detail-card.collapsed{max-width:none}}
