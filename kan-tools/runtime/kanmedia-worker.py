@@ -63,7 +63,7 @@ def status(state: str, percent: float, message: str, current: str = "", index: i
         "eta": eta,
         "stage": stage,
         "updatedAt": time.time(),
-        "workerVersion": "1.7.0",
+        "workerVersion": "1.8.1",
         "workerPid": os.getpid(),
         "childPid": child_pid,
     })
