@@ -316,8 +316,22 @@ function renderKanPassManager(host,status){
     </section>
     <section class="office-card kanpass-detail-card" id="kanPassDetail"><div class="office-empty">Chọn một tài khoản để xem hoặc sửa.</div></section>
   </div>`;
-  const search=host.querySelector('#kanPassSearch'),list=host.querySelector('#kanPassList'),detail=host.querySelector('#kanPassDetail'),count=host.querySelector('#kanPassCount');
-  let timer=null,currentId='';
+  const search=host.querySelector('#kanPassSearch'),list=host.querySelector('#kanPassList'),detail=host.querySelector('#kanPassDetail'),count=host.querySelector('#kanPassCount'),layout=host.querySelector('.kanpass-layout');
+  let timer=null,currentId='',currentItem=null;
+  const collapseDetail=()=>{
+    if(!currentId||!currentItem)return;
+    layout?.classList.add('detail-collapsed');
+    detail.classList.add('collapsed');
+    detail.innerHTML=`<button class="kanpass-detail-summary" type="button" title="Bấm để mở lại chi tiết">
+      <span><strong>${escapeHtml(currentItem.title||currentItem.service||currentItem.username||'Tài khoản')}</strong><small>${escapeHtml([currentItem.company,currentItem.tax_id,currentItem.company_id,currentItem.username].filter(Boolean).join(' · ')||'Đã thu gọn chi tiết')}</small></span>
+      <b>›</b>
+    </button>`;
+    detail.querySelector('.kanpass-detail-summary')?.addEventListener('click',()=>void selectItem(currentId));
+  };
+  const expandDetail=()=>{
+    layout?.classList.remove('detail-collapsed');
+    detail.classList.remove('collapsed');
+  };
   const loadList=async()=>{
     try{
       const data=await kanPassFetch('/kanpass/list?q='+encodeURIComponent(search.value.trim()));
@@ -329,11 +343,29 @@ function renderKanPassManager(host,status){
   };
   const selectItem=async(id)=>{
     currentId=id;
-    try{const data=await kanPassFetch('/kanpass/item?id='+encodeURIComponent(id));renderKanPassDetail(detail,data.item,{loadList,onSelected:(x)=>{currentId=x||''}});await loadList()}
-    catch(error){setStatus(error.message)}
+    try{
+      const data=await kanPassFetch('/kanpass/item?id='+encodeURIComponent(id));
+      currentItem=data.item;
+      expandDetail();
+      renderKanPassDetail(detail,data.item,{loadList,onSelected:(x)=>{currentId=x||''}});
+      await loadList();
+    }catch(error){setStatus(error.message)}
   };
   search.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(()=>void loadList(),180)});
-  host.querySelector('#kanPassNew').addEventListener('click',()=>{currentId='';renderKanPassDetail(detail,kanPassBlankItem(),{loadList,onSelected:(x)=>{currentId=x||''}});void loadList()});
+  host.querySelector('#kanPassNew').addEventListener('click',()=>{
+    currentId='';
+    currentItem=null;
+    expandDetail();
+    renderKanPassDetail(detail,kanPassBlankItem(),{loadList,onSelected:(x)=>{currentId=x||''}});
+    void loadList();
+  });
+  host.addEventListener('pointerdown',event=>{
+    if(!currentId||!currentItem||detail.classList.contains('collapsed'))return;
+    if(detail.contains(event.target))return;
+    if(event.target.closest('.kanpass-list-item'))return;
+    if(event.target.closest('#kanPassNew'))return;
+    collapseDetail();
+  });
   bindKanPassJsonButtons(host,{allowExport:true});
   bindKanPassWebBridge(host);
   void loadList();
