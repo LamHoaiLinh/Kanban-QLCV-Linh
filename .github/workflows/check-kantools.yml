@@ -37,11 +37,31 @@ jobs:
         shell: pwsh
         run: python -m py_compile kan-tools/runtime/kanmedia-server.py kan-tools/runtime/kanmedia-worker.py capture-agent/capture_agent.py capture-agent/kanpass.py office-tools/signing-agent/package/kanban_signing_agent.py
 
-      - name: Smoke test KanPass KDBX
+      - name: Smoke test KanPass KDBX and Windows DPAPI
         shell: pwsh
         run: |
           python -m pip install --disable-pip-version-check pykeepass
-          python -c "import os,tempfile,sys; from pykeepass import create_database,PyKeePass; p=os.path.join(tempfile.gettempdir(),'kanpass-ci.kdbx'); kp=create_database(p,password='KanPass-Smoke-123'); kp.add_entry(kp.root_group,'MB - Test','user','secret',notes='KANPASS_META_V1\\n{}'); kp.save(); kp2=PyKeePass(p,password='KanPass-Smoke-123'); assert kp2.entries[0].password=='secret'; os.remove(p); sys.path.insert(0,'capture-agent'); import kanpass; assert kanpass.MAX_HISTORY==5; print('KanPass KDBX OK')"
+          @'
+          import shutil, sys, tempfile
+          from pathlib import Path
+          sys.path.insert(0, 'capture-agent')
+          import kanpass
+          secret=b'kanpass-dpapi-smoke'
+          assert kanpass.dpapi_unprotect(kanpass.dpapi_protect(secret)) == secret
+          root=Path(tempfile.mkdtemp(prefix='kanpass-ci-'))
+          try:
+              manager=kanpass.KanPassManager(None, root)
+              manager.setup('KanPass-Smoke-123')
+              item=manager.save_item({'title':'MB - Test','service':'MB Bank','company':'Test','company_id':'COMP01','username':'user','password':'secret-A','field_order':'company_id,username,password'})
+              manager.save_item({**item,'password':'secret-B'})
+              revealed=manager.get_item(item['id'], reveal=True)
+              assert revealed['password']=='secret-B'
+              assert revealed['history'][0]['password']=='secret-A'
+              assert manager.export_backup()['encrypted'] is True
+              print('KanPass KDBX + DPAPI OK')
+          finally:
+              shutil.rmtree(root, ignore_errors=True)
+          '@ | python -
 
       - name: Check PowerShell installer syntax
         shell: pwsh
