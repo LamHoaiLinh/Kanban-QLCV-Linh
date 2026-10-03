@@ -842,19 +842,41 @@ class KanPassManager:
         p1.focus_set()
         win.focus_force()
 
+    @staticmethod
+    def _match_key(value: str) -> str:
+        text = str(value or "").casefold()
+        return "".join(ch for ch in text if ch.isalnum())
+
     def _context_matches(self, item: dict, ctx: dict) -> int:
-        title = str(ctx.get("title") or "").lower()
-        exe = str(ctx.get("exe") or "").lower()
+        title_raw = str(ctx.get("title") or "")
+        title = title_raw.casefold()
+        exe = str(ctx.get("exe") or "").casefold()
         score = 0
-        wm = str(item.get("window_match") or "").lower()
-        app = str(item.get("app_exe") or "").lower()
-        service = str(item.get("service") or "").lower()
+        wm_raw = str(item.get("window_match") or "")
+        wm = wm_raw.casefold()
+        app = str(item.get("app_exe") or "").casefold()
+        service = str(item.get("service") or "").casefold()
+
         if wm and wm in title:
-            score += 8
+            score += 10
+        else:
+            # Chrome/Edge đôi khi trả title có/không có hậu tố trình duyệt.
+            # So phần tiêu đề ứng dụng sau khi bỏ suffix giúp profile đã lưu vẫn match.
+            wm_core = self._match_key(_service_from_window(wm_raw))
+            title_core = self._match_key(_service_from_window(title_raw))
+            if wm_core and title_core and (wm_core == title_core or (len(wm_core) >= 6 and (wm_core in title_core or title_core in wm_core))):
+                score += 9
+
         if app and app == exe:
             score += 1 if exe in {'chrome.exe','msedge.exe','brave.exe','vivaldi.exe','firefox.exe'} else 4
-        if service and service in title:
-            score += 4
+
+        if service:
+            service_key = self._match_key(service)
+            title_key = self._match_key(title_raw)
+            if service in title or (len(service_key) >= 4 and service_key in title_key):
+                score += 5
+            elif service_key == "mbbank" and "mbbank" in title_key:
+                score += 5
         return score
 
     def matches_for_context(self, ctx: dict) -> list[dict]:
@@ -868,6 +890,10 @@ class KanPassManager:
         if not matches:
             return []
         top = matches[0]["_score"]
+        # Browser exe chỉ đáng 1 điểm và không đủ để nhận diện credential.
+        # Giữ ngưỡng 2 để tránh lấy nhầm tài khoản của một tab Chrome khác.
+        if top < 2:
+            return []
         return [x for x in matches if x["_score"] >= max(2, top - 2)]
 
     def _fill_entry(self, entry_id: str, target_hwnd: int):
