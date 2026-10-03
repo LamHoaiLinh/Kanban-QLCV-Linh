@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "kanToolVersion": "2.6.1",
-  "installerVersion": "2.3.0",
+  "kanToolVersion": "2.7.0",
+  "installerVersion": "2.3.1",
   "pythonFallback": {
     "version": "3.13.16",
     "url": "https://www.python.org/ftp/python/3.13.16/python-3.13.16-amd64.exe"
@@ -15,16 +15,17 @@
       ]
     },
     "capture": {
-      "version": "6.1.0",
+      "version": "6.2.0",
       "source": "capture-agent/capture_agent.py",
-      "kanpassSource": "capture-agent/kanpass.py"
+      "kanpassSource": "capture-agent/kanpass.py",
+      "webBridgeSource": "capture-agent/kanpass_webbridge.py"
     },
     "signing": {
       "version": "1.1.0",
       "source": "office-tools/signing-agent/package/kanban_signing_agent.py"
     },
     "pythonPackages": {
-      "version": "2026.10.03.2"
+      "version": "2026.10.03.3"
     },
     "ytDlp": {
       "version": "2026.10.03.1",
