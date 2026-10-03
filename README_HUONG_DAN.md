@@ -17,7 +17,7 @@ Tài liệu này ưu tiên tra cứu theo chức năng. Phần lịch sử cập
 ## KanPass
 - KanPass là kho tài khoản offline dùng KDBX mã hóa, nằm trong Windows Agent của KanBan.
 - Alt+A: đặt con trỏ ở ô đầu tiên của form đăng nhập rồi tự điền theo profile. Nếu có nhiều công ty/tài khoản phù hợp, KanPass yêu cầu chọn.
-- Alt+P: lưu hoặc cập nhật tài khoản từ cửa sổ hiện tại. KanPass chỉ tự đọc trường Windows cho phép; ô password được bảo vệ sẽ yêu cầu nhập trong popup.
+- Alt+P: lưu/cập nhật bằng popup gọn kiểu password manager. KanPass tự nhận diện dịch vụ/tài khoản và tự điền metadata có thể suy luận; mặc định chỉ hỏi mật khẩu khi ứng dụng không cho đọc ngược. Các trường Công ty/MST/Company ID/username/thứ tự điền được ẩn trong **Chi tiết…** và chỉ sửa khi cần.
 - Mỗi dịch vụ có thể có nhiều hồ sơ. Nên đặt Tên tài khoản dễ nhận biết và lưu thêm Công ty/MST/Company ID khi có.
 - KanPass giữ tối đa 5 mật khẩu cũ để tra cứu và cảnh báo khi mật khẩu mới trùng lịch sử.
 - Mở CÔNG CỤ → KanPass để tìm theo tên tài khoản, công ty, MST hoặc username. Ngay trong KanPass có **Xuất JSON KanPass** và **Nhập JSON KanPass** riêng: file chỉ chứa KDBX đã mã hóa, không chứa công việc, sinh nhật hay dữ liệu KanBan khác. Mật khẩu, lịch sử và mật khẩu chính chỉ nhập/hiện trong cửa sổ native của Windows Agent; trang Web không nhận plaintext secret.
