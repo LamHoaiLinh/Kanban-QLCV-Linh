@@ -534,9 +534,9 @@ class KanPassManager:
         if wm and wm in title:
             score += 8
         if app and app == exe:
-            score += 4
+            score += 1 if exe in {'chrome.exe','msedge.exe','brave.exe','vivaldi.exe','firefox.exe'} else 4
         if service and service in title:
-            score += 2
+            score += 4
         return score
 
     def matches_for_context(self, ctx: dict) -> list[dict]:
@@ -676,9 +676,12 @@ class KanPassManager:
             fields["title"].set(current.get("title") or "")
             fields["service"].set(current.get("service") or _service_from_window(ctx.get("title") or ""))
             fields["company"].set(current.get("company") or "")
+            first_visible = visible[0] if visible else ""
+            tax_digits = "".join(ch for ch in first_visible if ch.isdigit())
+            guessed_tax = first_visible if len(tax_digits) in (10, 13) and len(tax_digits) == len(first_visible.replace(" ", "")) else ""
             fields["company_id"].set(current.get("company_id") or (visible[0] if len(visible) >= 2 else ""))
-            fields["tax_id"].set(current.get("tax_id") or "")
-            fields["username"].set(current.get("username") or (visible[1] if len(visible) >= 2 else visible[0] if len(visible) == 1 else ""))
+            fields["tax_id"].set(current.get("tax_id") or guessed_tax)
+            fields["username"].set(current.get("username") or (visible[1] if len(visible) >= 2 else first_visible if first_visible and not guessed_tax else ""))
             fields["password"].set("")
             order = current.get("field_order") or []
             fields["field_order"].set(",".join(order))
@@ -724,7 +727,11 @@ class KanPassManager:
                 reveal = str((query or {}).get("reveal", "")).lower() in ("1", "true", "yes")
                 return 200, {"ok": True, "item": self.get_item((query or {}).get("id", ""), reveal=reveal)}
             if path == "/kanpass/save" and method == "POST":
-                return 200, {"ok": True, "item": self.save_item(body or {})}
+                payload = body or {}
+                reuse = self.password_reuse_info(str(payload.get("id") or ""), str(payload.get("password") or ""))
+                if reuse and reuse.get("kind") == "history" and not bool(payload.get("allowReuse")):
+                    return 409, {"ok": False, "reuse": True, "changed_at": reuse.get("changed_at") or "", "message": "Mật khẩu này đã từng được sử dụng."}
+                return 200, {"ok": True, "item": self.save_item(payload)}
             if path == "/kanpass/delete" and method == "POST":
                 return 200, self.delete_item(str((body or {}).get("id") or ""))
             if path == "/kanpass/export" and method == "GET":
