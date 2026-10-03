@@ -199,26 +199,57 @@ class _INPUT(ctypes.Structure):
     _fields_ = [("type", wintypes.DWORD), ("u", _INPUTUNION)]
 
 
-def _send_key(vk: int):
+def _configure_sendinput():
     user32 = ctypes.windll.user32
+    user32.SendInput.argtypes = [wintypes.UINT, ctypes.POINTER(_INPUT), ctypes.c_int]
+    user32.SendInput.restype = wintypes.UINT
+    user32.GetAsyncKeyState.argtypes = [ctypes.c_int]
+    user32.GetAsyncKeyState.restype = wintypes.SHORT
+    return user32
+
+
+def _wait_for_modifier_release(timeout: float = 1.25) -> bool:
+    """WM_HOTKEY fires while Alt can still be physically down. Never type secrets until modifiers are released."""
+    user32 = _configure_sendinput()
+    modifier_keys = (0x12, 0x11, 0x10, 0x5B, 0x5C)  # Alt, Ctrl, Shift, LWin, RWin
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if not any(user32.GetAsyncKeyState(vk) & 0x8000 for vk in modifier_keys):
+            time.sleep(0.035)
+            return True
+        time.sleep(0.015)
+    return False
+
+
+def _send_key(vk: int):
+    user32 = _configure_sendinput()
     arr = (_INPUT * 2)()
     arr[0].type = 1
     arr[0].ki = _KEYBDINPUT(vk, 0, 0, 0, 0)
     arr[1].type = 1
     arr[1].ki = _KEYBDINPUT(vk, 0, 0x0002, 0, 0)
-    user32.SendInput(2, ctypes.byref(arr), ctypes.sizeof(_INPUT))
+    sent = user32.SendInput(2, arr, ctypes.sizeof(_INPUT))
+    if sent != 2:
+        raise ctypes.WinError()
 
 
 def _send_text(text: str):
-    user32 = ctypes.windll.user32
-    for ch in str(text):
-        code = ord(ch)
-        arr = (_INPUT * 2)()
-        arr[0].type = 1
-        arr[0].ki = _KEYBDINPUT(0, code, 0x0004, 0, 0)
-        arr[1].type = 1
-        arr[1].ki = _KEYBDINPUT(0, code, 0x0004 | 0x0002, 0, 0)
-        user32.SendInput(2, ctypes.byref(arr), ctypes.sizeof(_INPUT))
+    # KEYEVENTF_UNICODE expects UTF-16 code units, not Python Unicode code points.
+    raw = str(text).encode("utf-16-le", errors="surrogatepass")
+    if not raw:
+        return
+    units = [raw[i] | (raw[i + 1] << 8) for i in range(0, len(raw), 2)]
+    arr = (_INPUT * (len(units) * 2))()
+    for index, code in enumerate(units):
+        arr[index * 2].type = 1
+        arr[index * 2].ki = _KEYBDINPUT(0, code, 0x0004, 0, 0)
+        arr[index * 2 + 1].type = 1
+        arr[index * 2 + 1].ki = _KEYBDINPUT(0, code, 0x0004 | 0x0002, 0, 0)
+    user32 = _configure_sendinput()
+    expected = len(units) * 2
+    sent = user32.SendInput(expected, arr, ctypes.sizeof(_INPUT))
+    if sent != expected:
+        raise ctypes.WinError()
 
 
 def foreground_context() -> dict:
@@ -851,9 +882,14 @@ class KanPassManager:
         sequence = [key for key in item.get("field_order", []) if values.get(key) != ""]
         if not sequence:
             raise RuntimeError("Tài khoản chưa có dữ liệu để điền.")
+        if not _wait_for_modifier_release():
+            raise RuntimeError("Phím Alt/Ctrl/Shift vẫn đang được giữ. Hãy nhả phím rồi thử Alt+A lại.")
         user32 = ctypes.windll.user32
         user32.SetForegroundWindow(target_hwnd)
-        time.sleep(0.12)
+        time.sleep(0.08)
+        if user32.GetForegroundWindow() != target_hwnd:
+            user32.SetForegroundWindow(target_hwnd)
+            time.sleep(0.08)
         for index, key in enumerate(sequence):
             _send_text(values[key])
             if index < len(sequence) - 1:
