@@ -160,19 +160,13 @@ async function renderKanPassTool(){
 function renderKanPassSetup(host){
   host.innerHTML=`<div class="office-card kanpass-setup">
     <h4>Thiết lập KanPass lần đầu</h4>
-    <p class="office-card-note">Tạo một mật khẩu chính để mã hóa file KDBX. Trên chính máy Windows này, KanPass dùng Windows DPAPI để mở tự động hằng ngày; khi mang backup sang máy khác, bạn cần mật khẩu chính này.</p>
-    <div class="office-grid">
-      ${kanPassField('Mật khẩu chính','kanPassMaster','','password','Tối thiểu 10 ký tự')}
-      ${kanPassField('Nhập lại','kanPassMaster2','','password','Nhập lại mật khẩu chính')}
-    </div>
-    <div class="office-warning">Hãy lưu mật khẩu chính ở nơi an toàn. KanBan không có “cửa hậu” để giải mã KDBX nếu bạn quên mật khẩu chính khi chuyển sang máy khác.</div>
-    <div class="office-toolbar"><span class="spacer"></span><button class="office-btn primary" id="kanPassSetupBtn">Tạo KanPass</button></div>
+    <p class="office-card-note">KanPass dùng KDBX mã hóa. Mật khẩu chính được nhập trong cửa sổ native của Windows Agent, không đi qua JavaScript của trang Web.</p>
+    <div class="office-warning">Trên chính máy Windows này, DPAPI giúp KanPass mở tự động hằng ngày. Khi mang backup sang máy khác, bạn vẫn cần mật khẩu chính để xác minh lần đầu.</div>
+    <div class="office-toolbar"><span class="spacer"></span><button class="office-btn primary" id="kanPassSetupBtn">Thiết lập KanPass trên Windows</button></div>
   </div>`;
   host.querySelector('#kanPassSetupBtn').addEventListener('click',async()=>{
-    const a=host.querySelector('#kanPassMaster').value,b=host.querySelector('#kanPassMaster2').value;
-    if(a!==b){setStatus('Mật khẩu nhập lại chưa khớp.');return}
-    try{setStatus('Đang tạo kho KanPass…');await kanPassFetch('/kanpass/setup',{method:'POST',body:{masterPassword:a}});setStatus('Đã tạo KanPass.');await renderKanPassTool()}
-    catch(error){setStatus(error.message)}
+    try{setStatus('Đang mở cửa sổ thiết lập KanPass…');await kanPassFetch('/kanpass/setup',{method:'POST',body:{}});setStatus('Đã tạo KanPass.');await renderKanPassTool()}
+    catch(error){if(error.status===409&&error.data?.cancelled){setStatus('Đã hủy thiết lập KanPass.');return}setStatus(error.message)}
   });
 }
 function kanPassBlankItem(){
@@ -237,9 +231,11 @@ function renderKanPassDetail(host,item,ctx){
     }catch(error){setStatus(error.message)}
   });
   host.querySelector('#kanPassDelete')?.addEventListener('click',async()=>{
-    if(!confirm('Xóa tài khoản này khỏi KanPass?'))return;
-    try{await kanPassFetch('/kanpass/delete',{method:'POST',body:{id:item.id}});ctx.onSelected('');setStatus('Đã xóa tài khoản.');host.innerHTML='<div class="office-empty">Đã xóa. Chọn tài khoản khác hoặc tạo mới.</div>';await ctx.loadList()}
-    catch(error){setStatus(error.message)}
+    try{
+      const data=await kanPassFetch('/kanpass/delete',{method:'POST',body:{id:item.id}});
+      if(!data.deleted)return;
+      ctx.onSelected('');setStatus('Đã xóa tài khoản.');host.innerHTML='<div class="office-empty">Đã xóa. Chọn tài khoản khác hoặc tạo mới.</div>';await ctx.loadList();
+    }catch(error){if(error.status===409&&error.data?.cancelled){setStatus('Đã hủy xóa tài khoản.');return}setStatus(error.message)}
   });
   host.querySelector('#kanPassReveal')?.addEventListener('click',async()=>{
     try{await kanPassFetch('/kanpass/show',{method:'POST',body:{id:item.id}});setStatus('Đã mở cửa sổ xem mật khẩu an toàn trên Windows.')}
