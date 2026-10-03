@@ -41,7 +41,7 @@
     },
     "backup": {
       "version": "1.0.0",
-      "source": "kan-tools/runtime/kanbackup-server.py"
+      "source": "kan-tools/runtime/kanbackup-server.py.gz.b64"
     },
     "kopia": {
       "version": "0.23.1",
