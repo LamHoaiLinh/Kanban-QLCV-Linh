@@ -13,6 +13,7 @@ $Media = Join-Path $Root "media\bin"
 $NodeDir = Join-Path $Root "media\node"
 $Signing = Join-Path $Root "signing"
 $CaptureDir = Join-Path $Root "capture"
+$BackupDir = Join-Path $Root "backup"
 $Jobs = Join-Path $Root "jobs"
 $Uploads = Join-Path $Root "uploads"
 $Logs = Join-Path $Root "logs"
@@ -23,7 +24,7 @@ $Mode = [string]$Mode
 if($Mode -notin @("/install","/update","/repair")){ $Mode = "/install" }
 $Force = ($Mode -ieq "/repair")
 
-$dirs = @($Root,$Runtime,$Media,$NodeDir,$Signing,$CaptureDir,$Jobs,$Uploads,$Logs,$TempDir)
+$dirs = @($Root,$Runtime,$Media,$NodeDir,$Signing,$CaptureDir,$BackupDir,$Jobs,$Uploads,$Logs,$TempDir)
 foreach($d in $dirs){ New-Item -ItemType Directory -Force -Path $d | Out-Null }
 
 $InstallLog = Join-Path $Logs "install-latest.log"
@@ -393,12 +394,55 @@ if($needSigning){
   Write-Host "  Ky so: khong doi." -ForegroundColor DarkGray
 }
 
+$backupAgent=Join-Path $BackupDir "kanbackup-server.py"
+$kopiaExe=Join-Path $BackupDir "kopia.exe"
+$needBackup=Need-Component "backup" @($backupAgent)
+if($needBackup){
+  Write-Step "Cap nhat KanBackup"
+  $backupPayload=Join-Path $TempDir "kanbackup-server.py.gz.b64"
+  Download-File ([string]$Manifest.components.backup.source) $backupPayload
+  $encoded=(Get-Content -LiteralPath $backupPayload -Raw -Encoding UTF8).Trim()
+  $compressed=[Convert]::FromBase64String($encoded)
+  $memory=New-Object System.IO.MemoryStream(,$compressed)
+  $gzip=New-Object System.IO.Compression.GZipStream($memory,[System.IO.Compression.CompressionMode]::Decompress)
+  $output=[System.IO.File]::Create($backupAgent)
+  try{$gzip.CopyTo($output)}finally{$output.Dispose();$gzip.Dispose();$memory.Dispose()}
+  if((Get-Item $backupAgent).Length -lt 12000){throw "Source KanBackup khong hop le."}
+  & $venvPy -m py_compile $backupAgent
+  if($LASTEXITCODE -ne 0){throw "KanBackup source bi loi cu phap."}
+  Stop-Matching "*kanbackup-server.py*"
+}else{
+  Write-Host "  KanBackup: khong doi." -ForegroundColor DarkGray
+}
+
+$needKopia=Need-Component "kopia" @($kopiaExe)
+if($needKopia){
+  Write-Step "Cai / cap nhat Kopia backup engine"
+  Stop-Matching "*kanbackup-server.py*"
+  $kopiaZip=Join-Path $TempDir "kopia.zip"
+  $kopiaOut=Join-Path $TempDir "kopia"
+  Remove-Item -Recurse -Force $kopiaOut -ErrorAction SilentlyContinue
+  Download-Url ([string]$Manifest.components.kopia.url) $kopiaZip 5000000 4
+  $wantHash=([string]$Manifest.components.kopia.sha256).ToLowerInvariant()
+  $gotHash=(Get-FileHash $kopiaZip -Algorithm SHA256).Hash.ToLowerInvariant()
+  if($wantHash -and $gotHash -ne $wantHash){throw "SHA256 Kopia khong khop."}
+  Expand-Archive $kopiaZip $kopiaOut -Force
+  $foundKopia=Get-ChildItem $kopiaOut -Recurse -Filter "kopia.exe"|Select-Object -First 1
+  if(-not $foundKopia){throw "Khong tim thay kopia.exe trong goi chinh thuc."}
+  Copy-Item $foundKopia.FullName $kopiaExe -Force
+  & $kopiaExe --version
+  if($LASTEXITCODE -ne 0){throw "Kopia khong chay duoc sau khi cai."}
+}else{
+  Write-Host "  Kopia: khong doi." -ForegroundColor DarkGray
+}
+
 Write-Step "Dang ky chay cung Windows"
 $run="HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
 New-Item -Path $run -Force|Out-Null
 New-ItemProperty $run -Name "KanbanCapture" -Value ('"'+$pyw+'" "'+$capture+'" --background') -PropertyType String -Force|Out-Null
 New-ItemProperty $run -Name "KanBanSigning" -Value ('"'+$pyw+'" "'+$signAgent+'"') -PropertyType String -Force|Out-Null
 New-ItemProperty $run -Name "KanBanMedia" -Value ('"'+$pyw+'" "'+(Join-Path $Runtime "kanmedia-server.py")+'"') -PropertyType String -Force|Out-Null
+New-ItemProperty $run -Name "KanBanBackup" -Value ('"'+$pyw+'" "'+$backupAgent+'"') -PropertyType String -Force|Out-Null
 
 $baseKey="HKCU:\Software\Classes\kanbancapture"
 New-Item $baseKey -Force|Out-Null
@@ -416,6 +460,9 @@ if($needSigning -or -not (Test-Url "http://127.0.0.1:8765/health" @{"X-KanBan-Ag
 }
 $mediaServer=Join-Path $Runtime "kanmedia-server.py"
 Start-Process -FilePath $pyw -ArgumentList ('"'+$mediaServer+'"') -WindowStyle Hidden
+if($needBackup -or $needKopia -or -not (Test-Url "http://127.0.0.1:47634/ping" @{"X-KanBan-Agent"="linh-kanbackup-v1"})){
+  Start-Process -FilePath $pyw -ArgumentList ('"'+$backupAgent+'"') -WindowStyle Hidden
+}
 
 Write-Step "Kiem tra sau cai dat"
 $serverOk=$false
@@ -440,6 +487,19 @@ try{
 if(-not $mediaOk){
   throw "KanMedia da chay nhung con thieu thanh phan. Bo cai se thu lai o lan repair."
 }
+$backupOk=$false
+for($i=0;$i -lt 50;$i++){
+  try{
+    $b=Invoke-RestMethod -Headers @{"X-KanBan-Agent"="linh-kanbackup-v1"} -Uri "http://127.0.0.1:47634/ping" -TimeoutSec 2
+    if($b.ok -and $b.available){$backupOk=$true;break}
+  }catch{}
+  Start-Sleep -Milliseconds 250
+}
+if(-not $backupOk){
+  $log=Join-Path $Logs "kanbackup-server.log"
+  if(Test-Path $log){ Get-Content $log -Tail 40 }
+  throw "KanBackup / Kopia chua khoi dong duoc."
+}
 
 # Ghi dung manifest da cai de lan sau chi cap nhat thanh phan thay doi.
 Copy-Item -LiteralPath $ManifestPath -Destination $InstalledPath -Force
@@ -454,6 +514,7 @@ Write-Host "============================================================" -Foreg
 Write-Host "  - Alt+C / Alt+X: chup man hinh; Alt+A / Alt+P: KanPass; Web Bridge: tu Save/Update tren Web duoc KanPass mo"
 Write-Host "  - KanMedia: Tai / Chuyen doi / Edit Media"
 Write-Host "  - Ho tro ky PDF bang USB Token"
+Write-Host "  - KanBackup + Kopia: backup tang dan / dedup, lich Windows, restore rieng"
 Write-Host "  - Cap nhat theo tung thanh phan, khong tai lai neu khong can"
 Write-Host ""
 try { Stop-Transcript | Out-Null } catch {}
