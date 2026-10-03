@@ -3,11 +3,20 @@ import copy, ctypes, io, json, math, os, shutil, socket, struct, subprocess, sys
 from ctypes import wintypes
 from datetime import datetime, timedelta
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk, font as tkfont
 
-APP='KanbanCapture'; PORT=47631; HOTKEY_ID=0x4B43; HOTKEY_LONG_ID=0x4B58
+try:
+    from kanpass import KanPassManager
+except Exception:
+    KanPassManager = None
+
+APP='KanbanCapture'; PORT=47631
+HOTKEY_ID=0x4B43; HOTKEY_LONG_ID=0x4B58; HOTKEY_FILL_ID=0x4B41; HOTKEY_SAVE_ID=0x4B50
 DIR=Path(os.environ.get('LOCALAPPDATA',tempfile.gettempdir()))/APP; CFG=DIR/'settings.json'; CLIP=DIR/'Clipboard'
+KANPASS_HEADER='linh-kanpass-v1'
+KANPASS_ALLOWED_ORIGINS=('https://lamhoailinh.github.io','http://localhost','http://127.0.0.1')
 DEFAULT={'format':'jpg','jpeg_quality':100,'pen_width':4,'text_size':26}
 
 def config():
@@ -32,6 +41,8 @@ def install():
     send('quit')
     time.sleep(.45)
     if src!=target: shutil.copy2(src,target)
+    kanpass_src=src.with_name('kanpass.py'); kanpass_target=DIR/'kanpass.py'
+    if kanpass_src.exists() and kanpass_src.resolve()!=kanpass_target.resolve(): shutil.copy2(kanpass_src,kanpass_target)
     pyw=Path(sys.executable).with_name('pythonw.exe'); pyw=pyw if pyw.exists() else Path(sys.executable)
     base=r'Software\Classes\kanbancapture'
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER,base) as k: winreg.SetValueEx(k,None,0,winreg.REG_SZ,'URL:Kanban Capture'); winreg.SetValueEx(k,'URL Protocol',0,winreg.REG_SZ,'')
@@ -41,7 +52,7 @@ def install():
     for _ in range(30):
         time.sleep(.12)
         if send('ping',expect_reply=True):
-            print('Đã cài và khởi động Kanban Capture Agent. Alt+C chụp nhanh, Alt+X chụp dài.')
+            print('Đã cài và khởi động Kanban Agent. Alt+C chụp nhanh, Alt+X chụp dài, Alt+A điền KanPass, Alt+P lưu/cập nhật KanPass.')
             return 0
     raise RuntimeError('Đã chép Agent nhưng chưa khởi động được. Hãy thử chạy lại file cài đặt hoặc khởi động Windows.')
 
@@ -1119,38 +1130,117 @@ class Overlay:
 class Agent:
     def __init__(self,first=None):
         self.cfg=config(); self.root=tk.Tk(); self.root.withdraw(); self.overlay=None; self.alive=True; self.settings=None; self.capture_target_hwnd=None
+        self.kanpass=KanPassManager(self.root,DIR) if KanPassManager else None
         self.sock=socket.socket(); self.sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1); self.sock.bind(('127.0.0.1',PORT)); self.sock.listen(3)
         threading.Thread(target=self.listen,daemon=True).start(); threading.Thread(target=self.hotkey,daemon=True).start(); cleanup()
         if first:self.root.after(150,lambda:self.handle(first))
+    def _http_response(self,conn,status,payload=None,origin='*',extra_headers=None):
+        reasons={200:'OK',204:'No Content',400:'Bad Request',403:'Forbidden',404:'Not Found',409:'Conflict',500:'Internal Server Error'}
+        body=b'' if status==204 else json.dumps(payload if payload is not None else {'ok':True},ensure_ascii=False).encode('utf-8')
+        headers=[
+            f'HTTP/1.1 {status} {reasons.get(status,"OK")}',
+            f'Access-Control-Allow-Origin: {origin or "*"}',
+            'Access-Control-Allow-Methods: GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers: Content-Type, X-KanBan-Agent',
+            'Access-Control-Allow-Private-Network: true',
+            'Cache-Control: no-store',
+            'Connection: close',
+            'Content-Type: application/json; charset=utf-8',
+            f'Content-Length: {len(body)}'
+        ]
+        if extra_headers:
+            headers.extend(extra_headers)
+        conn.sendall(('\r\n'.join(headers)+'\r\n\r\n').encode('utf-8')+body)
+
+    def _origin_allowed(self,origin):
+        if not origin:return True
+        low=origin.lower()
+        return any(low==base or low.startswith(base+':') for base in KANPASS_ALLOWED_ORIGINS)
+
     def listen(self):
         while self.alive:
             try:
-                conn,_=self.sock.accept(); conn.settimeout(.8); raw=conn.recv(4096)
-                if raw.startswith(b'GET ') or raw.startswith(b'OPTIONS '):
-                    text=raw.decode('latin1',errors='ignore'); first=text.split('\r\n',1)[0].split()
-                    method=first[0] if first else 'GET'; path=first[1] if len(first)>1 else '/ping'
-                    headers=('HTTP/1.1 204 No Content' if method=='OPTIONS' else 'HTTP/1.1 200 OK')+'\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type\r\nAccess-Control-Allow-Private-Network: true\r\nCache-Control: no-store\r\nConnection: close\r\nContent-Type: application/json\r\n\r\n'
-                    body='' if method=='OPTIONS' else '{"ok":true}'
-                    conn.sendall((headers+body).encode('utf-8')); conn.close()
-                    if method!='OPTIONS':
-                        cmd=path.split('?',1)[0].strip('/').lower() or 'ping'
-                        self.root.after(0,lambda q=cmd:self.handle(q))
+                conn,_=self.sock.accept(); conn.settimeout(2.5)
+                raw=b''
+                while b'\r\n\r\n' not in raw and len(raw)<65536:
+                    chunk=conn.recv(8192)
+                    if not chunk:break
+                    raw+=chunk
+                if not raw:
+                    conn.close();continue
+                if not (raw.startswith(b'GET ') or raw.startswith(b'POST ') or raw.startswith(b'OPTIONS ')):
+                    data=raw.decode(errors='ignore').strip(); conn.sendall(b'OK\n'); conn.close()
+                    if data:self.root.after(0,lambda q=data:self.handle(q))
                     continue
-                data=raw.decode(errors='ignore').strip(); conn.sendall(b'OK\n'); conn.close()
-                if data:self.root.after(0,lambda q=data:self.handle(q))
-            except (OSError,socket.timeout):continue
+                head,body=(raw.split(b'\r\n\r\n',1)+[b''])[:2]
+                text=head.decode('latin1',errors='ignore')
+                lines=text.split('\r\n'); first=lines[0].split()
+                method=first[0].upper() if first else 'GET'; target=first[1] if len(first)>1 else '/ping'
+                headers={}
+                for line in lines[1:]:
+                    if ':' in line:
+                        k,v=line.split(':',1);headers[k.strip().lower()]=v.strip()
+                length=max(0,min(50_000_000,int(headers.get('content-length','0') or 0)))
+                while len(body)<length:
+                    chunk=conn.recv(min(65536,length-len(body)))
+                    if not chunk:break
+                    body+=chunk
+                parsed=urlsplit(target); path=parsed.path or '/ping'
+                origin=headers.get('origin','')
+                response_origin=origin if origin and self._origin_allowed(origin) else '*'
+                if method=='OPTIONS':
+                    if path.startswith('/kanpass/') and origin and not self._origin_allowed(origin):
+                        self._http_response(conn,403,{'ok':False,'message':'Origin không được phép.'},'*')
+                    else:
+                        self._http_response(conn,204,None,response_origin)
+                    conn.close();continue
+                if path.startswith('/kanpass/'):
+                    if origin and not self._origin_allowed(origin):
+                        self._http_response(conn,403,{'ok':False,'message':'Origin không được phép.'},'*');conn.close();continue
+                    if headers.get('x-kanban-agent')!=KANPASS_HEADER:
+                        self._http_response(conn,403,{'ok':False,'message':'Thiếu khóa KanPass cục bộ.'},response_origin);conn.close();continue
+                    if not self.kanpass:
+                        self._http_response(conn,500,{'ok':False,'message':'KanPass chưa được cài trong Agent.'},response_origin);conn.close();continue
+                    query={k:(v[-1] if isinstance(v,list) and v else '') for k,v in parse_qs(parsed.query,keep_blank_values=True).items()}
+                    obj={}
+                    if method=='POST' and body:
+                        try:obj=json.loads(body[:length or len(body)].decode('utf-8'))
+                        except Exception:
+                            self._http_response(conn,400,{'ok':False,'message':'JSON không hợp lệ.'},response_origin);conn.close();continue
+                    status,payload=self.kanpass.handle_api(method,path,query,obj)
+                    self._http_response(conn,status,payload,response_origin);conn.close();continue
+                self._http_response(conn,200,{'ok':True},response_origin);conn.close()
+                cmd=path.split('?',1)[0].strip('/').lower() or 'ping'
+                self.root.after(0,lambda q=cmd:self.handle(q))
+            except (OSError,socket.timeout,ValueError):
+                try:conn.close()
+                except Exception:pass
+                continue
+            except Exception:
+                try:conn.close()
+                except Exception:pass
+                continue
+
     def hotkey(self):
-        u=ctypes.windll.user32
-        ok_c=bool(u.RegisterHotKey(None,HOTKEY_ID,0x0001|0x4000,0x43))
-        ok_x=bool(u.RegisterHotKey(None,HOTKEY_LONG_ID,0x0001|0x4000,0x58))
+        u=ctypes.windll.user32; mods=0x0001|0x4000
+        ok_c=bool(u.RegisterHotKey(None,HOTKEY_ID,mods,0x43))
+        ok_x=bool(u.RegisterHotKey(None,HOTKEY_LONG_ID,mods,0x58))
+        ok_a=bool(u.RegisterHotKey(None,HOTKEY_FILL_ID,mods,0x41))
+        ok_p=bool(u.RegisterHotKey(None,HOTKEY_SAVE_ID,mods,0x50))
         if not ok_c:self.root.after(0,lambda:messagebox.showwarning('Kanban Capture','Không đăng ký được Alt+C. Có thể phím này đang bị ứng dụng khác chiếm. Nút CHỤP trong Kanban vẫn dùng được.'))
         if not ok_x:self.root.after(0,lambda:messagebox.showwarning('Kanban Capture','Không đăng ký được Alt+X cho chụp dài. Có thể phím này đang bị ứng dụng khác chiếm.'))
         m=wintypes.MSG()
         while self.alive and u.GetMessageW(ctypes.byref(m),None,0,0):
-            if m.message==0x0312 and m.wParam==HOTKEY_ID:self.root.after(0,lambda:self.capture(False))
-            elif m.message==0x0312 and m.wParam==HOTKEY_LONG_ID:self.root.after(0,lambda:self.capture(True))
+            if m.message!=0x0312:continue
+            if m.wParam==HOTKEY_ID:self.root.after(0,lambda:self.capture(False))
+            elif m.wParam==HOTKEY_LONG_ID:self.root.after(0,lambda:self.capture(True))
+            elif m.wParam==HOTKEY_FILL_ID and ok_a and self.kanpass:self.root.after(0,self.kanpass.hotkey_autofill)
+            elif m.wParam==HOTKEY_SAVE_ID and ok_p and self.kanpass:self.root.after(0,self.kanpass.hotkey_save_update)
         if ok_c:u.UnregisterHotKey(None,HOTKEY_ID)
         if ok_x:u.UnregisterHotKey(None,HOTKEY_LONG_ID)
+        if ok_a:u.UnregisterHotKey(None,HOTKEY_FILL_ID)
+        if ok_p:u.UnregisterHotKey(None,HOTKEY_SAVE_ID)
+
     def handle(self,q):
         q=q.split('?',1)[0].strip('/ ').lower()
         if q=='capture':self.capture(False)
@@ -1182,7 +1272,7 @@ class Agent:
         ttk.Radiobutton(f,text='JPG (mặc định)',variable=fmt,value='jpg').grid(row=1,column=0,sticky='w'); ttk.Radiobutton(f,text='PNG',variable=fmt,value='png').grid(row=1,column=1,sticky='w')
         ttk.Label(f,text='Chất lượng JPG').grid(row=2,column=0,sticky='w',pady=6); ttk.Spinbox(f,from_=70,to=100,textvariable=q,width=8).grid(row=2,column=1,sticky='e')
         ttk.Label(f,text='Độ dày nét và cỡ chữ được chỉnh trực tiếp trong lúc chụp.',foreground='#53645c').grid(row=3,column=0,columnspan=2,sticky='w',pady=(8,4))
-        ttk.Label(f,text='Alt + C: chụp nhanh · Alt + X: chụp dài theo khung cố định.').grid(row=4,column=0,columnspan=2,sticky='w',pady=(6,6))
+        ttk.Label(f,text='Alt+C: chụp nhanh · Alt+X: chụp dài · Alt+A: KanPass tự điền · Alt+P: lưu/cập nhật mật khẩu.').grid(row=4,column=0,columnspan=2,sticky='w',pady=(6,6))
         def ok():
             self.cfg['format']='png' if fmt.get()=='png' else 'jpg'; self.cfg['jpeg_quality']=max(70,min(100,int(q.get()))); save_cfg(self.cfg); w.destroy()
         ttk.Button(f,text='Hủy',command=w.destroy).grid(row=5,column=0,pady=(8,0)); ttk.Button(f,text='Lưu',command=ok).grid(row=5,column=1,pady=(8,0)); w.focus_force()

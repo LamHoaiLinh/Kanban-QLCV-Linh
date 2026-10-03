@@ -2,9 +2,12 @@ name: Check KanBan Tools
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, 'feature/**' ]
     paths:
       - 'kan-tools/**'
+      - 'capture-agent/**'
+      - 'office-tools/office-tools.js'
+      - 'office-tools/office-tools.css'
       - 'office-tools/kanmedia/**'
       - 'kantool-launcher.js'
       - 'kantool-extra.css'
@@ -32,7 +35,33 @@ jobs:
 
       - name: Check Python syntax
         shell: pwsh
-        run: python -m py_compile kan-tools/runtime/kanmedia-server.py kan-tools/runtime/kanmedia-worker.py capture-agent/capture_agent.py office-tools/signing-agent/package/kanban_signing_agent.py
+        run: python -m py_compile kan-tools/runtime/kanmedia-server.py kan-tools/runtime/kanmedia-worker.py capture-agent/capture_agent.py capture-agent/kanpass.py office-tools/signing-agent/package/kanban_signing_agent.py
+
+      - name: Smoke test KanPass KDBX and Windows DPAPI
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check pykeepass
+          @'
+          import shutil, sys, tempfile
+          from pathlib import Path
+          sys.path.insert(0, 'capture-agent')
+          import kanpass
+          secret=b'kanpass-dpapi-smoke'
+          assert kanpass.dpapi_unprotect(kanpass.dpapi_protect(secret)) == secret
+          root=Path(tempfile.mkdtemp(prefix='kanpass-ci-'))
+          try:
+              manager=kanpass.KanPassManager(None, root)
+              manager.setup('KanPass-Smoke-123')
+              item=manager.save_item({'title':'MB - Test','service':'MB Bank','company':'Test','company_id':'COMP01','username':'user','password':'secret-A','field_order':'company_id,username,password'})
+              manager.save_item({**item,'password':'secret-B'})
+              revealed=manager.get_item(item['id'], reveal=True)
+              assert revealed['password']=='secret-B'
+              assert revealed['history'][0]['password']=='secret-A'
+              assert manager.export_backup()['encrypted'] is True
+              print('KanPass KDBX + DPAPI OK')
+          finally:
+              shutil.rmtree(root, ignore_errors=True)
+          '@ | python -
 
       - name: Check PowerShell installer syntax
         shell: pwsh
@@ -51,4 +80,12 @@ jobs:
 
       - name: Check JavaScript syntax
         shell: pwsh
-        run: node -e "const fs=require('fs'); for(const p of ['app.js','sw.js','office-tools/kanmedia/kanmedia.js','kantool-launcher.js','capture-launcher.js']){let s=fs.readFileSync(p,'utf8').replace(/\bexport\s+/g,''); new Function(s); console.log('OK '+p)}"
+        run: |
+          node --check app.js
+          node --check sw.js
+          node --check kantool-launcher.js
+          node --check capture-launcher.js
+          Copy-Item office-tools/office-tools.js "$env:RUNNER_TEMP\office-tools-check.mjs"
+          Copy-Item office-tools/kanmedia/kanmedia.js "$env:RUNNER_TEMP\kanmedia-check.mjs"
+          node --check "$env:RUNNER_TEMP\office-tools-check.mjs"
+          node --check "$env:RUNNER_TEMP\kanmedia-check.mjs"

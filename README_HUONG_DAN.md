@@ -1,3 +1,47 @@
+# HƯỚNG DẪN KANBAN THEO CHỨC NĂNG
+
+Tài liệu này ưu tiên tra cứu theo chức năng. Phần lịch sử cập nhật cũ được giữ phía dưới để đối chiếu khi cần.
+
+## Bảng công việc và ghi chú
+- Dùng biểu tượng ⠿ để kéo dự án, cột và thẻ.
+- Ctrl+Enter: nhập nhanh công việc khi trang KanBan đang focus.
+- Ctrl+click / Shift+click / Ctrl+A: chọn nhiều thẻ; Delete chuyển nội dung vào khu Đã xóa.
+- Dấu ＋ dưới tên dự án: tạo Ghi chú nhanh. Nội dung ghi chú được lưu chung với dự án trong backup.
+
+## Đồng hồ, Sinh nhật / Ngày giỗ và Lịch Công việc
+- Bấm đồng hồ để mở báo thức, đếm ngược và sửa preset.
+- Sinh nhật dùng dương lịch; Ngày giỗ dùng âm lịch Việt Nam.
+- Lịch Công việc hỗ trợ ngày cụ thể, lặp hàng tháng hoặc hằng năm.
+- Các nhóm lịch được lưu trong bản sao JSON chung và có thể chọn riêng khi nhập lại.
+
+## KanPass
+- KanPass là kho tài khoản offline dùng KDBX mã hóa, nằm trong Windows Agent của KanBan.
+- Alt+A: đặt con trỏ ở ô đầu tiên của form đăng nhập rồi tự điền theo profile. Nếu có nhiều công ty/tài khoản phù hợp, KanPass yêu cầu chọn.
+- Alt+P: lưu hoặc cập nhật tài khoản từ cửa sổ hiện tại. KanPass chỉ tự đọc trường Windows cho phép; ô password được bảo vệ sẽ yêu cầu nhập trong popup.
+- Mỗi dịch vụ có thể có nhiều hồ sơ. Nên đặt Tên tài khoản dễ nhận biết và lưu thêm Công ty/MST/Company ID khi có.
+- KanPass giữ tối đa 5 mật khẩu cũ để tra cứu và cảnh báo khi mật khẩu mới trùng lịch sử.
+- Mở CÔNG CỤ → KanPass để tìm theo tên tài khoản, công ty, MST hoặc username. Mật khẩu, lịch sử và mật khẩu chính chỉ nhập/hiện trong cửa sổ native của Windows Agent; trang Web không nhận plaintext secret.
+- Khi xuất backup, KanPass được nhúng dưới dạng KDBX đã mã hóa; không xuất password dạng chữ thường.
+
+## CÔNG CỤ và Windows Agent
+- Alt+C: chụp nhanh. Alt+X: chụp dài. Alt+A / Alt+P: KanPass.
+- PDF, IMG, Nhập liệu PDF/IMG, Rename, Excel, KanPass, KanPaint và KanMedia nằm trong CÔNG CỤ.
+- Chuột phải CÔNG CỤ → **Cập nhật / sửa KanBan Tools**. Người dùng chỉ cần tải và mở `CAI_KANTOOL_1_LAN_BAM.bat` một lần; installer tự kiểm tra Python/runtime/thư viện và đăng ký Agent chạy cùng Windows.
+- Không cần cài riêng KanPass hoặc PyKeePass bằng tay.
+
+## Sao lưu và khôi phục
+- **Xuất bản sao JSON** tạo một file chung gồm dự án/công việc/ghi chú, lịch nhắc, đồng hồ/preset, giao diện/quy tắc, Nội dung đã xóa, tùy chọn nhạc/CÔNG CỤ và KanPass nếu Agent đang sẵn sàng.
+- **Nhập dữ liệu** đọc file trước rồi cho chọn từng nhóm cần khôi phục. Nhóm không chọn được giữ nguyên trên máy.
+- Quyền truy cập thư mục nhạc của trình duyệt không thể đóng gói vào JSON; khi đổi máy cần chọn lại thư mục nhạc.
+- Khi nhập KDBX sang máy Windows khác, KanPass yêu cầu mật khẩu chính để xác minh lần đầu.
+
+## Cài đặt, cập nhật và xử lý lỗi
+- Bộ cài dùng chung thư mục KanBan Tools và chỉ cập nhật thành phần thay đổi; dữ liệu KanPass nằm ngoài thư mục runtime nên không bị ghi đè khi update.
+- Nếu Alt+A/Alt+P hoặc một công cụ chưa hoạt động: chuột phải **CÔNG CỤ** → **Cập nhật / sửa KanBan Tools** → chạy file cài nếu KanBan tải xuống.
+- Màn chẩn đoán hiển thị riêng trạng thái Chụp màn hình, KanPass, KanMedia và Ký số PDF.
+
+# LỊCH SỬ CẬP NHẬT
+
 # Cập nhật v7.4.4 – thao tác trực tiếp bằng click / double-click
 
 - Nút quay lại đã đổi thành **← Trở về KanBan** và làm lớn, dễ thấy hơn.

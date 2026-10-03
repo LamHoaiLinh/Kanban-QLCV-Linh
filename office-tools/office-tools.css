@@ -440,3 +440,26 @@
 .office-tools-dialog .office-table td{border-bottom-width:1.25px}
 .office-tools-dialog .office-subtab.active,
 .office-tools-dialog .office-nav button.active{box-shadow:inset 0 0 0 .5px currentColor}
+
+
+/* ===== v5.1 KanPass ===== */
+.kanpass-panel{max-width:1500px;margin:0 auto}
+.kanpass-layout{display:grid;grid-template-columns:minmax(270px,.72fr) minmax(440px,1.28fr);gap:12px;align-items:start}
+.kanpass-list-card,.kanpass-detail-card{min-width:0;margin-bottom:0}
+.kanpass-search-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.kanpass-search-row input,.kanpass-detail-card input,.kanpass-setup input{width:100%;min-height:38px;border:1.5px solid var(--border);border-radius:10px;background:var(--panel);color:var(--text);padding:8px 10px;font:inherit}
+.kanpass-count{margin:9px 2px 7px;color:var(--muted);font-size:11px;font-weight:800}
+.kanpass-list{display:grid;gap:6px;max-height:68vh;overflow:auto;padding-right:2px}
+.kanpass-list-item{display:grid;gap:3px;width:100%;padding:10px 11px;text-align:left;border:1.5px solid var(--border);border-radius:12px;background:var(--panel);color:var(--text);cursor:pointer}
+.kanpass-list-item:hover,.kanpass-list-item.active{border-color:var(--green);background:var(--green-soft)}
+.kanpass-list-item strong{font-size:12.5px}.kanpass-list-item span{font-size:11px;color:var(--text);overflow-wrap:anywhere}.kanpass-list-item small{font-size:10px;color:var(--muted);overflow-wrap:anywhere}
+.kanpass-detail-head,.kanpass-secret-title{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.kanpass-detail-head h4{margin:0 0 4px}.kanpass-detail-head .office-card-note{margin-bottom:10px}
+.kanpass-actions{margin-top:14px}
+.kanpass-secrets{margin-top:13px;padding:12px;border:1.5px solid var(--border);border-radius:13px;background:var(--panel-soft)}
+.kanpass-secret-input{margin-top:7px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.kanpass-history-title{margin:13px 0 7px;font-size:11px;font-weight:900;color:var(--muted)}
+.kanpass-history{display:grid;gap:7px}.kanpass-history>div{display:grid;grid-template-columns:minmax(130px,.45fr) minmax(0,1fr);gap:8px;align-items:center}.kanpass-history span{font-size:10.5px;color:var(--muted)}
+.kanpass-setup{max-width:800px}.kanpass-setup .office-warning{margin-top:10px}
+@media(max-width:950px){.kanpass-layout{grid-template-columns:1fr}.kanpass-list{max-height:260px}}
+@media(max-width:620px){.kanpass-search-row{grid-template-columns:1fr}.kanpass-history>div{grid-template-columns:1fr}.kanpass-detail-head{display:grid}}

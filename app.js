@@ -2,10 +2,14 @@
   'use strict';
 
   const STORAGE_KEY = 'linh_personal_kanban_v1';
-  const VERSION = 22;
+  const VERSION = 23;
   const DEFAULT_BACKGROUND_ID = 'bg6';
   const KAN_ALARM_AGENT = 'http://127.0.0.1:47632';
   const KAN_ALARM_HEADERS = {'X-KanBan-Agent':'linh-kanban-v1','Content-Type':'application/json'};
+  const KANPASS_API = 'http://127.0.0.1:47631';
+  const KANPASS_HEADERS = {'X-KanBan-Agent':'linh-kanpass-v1','Content-Type':'application/json'};
+  const MUSIC_SETTINGS_KEY = 'linh_kanban_music_settings_v1';
+  const OFFICE_SETTINGS_KEY = 'linh_kanban_office_settings_v1';
   const DEFAULT_TIMER_PRESETS = [
     {seconds:60,label:''},
     {seconds:180,label:''},
@@ -108,7 +112,7 @@
       'emptyState','board','projectDialog','projectForm','projectDialogTitle','projectNameInput','projectColorOptions','deleteProjectBtn',
       'cardDialog','cardForm','cardDialogTitle','cardTitleInput','cardDescriptionInput','checklistEditor','checklistEmpty','addChecklistBtn',
       'labelOptions','cardColumnSelect','deleteCardBtn','duplicateCardBtn','columnDialog','columnForm','columnDialogTitle','columnNameInput','columnColorOptions',
-      'deleteColumnBtn','clearColumnContentBtn','duplicateColumnBtn','quickCaptureDialog','quickCaptureForm','quickCaptureTitleInput','quickCaptureColumnSelect','quickCaptureDestinationHint','backgroundDialog','backgroundOptions','guideDialog','settingsBtn','settingsDialog','settingsExportBtn','quickCaptureProjectName','quickCaptureDefaultColumnSelect','quickCaptureStatus','dailyMoveEnabled','dailyMoveProjectName','dailyMoveRules','addDailyMoveRuleBtn','dailyMoveStatus','openDeletedContentBtn','deletedContentCount','deletedContentDialog','deletedArchiveTabBtn','deletedTrashTabBtn','deletedArchivePanel','deletedTrashPanel','deletedArchiveCount','deletedTrashCount','deletedArchiveList','deletedTrashList','emptyTrashBtn','openResetDataBtn','resetDataDialog','resetDataForm','resetBackupBtn','resetConfirmInput','resetDeleteBtn','resetBackupStatus','confirmDialog','confirmTitle','confirmMessage','globalTooltip','toast',
+      'deleteColumnBtn','clearColumnContentBtn','duplicateColumnBtn','quickCaptureDialog','quickCaptureForm','quickCaptureTitleInput','quickCaptureColumnSelect','quickCaptureDestinationHint','backgroundDialog','backgroundOptions','guideDialog','settingsBtn','settingsDialog','settingsExportBtn','quickCaptureProjectName','quickCaptureDefaultColumnSelect','quickCaptureStatus','dailyMoveEnabled','dailyMoveProjectName','dailyMoveRules','addDailyMoveRuleBtn','dailyMoveStatus','openDeletedContentBtn','deletedContentCount','deletedContentDialog','deletedArchiveTabBtn','deletedTrashTabBtn','deletedArchivePanel','deletedTrashPanel','deletedArchiveCount','deletedTrashCount','deletedArchiveList','deletedTrashList','emptyTrashBtn','openResetDataBtn','resetDataDialog','resetDataForm','resetBackupBtn','resetConfirmInput','resetDeleteBtn','resetBackupStatus','importSelectDialog','importSectionList','importSelectAllBtn','importSectionsConfirmBtn','confirmDialog','confirmTitle','confirmMessage','globalTooltip','toast',
       'clockCurrentTime','clockDayPeriod','clockWeekday','clockDate','clockLunarDate','timerDisplay','timerDialogDisplay','timerEndTime','timerAgentStatus','clockStatus','timerMinutesInput','timerSecondsInput','timerLabelInput','timerStartPauseBtn','timerResetBtn','timerStopAlarmBtn','timerTestAlarmBtn','timerLocalAlarmInput','timerRepeatAlarmInput','timerNotifyInput','timerPresetEditor','timerPresetEditTitle','timerPresetLabelInput','timerPresetMinutesInput','timerPresetSecondsInput','saveTimerPresetBtn','cancelTimerPresetEditBtn','resetTimerPresetBtn','deskClockWidget','deskClockControls','clockToggleBtn','quickStopAlarmBtn','clockDialog',
       'clockAlarmTabBtn','clockSpecialTabBtn','clockWorkTabBtn','clockAlarmPanel','clockSpecialPanel','clockWorkPanel','specialDateNameInput','specialDateTypeSelect','specialBirthdayFields','specialBirthdayDateInput','specialMemorialFields','specialLunarDateInput','addSpecialDateBtn','cancelSpecialDateEditBtn','specialTickerSettingInput','specialDateSearchInput','specialDateMonthFilter','specialDateList','specialDateCount','specialDateEmpty','specialReminderBar','specialReminderText','specialReminderToggle','exportSpecialDatesBtn','importSpecialDatesBtn','importSpecialDatesFile','workDateTitleInput','workDateInput','workRepeatMonthlyInput','workRepeatYearlyInput','addWorkDateBtn','cancelWorkDateEditBtn','workTickerSettingInput','workDateSearchInput','workDateMonthFilter','workDateList','workDateCount','workDateEmpty','workReminderBar','workReminderText','workReminderToggle'
     ].forEach(id => refs[id] = document.getElementById(id));
@@ -1426,12 +1430,59 @@
     }
   }
 
-  function exportData() {
+  function readJsonPreference(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function fetchKanPassBackup() {
+    try {
+      const response = await fetch(KANPASS_API + '/kanpass/export', {headers:KANPASS_HEADERS,cache:'no-store'});
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.message || 'KanPass không phản hồi.');
+      return data.kanpass || {available:false};
+    } catch (error) {
+      console.warn('Không xuất được KanPass:',error);
+      return {available:false,exportError:true};
+    }
+  }
+
+  async function exportData() {
     state.settings.lastExportAt = nowIso();
     saveNow();
     const specialDateCount=state.settings?.clock?.specialDates?.length || 0;
     const workDateCount=state.settings?.clock?.workDates?.length || 0;
-    const payload = {app:'Kanban Cá Nhân',exportVersion:VERSION,exportedAt:nowIso(),backupIncludes:{projects:true,notes:true,settings:true,specialDates:specialDateCount,workDates:workDateCount},data:state};
+    const kanpass=await fetchKanPassBackup();
+    if(kanpass?.exportError){
+      const proceed=await askConfirm('KanPass chưa được sao lưu','KanBan không kết nối được Windows Agent nên file này sẽ KHÔNG chứa mật khẩu KanPass. Bạn có thể hủy, cập nhật/sửa KanBan Tools rồi xuất lại. Vẫn xuất phần dữ liệu còn lại?');
+      if(!proceed)return null;
+    }
+    const localPreferences={
+      musicSettings:readJsonPreference(MUSIC_SETTINGS_KEY),
+      officeSettings:readJsonPreference(OFFICE_SETTINGS_KEY)
+    };
+    const payload={
+      app:'Kanban Cá Nhân',
+      exportVersion:VERSION,
+      backupSchema:2,
+      exportedAt:nowIso(),
+      backupIncludes:{
+        projects:true,
+        notes:true,
+        settings:true,
+        specialDates:specialDateCount,
+        workDates:workDateCount,
+        localPreferences:Boolean(localPreferences.musicSettings || localPreferences.officeSettings),
+        kanpass:Number(kanpass?.count || 0)
+      },
+      data:state,
+      localPreferences,
+      kanpass
+    };
     const blob = new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'});
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -1444,7 +1495,122 @@
     const backupParts=[];
     if (specialDateCount) backupParts.push(`${specialDateCount} ngày sinh nhật/ngày giỗ`);
     if (workDateCount) backupParts.push(`${workDateCount} lịch công việc`);
-    showToast(backupParts.length ? `Đã xuất bản sao dữ liệu, gồm ${backupParts.join(' và ')}.` : 'Đã xuất bản sao dữ liệu.');
+    if (kanpass?.available) backupParts.push(`${Number(kanpass.count||0)} tài khoản KanPass đã mã hóa`);
+    if (kanpass?.exportError) backupParts.push('KanPass chưa được đưa vào vì Agent không kết nối');
+    showToast(backupParts.length ? `Đã xuất bản sao: ${backupParts.join(' · ')}.` : 'Đã xuất bản sao dữ liệu.');
+    return payload;
+  }
+
+  const IMPORT_SECTION_DEFS=[
+    {id:'projects',label:'Dự án, công việc & ghi chú',desc:'Các dự án, cột, thẻ và ghi chú nhanh theo dự án.'},
+    {id:'specialDates',label:'Sinh nhật / Ngày giỗ',desc:'Danh sách ngày đặc biệt và dữ liệu nhắc hằng năm.'},
+    {id:'workDates',label:'Lịch Công việc',desc:'Các lịch nhắc công việc theo ngày, tháng hoặc năm.'},
+    {id:'clock',label:'Đồng hồ & preset hẹn giờ',desc:'Thời lượng, preset, chuông, thông báo và tùy chọn đồng hồ.'},
+    {id:'settings',label:'Giao diện & quy tắc KanBan',desc:'Theme, hình nền, nhập nhanh và quy tắc tự chuyển ngày.'},
+    {id:'deleted',label:'Nội dung đã xóa / Thùng rác',desc:'Phần lưu trữ các công việc đã xóa.'},
+    {id:'preferences',label:'Nhạc & tùy chọn CÔNG CỤ',desc:'Cài đặt trình phát nhạc và các tùy chọn công cụ. Quyền thư mục nhạc phải chọn lại trên máy mới.'},
+    {id:'kanpass',label:'KanPass / mật khẩu',desc:'Kho KDBX đã mã hóa. Có thể cần mật khẩu chính khi nhập sang máy khác.'}
+  ];
+
+  function chooseImportSections(available) {
+    return new Promise(resolve => {
+      const defs=IMPORT_SECTION_DEFS.filter(item=>available.has(item.id));
+      if (!defs.length) {resolve([]);return}
+      refs.importSectionList.innerHTML=defs.map(item=>`
+        <label class="import-section-item">
+          <input type="checkbox" value="${escapeAttr(item.id)}" checked>
+          <span><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.desc)}</small></span>
+        </label>`).join('');
+      const boxes=()=>[...refs.importSectionList.querySelectorAll('input[type="checkbox"]')];
+      const sync=()=>{refs.importSectionsConfirmBtn.disabled=!boxes().some(x=>x.checked)};
+      refs.importSelectAllBtn.onclick=()=>{
+        const all=boxes(),want=all.some(x=>!x.checked);
+        all.forEach(x=>x.checked=want);sync();
+      };
+      refs.importSectionList.onchange=sync;
+      refs.importSelectDialog.returnValue='';
+      refs.importSelectDialog.addEventListener('close',()=>{
+        resolve(refs.importSelectDialog.returnValue==='import'?boxes().filter(x=>x.checked).map(x=>x.value):[]);
+      },{once:true});
+      sync();
+      refs.importSelectDialog.showModal();
+    });
+  }
+
+  async function importKanPassSection(payload) {
+    if (!payload?.available || !payload?.kdbxBase64) return false;
+    try{
+      const response=await fetch(KANPASS_API+'/kanpass/import',{
+        method:'POST',headers:KANPASS_HEADERS,cache:'no-store',
+        body:JSON.stringify(payload)
+      });
+      let data={};try{data=await response.json()}catch{}
+      if(response.ok)return Boolean(data?.ok);
+      if(response.status===409 && data?.cancelled)return false;
+      throw new Error(data?.message || 'Không nhập được KanPass.');
+    }catch(error){
+      throw new Error('Không nhập được KanPass: '+(error?.message || 'Windows Agent không phản hồi. Hãy cập nhật KanBan Tools trước.'));
+    }
+  }
+
+  function availableImportSections(parsed,raw) {
+    const set=new Set();
+    if(Array.isArray(raw?.projects))set.add('projects');
+    if(raw?.settings?.clock && Object.prototype.hasOwnProperty.call(raw.settings.clock,'specialDates'))set.add('specialDates');
+    if(raw?.settings?.clock && Object.prototype.hasOwnProperty.call(raw.settings.clock,'workDates'))set.add('workDates');
+    if(raw?.settings?.clock)set.add('clock');
+    if(raw?.settings)set.add('settings');
+    if(raw?.deleted)set.add('deleted');
+    if(parsed?.localPreferences && (parsed.localPreferences.musicSettings || parsed.localPreferences.officeSettings))set.add('preferences');
+    if(parsed?.kanpass?.available && parsed.kanpass?.kdbxBase64)set.add('kanpass');
+    return set;
+  }
+
+  function applyImportedSections(imported,parsed,selected) {
+    const pick=new Set(selected);
+    let changed=false,reloadNeeded=false;
+    if(pick.has('projects')){
+      state.projects=imported.projects;
+      state.activeProjectId=imported.activeProjectId || imported.projects[0]?.id || null;
+      changed=true;
+    }
+    const currentClock=state.settings.clock || createDefaultClockSettings();
+    const importedClock=imported.settings.clock || createDefaultClockSettings();
+    if(pick.has('clock')){
+      state.settings.clock={
+        ...importedClock,
+        specialDates:pick.has('specialDates')?importedClock.specialDates:currentClock.specialDates,
+        workDates:pick.has('workDates')?importedClock.workDates:currentClock.workDates
+      };
+      changed=true;
+    }else{
+      if(pick.has('specialDates')){state.settings.clock.specialDates=importedClock.specialDates;state.settings.clock.reminderTicker=importedClock.reminderTicker;changed=true}
+      if(pick.has('workDates')){state.settings.clock.workDates=importedClock.workDates;state.settings.clock.workReminderTicker=importedClock.workReminderTicker;changed=true}
+    }
+    if(pick.has('settings')){
+      state.settings.theme=imported.settings.theme;
+      state.settings.background=imported.settings.background;
+      state.settings.dailyMove=imported.settings.dailyMove;
+      state.settings.quickCapture=imported.settings.quickCapture;
+      changed=true;
+    }
+    if(pick.has('deleted')){state.deleted=imported.deleted;changed=true}
+    if(pick.has('preferences')){
+      const prefs=parsed.localPreferences || {};
+      if(prefs.musicSettings)localStorage.setItem(MUSIC_SETTINGS_KEY,JSON.stringify(prefs.musicSettings));
+      if(prefs.officeSettings)localStorage.setItem(OFFICE_SETTINGS_KEY,JSON.stringify(prefs.officeSettings));
+      reloadNeeded=true;
+    }
+    if(changed){
+      ensureActiveProject();
+      state=normalizeState(state);
+      applyTheme();
+      applyBackground();
+      initClockWidget();
+      saveNow();
+      renderAll();
+    }
+    return {changed,reloadNeeded};
   }
 
   async function importData(event) {
@@ -1453,21 +1619,25 @@
     if (!file) return;
     try {
       const parsed = JSON.parse(await file.text());
-      const imported = normalizeState(parsed.data || parsed);
-      const ok = await askConfirm('Nhập dữ liệu?','Dữ liệu hiện tại sẽ được thay thế. Nên xuất bản sao trước khi tiếp tục.');
-      if (!ok) return;
-      captureUndo('Nhập dữ liệu');
-      state = imported;
-      ensureActiveProject();
-      applyTheme();
-      applyBackground();
-      initClockWidget();
-      saveNow();
-      renderAll();
-      showToast('Đã nhập dữ liệu thành công.');
+      const raw=parsed.data || parsed;
+      const imported = normalizeState(raw);
+      const available=availableImportSections(parsed,raw);
+      const selected=await chooseImportSections(available);
+      if(!selected.length)return;
+      let passImported=false,passError='';
+      if(selected.includes('kanpass')){
+        try{passImported=await importKanPassSection(parsed.kanpass)}
+        catch(error){passError=error?.message || 'Không nhập được KanPass.'}
+      }
+      if(selected.some(id=>id!=='kanpass' && id!=='preferences'))captureUndo('Nhập dữ liệu chọn lọc');
+      const result=applyImportedSections(imported,parsed,selected);
+      const labels=IMPORT_SECTION_DEFS.filter(x=>selected.includes(x.id) && (x.id!=='kanpass' || passImported)).map(x=>x.label);
+      const skipped=selected.includes('kanpass')&&!passImported ? ` · KanPass bỏ qua${passError?': '+passError:''}` : '';
+      showToast(`Đã nhập: ${labels.join(' · ') || 'không có nhóm dữ liệu thường'}${skipped}.`);
+      if(result.reloadNeeded)setTimeout(()=>location.reload(),900);
     } catch (error) {
       console.error(error);
-      showToast('Tệp JSON không hợp lệ hoặc sai cấu trúc.');
+      showToast(error?.message || 'Tệp JSON không hợp lệ hoặc sai cấu trúc.');
     }
   }
 
@@ -1782,8 +1952,13 @@
     requestAnimationFrame(() => refs.resetConfirmInput.focus());
   }
 
-  function exportBackupBeforeReset() {
-    exportData();
+  async function exportBackupBeforeReset() {
+    const result=await exportData();
+    if(!result){
+      refs.resetBackupStatus.textContent = 'Chưa xuất backup.';
+      refs.resetBackupStatus.className = 'reset-backup-status';
+      return;
+    }
     refs.resetBackupStatus.textContent = 'Đã tạo file backup JSON. Hãy kiểm tra thư mục tải xuống trước khi xóa.';
     refs.resetBackupStatus.className = 'reset-backup-status success';
   }
@@ -1827,7 +2002,7 @@
     refs.resetDeleteBtn.textContent = 'Xóa vĩnh viễn';
     refs.resetConfirmInput.value = '';
     updateResetDeleteButton();
-    showToast('Đã xóa toàn bộ dữ liệu và khôi phục ứng dụng về trạng thái ban đầu.');
+    showToast('Đã xóa dữ liệu KanBan trong trình duyệt. Kho KanPass vẫn được giữ nguyên.');
   }
 
   function removeAppStorage(storage) {
