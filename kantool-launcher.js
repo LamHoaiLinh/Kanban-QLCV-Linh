@@ -24,13 +24,13 @@ async function downloadBat(manual){
     const text=await r.text();
     if(text.length<700||!text.toUpperCase().includes('KANBAN TOOLS'))throw new Error('File không hợp lệ');
     const url=URL.createObjectURL(new Blob([text],{type:'application/octet-stream'}));
-    const a=document.createElement('a');a.href=url;a.download='KanTool.bat';document.body.appendChild(a);a.click();a.remove();
+    const a=document.createElement('a');a.href=url;a.download='CAI_KANTOOL_1_LAN_BAM.bat';document.body.appendChild(a);a.click();a.remove();
     setTimeout(function(){URL.revokeObjectURL(url);},1500);
-    if(status)status.textContent=manual?'Đã tải KanTool.bat mới nhất.':'KanBan Tools chưa chạy. Đã tải bộ cài mới nhất — chỉ cần mở KanTool.bat một lần, các bước còn lại tự động.';
+    if(status)status.textContent=manual?'Đã tải CAI_KANTOOL_1_LAN_BAM.bat mới nhất.':'KanBan Tools chưa chạy. Đã tải bộ cài mới nhất — chỉ cần mở file CAI_KANTOOL_1_LAN_BAM.bat một lần, các bước còn lại tự động.';
     return true;
   }catch(e){
     try{
-      const a=document.createElement('a');a.href='kan-tools/KanTool.bat?t='+Date.now();a.download='KanTool.bat';document.body.appendChild(a);a.click();a.remove();
+      const a=document.createElement('a');a.href='kan-tools/KanTool.bat?t='+Date.now();a.download='CAI_KANTOOL_1_LAN_BAM.bat';document.body.appendChild(a);a.click();a.remove();
       if(status)status.textContent=manual?'Đã tải bộ cài dự phòng từ GitHub Pages.':'Đã tải bộ cài dự phòng — hãy mở KanTool.bat vừa tải.';
       return true;
     }catch(x){
@@ -58,7 +58,7 @@ async function getDiagnostics(show){
     lastDiagnostics=null;
     if(show){
       const box=panel.querySelector('[data-diagnostics]');
-      box.hidden=false;box.textContent='KanBan Tools chưa chạy nên chưa thể chẩn đoán. Nút chính sẽ tải bộ cài mới nhất; mở KanTool.bat một lần để tự cài.';
+      box.hidden=false;box.textContent='KanBan Tools chưa chạy nên chưa thể chẩn đoán. Nút chính sẽ tải bộ cài mới nhất; mở CAI_KANTOOL_1_LAN_BAM.bat một lần để tự cài.';
     }
     return null;
   }
@@ -104,11 +104,11 @@ function ensurePanel(){
     '<p>Bạn chỉ cần dùng <strong>một nút</strong>. KanBan tự kiểm tra, cập nhật hoặc sửa thành phần cần thiết.</p>'+
     '<div class="kantool-list" data-list></div>'+
     '<button type="button" data-smart class="kantool-smart-btn">↻ Cập nhật / sửa KanBan Tools</button>'+
-    '<div class="kantool-smart-note">Nếu chưa cài, nút này tải KanTool.bat mới nhất; mở file một lần là tự cài. Nếu đã cài, KanBan tự cập nhật hoặc sửa lỗi bằng cùng một bộ cài.</div>'+
+    '<div class="kantool-smart-note">Nếu chưa cài, nút này tải KanTool.bat mới nhất; mở file một lần là tự cài và tự sửa nếu lần đầu chưa xong. Nếu đã cài, KanBan tự cập nhật hoặc sửa lỗi bằng cùng một bộ cài.</div>'+
     '<details class="kantool-advanced"><summary>Tùy chọn nâng cao</summary>'+
       '<div class="capture-control-actions kantool-secondary-actions">'+
         '<button type="button" data-retry>Kiểm tra lại</button>'+
-        '<button type="button" data-download>⬇ Tải KanTool.bat thủ công</button>'+
+        '<button type="button" data-download>⬇ Tải bộ cài 1 lần bấm</button>'+
         '<button type="button" data-copy-diag>Sao chép chẩn đoán</button>'+
       '</div>'+
       '<div class="kantool-diagnostics" data-diagnostics hidden></div>'+
