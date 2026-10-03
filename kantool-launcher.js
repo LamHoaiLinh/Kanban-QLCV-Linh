@@ -1,7 +1,7 @@
 (function(){
 'use strict';
 const toolBtn=document.querySelector('.office-suite-launch-btn');if(!toolBtn)return;
-const MEDIA='http://127.0.0.1:47632',CAPTURE='http://127.0.0.1:47631',SIGN='http://127.0.0.1:8765',HEAD={'X-KanBan-Agent':'linh-kanban-v1'};
+const MEDIA='http://127.0.0.1:47632',CAPTURE='http://127.0.0.1:47631',SIGN='http://127.0.0.1:8765',HEAD={'X-KanBan-Agent':'linh-kanban-v1'},PASS_HEAD={'X-KanBan-Agent':'linh-kanpass-v1'};
 const RAW_BAT='https://raw.githubusercontent.com/LamHoaiLinh/Kanban-QLCV-Linh/main/kan-tools/KanTool.bat';
 let panel=null,lastDiagnostics=null;
 
@@ -113,7 +113,7 @@ function ensurePanel(){
       '</div>'+
       '<div class="kantool-diagnostics" data-diagnostics hidden></div>'+
     '</details>'+
-    '<div class="capture-security-note">KanMedia có thể tự cập nhật yt-dlp và thử lại một lần khi YouTube thay đổi bộ trích xuất. Bộ cài không tắt Windows Security hoặc tạo Defender exclusion.</div>'+
+    '<div class="capture-security-note">KanPass lưu mật khẩu trong KDBX mã hóa trên máy; bộ cài không tắt Windows Security hoặc tạo Defender exclusion. KanMedia có thể tự cập nhật yt-dlp khi YouTube thay đổi.</div>'+
     '</section>';
   document.body.appendChild(panel);
   panel.addEventListener('click',function(e){if(e.target===panel||e.target.closest('.capture-setup-close'))panel.hidden=true;});
@@ -137,13 +137,14 @@ async function refresh(){
   status.textContent='Đang kiểm tra…';
   const result=await Promise.all([
     probe(CAPTURE+'/ping'),
+    probe(CAPTURE+'/kanpass/status',PASS_HEAD,1700),
     probe(MEDIA+'/health',HEAD,1700),
     probe(SIGN+'/health',HEAD,1700),
     probe(MEDIA+'/system/version',HEAD,3500)
   ]);
-  const cap=result[0],media=result[1],sign=result[2],ver=result[3];
-  list.innerHTML=row('Chụp màn hình',!!cap)+row('KanMedia',!!(media&&media.mediaReady))+row('Ký số PDF',!!(sign&&sign.ok));
-  const ready=!!cap&&!!(media&&media.mediaReady)&&!!(sign&&sign.ok);
+  const cap=result[0],pass=result[1],media=result[2],sign=result[3],ver=result[4];
+  list.innerHTML=row('Chụp màn hình',!!cap)+row('KanPass',!!(pass&&pass.available))+row('KanMedia',!!(media&&media.mediaReady))+row('Ký số PDF',!!(sign&&sign.ok));
+  const ready=!!cap&&!!(pass&&pass.available)&&!!(media&&media.mediaReady)&&!!(sign&&sign.ok);
   if(!media){
     status.textContent='Chưa cài hoặc KanBan Tools chưa chạy. Bấm nút xanh bên dưới.';
     status.classList.toggle('ready',false);
