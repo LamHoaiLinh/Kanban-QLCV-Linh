@@ -39,11 +39,23 @@ def _make_blob(data: bytes):
     return _DATA_BLOB(len(data), ctypes.cast(buffer, ctypes.POINTER(ctypes.c_byte))), buffer
 
 
+def _configure_dpapi():
+    crypt32 = ctypes.windll.crypt32
+    kernel32 = ctypes.windll.kernel32
+    blob_ptr = ctypes.POINTER(_DATA_BLOB)
+    crypt32.CryptProtectData.argtypes = [blob_ptr, ctypes.c_wchar_p, blob_ptr, ctypes.c_void_p, ctypes.c_void_p, wintypes.DWORD, blob_ptr]
+    crypt32.CryptProtectData.restype = wintypes.BOOL
+    crypt32.CryptUnprotectData.argtypes = [blob_ptr, ctypes.c_void_p, blob_ptr, ctypes.c_void_p, ctypes.c_void_p, wintypes.DWORD, blob_ptr]
+    crypt32.CryptUnprotectData.restype = wintypes.BOOL
+    kernel32.LocalFree.argtypes = [ctypes.c_void_p]
+    kernel32.LocalFree.restype = ctypes.c_void_p
+    return crypt32, kernel32
+
+
 def dpapi_protect(data: bytes) -> bytes:
     in_blob, keepalive = _make_blob(data)
     out_blob = _DATA_BLOB()
-    crypt32 = ctypes.windll.crypt32
-    kernel32 = ctypes.windll.kernel32
+    crypt32, kernel32 = _configure_dpapi()
     if not crypt32.CryptProtectData(
         ctypes.byref(in_blob), "KanPass", None, None, None, 0, ctypes.byref(out_blob)
     ):
@@ -51,24 +63,22 @@ def dpapi_protect(data: bytes) -> bytes:
     try:
         return ctypes.string_at(out_blob.pbData, out_blob.cbData)
     finally:
-        kernel32.LocalFree(out_blob.pbData)
+        kernel32.LocalFree(ctypes.cast(out_blob.pbData, ctypes.c_void_p))
         _ = keepalive
 
 
 def dpapi_unprotect(data: bytes) -> bytes:
     in_blob, keepalive = _make_blob(data)
     out_blob = _DATA_BLOB()
-    description = ctypes.c_wchar_p()
-    crypt32 = ctypes.windll.crypt32
-    kernel32 = ctypes.windll.kernel32
+    crypt32, kernel32 = _configure_dpapi()
     if not crypt32.CryptUnprotectData(
-        ctypes.byref(in_blob), ctypes.byref(description), None, None, None, 0, ctypes.byref(out_blob)
+        ctypes.byref(in_blob), None, None, None, None, 0, ctypes.byref(out_blob)
     ):
         raise ctypes.WinError()
     try:
         return ctypes.string_at(out_blob.pbData, out_blob.cbData)
     finally:
-        kernel32.LocalFree(out_blob.pbData)
+        kernel32.LocalFree(ctypes.cast(out_blob.pbData, ctypes.c_void_p))
         _ = keepalive
 
 
@@ -203,6 +213,19 @@ def _send_text(text: str):
 def foreground_context() -> dict:
     user32 = ctypes.windll.user32
     kernel32 = ctypes.windll.kernel32
+    user32.GetForegroundWindow.restype = wintypes.HWND
+    user32.GetWindowTextLengthW.argtypes = [wintypes.HWND]
+    user32.GetWindowTextLengthW.restype = ctypes.c_int
+    user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+    user32.GetWindowTextW.restype = ctypes.c_int
+    user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+    user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.QueryFullProcessImageNameW.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD)]
+    kernel32.QueryFullProcessImageNameW.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.CloseHandle.restype = wintypes.BOOL
     hwnd = user32.GetForegroundWindow()
     length = user32.GetWindowTextLengthW(hwnd)
     buffer = ctypes.create_unicode_buffer(max(2, length + 1))
@@ -220,7 +243,7 @@ def foreground_context() -> dict:
                 exe = os.path.basename(path.value)
         finally:
             kernel32.CloseHandle(handle)
-    return {"hwnd": int(hwnd), "title": buffer.value, "exe": exe, "pid": int(pid.value)}
+    return {"hwnd": int(hwnd or 0), "title": buffer.value, "exe": exe, "pid": int(pid.value)}
 
 
 def read_visible_edit_controls(hwnd: int) -> list[str]:
