@@ -2,10 +2,20 @@
   'use strict';
 
   const STORAGE_KEY = 'linh_personal_kanban_v1';
-  const VERSION = 21;
+  const VERSION = 22;
   const DEFAULT_BACKGROUND_ID = 'bg6';
   const KAN_ALARM_AGENT = 'http://127.0.0.1:47632';
   const KAN_ALARM_HEADERS = {'X-KanBan-Agent':'linh-kanban-v1','Content-Type':'application/json'};
+  const DEFAULT_TIMER_PRESETS = [
+    {seconds:60,label:''},
+    {seconds:180,label:''},
+    {seconds:300,label:''},
+    {seconds:600,label:''},
+    {seconds:900,label:''},
+    {seconds:1500,label:''},
+    {seconds:3000,label:''},
+    {seconds:5400,label:''}
+  ];
   const DEFAULT_COLUMN_TITLES = ['Đã hoàn thành','Việc cần làm/chưa sắp xếp','Việc hôm nay','Việc ngày mai','Mục tiêu/ý tưởng'];
   const BACKGROUNDS = [
     {id:'none',name:'Không dùng hình nền',file:null},
@@ -63,6 +73,7 @@
   let lastWorkReminderKey = '';
   let editingSpecialDateId = null;
   let editingWorkDateId = null;
+  let editingTimerPresetIndex = null;
   let deletedViewTab = 'archive';
   let noteEditId = null;
   let noteEditProjectId = null;
@@ -98,7 +109,7 @@
       'cardDialog','cardForm','cardDialogTitle','cardTitleInput','cardDescriptionInput','checklistEditor','checklistEmpty','addChecklistBtn',
       'labelOptions','cardColumnSelect','deleteCardBtn','duplicateCardBtn','columnDialog','columnForm','columnDialogTitle','columnNameInput','columnColorOptions',
       'deleteColumnBtn','clearColumnContentBtn','duplicateColumnBtn','quickCaptureDialog','quickCaptureForm','quickCaptureTitleInput','quickCaptureColumnSelect','quickCaptureDestinationHint','backgroundDialog','backgroundOptions','guideDialog','settingsBtn','settingsDialog','settingsExportBtn','quickCaptureProjectName','quickCaptureDefaultColumnSelect','quickCaptureStatus','dailyMoveEnabled','dailyMoveProjectName','dailyMoveRules','addDailyMoveRuleBtn','dailyMoveStatus','openDeletedContentBtn','deletedContentCount','deletedContentDialog','deletedArchiveTabBtn','deletedTrashTabBtn','deletedArchivePanel','deletedTrashPanel','deletedArchiveCount','deletedTrashCount','deletedArchiveList','deletedTrashList','emptyTrashBtn','openResetDataBtn','resetDataDialog','resetDataForm','resetBackupBtn','resetConfirmInput','resetDeleteBtn','resetBackupStatus','confirmDialog','confirmTitle','confirmMessage','globalTooltip','toast',
-      'clockCurrentTime','clockDayPeriod','clockWeekday','clockDate','clockLunarDate','timerDisplay','timerDialogDisplay','timerEndTime','timerAgentStatus','clockStatus','timerMinutesInput','timerSecondsInput','timerStartPauseBtn','timerResetBtn','timerStopAlarmBtn','timerTestAlarmBtn','timerLocalAlarmInput','timerRepeatAlarmInput','timerNotifyInput','deskClockWidget','deskClockControls','clockToggleBtn','quickStopAlarmBtn','clockDialog',
+      'clockCurrentTime','clockDayPeriod','clockWeekday','clockDate','clockLunarDate','timerDisplay','timerDialogDisplay','timerEndTime','timerAgentStatus','clockStatus','timerMinutesInput','timerSecondsInput','timerLabelInput','timerStartPauseBtn','timerResetBtn','timerStopAlarmBtn','timerTestAlarmBtn','timerLocalAlarmInput','timerRepeatAlarmInput','timerNotifyInput','timerPresetEditor','timerPresetEditTitle','timerPresetLabelInput','timerPresetMinutesInput','timerPresetSecondsInput','saveTimerPresetBtn','cancelTimerPresetEditBtn','resetTimerPresetBtn','deskClockWidget','deskClockControls','clockToggleBtn','quickStopAlarmBtn','clockDialog',
       'clockAlarmTabBtn','clockSpecialTabBtn','clockWorkTabBtn','clockAlarmPanel','clockSpecialPanel','clockWorkPanel','specialDateNameInput','specialDateTypeSelect','specialBirthdayFields','specialBirthdayDateInput','specialMemorialFields','specialLunarDateInput','addSpecialDateBtn','cancelSpecialDateEditBtn','specialTickerSettingInput','specialDateSearchInput','specialDateMonthFilter','specialDateList','specialDateCount','specialDateEmpty','specialReminderBar','specialReminderText','specialReminderToggle','exportSpecialDatesBtn','importSpecialDatesBtn','importSpecialDatesFile','workDateTitleInput','workDateInput','workRepeatMonthlyInput','workRepeatYearlyInput','addWorkDateBtn','cancelWorkDateEditBtn','workTickerSettingInput','workDateSearchInput','workDateMonthFilter','workDateList','workDateCount','workDateEmpty','workReminderBar','workReminderText','workReminderToggle'
     ].forEach(id => refs[id] = document.getElementById(id));
   }
@@ -214,7 +225,15 @@
     refs.timerLocalAlarmInput.addEventListener('change', handleAlarmOptionChange);
     refs.timerRepeatAlarmInput.addEventListener('change', handleAlarmOptionChange);
     refs.timerNotifyInput.addEventListener('change', handleAlarmOptionChange);
-    document.querySelectorAll('.timer-preset').forEach(button => button.addEventListener('click', () => applyTimerPreset(Number(button.dataset.minutes || 0))));
+    refs.timerLabelInput.addEventListener('change', handleTimerLabelChange);
+    document.querySelectorAll('.timer-preset').forEach(button => button.addEventListener('click', () => applyTimerPresetByIndex(Number(button.dataset.presetIndex || 0))));
+    document.querySelectorAll('.timer-preset-edit').forEach(button => button.addEventListener('click', event => {
+      event.stopPropagation();
+      openTimerPresetEditor(Number(button.dataset.presetEdit || 0));
+    }));
+    refs.saveTimerPresetBtn.addEventListener('click', saveTimerPresetEdit);
+    refs.cancelTimerPresetEditBtn.addEventListener('click', closeTimerPresetEditor);
+    refs.resetTimerPresetBtn.addEventListener('click', resetTimerPresetEdit);
     refs.clockAlarmTabBtn.addEventListener('click', () => switchClockTab('alarm'));
     refs.clockSpecialTabBtn.addEventListener('click', () => switchClockTab('special'));
     refs.clockWorkTabBtn.addEventListener('click', () => switchClockTab('work'));
@@ -1886,11 +1905,26 @@
       localAlarm:true,
       repeatAlarm:true,
       notify:true,
+      timerLabel:'',
+      timerPresets:DEFAULT_TIMER_PRESETS.map(item => ({...item})),
       specialDates:[],
       reminderTicker:true,
       workDates:[],
       workReminderTicker:true
     };
+  }
+
+  function normalizeTimerPresets(input) {
+    const source = Array.isArray(input) ? input : [];
+    return DEFAULT_TIMER_PRESETS.map((fallback,index) => {
+      const item = source[index];
+      const secondsRaw = Number(item?.seconds);
+      const seconds = Number.isFinite(secondsRaw)
+        ? Math.max(1,Math.min(359999,Math.round(secondsRaw)))
+        : fallback.seconds;
+      const label = String(item?.label || '').trim().slice(0,48);
+      return {seconds,label};
+    });
   }
 
   function normalizeClockSettings(input) {
@@ -1926,6 +1960,8 @@
       localAlarm:input?.localAlarm !== false,
       repeatAlarm:input?.repeatAlarm !== false,
       notify:input?.notify !== false,
+      timerLabel:String(input?.timerLabel || '').trim().slice(0,80),
+      timerPresets:normalizeTimerPresets(input?.timerPresets),
       specialDates:normalizeSpecialDates(input?.specialDates),
       reminderTicker:input?.reminderTicker !== false,
       workDates:normalizeWorkDates(input?.workDates),
@@ -2590,6 +2626,7 @@
     }
     if (!clockWorker && !clockTickTimer) clockTickTimer = setInterval(updateClockWidget,500);
     updateClockWidget();
+    renderTimerPresets();
     renderSpecialDateList();
     renderWorkDateList();
     renderSpecialReminderBar(new Date(),true);
@@ -2609,6 +2646,8 @@
     renderWorkDateList();
     updateSpecialDateFields();
     updateClockWidget();
+    renderTimerPresets();
+    closeTimerPresetEditor();
     refreshAlarmAgentStatus();
     if (!refs.clockDialog.open) refs.clockDialog.showModal();
   }
@@ -2679,7 +2718,7 @@
       await alarmAgentRequest('/alarm/schedule',{
         deadlineMs:new Date(clock.endAt).getTime(),
         durationSec:clock.remainingSec || clock.durationSec,
-        label:'KanBan — Hết giờ',
+        label:clock.timerLabel ? ('KanBan — '+clock.timerLabel) : 'KanBan — Hết giờ',
         repeat:clock.repeatAlarm,
         sound:true,
         notify:clock.notify
@@ -2909,6 +2948,9 @@
         refs.timerSecondsInput.value = clock.durationSec%60;
       }
     }
+    if (refs.timerLabelInput && document.activeElement !== refs.timerLabelInput) {
+      refs.timerLabelInput.value = clock.timerLabel || '';
+    }
     refs.timerStartPauseBtn.textContent = clock.running
       ? 'Tạm dừng'
       : (clock.remainingSec>0 && clock.remainingSec!==clock.durationSec ? 'Tiếp tục' : 'Bắt đầu');
@@ -2968,6 +3010,7 @@
     const durationSec = getTimerInputSeconds();
     const clock = state.settings.clock || (state.settings.clock = createDefaultClockSettings());
     clock.durationSec = durationSec;
+    clock.timerLabel = String(refs.timerLabelInput?.value || clock.timerLabel || '').trim().slice(0,80);
     if (!clock.running) clock.remainingSec = durationSec;
     saveNow();
     updateClockWidget();
@@ -2981,20 +3024,116 @@
     return Math.max(1,minutes*60+seconds);
   }
 
-  async function applyTimerPreset(minutes) {
-    const safeMinutes = Math.max(0,Math.min(999,Math.round(minutes||0)));
-    refs.timerMinutesInput.value = safeMinutes;
-    refs.timerSecondsInput.value = 0;
-    await stopAlarm(false);
+  function formatTimerPresetDuration(totalSeconds) {
+    const safe = Math.max(1,Math.min(359999,Math.round(Number(totalSeconds)||1)));
+    const minutes = Math.floor(safe/60);
+    const seconds = safe%60;
+    if (minutes === 0) return `${seconds}s`;
+    if (seconds === 0) return `${minutes}p`;
+    return `${minutes}p ${seconds}s`;
+  }
+
+  function renderTimerPresets() {
+    const clock = state?.settings?.clock;
+    if (!clock) return;
+    clock.timerPresets = normalizeTimerPresets(clock.timerPresets);
+    document.querySelectorAll('.timer-preset').forEach(button => {
+      const index = Number(button.dataset.presetIndex || 0);
+      const preset = clock.timerPresets[index] || DEFAULT_TIMER_PRESETS[index] || DEFAULT_TIMER_PRESETS[0];
+      const durationText = formatTimerPresetDuration(preset.seconds);
+      button.innerHTML = `<span class="timer-preset-time">${escapeHtml(durationText)}</span>${preset.label ? `<span class="timer-preset-label">${escapeHtml(preset.label)}</span>` : ''}`;
+      button.title = preset.label
+        ? `${durationText} · ${preset.label} — bấm để dùng`
+        : `${durationText} — bấm để dùng`;
+      button.classList.toggle('has-label',Boolean(preset.label));
+      button.classList.toggle('active',clock.durationSec===preset.seconds && (clock.timerLabel||'')===preset.label);
+    });
+    document.querySelectorAll('.timer-preset-edit').forEach(button => {
+      const index = Number(button.dataset.presetEdit || 0);
+      const preset = clock.timerPresets[index] || DEFAULT_TIMER_PRESETS[index] || DEFAULT_TIMER_PRESETS[0];
+      button.title = `Sửa nút ${formatTimerPresetDuration(preset.seconds)}${preset.label ? ' · '+preset.label : ''}`;
+    });
+  }
+
+  function handleTimerLabelChange() {
     const clock = state.settings.clock || (state.settings.clock = createDefaultClockSettings());
-    clock.durationSec = Math.max(1,safeMinutes*60);
-    clock.remainingSec = clock.durationSec;
+    clock.timerLabel = String(refs.timerLabelInput.value || '').trim().slice(0,80);
+    refs.timerLabelInput.value = clock.timerLabel;
+    saveNow();
+    renderTimerPresets();
+  }
+
+  async function applyTimerPresetByIndex(index) {
+    const clock = state.settings.clock || (state.settings.clock = createDefaultClockSettings());
+    clock.timerPresets = normalizeTimerPresets(clock.timerPresets);
+    const safeIndex = Math.max(0,Math.min(DEFAULT_TIMER_PRESETS.length-1,Math.round(Number(index)||0)));
+    const preset = clock.timerPresets[safeIndex];
+    const durationSec = Math.max(1,preset.seconds);
+    refs.timerMinutesInput.value = Math.floor(durationSec/60);
+    refs.timerSecondsInput.value = durationSec%60;
+    refs.timerLabelInput.value = preset.label || '';
+    await stopAlarm(false);
+    clock.durationSec = durationSec;
+    clock.remainingSec = durationSec;
+    clock.timerLabel = preset.label || '';
     clock.endAt = null;
     clock.running = false;
     clock.alarmActive = false;
     saveNow();
     updateClockWidget();
-    showToast(`Đã đặt nhanh ${safeMinutes} phút.`);
+    renderTimerPresets();
+    showToast(`Đã đặt nhanh ${formatTimerPresetDuration(durationSec)}${preset.label ? ' — '+preset.label : ''}.`);
+  }
+
+  function openTimerPresetEditor(index) {
+    const clock = state.settings.clock || (state.settings.clock = createDefaultClockSettings());
+    clock.timerPresets = normalizeTimerPresets(clock.timerPresets);
+    editingTimerPresetIndex = Math.max(0,Math.min(DEFAULT_TIMER_PRESETS.length-1,Math.round(Number(index)||0)));
+    const preset = clock.timerPresets[editingTimerPresetIndex];
+    refs.timerPresetEditTitle.textContent = `Tùy chỉnh nút nhanh ${editingTimerPresetIndex+1}`;
+    refs.timerPresetLabelInput.value = preset.label || '';
+    refs.timerPresetMinutesInput.value = Math.floor(preset.seconds/60);
+    refs.timerPresetSecondsInput.value = preset.seconds%60;
+    refs.timerPresetEditor.hidden = false;
+    refs.timerPresetLabelInput.focus();
+    refs.timerPresetLabelInput.select();
+  }
+
+  function closeTimerPresetEditor() {
+    editingTimerPresetIndex = null;
+    if (refs.timerPresetEditor) refs.timerPresetEditor.hidden = true;
+  }
+
+  function readTimerPresetEditorSeconds() {
+    const minutes = sanitizeInteger(refs.timerPresetMinutesInput.value,0,999);
+    const seconds = sanitizeInteger(refs.timerPresetSecondsInput.value,0,59);
+    refs.timerPresetMinutesInput.value = minutes;
+    refs.timerPresetSecondsInput.value = seconds;
+    return Math.max(1,Math.min(359999,minutes*60+seconds));
+  }
+
+  function saveTimerPresetEdit() {
+    if (editingTimerPresetIndex === null) return;
+    const clock = state.settings.clock || (state.settings.clock = createDefaultClockSettings());
+    clock.timerPresets = normalizeTimerPresets(clock.timerPresets);
+    const seconds = readTimerPresetEditorSeconds();
+    const label = String(refs.timerPresetLabelInput.value || '').trim().slice(0,48);
+    clock.timerPresets[editingTimerPresetIndex] = {seconds,label};
+    saveNow();
+    renderTimerPresets();
+    closeTimerPresetEditor();
+    showToast(`Đã lưu nút nhanh ${formatTimerPresetDuration(seconds)}${label ? ' — '+label : ''}.`);
+  }
+
+  function resetTimerPresetEdit() {
+    if (editingTimerPresetIndex === null) return;
+    const clock = state.settings.clock || (state.settings.clock = createDefaultClockSettings());
+    clock.timerPresets = normalizeTimerPresets(clock.timerPresets);
+    clock.timerPresets[editingTimerPresetIndex] = {...DEFAULT_TIMER_PRESETS[editingTimerPresetIndex]};
+    saveNow();
+    renderTimerPresets();
+    openTimerPresetEditor(editingTimerPresetIndex);
+    showToast('Đã khôi phục nút nhanh mặc định.');
   }
 
   async function toggleCountdown() {
@@ -3048,7 +3187,7 @@
     startAlarm();
     saveNow();
     updateClockWidget();
-    showToast('Đã hết giờ — báo thức đang reo.');
+    showToast(clock.timerLabel ? `Đã hết giờ — ${clock.timerLabel}.` : 'Đã hết giờ — báo thức đang reo.');
   }
 
   function startAlarm() {
@@ -3056,7 +3195,7 @@
     playAlarmPattern();
     const clock = state.settings.clock || createDefaultClockSettings();
     if (clock.repeatAlarm) alarmTimer = setInterval(playAlarmPattern,1500);
-    if (clock.notify) showWebNotification('KanBan — Hết giờ','Bộ đếm ngược đã kết thúc. Bấm Tắt chuông trong KanBan khi bạn đã xử lý xong.');
+    if (clock.notify) showWebNotification(clock.timerLabel ? ('KanBan — '+clock.timerLabel) : 'KanBan — Hết giờ','Bộ đếm ngược đã kết thúc. Bấm Tắt chuông trong KanBan khi bạn đã xử lý xong.');
     startAlarmTitleFlash();
   }
 
@@ -3132,7 +3271,8 @@
     let flip = false;
     alarmTitleTimer = setInterval(() => {
       flip = !flip;
-      document.title = flip ? '⏰ HẾT GIỜ — KanBan' : originalDocumentTitle;
+      const label = state?.settings?.clock?.timerLabel;
+      document.title = flip ? (label ? `⏰ ${label} — KanBan` : '⏰ HẾT GIỜ — KanBan') : originalDocumentTitle;
     },700);
   }
 
