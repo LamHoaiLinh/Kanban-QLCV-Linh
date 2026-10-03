@@ -26,6 +26,16 @@ $Force = ($Mode -ieq "/repair")
 $dirs = @($Root,$Runtime,$Media,$NodeDir,$Signing,$CaptureDir,$Jobs,$Uploads,$Logs,$TempDir)
 foreach($d in $dirs){ New-Item -ItemType Directory -Force -Path $d | Out-Null }
 
+$InstallLog = Join-Path $Logs "install-latest.log"
+try { Start-Transcript -Path $InstallLog -Force | Out-Null } catch {}
+trap {
+  Write-Host ""
+  Write-Host ("[LOI] " + $_.Exception.Message) -ForegroundColor Red
+  Write-Host ("Log: " + $InstallLog) -ForegroundColor Yellow
+  try { Stop-Transcript | Out-Null } catch {}
+  exit 1
+}
+
 $Manifest = Get-Content -LiteralPath $ManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $Installed = $null
 if(Test-Path $InstalledPath){
@@ -49,11 +59,35 @@ function Need-Component([string]$Name,[string[]]$RequiredFiles=@()){
   foreach($f in $RequiredFiles){ if(-not (Test-Path $f)){ return $true } }
   return $false
 }
+function Download-Url([string]$Url,[string]$Target,[long]$MinBytes=100,[int]$Attempts=4){
+  $last=$null
+  for($i=1;$i -le $Attempts;$i++){
+    try{
+      if(Test-Path $Target){ Remove-Item -LiteralPath $Target -Force -ErrorAction SilentlyContinue }
+      Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $Target -TimeoutSec 120
+      if(-not (Test-Path $Target) -or (Get-Item $Target).Length -lt $MinBytes){ throw "File tai ve khong hop le." }
+      return
+    }catch{
+      $last=$_
+      Write-Host ("  Tai that bai lan " + $i + "/" + $Attempts + ". Thu lai...") -ForegroundColor Yellow
+      Start-Sleep -Seconds ([Math]::Min(2*$i,8))
+    }
+  }
+  throw $last
+}
 function Download-File([string]$Relative,[string]$Target){
   $stamp = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
   $u = "{0}/{1}?ts={2}" -f $Repo.TrimEnd("/"), $Relative.TrimStart("/"), $stamp
-  Invoke-WebRequest -UseBasicParsing -Uri $u -OutFile $Target
-  if(-not (Test-Path $Target) -or (Get-Item $Target).Length -lt 100){ throw "File tai ve khong hop le: $Relative" }
+  Download-Url $u $Target 100 4
+}
+function Invoke-PipRetry([string[]]$Args,[string]$Label){
+  for($i=1;$i -le 4;$i++){
+    Write-Host ("  " + $Label + " - lan " + $i + "/4") -ForegroundColor DarkGray
+    & $venvPy -m pip @Args
+    if($LASTEXITCODE -eq 0){ return }
+    if($i -lt 4){ Start-Sleep -Seconds ([Math]::Min(3*$i,9)) }
+  }
+  throw ("Khong hoan tat duoc: " + $Label)
 }
 function Stage-LatestBootstrapper(){
   try{
@@ -159,7 +193,7 @@ function Ensure-Python(){
     $url=[string]$Manifest.pythonFallback.url
     $installer=Join-Path $TempDir "python-$ver-amd64.exe"
     Write-Host "  Dang tai Python $ver chinh thuc tu python.org..."
-    Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $installer
+    Download-Url $url $installer 1000000 4
     $sig=Get-AuthenticodeSignature -FilePath $installer
     if($sig.Status -ne "Valid" -or $sig.SignerCertificate.Subject -notmatch "Python Software Foundation"){
       throw "Chu ky so Python installer khong hop le."
@@ -235,12 +269,14 @@ $venvPip = @($venvPy,"-m","pip")
 $pyw = Join-Path $Root ".venv\Scripts\pythonw.exe"
 
 $needPackages = Need-Component "pythonPackages" @()
+try{
+  & $venvPy -c "import PIL,cryptography,pyhanko,reportlab" 2>$null
+  if($LASTEXITCODE -ne 0){ $needPackages=$true }
+}catch{ $needPackages=$true }
 if($needPackages){
   Write-Step "Cap nhat thu vien Python dung chung"
-  & $venvPy -m pip install --disable-pip-version-check --upgrade pip setuptools wheel
-  if($LASTEXITCODE -ne 0){ throw "Khong cap nhat duoc pip." }
-  & $venvPy -m pip install --disable-pip-version-check -U pillow cryptography pyhanko reportlab
-  if($LASTEXITCODE -ne 0){ throw "Khong cai du thu vien KanBan Tools." }
+  Invoke-PipRetry @("--disable-pip-version-check","--retries","8","--timeout","60","install","--upgrade","pip","setuptools","wheel") "Cap nhat pip/setuptools/wheel"
+  Invoke-PipRetry @("--disable-pip-version-check","--retries","8","--timeout","60","install","-U","pillow","cryptography","pyhanko","reportlab") "Cai thu vien KanBan Tools"
 }else{
   Write-Host "  Thu vien Python: da dung phien ban." -ForegroundColor DarkGray
 }
@@ -250,8 +286,7 @@ $ytOk=$false
 try{ & $venvPy -m yt_dlp --version | Out-Null; if($LASTEXITCODE -eq 0){$ytOk=$true} }catch{}
 if($needYt -or -not $ytOk){
   Write-Step "Cap nhat loi tai yt-dlp"
-  & $venvPy -m pip install --disable-pip-version-check -U --pre "yt-dlp[default]"
-  if($LASTEXITCODE -ne 0){ throw "Khong cap nhat duoc yt-dlp." }
+  Invoke-PipRetry @("--disable-pip-version-check","--retries","8","--timeout","60","install","-U","--pre","yt-dlp[default]") "Cap nhat yt-dlp"
 }else{
   Write-Host "  yt-dlp: giu ban dang chay tot." -ForegroundColor DarkGray
 }
@@ -282,12 +317,14 @@ if($nodeNeed){
   New-Item -ItemType Directory -Force -Path $NodeDir|Out-Null
   $channel=[string]$Manifest.components.node.channel
   $base="https://nodejs.org/dist/$channel/"
-  $sum=Invoke-WebRequest -UseBasicParsing -Uri ($base+"SHASUMS256.txt")
-  $line=($sum.Content -split "\r?\n"|Where-Object{$_ -like "*win-x64.zip"}|Select-Object -First 1)
+  $sumPath=Join-Path $TempDir "node-SHASUMS256.txt"
+  Download-Url ($base+"SHASUMS256.txt") $sumPath 1000 4
+  $sumContent=Get-Content -LiteralPath $sumPath -Raw
+  $line=($sumContent -split "\r?\n"|Where-Object{$_ -like "*win-x64.zip"}|Select-Object -First 1)
   if(-not $line){throw "Khong tim thay goi Node Windows x64."}
   $parts=$line -split "\s+";$sha=$parts[0].ToLowerInvariant();$name=$parts[-1]
   $zip=Join-Path $TempDir "node.zip";$out=Join-Path $TempDir "node"
-  Invoke-WebRequest -UseBasicParsing -Uri ($base+$name) -OutFile $zip
+  Download-Url ($base+$name) $zip 1000000 4
   if((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne $sha){throw "SHA256 Node khong khop."}
   Expand-Archive $zip $out -Force
   $src=Get-ChildItem $out -Recurse -Filter node.exe|Select-Object -First 1
@@ -301,14 +338,22 @@ $ffmpeg=Join-Path $Media "ffmpeg.exe"
 $ffprobe=Join-Path $Media "ffprobe.exe"
 if(Need-Component "ffmpeg" @($ffmpeg,$ffprobe)){
   Write-Step "Cap nhat FFmpeg / FFprobe"
-  $rel=Invoke-RestMethod -Headers @{"User-Agent"="KanBanTools"} -Uri "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest"
-  $a=$rel.assets|Where-Object{$_.name -eq "ffmpeg-master-latest-win64-gpl.zip"}|Select-Object -First 1
-  if(-not $a){throw "Khong tim thay FFmpeg Windows."}
   $zip=Join-Path $TempDir "ffmpeg.zip";$out=Join-Path $TempDir "ffmpeg"
-  Invoke-WebRequest -UseBasicParsing -Uri $a.browser_download_url -OutFile $zip
-  if((Get-Item $zip).Length -lt 50000000){throw "Goi FFmpeg khong hop le."}
-  if($a.digest -and $a.digest -match "^sha256:(.+)$"){
-    if((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne $Matches[1].ToLowerInvariant()){throw "SHA256 FFmpeg khong khop."}
+  $ffUrl="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
+  $expectedSha=""
+  try{
+    $rel=Invoke-RestMethod -Headers @{"User-Agent"="KanBanTools"} -Uri "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest" -TimeoutSec 30
+    $a=$rel.assets|Where-Object{$_.name -eq "ffmpeg-master-latest-win64-gpl.zip"}|Select-Object -First 1
+    if($a){
+      $ffUrl=$a.browser_download_url
+      if($a.digest -and $a.digest -match "^sha256:(.+)$"){ $expectedSha=$Matches[1].ToLowerInvariant() }
+    }
+  }catch{
+    Write-Host "  GitHub API cham/bi gioi han, dung link FFmpeg latest truc tiep." -ForegroundColor Yellow
+  }
+  Download-Url $ffUrl $zip 50000000 4
+  if($expectedSha){
+    if((Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expectedSha){throw "SHA256 FFmpeg khong khop."}
   }
   Expand-Archive $zip $out -Force
   $ff=Get-ChildItem $out -Recurse -Filter ffmpeg.exe|Select-Object -First 1
@@ -367,18 +412,27 @@ $mediaServer=Join-Path $Runtime "kanmedia-server.py"
 Start-Process -FilePath $pyw -ArgumentList ('"'+$mediaServer+'"') -WindowStyle Hidden
 
 Write-Step "Kiem tra sau cai dat"
-$mediaOk=$false
-for($i=0;$i -lt 30;$i++){
+$serverOk=$false
+for($i=0;$i -lt 100;$i++){
   try{
-    $h=Invoke-RestMethod -Headers @{"X-KanBan-Agent"="linh-kanban-v1"} -Uri "http://127.0.0.1:47632/health" -TimeoutSec 2
-    if($h.ok -and $h.mediaReady){$mediaOk=$true;break}
+    $p=Invoke-RestMethod -Headers @{"X-KanBan-Agent"="linh-kanban-v1"} -Uri "http://127.0.0.1:47632/ping" -TimeoutSec 3
+    if($p.ok){$serverOk=$true;break}
   }catch{}
   Start-Sleep -Milliseconds 300
 }
-if(-not $mediaOk){
+if(-not $serverOk){
   $log=Join-Path $Logs "kanmedia-server.log"
-  if(Test-Path $log){ Get-Content $log -Tail 25 }
-  throw "KanMedia chua khoi dong duoc."
+  if(Test-Path $log){ Get-Content $log -Tail 40 }
+  throw "KanMedia server chua khoi dong duoc sau 30 giay."
+}
+$mediaOk=$false
+try{
+  $h=Invoke-RestMethod -Headers @{"X-KanBan-Agent"="linh-kanban-v1"} -Uri "http://127.0.0.1:47632/health" -TimeoutSec 8
+  $mediaOk=($h.ok -and $h.mediaReady)
+  if(-not $mediaOk -and $h.errors){ Write-Host ("  Thanh phan chua san sang: " + ($h.errors -join "; ")) -ForegroundColor Yellow }
+}catch{}
+if(-not $mediaOk){
+  throw "KanMedia da chay nhung con thieu thanh phan. Bo cai se thu lai o lan repair."
 }
 
 # Ghi dung manifest da cai de lan sau chi cap nhat thanh phan thay doi.
@@ -396,3 +450,4 @@ Write-Host "  - KanMedia: Tai / Chuyen doi / Edit Media"
 Write-Host "  - Ho tro ky PDF bang USB Token"
 Write-Host "  - Cap nhat theo tung thanh phan, khong tai lai neu khong can"
 Write-Host ""
+try { Stop-Transcript | Out-Null } catch {}
