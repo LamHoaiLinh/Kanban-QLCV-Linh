@@ -219,29 +219,19 @@ function renderKanPassDetail(host,item,ctx){
       ${kanPassField('Mã công ty / Company ID','kpCompanyId',item.company_id,'text','Tùy chọn')}
       ${kanPassField('Mã số thuế','kpTaxId',item.tax_id,'text','Tùy chọn')}
       ${kanPassField('Tên đăng nhập','kpUsername',item.username,'text','')}
-      ${kanPassField(isNew?'Mật khẩu':'Mật khẩu mới','kpPassword','', 'password',isNew?'Nhập mật khẩu':'Để trống nếu không đổi')}
       ${kanPassField('Website','kpUrl',item.url,'url','https://…')}
       ${kanPassField('Tên cửa sổ nhận diện','kpWindow',item.window_match,'text','Ví dụ: MB Bank')}
       ${kanPassField('File ứng dụng','kpExe',item.app_exe,'text','Ví dụ: chrome.exe')}
     </div>
     ${kanPassField('Thứ tự Alt+A','kpOrder',order,'text','company_id,username,password')}
-    <div class="office-field-help">MB nhiều công ty: <b>company_id,username,password</b> · Thuế: <b>tax_id,password</b>. Alt+P sẽ tự nhận diện được gì thì điền trước, ô password được bảo vệ sẽ yêu cầu bạn nhập.</div>
-    <div id="kanPassSecretBox"></div>
-    <div class="office-toolbar kanpass-actions">${!isNew?'<button class="office-btn danger" id="kanPassDelete">Xóa</button>':''}<span class="spacer"></span><button class="office-btn primary" id="kanPassSave">Lưu</button></div>`;
+    <div class="office-field-help">MB nhiều công ty: <b>company_id,username,password</b> · Thuế: <b>tax_id,password</b>. Password không đi qua trang Web: Alt+P hoặc nút Đặt/đổi mật khẩu sẽ mở cửa sổ native của Windows Agent.</div>
+    <div class="office-toolbar kanpass-actions">${!isNew?'<button class="office-btn danger" id="kanPassDelete">Xóa</button><button class="office-btn" id="kanPassPassword">Đặt / đổi mật khẩu</button>':''}<span class="spacer"></span><button class="office-btn primary" id="kanPassSave">Lưu thông tin</button></div>`;
   const value=id=>host.querySelector('#'+id)?.value||'';
   host.querySelector('#kanPassSave').addEventListener('click',async()=>{
-    const body={id:value('kpId'),title:value('kpTitle'),service:value('kpService'),company:value('kpCompany'),company_id:value('kpCompanyId'),tax_id:value('kpTaxId'),username:value('kpUsername'),password:value('kpPassword'),url:value('kpUrl'),window_match:value('kpWindow'),app_exe:value('kpExe'),field_order:value('kpOrder')};
+    const body={id:value('kpId'),title:value('kpTitle'),service:value('kpService'),company:value('kpCompany'),company_id:value('kpCompanyId'),tax_id:value('kpTaxId'),username:value('kpUsername'),url:value('kpUrl'),window_match:value('kpWindow'),app_exe:value('kpExe'),field_order:value('kpOrder')};
     try{
       setStatus('Đang lưu KanPass…');
-      let data;
-      try{data=await kanPassFetch('/kanpass/save',{method:'POST',body})}
-      catch(error){
-        if(error.status===409 && error.data?.reuse){
-          const when=error.data.changed_at?(' Lần lưu trước: '+error.data.changed_at+'.'):'';
-          if(!confirm('Mật khẩu này đã từng được sử dụng.'+when+' Một số ngân hàng không cho dùng lại mật khẩu cũ. Vẫn lưu?')){setStatus('Đã giữ nguyên mật khẩu.');return}
-          data=await kanPassFetch('/kanpass/save',{method:'POST',body:{...body,allowReuse:true}});
-        }else throw error;
-      }
+      const data=await kanPassFetch('/kanpass/save',{method:'POST',body});
       ctx.onSelected(data.item.id);setStatus('Đã lưu '+(data.item.title||'tài khoản')+'.');await ctx.loadList();
       const refreshed=await kanPassFetch('/kanpass/item?id='+encodeURIComponent(data.item.id));renderKanPassDetail(host,refreshed.item,ctx);
     }catch(error){setStatus(error.message)}
@@ -252,21 +242,13 @@ function renderKanPassDetail(host,item,ctx){
     catch(error){setStatus(error.message)}
   });
   host.querySelector('#kanPassReveal')?.addEventListener('click',async()=>{
-    try{
-      const data=await kanPassFetch('/kanpass/item?id='+encodeURIComponent(item.id)+'&reveal=1');
-      renderKanPassSecrets(host.querySelector('#kanPassSecretBox'),data.item);
-    }catch(error){setStatus(error.message)}
+    try{await kanPassFetch('/kanpass/show',{method:'POST',body:{id:item.id}});setStatus('Đã mở cửa sổ xem mật khẩu an toàn trên Windows.')}
+    catch(error){setStatus(error.message)}
   });
-}
-function renderKanPassSecrets(host,item){
-  const history=Array.isArray(item.history)?item.history:[];
-  host.innerHTML=`<div class="kanpass-secrets">
-    <div class="kanpass-secret-title"><strong>Mật khẩu hiện tại</strong><button class="office-btn" type="button" id="kpToggleSecrets">Hiện / Ẩn</button></div>
-    <input class="kanpass-secret-input" type="password" readonly value="${escapeHtml(item.password||'')}">
-    <div class="kanpass-history-title">Lịch sử mật khẩu gần nhất (${history.length}/5)</div>
-    <div class="kanpass-history">${history.length?history.map((h,i)=>`<div><span>${i+1}. ${escapeHtml(h.changed_at||'')}</span><input class="kanpass-secret-input" type="password" readonly value="${escapeHtml(h.password||'')}"></div>`).join(''):'<span class="office-card-note">Chưa có lịch sử đổi mật khẩu.</span>'}</div>
-  </div>`;
-  host.querySelector('#kpToggleSecrets').addEventListener('click',()=>host.querySelectorAll('.kanpass-secret-input').forEach(input=>input.type=input.type==='password'?'text':'password'));
+  host.querySelector('#kanPassPassword')?.addEventListener('click',async()=>{
+    try{await kanPassFetch('/kanpass/password-dialog',{method:'POST',body:{id:item.id}});setStatus('Đã mở cửa sổ đặt/đổi mật khẩu trên Windows.')}
+    catch(error){setStatus(error.message)}
+  });
 }
 
 async function resetKanPaintLegacyRuntime(){
