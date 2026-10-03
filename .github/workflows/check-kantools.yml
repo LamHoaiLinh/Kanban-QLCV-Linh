@@ -35,12 +35,12 @@ jobs:
 
       - name: Check Python syntax
         shell: pwsh
-        run: python -m py_compile kan-tools/runtime/kanmedia-server.py kan-tools/runtime/kanmedia-worker.py capture-agent/capture_agent.py capture-agent/kanpass.py office-tools/signing-agent/package/kanban_signing_agent.py
+        run: python -m py_compile kan-tools/runtime/kanmedia-server.py kan-tools/runtime/kanmedia-worker.py capture-agent/capture_agent.py capture-agent/kanpass.py capture-agent/kanpass_webbridge.py office-tools/signing-agent/package/kanban_signing_agent.py
 
       - name: Smoke test KanPass KDBX and Windows DPAPI
         shell: pwsh
         run: |
-          python -m pip install --disable-pip-version-check pykeepass
+          python -m pip install --disable-pip-version-check pykeepass websocket-client
           @'
           import shutil, sys, tempfile
           from pathlib import Path
@@ -63,8 +63,26 @@ jobs:
               assert guessed['company_id']=='0319460837'
               assert guessed['username']=='linh-user'
               assert guessed['company']=='CÔNG TY TNHH ĐÀO TẠO LÁI XE BÌNH TÂN'
+              from kanpass_webbridge import KanPassWebBridge
+              bridge=object.__new__(KanPassWebBridge)
+              bridge.kanpass=manager
+              dom=bridge.parse_dom_candidate({
+                  'href':'https://example-bank.test/login',
+                  'host':'example-bank.test',
+                  'title':'MBBank Digital Banking Corp',
+                  'fields':[
+                      {'type':'text','name':'companyId','label':'Company ID','value':'0319460837'},
+                      {'type':'text','name':'username','label':'Tên đăng nhập','value':'demo-user'},
+                      {'type':'password','name':'password','label':'Mật khẩu','value':'demo-value'}
+                  ]
+              })
+              assert dom['service']=='MB Bank'
+              assert dom['company_id']=='0319460837'
+              assert dom['username']=='demo-user'
+              assert dom['company']=='CÔNG TY TNHH ĐÀO TẠO LÁI XE BÌNH TÂN'
+              assert dom['url']=='https://example-bank.test'
               assert manager.export_backup()['encrypted'] is True
-              print('KanPass KDBX + DPAPI + compact inference OK')
+              print('KanPass KDBX + DPAPI + DOM/CDP inference OK')
           finally:
               shutil.rmtree(root, ignore_errors=True)
           '@ | python -

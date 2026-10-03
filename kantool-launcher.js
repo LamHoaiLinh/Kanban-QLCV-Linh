@@ -138,13 +138,14 @@ async function refresh(){
   const result=await Promise.all([
     probe(CAPTURE+'/ping'),
     probe(CAPTURE+'/kanpass/status',PASS_HEAD,1700),
+    probe(CAPTURE+'/kanpass/web/status',PASS_HEAD,1700),
     probe(MEDIA+'/health',HEAD,1700),
     probe(SIGN+'/health',HEAD,1700),
     probe(MEDIA+'/system/version',HEAD,3500)
   ]);
-  const cap=result[0],pass=result[1],media=result[2],sign=result[3],ver=result[4];
-  list.innerHTML=row('Chụp màn hình',!!cap)+row('KanPass',!!(pass&&pass.available))+row('KanMedia',!!(media&&media.mediaReady))+row('Ký số PDF',!!(sign&&sign.ok));
-  const ready=!!cap&&!!(pass&&pass.available)&&!!(media&&media.mediaReady)&&!!(sign&&sign.ok);
+  const cap=result[0],pass=result[1],passWeb=result[2],media=result[3],sign=result[4],ver=result[5];
+  list.innerHTML=row('Chụp màn hình',!!cap)+row('KanPass',!!(pass&&pass.available))+row('KanPass Web',!!(passWeb&&passWeb.available))+row('KanMedia',!!(media&&media.mediaReady))+row('Ký số PDF',!!(sign&&sign.ok));
+  const ready=!!cap&&!!(pass&&pass.available)&&!!(passWeb&&passWeb.available)&&!!(media&&media.mediaReady)&&!!(sign&&sign.ok);
   if(!media){
     status.textContent='Chưa cài hoặc KanBan Tools chưa chạy. Bấm nút xanh bên dưới.';
     status.classList.toggle('ready',false);

@@ -11,6 +11,10 @@ try:
     from kanpass import KanPassManager
 except Exception:
     KanPassManager = None
+try:
+    from kanpass_webbridge import KanPassWebBridge
+except Exception:
+    KanPassWebBridge = None
 
 APP='KanbanCapture'; PORT=47631
 HOTKEY_ID=0x4B43; HOTKEY_LONG_ID=0x4B58; HOTKEY_FILL_ID=0x4B41; HOTKEY_SAVE_ID=0x4B50
@@ -43,6 +47,8 @@ def install():
     if src!=target: shutil.copy2(src,target)
     kanpass_src=src.with_name('kanpass.py'); kanpass_target=DIR/'kanpass.py'
     if kanpass_src.exists() and kanpass_src.resolve()!=kanpass_target.resolve(): shutil.copy2(kanpass_src,kanpass_target)
+    webbridge_src=src.with_name('kanpass_webbridge.py'); webbridge_target=DIR/'kanpass_webbridge.py'
+    if webbridge_src.exists() and webbridge_src.resolve()!=webbridge_target.resolve(): shutil.copy2(webbridge_src,webbridge_target)
     pyw=Path(sys.executable).with_name('pythonw.exe'); pyw=pyw if pyw.exists() else Path(sys.executable)
     base=r'Software\Classes\kanbancapture'
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER,base) as k: winreg.SetValueEx(k,None,0,winreg.REG_SZ,'URL:Kanban Capture'); winreg.SetValueEx(k,'URL Protocol',0,winreg.REG_SZ,'')
@@ -1131,6 +1137,8 @@ class Agent:
     def __init__(self,first=None):
         self.cfg=config(); self.root=tk.Tk(); self.root.withdraw(); self.overlay=None; self.alive=True; self.settings=None; self.capture_target_hwnd=None
         self.kanpass=KanPassManager(self.root,DIR) if KanPassManager else None
+        self.kanpass_web=KanPassWebBridge(self.root,self.kanpass,DIR) if (self.kanpass and KanPassWebBridge) else None
+        if self.kanpass and self.kanpass_web:self.kanpass.attach_web_bridge(self.kanpass_web)
         self.sock=socket.socket(); self.sock.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1); self.sock.bind(('127.0.0.1',PORT)); self.sock.listen(3)
         threading.Thread(target=self.listen,daemon=True).start(); threading.Thread(target=self.hotkey,daemon=True).start(); cleanup()
         if first:self.root.after(150,lambda:self.handle(first))
@@ -1272,12 +1280,15 @@ class Agent:
         ttk.Radiobutton(f,text='JPG (mặc định)',variable=fmt,value='jpg').grid(row=1,column=0,sticky='w'); ttk.Radiobutton(f,text='PNG',variable=fmt,value='png').grid(row=1,column=1,sticky='w')
         ttk.Label(f,text='Chất lượng JPG').grid(row=2,column=0,sticky='w',pady=6); ttk.Spinbox(f,from_=70,to=100,textvariable=q,width=8).grid(row=2,column=1,sticky='e')
         ttk.Label(f,text='Độ dày nét và cỡ chữ được chỉnh trực tiếp trong lúc chụp.',foreground='#53645c').grid(row=3,column=0,columnspan=2,sticky='w',pady=(8,4))
-        ttk.Label(f,text='Alt+C: chụp nhanh · Alt+X: chụp dài · Alt+A: KanPass tự điền · Alt+P: lưu/cập nhật mật khẩu.').grid(row=4,column=0,columnspan=2,sticky='w',pady=(6,6))
+        ttk.Label(f,text='Alt+C: chụp nhanh · Alt+X: chụp dài · Alt+A: KanPass tự điền · Alt+P: lưu/cập nhật. Web mở bằng KanPass có thể tự Save/Update qua DOM/CDP.').grid(row=4,column=0,columnspan=2,sticky='w',pady=(6,6))
         def ok():
             self.cfg['format']='png' if fmt.get()=='png' else 'jpg'; self.cfg['jpeg_quality']=max(70,min(100,int(q.get()))); save_cfg(self.cfg); w.destroy()
         ttk.Button(f,text='Hủy',command=w.destroy).grid(row=5,column=0,pady=(8,0)); ttk.Button(f,text='Lưu',command=ok).grid(row=5,column=1,pady=(8,0)); w.focus_force()
     def quit(self):
         self.alive=False
+        try:
+            if self.kanpass_web:self.kanpass_web.stop_browser()
+        except:pass
         try:self.sock.close()
         except:pass
         self.root.quit()

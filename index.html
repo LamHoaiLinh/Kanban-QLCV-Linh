@@ -9,7 +9,7 @@
   <link rel="manifest" href="manifest.webmanifest?v=3.2">
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css?v=6.42">
-  <link rel="stylesheet" href="office-tools/office-tools.css?v=5.1.1">
+  <link rel="stylesheet" href="office-tools/office-tools.css?v=5.2.0">
   <link rel="stylesheet" href="office-tools/worksheet-editor.css?v=1.2.0">
   <link rel="stylesheet" href="kantool-extra.css?v=1.2.0">
 </head>
@@ -297,7 +297,7 @@
         </div></details>
         <details><summary>KanPass · tài khoản & mật khẩu</summary><div class="guide-group-body">
           <p><strong>Alt+A:</strong> đặt con trỏ vào ô đầu tiên của vùng đăng nhập rồi nhấn Alt+A. Nếu có nhiều công ty/tài khoản phù hợp, KanPass sẽ hỏi bạn chọn.</p>
-          <p><strong>Alt+P:</strong> sau khi nhập hoặc đổi thông tin đăng nhập, nhấn Alt+P. KanPass tự nhận diện tài khoản và chỉ hiện popup gọn kiểu Save/Update; mặc định chỉ cần nhập mật khẩu nếu ứng dụng không cho đọc ngược. Công ty/MST/Company ID/username/thứ tự điền nằm trong <b>Chi tiết…</b> và không bắt buộc phải điền.</p>
+          <p><strong>Web tự Save/Update:</strong> trong CÔNG CỤ → KanPass, nhập URL rồi bấm <b>Mở Web bằng KanPass</b>. Trình duyệt dùng profile riêng, KanPass đọc DOM bằng CDP trong RAM; khi login thành công sẽ chỉ hỏi <b>Lưu</b> hoặc <b>Cập nhật</b>. Không lấy password từ Network request và không ghi request body/password xuống file.</p><p><strong>Alt+P:</strong> vẫn là phương án dự phòng cho Chrome/Edge mở bình thường và phần mềm Windows. KanPass tự nhận diện tài khoản; các trường Công ty/MST/Company ID/username/thứ tự điền nằm trong <b>Chi tiết…</b>.</p>
           <p><strong>Nhiều công ty:</strong> mỗi dịch vụ có thể có nhiều hồ sơ. Nên đặt Tên tài khoản dễ nhận biết và lưu Công ty/MST/Company ID. KanPass giữ tối đa 5 mật khẩu cũ và cảnh báo nếu bạn dùng lại mật khẩu đã từng đặt.</p>
           <p><strong>Quản lý:</strong> mở CÔNG CỤ → KanPass để tìm theo tên tài khoản, công ty, MST hoặc username. Có nút <b>Xuất JSON KanPass</b> / <b>Nhập JSON KanPass</b> riêng chỉ cho mật khẩu; file chứa KDBX đã mã hóa, không kèm công việc hay sinh nhật. Mật khẩu, lịch sử và mật khẩu chính chỉ nhập/hiện trong popup native của Windows Agent, không trả về JavaScript của trang Web.</p>
         </div></details>
@@ -759,8 +759,8 @@
   <script src="music-player.js?v=3.3"></script>
   <script src="kalo-launcher.js?v=1.0.5"></script>
   <script src="capture-launcher.js?v=1.5.0"></script>
-  <script src="kantool-launcher.js?v=1.6.0"></script>
-  <script type="module" src="office-tools/office-tools.js?v=6.0.1"></script>
+  <script src="kantool-launcher.js?v=1.6.1"></script>
+  <script type="module" src="office-tools/office-tools.js?v=6.1.0"></script>
   <script type="module" src="game-launcher.js?v=1.71"></script>
 </body>
 </html>
