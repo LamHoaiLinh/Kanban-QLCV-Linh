@@ -270,13 +270,13 @@ $pyw = Join-Path $Root ".venv\Scripts\pythonw.exe"
 
 $needPackages = Need-Component "pythonPackages" @()
 try{
-  & $venvPy -c "import PIL,cryptography,pyhanko,reportlab,pykeepass" 2>$null
+  & $venvPy -c "import PIL,cryptography,pyhanko,reportlab,pykeepass,websocket" 2>$null
   if($LASTEXITCODE -ne 0){ $needPackages=$true }
 }catch{ $needPackages=$true }
 if($needPackages){
   Write-Step "Cap nhat thu vien Python dung chung"
   Invoke-PipRetry @("--disable-pip-version-check","--retries","8","--timeout","60","install","--upgrade","pip","setuptools","wheel") "Cap nhat pip/setuptools/wheel"
-  Invoke-PipRetry @("--disable-pip-version-check","--retries","8","--timeout","60","install","-U","pillow","cryptography","pyhanko","reportlab","pykeepass") "Cai thu vien KanBan Tools"
+  Invoke-PipRetry @("--disable-pip-version-check","--retries","8","--timeout","60","install","-U","pillow","cryptography","pyhanko","reportlab","pykeepass","websocket-client") "Cai thu vien KanBan Tools"
 }else{
   Write-Host "  Thu vien Python: da dung phien ban." -ForegroundColor DarkGray
 }
@@ -367,17 +367,20 @@ if(Need-Component "ffmpeg" @($ffmpeg,$ffprobe)){
 
 $capture=Join-Path $CaptureDir "capture_agent.py"
 $kanpass=Join-Path $CaptureDir "kanpass.py"
-$needCapture=Need-Component "capture" @($capture,$kanpass)
+$kanpassWeb=Join-Path $CaptureDir "kanpass_webbridge.py"
+$needCapture=Need-Component "capture" @($capture,$kanpass,$kanpassWeb)
 if($needCapture){
-  Write-Step "Cap nhat Windows Agent + KanPass"
+  Write-Step "Cap nhat Windows Agent + KanPass Web Bridge"
   Download-File ([string]$Manifest.components.capture.source) $capture
   Download-File ([string]$Manifest.components.capture.kanpassSource) $kanpass
+  Download-File ([string]$Manifest.components.capture.webBridgeSource) $kanpassWeb
   if((Get-Item $capture).Length -lt 20000){throw "Source Capture khong hop le."}
   if((Get-Item $kanpass).Length -lt 10000){throw "Source KanPass khong hop le."}
+  if((Get-Item $kanpassWeb).Length -lt 10000){throw "Source KanPass Web Bridge khong hop le."}
   try{Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:47631/quit" -TimeoutSec 1|Out-Null}catch{}
   Stop-Matching "*capture_agent.py*"
 }else{
-  Write-Host "  Windows Agent / KanPass: khong doi." -ForegroundColor DarkGray
+  Write-Host "  Windows Agent / KanPass Web Bridge: khong doi." -ForegroundColor DarkGray
 }
 
 $signAgent=Join-Path $Signing "kanban_signing_agent.py"
@@ -448,7 +451,7 @@ Write-Host ""
 Write-Host "============================================================" -ForegroundColor Green
 Write-Host "  KANBAN TOOLS DA SAN SANG" -ForegroundColor Green
 Write-Host "============================================================" -ForegroundColor Green
-Write-Host "  - Alt+C / Alt+X: chup man hinh; Alt+A: KanPass tu dien; Alt+P: luu/cap nhat tai khoan"
+Write-Host "  - Alt+C / Alt+X: chup man hinh; Alt+A / Alt+P: KanPass; Web Bridge: tu Save/Update tren Web duoc KanPass mo"
 Write-Host "  - KanMedia: Tai / Chuyen doi / Edit Media"
 Write-Host "  - Ho tro ky PDF bang USB Token"
 Write-Host "  - Cap nhat theo tung thanh phan, khong tai lai neu khong can"
