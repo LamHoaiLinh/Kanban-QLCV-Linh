@@ -13,15 +13,25 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
 
-try:
-    from pykeepass import PyKeePass, create_database
-    from pykeepass.exceptions import CredentialsError
-    PYKEEPASS_OK = True
-except Exception:
-    PyKeePass = None
-    create_database = None
-    CredentialsError = Exception
-    PYKEEPASS_OK = False
+PyKeePass = None
+create_database = None
+PYKEEPASS_OK = None
+
+
+def _ensure_pykeepass() -> bool:
+    global PyKeePass, create_database, PYKEEPASS_OK
+    if PYKEEPASS_OK is not None:
+        return bool(PYKEEPASS_OK)
+    try:
+        from pykeepass import PyKeePass as _PyKeePass, create_database as _create_database
+        PyKeePass = _PyKeePass
+        create_database = _create_database
+        PYKEEPASS_OK = True
+    except Exception:
+        PyKeePass = None
+        create_database = None
+        PYKEEPASS_OK = False
+    return bool(PYKEEPASS_OK)
 
 
 META_PREFIX = "KANPASS_META_V1\n"
@@ -298,10 +308,10 @@ class KanPassManager:
     def status(self) -> dict:
         return {
             "ok": True,
-            "available": PYKEEPASS_OK,
+            "available": _ensure_pykeepass(),
             "setupRequired": not self.db_path.exists(),
-            "ready": bool(PYKEEPASS_OK and self.db_path.exists() and self.unlock_path.exists()),
-            "count": self.count_entries() if PYKEEPASS_OK and self.db_path.exists() and self.unlock_path.exists() else 0,
+            "ready": bool(_ensure_pykeepass() and self.db_path.exists() and self.unlock_path.exists()),
+            "count": self.count_entries() if _ensure_pykeepass() and self.db_path.exists() and self.unlock_path.exists() else 0,
             "format": "kdbx4"
         }
 
@@ -320,7 +330,7 @@ class KanPassManager:
         return master
 
     def _open(self):
-        if not PYKEEPASS_OK:
+        if not _ensure_pykeepass():
             raise RuntimeError("Thiếu thư viện PyKeePass. Hãy cập nhật KanBan Tools.")
         if self._kp is not None:
             return self._kp
@@ -334,7 +344,7 @@ class KanPassManager:
         master = str(master or "")
         if len(master) < 10:
             raise ValueError("Mật khẩu chính KanPass cần ít nhất 10 ký tự.")
-        if not PYKEEPASS_OK:
+        if not _ensure_pykeepass():
             raise RuntimeError("Thiếu thư viện PyKeePass. Hãy cập nhật KanBan Tools.")
         with self._lock:
             if self.db_path.exists():
@@ -498,6 +508,8 @@ class KanPassManager:
         }
 
     def import_backup(self, payload: dict) -> dict:
+        if not _ensure_pykeepass():
+            raise RuntimeError("Thiếu thư viện PyKeePass. Hãy cập nhật KanBan Tools.")
         raw_b64 = str((payload or {}).get("kdbxBase64") or "")
         if not raw_b64:
             raise ValueError("Backup KanPass không có dữ liệu KDBX.")
