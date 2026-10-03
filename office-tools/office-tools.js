@@ -138,6 +138,91 @@ async function kanPassFetch(path,options={}){
 function kanPassField(label,id,value='',type='text',placeholder=''){
   return `<label class="office-field"><span>${escapeHtml(label)}</span><input id="${id}" type="${type}" value="${escapeHtml(value||'')}" placeholder="${escapeHtml(placeholder)}" autocomplete="off"></label>`;
 }
+
+function kanPassStandalonePayload(kanpass){
+  return {
+    app:'KanPass',
+    exportVersion:1,
+    exportedAt:new Date().toISOString(),
+    contains:'passwords-only',
+    note:'Chỉ chứa kho mật khẩu KanPass dạng KDBX đã mã hóa; không chứa công việc, lịch nhắc hoặc dữ liệu KanBan khác.',
+    kanpass
+  };
+}
+function downloadKanPassJson(payload){
+  const stamp=new Date().toISOString().slice(0,10);
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const link=document.createElement('a');
+  link.href=url;
+  link.download=`kanpass-passwords-${stamp}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+async function exportKanPassJsonOnly(){
+  setStatus('Đang xuất JSON KanPass…');
+  const data=await kanPassFetch('/kanpass/export');
+  const vault=data?.kanpass;
+  if(!vault?.available||!vault?.kdbxBase64)throw new Error('KanPass chưa có kho mật khẩu để xuất.');
+  downloadKanPassJson(kanPassStandalonePayload(vault));
+  setStatus(`Đã xuất JSON KanPass riêng: ${Number(vault.count||0)} tài khoản, KDBX vẫn được mã hóa.`);
+}
+function extractKanPassFromJson(parsed){
+  const vault=parsed?.kanpass?.kdbxBase64 ? parsed.kanpass : (parsed?.kdbxBase64 ? parsed : null);
+  if(!vault?.kdbxBase64)throw new Error('File JSON không chứa dữ liệu KanPass.');
+  if(vault.encrypted===false)throw new Error('Từ chối nhập file KanPass không được đánh dấu mã hóa.');
+  if(vault.format&&String(vault.format).toLowerCase()!=='kdbx')throw new Error('Định dạng KanPass không phải KDBX.');
+  return {available:true,format:'kdbx',encrypted:true,count:Number(vault.count||0),kdbxBase64:String(vault.kdbxBase64)};
+}
+async function importKanPassJsonOnly(){
+  const input=document.createElement('input');
+  input.type='file';
+  input.accept='.json,application/json';
+  input.hidden=true;
+  document.body.appendChild(input);
+  try{
+    const file=await new Promise(resolve=>{
+      input.addEventListener('change',()=>resolve(input.files?.[0]||null),{once:true});
+      input.click();
+    });
+    if(!file)return false;
+    let parsed;
+    try{parsed=JSON.parse(await file.text())}catch{throw new Error('File JSON không hợp lệ.')}
+    const vault=extractKanPassFromJson(parsed);
+    const status=await kanPassFetch('/kanpass/status');
+    if(!status.setupRequired&&Number(status.count||0)>0){
+      const ok=confirm(`KanPass hiện có ${Number(status.count||0)} tài khoản.\n\nNhập file này sẽ THAY TOÀN BỘ kho KanPass hiện tại bằng kho trong file JSON. Windows Agent sẽ giữ một bản KDBX trước khi nhập.\n\nTiếp tục?`);
+      if(!ok){setStatus('Đã hủy nhập JSON KanPass.');return false}
+    }
+    setStatus('Đang nhập JSON KanPass…');
+    try{
+      const result=await kanPassFetch('/kanpass/import',{method:'POST',body:vault});
+      setStatus(`Đã nhập JSON KanPass: ${Number(result.count||vault.count||0)} tài khoản.`);
+      await renderKanPassTool();
+      return true;
+    }catch(error){
+      if(error.status===409&&error.data?.cancelled){setStatus('Đã hủy nhập JSON KanPass.');return false}
+      throw error;
+    }
+  }finally{
+    input.remove();
+  }
+}
+function bindKanPassJsonButtons(host,{allowExport=true}={}){
+  const exportBtn=host.querySelector('#kanPassExportJson');
+  const importBtn=host.querySelector('#kanPassImportJson');
+  if(exportBtn){
+    exportBtn.disabled=!allowExport;
+    exportBtn.addEventListener('click',async()=>{
+      try{await exportKanPassJsonOnly()}catch(error){setStatus(error.message)}
+    });
+  }
+  importBtn?.addEventListener('click',async()=>{
+    try{await importKanPassJsonOnly()}catch(error){setStatus(error.message)}
+  });
+}
 async function renderKanPassTool(){
   mainHost.innerHTML=`<section class="office-tool-panel active kanpass-panel">
     <div class="office-tool-head"><div><h3>KanPass</h3><p>Kho tài khoản offline mã hóa. Alt+A tự điền · Alt+P lưu/cập nhật ở cửa sổ đang dùng.</p></div><span class="office-recommend-badge">KDBX mã hóa</span></div>
@@ -162,18 +247,27 @@ function renderKanPassSetup(host){
     <h4>Thiết lập KanPass lần đầu</h4>
     <p class="office-card-note">KanPass dùng KDBX mã hóa. Mật khẩu chính được nhập trong cửa sổ native của Windows Agent, không đi qua JavaScript của trang Web.</p>
     <div class="office-warning">Trên chính máy Windows này, DPAPI giúp KanPass mở tự động hằng ngày. Khi mang backup sang máy khác, bạn vẫn cần mật khẩu chính để xác minh lần đầu.</div>
+    <div class="kanpass-json-actions">
+      <div><strong>Đã có KanPass từ máy khác?</strong><span>Nhập file JSON KanPass riêng; file chỉ chứa KDBX đã mã hóa.</span></div>
+      <button class="office-btn" id="kanPassImportJson" type="button">↓ Nhập JSON KanPass</button>
+    </div>
     <div class="office-toolbar"><span class="spacer"></span><button class="office-btn primary" id="kanPassSetupBtn">Thiết lập KanPass trên Windows</button></div>
   </div>`;
   host.querySelector('#kanPassSetupBtn').addEventListener('click',async()=>{
     try{setStatus('Đang mở cửa sổ thiết lập KanPass…');await kanPassFetch('/kanpass/setup',{method:'POST',body:{}});setStatus('Đã tạo KanPass.');await renderKanPassTool()}
     catch(error){if(error.status===409&&error.data?.cancelled){setStatus('Đã hủy thiết lập KanPass.');return}setStatus(error.message)}
   });
+  bindKanPassJsonButtons(host,{allowExport:false});
 }
 function kanPassBlankItem(){
   return {id:'',title:'',service:'',company:'',company_id:'',tax_id:'',username:'',password:'',url:'',window_match:'',app_exe:'',field_order:['username','password'],history:[],history_count:0};
 }
 function renderKanPassManager(host,status){
-  host.innerHTML=`<div class="kanpass-layout">
+  host.innerHTML=`<div class="kanpass-json-bar">
+      <div><strong>Sao lưu riêng KanPass</strong><span>JSON này chỉ chứa mật khẩu KanPass dạng KDBX đã mã hóa, không liên quan công việc/sinh nhật.</span></div>
+      <div class="kanpass-json-buttons"><button class="office-btn" id="kanPassExportJson" type="button">↑ Xuất JSON KanPass</button><button class="office-btn" id="kanPassImportJson" type="button">↓ Nhập JSON KanPass</button></div>
+    </div>
+    <div class="kanpass-layout">
     <section class="office-card kanpass-list-card">
       <div class="kanpass-search-row"><input id="kanPassSearch" type="search" placeholder="Tìm tên tài khoản, công ty, MST, username…" autocomplete="off"><button class="office-btn primary" id="kanPassNew">＋ Mới</button></div>
       <div class="kanpass-count" id="kanPassCount">${Number(status.count||0)} tài khoản</div>
@@ -199,6 +293,7 @@ function renderKanPassManager(host,status){
   };
   search.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(()=>void loadList(),180)});
   host.querySelector('#kanPassNew').addEventListener('click',()=>{currentId='';renderKanPassDetail(detail,kanPassBlankItem(),{loadList,onSelected:(x)=>{currentId=x||''}});void loadList()});
+  bindKanPassJsonButtons(host,{allowExport:true});
   void loadList();
 }
 function renderKanPassDetail(host,item,ctx){
