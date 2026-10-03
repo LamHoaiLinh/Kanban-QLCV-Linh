@@ -1963,3 +1963,23 @@ body.kalo-open{overflow:hidden!important}
 #clockDialog .work-date-intro,
 #clockDialog .special-date-sharebar{border-width:1.5px}
 #clockDialog .clock-tab.active{box-shadow:inset 0 0 0 .5px currentColor}
+
+
+/* ===== v6.42: hướng dẫn theo chức năng + nhập backup chọn lọc ===== */
+.guide-functional{width:min(820px,calc(100vw - 32px));max-height:min(88vh,860px)}
+.guide-groups{display:grid;gap:9px;overflow:auto;padding:2px 3px 4px}
+.guide-groups details{border:1.5px solid var(--border);border-radius:14px;background:var(--panel);overflow:hidden}
+.guide-groups summary{cursor:pointer;padding:12px 14px;font-size:13px;font-weight:900;color:var(--text);background:var(--panel-soft);user-select:none}
+.guide-groups details[open] summary{border-bottom:1.5px solid var(--border);color:var(--green-dark)}
+.guide-group-body{display:grid;gap:8px;padding:12px 14px}
+.guide-group-body p{margin:0;font-size:12px;line-height:1.55;color:var(--text)}
+.guide-group-body strong{color:var(--green-dark)}
+.import-select-modal{width:min(680px,calc(100vw - 32px))}
+.import-select-note{margin:0 0 12px;color:var(--muted);font-size:12px;line-height:1.5}
+.import-section-list{display:grid;gap:8px;max-height:56vh;overflow:auto}
+.import-section-item{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;padding:10px 12px;border:1.5px solid var(--border);border-radius:12px;background:var(--panel);cursor:pointer}
+.import-section-item:hover{border-color:var(--green);background:var(--green-soft)}
+.import-section-item input{margin-top:3px;accent-color:var(--green)}
+.import-section-item span{display:grid;gap:3px}.import-section-item strong{font-size:12.5px}.import-section-item small{font-size:11px;line-height:1.4;color:var(--muted)}
+.import-select-actions{display:flex;justify-content:flex-end;margin-top:10px}
+@media(max-width:700px){.guide-functional,.import-select-modal{width:100vw;max-width:none;max-height:100dvh;height:100dvh;border-radius:0}.guide-groups{max-height:none}}
