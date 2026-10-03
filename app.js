@@ -2010,7 +2010,7 @@
     refs.resetDeleteBtn.textContent = 'Xóa vĩnh viễn';
     refs.resetConfirmInput.value = '';
     updateResetDeleteButton();
-    showToast('Đã xóa toàn bộ dữ liệu và khôi phục ứng dụng về trạng thái ban đầu.');
+    showToast('Đã xóa dữ liệu KanBan trong trình duyệt. Kho KanPass vẫn được giữ nguyên.');
   }
 
   function removeAppStorage(storage) {
