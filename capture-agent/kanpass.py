@@ -552,6 +552,75 @@ class KanPassManager:
             except Exception:
                 pass
 
+    def _setup_master_sync(self):
+        result = {"value": None}
+        done = threading.Event()
+
+        def show():
+            win = tk.Toplevel(self.root)
+            win.title("KanPass - Thiết lập lần đầu")
+            win.attributes("-topmost", True)
+            win.resizable(False, False)
+            frame = ttk.Frame(win, padding=16)
+            frame.pack(fill="both", expand=True)
+            ttk.Label(frame, text="Tạo mật khẩu chính KanPass", font=("Segoe UI", 12, "bold")).grid(row=0, column=0, columnspan=2, sticky="w")
+            ttk.Label(frame, text="Mật khẩu này dùng để mở file KDBX khi chuyển sang máy khác.", foreground="#61706a").grid(row=1, column=0, columnspan=2, sticky="w", pady=(2, 12))
+            first = tk.StringVar()
+            second = tk.StringVar()
+            ttk.Label(frame, text="Mật khẩu chính").grid(row=2, column=0, sticky="w", pady=4)
+            p1 = ttk.Entry(frame, textvariable=first, show="●", width=42)
+            p1.grid(row=2, column=1, sticky="ew", pady=4)
+            ttk.Label(frame, text="Nhập lại").grid(row=3, column=0, sticky="w", pady=4)
+            ttk.Entry(frame, textvariable=second, show="●", width=42).grid(row=3, column=1, sticky="ew", pady=4)
+            note = ttk.Label(frame, text="Tối thiểu 10 ký tự. Hãy lưu mật khẩu chính ở nơi an toàn.", foreground="#61706a")
+            note.grid(row=4, column=0, columnspan=2, sticky="w", pady=(6, 10))
+            actions = ttk.Frame(frame)
+            actions.grid(row=5, column=0, columnspan=2, sticky="ew")
+            def finish(value=None):
+                result["value"] = value
+                try:
+                    win.destroy()
+                finally:
+                    done.set()
+            def create():
+                master = first.get()
+                if len(master) < 10:
+                    messagebox.showwarning("KanPass", "Mật khẩu chính cần ít nhất 10 ký tự.", parent=win)
+                    return
+                if master != second.get():
+                    messagebox.showwarning("KanPass", "Mật khẩu nhập lại chưa khớp.", parent=win)
+                    return
+                finish(master)
+            ttk.Button(actions, text="Hủy", command=lambda:finish(None)).pack(side="left")
+            ttk.Button(actions, text="Tạo KanPass", command=create).pack(side="right")
+            win.protocol("WM_DELETE_WINDOW", lambda:finish(None))
+            p1.focus_set()
+            win.focus_force()
+
+        self.root.after(0, show)
+        if not done.wait(300):
+            return None
+        return result.get("value")
+
+    def _confirm_delete_sync(self, title: str):
+        result = {"value": False}
+        done = threading.Event()
+
+        def ask():
+            try:
+                result["value"] = bool(messagebox.askyesno(
+                    "KanPass - Xóa tài khoản",
+                    f"Xóa tài khoản “{title or 'Tài khoản'}” khỏi KanPass?\n\nThao tác này sẽ xóa cả mật khẩu và lịch sử của tài khoản đó.",
+                    parent=self.root
+                ))
+            finally:
+                done.set()
+
+        self.root.after(0, ask)
+        if not done.wait(300):
+            return False
+        return result["value"]
+
     def _ask_master_sync(self):
         result = {"value": None}
         done = threading.Event()
@@ -883,7 +952,12 @@ class KanPassManager:
             if path == "/kanpass/status" and method == "GET":
                 return 200, self.status()
             if path == "/kanpass/setup" and method == "POST":
-                return 200, self.setup(str((body or {}).get("masterPassword") or ""))
+                if self.db_path.exists():
+                    return 200, self.status()
+                master = self._setup_master_sync()
+                if master is None:
+                    return 409, {"ok": False, "cancelled": True, "message": "Đã hủy thiết lập KanPass."}
+                return 200, self.setup(master)
             if path == "/kanpass/list" and method == "GET":
                 return 200, {"ok": True, "items": self.list_items((query or {}).get("q", ""))}
             if path == "/kanpass/item" and method == "GET":
@@ -903,7 +977,13 @@ class KanPassManager:
                 payload["password"] = ""
                 return 200, {"ok": True, "item": self.save_item(payload)}
             if path == "/kanpass/delete" and method == "POST":
-                return 200, self.delete_item(str((body or {}).get("id") or ""))
+                entry_id = str((body or {}).get("id") or "")
+                item = self.get_item(entry_id, reveal=False)
+                if not self._confirm_delete_sync(item.get("title") or ""):
+                    return 409, {"ok": False, "cancelled": True, "message": "Đã hủy xóa tài khoản."}
+                result = self.delete_item(entry_id)
+                result["deleted"] = True
+                return 200, result
             if path == "/kanpass/export" and method == "GET":
                 return 200, {"ok": True, "kanpass": self.export_backup()}
             if path == "/kanpass/import" and method == "POST":
