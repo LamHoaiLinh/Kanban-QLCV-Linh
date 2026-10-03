@@ -895,6 +895,118 @@ class KanPassManager:
         ttk.Button(buttons, text="Điền", command=fill).pack(side="right")
         win.focus_force()
 
+    def _friendly_service(self, window_title: str) -> str:
+        raw = _service_from_window(window_title)
+        low = raw.casefold()
+        aliases = (
+            (("mbbank", "mb bank"), "MB Bank"),
+            (("thuedientu", "thuế điện tử", "etax", "e-tax"), "Thuế điện tử"),
+            (("baohiemxahoi", "bảo hiểm xã hội", "vss"), "BHXH"),
+            (("misa",), "MISA"),
+        )
+        for needles, label in aliases:
+            if any(token in low for token in needles):
+                return label
+        return raw
+
+    @staticmethod
+    def _digits_identifier(value: str) -> str:
+        text = _clean(value, 80).replace(" ", "")
+        digits = "".join(ch for ch in text if ch.isdigit())
+        return text if len(digits) in (10, 13) and digits == text else ""
+
+    def _company_from_identifier(self, identifier: str) -> str:
+        wanted = _clean(identifier, 100).casefold()
+        if not wanted:
+            return ""
+        for item in self.list_items():
+            if (
+                _clean(item.get("company_id"), 100).casefold() == wanted
+                or _clean(item.get("tax_id"), 40).casefold() == wanted
+            ):
+                company = _clean(item.get("company"), 120)
+                if company:
+                    return company
+        return ""
+
+    def _guess_login_fields(self, ctx: dict, visible: list[str]) -> dict:
+        service = self._friendly_service(ctx.get("title") or "")
+        low_service = service.casefold()
+        values = []
+        for raw in visible:
+            value = _clean(raw, 250)
+            if not value or value in values:
+                continue
+            if value.casefold() in {_clean(ctx.get("title"), 250).casefold(), service.casefold()}:
+                continue
+            values.append(value)
+        first = values[0] if values else ""
+        second = values[1] if len(values) > 1 else ""
+        identifier = self._digits_identifier(first)
+        tax_like = any(token in low_service for token in ("thuế", "tax", "etax", "hóa đơn", "hoá đơn"))
+        guessed = {
+            "service": service,
+            "company": "",
+            "company_id": "",
+            "tax_id": "",
+            "username": "",
+            "password": "",
+            "window_match": _clean(ctx.get("title"), 180),
+            "app_exe": _clean(ctx.get("exe"), 100).lower(),
+        }
+        if identifier:
+            if tax_like:
+                guessed["tax_id"] = identifier
+            else:
+                guessed["company_id"] = identifier
+            guessed["company"] = self._company_from_identifier(identifier)
+            if second:
+                guessed["username"] = second
+        elif first:
+            guessed["username"] = first
+        seed = dict(guessed)
+        guessed["field_order"] = _normalize_order(None, seed)
+        guessed["title"] = _display_name(guessed)
+        return guessed
+
+    def _merge_guess_with_item(self, guessed: dict, item: dict | None) -> dict:
+        if not item:
+            return dict(guessed)
+        merged = dict(item)
+        for key in ("service", "company", "company_id", "tax_id", "username"):
+            if not merged.get(key) and guessed.get(key):
+                merged[key] = guessed[key]
+        merged["window_match"] = guessed.get("window_match") or merged.get("window_match") or ""
+        merged["app_exe"] = guessed.get("app_exe") or merged.get("app_exe") or ""
+        if not merged.get("field_order"):
+            merged["field_order"] = guessed.get("field_order") or ["username", "password"]
+        if not merged.get("title"):
+            merged["title"] = _display_name(merged)
+        return merged
+
+    def _best_match_for_guess(self, matches: list[dict], guessed: dict):
+        if not matches:
+            return None
+        cid = _clean(guessed.get("company_id"), 100).casefold()
+        tax = _clean(guessed.get("tax_id"), 40).casefold()
+        user = _clean(guessed.get("username"), 250).casefold()
+        ranked = []
+        for item in matches:
+            score = int(item.get("_score") or 0)
+            if cid and _clean(item.get("company_id"), 100).casefold() == cid:
+                score += 20
+            if tax and _clean(item.get("tax_id"), 40).casefold() == tax:
+                score += 20
+            if user and _clean(item.get("username"), 250).casefold() == user:
+                score += 8
+            ranked.append((score, item))
+        ranked.sort(key=lambda pair: -pair[0])
+        if not ranked:
+            return None
+        if len(ranked) == 1 or ranked[0][0] >= ranked[1][0] + 8:
+            return ranked[0][1]
+        return None
+
     def hotkey_save_update(self):
         if not self.db_path.exists():
             messagebox.showinfo("KanPass", "KanPass chưa thiết lập. Mở KanBan > CÔNG CỤ > KanPass để thiết lập lần đầu.", parent=self.root)
@@ -908,105 +1020,210 @@ class KanPassManager:
             messagebox.showerror("KanPass", f"Không thể mở lưu/cập nhật: {exc}", parent=self.root)
 
     def _save_update_dialog(self, ctx: dict, matches: list[dict], visible: list[str]):
-        win = tk.Toplevel(self.root)
-        win.title("KanPass - Lưu / cập nhật (Alt+P)")
-        win.attributes("-topmost", True)
-        win.geometry("560x610")
-        outer = ttk.Frame(win, padding=14)
-        outer.pack(fill="both", expand=True)
+        guessed = self._guess_login_fields(ctx, visible)
+        preferred = self._best_match_for_guess(matches, guessed)
 
-        ttk.Label(outer, text="Lưu / cập nhật thông tin đăng nhập", font=("Segoe UI", 12, "bold")).grid(row=0, column=0, columnspan=2, sticky="w")
-        ttk.Label(outer, text=f"Cửa sổ: {_clean(ctx.get('title'), 120)}", foreground="#61706a", wraplength=515).grid(row=1, column=0, columnspan=2, sticky="w", pady=(2, 10))
+        # Nếu định danh mạnh trùng một hồ sơ đã có, ưu tiên cập nhật hồ sơ đó ngay.
+        if not preferred:
+            duplicates = self.find_identity_duplicates(guessed)
+            if len(duplicates) == 1:
+                preferred = duplicates[0]
 
-        choices = [("Tạo tài khoản mới", "")] + [(x["title"], x["id"]) for x in matches]
-        labels = [x[0] for x in choices]
+        choices = []
+        if preferred:
+            choices.append((preferred.get("title") or preferred.get("username") or "Tài khoản", preferred.get("id") or ""))
+            for item in matches:
+                if item.get("id") != preferred.get("id"):
+                    choices.append((item.get("title") or item.get("username") or "Tài khoản", item.get("id") or ""))
+        else:
+            for item in matches:
+                choices.append((item.get("title") or item.get("username") or "Tài khoản", item.get("id") or ""))
+        choices.append(("＋ Tạo tài khoản mới", ""))
+        labels = [label for label, _ in choices]
         id_by_label = {label: entry_id for label, entry_id in choices}
-        pick = tk.StringVar(value=labels[1] if len(labels) > 1 else labels[0])
-        ttk.Label(outer, text="Tài khoản").grid(row=2, column=0, sticky="w", pady=4)
-        combo = ttk.Combobox(outer, textvariable=pick, values=labels, state="readonly")
-        combo.grid(row=2, column=1, sticky="ew", pady=4)
 
-        fields = {}
-        row = 3
-        specs = [
-            ("title", "Tên tài khoản", False),
-            ("service", "Dịch vụ / App", False),
-            ("company", "Công ty / Đơn vị", False),
-            ("company_id", "Mã công ty / Company ID", False),
-            ("tax_id", "Mã số thuế", False),
-            ("username", "Tên đăng nhập", False),
-            ("password", "Mật khẩu mới", True),
-            ("field_order", "Thứ tự điền", False)
+        win = tk.Toplevel(self.root)
+        win.title("KanPass - Lưu / cập nhật")
+        win.attributes("-topmost", True)
+        win.resizable(False, False)
+
+        outer = ttk.Frame(win, padding=16)
+        outer.pack(fill="both", expand=True)
+        outer.columnconfigure(0, weight=1)
+
+        pick = tk.StringVar(value=labels[0] if labels else "＋ Tạo tài khoản mới")
+        title_var = tk.StringVar()
+        summary_var = tk.StringVar()
+        password_var = tk.StringVar()
+        advanced_open = {"value": False}
+        advanced_vars = {
+            "title": tk.StringVar(),
+            "service": tk.StringVar(),
+            "company": tk.StringVar(),
+            "company_id": tk.StringVar(),
+            "tax_id": tk.StringVar(),
+            "username": tk.StringVar(),
+            "field_order": tk.StringVar(),
+        }
+
+        ttk.Label(outer, text="Lưu thông tin đăng nhập?", font=("Segoe UI", 13, "bold")).grid(row=0, column=0, sticky="w")
+        ttk.Label(
+            outer,
+            text=self._friendly_service(ctx.get("title") or ""),
+            foreground="#61706a",
+            font=("Segoe UI", 9)
+        ).grid(row=1, column=0, sticky="w", pady=(1, 10))
+
+        account_frame = ttk.Frame(outer)
+        account_frame.grid(row=2, column=0, sticky="ew")
+        account_frame.columnconfigure(0, weight=1)
+        account_name = ttk.Label(account_frame, textvariable=title_var, font=("Segoe UI", 11, "bold"))
+        account_name.grid(row=0, column=0, sticky="w")
+        if len(choices) > 2:
+            combo = ttk.Combobox(account_frame, textvariable=pick, values=labels, state="readonly", width=34)
+            combo.grid(row=0, column=1, sticky="e", padx=(10, 0))
+        else:
+            combo = None
+
+        ttk.Label(
+            outer,
+            textvariable=summary_var,
+            foreground="#61706a",
+            wraplength=440
+        ).grid(row=3, column=0, sticky="w", pady=(2, 10))
+
+        pw_frame = ttk.Frame(outer)
+        pw_frame.grid(row=4, column=0, sticky="ew")
+        pw_frame.columnconfigure(0, weight=1)
+        pw_entry = ttk.Entry(pw_frame, textvariable=password_var, show="●", width=42)
+        pw_entry.grid(row=0, column=0, sticky="ew")
+        show_password = {"value": False}
+        def toggle_password():
+            show_password["value"] = not show_password["value"]
+            pw_entry.configure(show="" if show_password["value"] else "●")
+        ttk.Button(pw_frame, text="Hiện", width=7, command=toggle_password).grid(row=0, column=1, padx=(7, 0))
+
+        pw_hint = ttk.Label(
+            outer,
+            text="KanPass không đọc ngược ô password được bảo vệ. Tài khoản mới: nhập mật khẩu. Tài khoản đã có: chỉ nhập nếu mật khẩu vừa đổi.",
+            foreground="#61706a",
+            wraplength=440
+        )
+        pw_hint.grid(row=5, column=0, sticky="w", pady=(5, 7))
+
+        advanced = ttk.Frame(outer)
+        advanced.columnconfigure(1, weight=1)
+        advanced_rows = [
+            ("title", "Tên tài khoản"),
+            ("service", "Dịch vụ / App"),
+            ("company", "Công ty / Đơn vị"),
+            ("company_id", "Company ID"),
+            ("tax_id", "Mã số thuế"),
+            ("username", "Tên đăng nhập"),
+            ("field_order", "Thứ tự điền"),
         ]
-        for key, label, secret in specs:
-            ttk.Label(outer, text=label).grid(row=row, column=0, sticky="w", pady=4)
-            var = tk.StringVar()
-            ent = ttk.Entry(outer, textvariable=var, show="●" if secret else "")
-            ent.grid(row=row, column=1, sticky="ew", pady=4)
-            fields[key] = var
-            row += 1
-        ttk.Label(outer, text="Ví dụ MB: company_id,username,password · Thuế: tax_id,password", foreground="#61706a").grid(row=row, column=0, columnspan=2, sticky="w", pady=(0, 7))
-        row += 1
-        status = ttk.Label(outer, text="KanPass chỉ đọc các ô văn bản thường. Ô password được bảo vệ sẽ không bị đọc ngược.", foreground="#61706a", wraplength=515)
-        status.grid(row=row, column=0, columnspan=2, sticky="w", pady=(2, 8))
-        row += 1
-        outer.columnconfigure(1, weight=1)
+        for row_index, (key, label) in enumerate(advanced_rows):
+            ttk.Label(advanced, text=label).grid(row=row_index, column=0, sticky="w", pady=3, padx=(0, 8))
+            ttk.Entry(advanced, textvariable=advanced_vars[key], width=38).grid(row=row_index, column=1, sticky="ew", pady=3)
 
-        def load_selected(*_):
+        def current_payload():
             entry_id = id_by_label.get(pick.get(), "")
-            current = self.get_item(entry_id, reveal=False) if entry_id else {}
-            fields["title"].set(current.get("title") or "")
-            fields["service"].set(current.get("service") or _service_from_window(ctx.get("title") or ""))
-            fields["company"].set(current.get("company") or "")
-            first_visible = visible[0] if visible else ""
-            tax_digits = "".join(ch for ch in first_visible if ch.isdigit())
-            guessed_tax = first_visible if len(tax_digits) in (10, 13) and len(tax_digits) == len(first_visible.replace(" ", "")) else ""
-            fields["company_id"].set(current.get("company_id") or (visible[0] if len(visible) >= 2 else ""))
-            fields["tax_id"].set(current.get("tax_id") or guessed_tax)
-            fields["username"].set(current.get("username") or (visible[1] if len(visible) >= 2 else first_visible if first_visible and not guessed_tax else ""))
-            fields["password"].set("")
-            order = current.get("field_order") or []
-            fields["field_order"].set(",".join(order))
-        combo.bind("<<ComboboxSelected>>", load_selected)
-        load_selected()
+            current = self.get_item(entry_id, reveal=False) if entry_id else None
+            payload = self._merge_guess_with_item(guessed, current)
+            payload["id"] = entry_id
+            return payload
 
-        buttons = ttk.Frame(outer)
-        buttons.grid(row=row, column=0, columnspan=2, sticky="ew", pady=(10, 0))
-        ttk.Button(buttons, text="Hủy", command=win.destroy).pack(side="left")
+        def sync_view(*_):
+            payload = current_payload()
+            is_new = not payload.get("id")
+            title = payload.get("title") or _display_name(payload)
+            title_var.set(title)
+            bits = []
+            if payload.get("company"):
+                bits.append(payload["company"])
+            if payload.get("company_id"):
+                bits.append("Company ID " + payload["company_id"])
+            if payload.get("tax_id"):
+                bits.append("MST " + payload["tax_id"])
+            if payload.get("username"):
+                bits.append(payload["username"])
+            summary_var.set(" · ".join(bits) if bits else "KanPass sẽ tự đặt tên; có thể đổi lại sau trong CÔNG CỤ → KanPass.")
+            for key, var in advanced_vars.items():
+                value = payload.get(key) or ""
+                if key == "field_order" and isinstance(value, list):
+                    value = ",".join(value)
+                var.set(value)
+            pw_hint.configure(text=(
+                "Không đọc được password từ ứng dụng này. Nhập mật khẩu để lưu tài khoản mới."
+                if is_new else
+                "Đã nhận diện tài khoản này. Chỉ nhập nếu mật khẩu vừa đổi; để trống sẽ giữ mật khẩu hiện tại."
+            ))
+            win.title("KanPass - " + ("Lưu mật khẩu" if is_new else "Cập nhật mật khẩu"))
+
+        if combo:
+            combo.bind("<<ComboboxSelected>>", sync_view)
+        sync_view()
+
+        def toggle_advanced():
+            advanced_open["value"] = not advanced_open["value"]
+            if advanced_open["value"]:
+                advanced.grid(row=7, column=0, sticky="ew", pady=(5, 8))
+                detail_btn.configure(text="Ẩn chi tiết")
+            else:
+                advanced.grid_remove()
+                detail_btn.configure(text="Chi tiết…")
+            win.update_idletasks()
+
+        actions = ttk.Frame(outer)
+        actions.grid(row=8, column=0, sticky="ew", pady=(5, 0))
+        ttk.Button(actions, text="Không lưu", command=win.destroy).pack(side="left")
+        detail_btn = ttk.Button(actions, text="Chi tiết…", command=toggle_advanced)
+        detail_btn.pack(side="left", padx=(7, 0))
 
         def save():
             try:
-                entry_id = id_by_label.get(pick.get(), "")
-                new_password = fields["password"].get()
-                payload = {key: var.get() for key, var in fields.items()}
-                payload.update({
-                    "id": entry_id,
-                    "window_match": ctx.get("title") or "",
-                    "app_exe": ctx.get("exe") or ""
-                })
-                if not entry_id:
+                payload = current_payload()
+                if advanced_open["value"]:
+                    for key, var in advanced_vars.items():
+                        payload[key] = var.get()
+                new_password = password_var.get()
+                if not payload.get("id") and not new_password:
+                    pw_entry.focus_set()
+                    return
+                payload["password"] = new_password
+                payload["window_match"] = ctx.get("title") or ""
+                payload["app_exe"] = ctx.get("exe") or ""
+
+                if not payload.get("id"):
                     duplicates = self.find_identity_duplicates(payload)
                     if len(duplicates) == 1:
-                        dup = duplicates[0]
-                        use_existing = messagebox.askyesno(
-                            "KanPass - Có tài khoản trùng định danh",
-                            f"Đã có “{dup.get('title') or 'Tài khoản'}” cùng dịch vụ và cùng MST/Company ID hoặc Công ty + username.\n\nChọn Có để cập nhật tài khoản đã có. Chọn Không để vẫn tạo một hồ sơ mới.",
-                            parent=win
-                        )
-                        if use_existing:
-                            entry_id = dup["id"]
-                            payload["id"] = entry_id
+                        payload["id"] = duplicates[0]["id"]
+
+                entry_id = payload.get("id") or ""
                 reused = self.password_reuse_info(entry_id, new_password) if entry_id and new_password else None
                 if reused and reused.get("kind") == "history":
                     when = reused.get("changed_at") or "trước đây"
-                    if not messagebox.askyesno("KanPass", f"Mật khẩu này đã từng được sử dụng ({when}).\nMột số ngân hàng không cho dùng lại mật khẩu cũ.\n\nVẫn lưu?", parent=win):
+                    if not messagebox.askyesno(
+                        "KanPass",
+                        f"Mật khẩu này đã từng được sử dụng ({when}).\nMột số ngân hàng không cho dùng lại mật khẩu cũ.\n\nVẫn cập nhật?",
+                        parent=win
+                    ):
                         return
-                saved = self.save_item(payload)
-                messagebox.showinfo("KanPass", f"Đã lưu: {saved['title']}", parent=win)
+                self.save_item(payload)
                 win.destroy()
             except Exception as exc:
                 messagebox.showerror("KanPass", str(exc), parent=win)
-        ttk.Button(buttons, text="Lưu / cập nhật", command=save).pack(side="right")
+
+        save_btn = ttk.Button(actions, text="Lưu / cập nhật", command=save)
+        save_btn.pack(side="right")
+        advanced.grid_remove()
+        win.bind("<Escape>", lambda _event: win.destroy())
+        win.bind("<Return>", lambda _event: save())
+        pw_entry.focus_set()
+        win.update_idletasks()
+        width = 500
+        height = max(245, win.winfo_reqheight())
+        win.geometry(f"{width}x{height}")
         win.focus_force()
 
     def handle_api(self, method: str, path: str, query: dict, body: dict) -> tuple[int, dict]:
