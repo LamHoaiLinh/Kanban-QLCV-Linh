@@ -37,6 +37,15 @@ if errorlevel 1 goto :FAIL_DOWNLOAD
 
 powershell -NoProfile -ExecutionPolicy Bypass -File "%BOOT%\install.ps1" -Mode "%MODE%" -ManifestPath "%BOOT%\manifest.json"
 set "RC=%ERRORLEVEL%"
+
+if not "%RC%"=="0" if /I not "%MODE%"=="/repair" (
+  echo.
+  echo Lan dau chua hoan tat. Dang tu dong sua va thu lai mot lan...
+  timeout /t 2 >nul
+  powershell -NoProfile -ExecutionPolicy Bypass -File "%BOOT%\install.ps1" -Mode "/repair" -ManifestPath "%BOOT%\manifest.json"
+  set "RC=%ERRORLEVEL%"
+)
+
 rmdir /s /q "%BOOT%" >nul 2>nul
 
 if not "%RC%"=="0" goto :FAIL_RUN
@@ -55,6 +64,7 @@ goto :FAIL_BOX
 :FAIL_RUN
 echo.
 echo [LOI] KanBan Tools chua cai dat / cap nhat xong. Ma loi: %RC%
+echo Log: %LOCALAPPDATA%\KanBanTools\logs\install-latest.log
 
 :FAIL_BOX
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
