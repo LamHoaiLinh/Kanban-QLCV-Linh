@@ -316,8 +316,17 @@ function renderKanPassManager(host,status){
     </section>
     <section class="office-card kanpass-detail-card" id="kanPassDetail"><div class="office-empty">Chọn một tài khoản để xem hoặc sửa.</div></section>
   </div>`;
-  const search=host.querySelector('#kanPassSearch'),list=host.querySelector('#kanPassList'),detail=host.querySelector('#kanPassDetail'),count=host.querySelector('#kanPassCount');
-  let timer=null,currentId='';
+  const search=host.querySelector('#kanPassSearch'),list=host.querySelector('#kanPassList'),detail=host.querySelector('#kanPassDetail'),count=host.querySelector('#kanPassCount'),layout=host.querySelector('.kanpass-layout');
+  let timer=null,currentId='',currentItem=null;
+  const collapseDetail=()=>{
+    if(!detail.querySelector('.kanpass-detail-full'))return;
+    layout?.classList.add('detail-collapsed');
+    detail.classList.add('collapsed');
+  };
+  const expandDetail=()=>{
+    layout?.classList.remove('detail-collapsed');
+    detail.classList.remove('collapsed');
+  };
   const loadList=async()=>{
     try{
       const data=await kanPassFetch('/kanpass/list?q='+encodeURIComponent(search.value.trim()));
@@ -329,11 +338,32 @@ function renderKanPassManager(host,status){
   };
   const selectItem=async(id)=>{
     currentId=id;
-    try{const data=await kanPassFetch('/kanpass/item?id='+encodeURIComponent(id));renderKanPassDetail(detail,data.item,{loadList,onSelected:(x)=>{currentId=x||''}});await loadList()}
-    catch(error){setStatus(error.message)}
+    try{
+      const data=await kanPassFetch('/kanpass/item?id='+encodeURIComponent(id));
+      currentItem=data.item;
+      expandDetail();
+      renderKanPassDetail(detail,data.item,{loadList,onSelected:(x)=>{currentId=x||''}});
+      await loadList();
+    }catch(error){setStatus(error.message)}
   };
   search.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(()=>void loadList(),180)});
-  host.querySelector('#kanPassNew').addEventListener('click',()=>{currentId='';renderKanPassDetail(detail,kanPassBlankItem(),{loadList,onSelected:(x)=>{currentId=x||''}});void loadList()});
+  host.querySelector('#kanPassNew').addEventListener('click',()=>{
+    currentId='';
+    currentItem=kanPassBlankItem();
+    expandDetail();
+    renderKanPassDetail(detail,currentItem,{loadList,onSelected:(x)=>{currentId=x||''}});
+    void loadList();
+  });
+  detail.addEventListener('click',event=>{
+    if(event.target.closest('.kanpass-detail-summary'))expandDetail();
+  });
+  host.addEventListener('pointerdown',event=>{
+    if(!detail.querySelector('.kanpass-detail-full')||detail.classList.contains('collapsed'))return;
+    if(detail.contains(event.target))return;
+    if(event.target.closest('.kanpass-list-item'))return;
+    if(event.target.closest('#kanPassNew'))return;
+    collapseDetail();
+  });
   bindKanPassJsonButtons(host,{allowExport:true});
   bindKanPassWebBridge(host);
   void loadList();
@@ -341,7 +371,10 @@ function renderKanPassManager(host,status){
 function renderKanPassDetail(host,item,ctx){
   const isNew=!item.id;
   const order=Array.isArray(item.field_order)?item.field_order.join(','):(item.field_order||'username,password');
-  host.innerHTML=`<div class="kanpass-detail-head"><div><h4>${isNew?'Tài khoản mới':escapeHtml(item.title||'Tài khoản')}</h4><p class="office-card-note">${isNew?'Nhập thông tin rồi lưu. Tên tài khoản có thể đặt theo công ty để tránh nhầm.':'Mật khẩu chỉ hiện khi bạn chủ động bấm Xem.'}</p></div>${!isNew?'<button class="office-btn" id="kanPassReveal">Xem mật khẩu / lịch sử</button>':''}</div>
+  const compactMeta=[item.company,item.tax_id,item.company_id,item.username].filter(Boolean).join(' · ')||(isNew?'Chưa lưu':'Đã thu gọn chi tiết');
+  host.innerHTML=`<button class="kanpass-detail-summary" type="button" title="Bấm để mở lại chi tiết"><span><strong>${isNew?'Tài khoản mới':escapeHtml(item.title||item.service||item.username||'Tài khoản')}</strong><small>${escapeHtml(compactMeta)}</small></span><b>›</b></button>
+    <div class="kanpass-detail-full">
+    <div class="kanpass-detail-head"><div><h4>${isNew?'Tài khoản mới':escapeHtml(item.title||'Tài khoản')}</h4><p class="office-card-note">${isNew?'Nhập thông tin rồi lưu. Tên tài khoản có thể đặt theo công ty để tránh nhầm.':'Mật khẩu chỉ hiện khi bạn chủ động bấm Xem.'}</p></div>${!isNew?'<button class="office-btn" id="kanPassReveal">Xem mật khẩu / lịch sử</button>':''}</div>
     <input id="kpId" type="hidden" value="${escapeHtml(item.id||'')}">
     <div class="office-grid">
       ${kanPassField('Tên tài khoản','kpTitle',item.title,'text','Ví dụ: MB Bank - Bình Tân')}
@@ -356,7 +389,8 @@ function renderKanPassDetail(host,item,ctx){
     </div>
     ${kanPassField('Thứ tự Alt+A','kpOrder',order,'text','company_id,username,password')}
     <div class="office-field-help">MB nhiều công ty: <b>company_id,username,password</b> · Thuế: <b>tax_id,password</b>. Password không đi qua trang Web: Alt+P hoặc nút Đặt/đổi mật khẩu sẽ mở cửa sổ native của Windows Agent.</div>
-    <div class="office-toolbar kanpass-actions">${!isNew?'<button class="office-btn danger" id="kanPassDelete">Xóa</button><button class="office-btn" id="kanPassPassword">Đặt / đổi mật khẩu</button>':''}<span class="spacer"></span><button class="office-btn primary" id="kanPassSave">Lưu thông tin</button></div>`;
+    <div class="office-toolbar kanpass-actions">${!isNew?'<button class="office-btn danger" id="kanPassDelete">Xóa</button><button class="office-btn" id="kanPassPassword">Đặt / đổi mật khẩu</button>':''}<span class="spacer"></span><button class="office-btn primary" id="kanPassSave">Lưu thông tin</button></div>
+    </div>`;
   const value=id=>host.querySelector('#'+id)?.value||'';
   host.querySelector('#kanPassSave').addEventListener('click',async()=>{
     const body={id:value('kpId'),title:value('kpTitle'),service:value('kpService'),company:value('kpCompany'),company_id:value('kpCompanyId'),tax_id:value('kpTaxId'),username:value('kpUsername'),url:value('kpUrl'),window_match:value('kpWindow'),app_exe:value('kpExe'),field_order:value('kpOrder')};

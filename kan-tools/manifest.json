@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "kanToolVersion": "2.7.0",
+  "kanToolVersion": "2.7.1",
   "installerVersion": "2.3.1",
   "pythonFallback": {
     "version": "3.13.16",
@@ -15,7 +15,7 @@
       ]
     },
     "capture": {
-      "version": "6.2.0",
+      "version": "6.2.1",
       "source": "capture-agent/capture_agent.py",
       "kanpassSource": "capture-agent/kanpass.py",
       "webBridgeSource": "capture-agent/kanpass_webbridge.py"

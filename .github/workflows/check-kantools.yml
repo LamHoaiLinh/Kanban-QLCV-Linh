@@ -2,7 +2,7 @@ name: Check KanBan Tools
 
 on:
   push:
-    branches: [ main, 'feature/**' ]
+    branches: [ main, 'feature/**', 'fix/**' ]
     paths:
       - 'kan-tools/**'
       - 'capture-agent/**'
@@ -63,6 +63,11 @@ jobs:
               assert guessed['company_id']=='0319460837'
               assert guessed['username']=='linh-user'
               assert guessed['company']=='CÔNG TY TNHH ĐÀO TẠO LÁI XE BÌNH TÂN'
+              browser_item=manager.save_item({'title':'MB Bank Browser','service':'MB Bank','window_match':'MBBank Digital Banking Corp - Google Chrome','app_exe':'chrome.exe','password':'browser-secret','field_order':'password'})
+              ctx={'title':'MBBank Digital Banking Corp','exe':'chrome.exe'}
+              assert manager._context_matches(browser_item,ctx) >= 9
+              matched=manager.matches_for_context(ctx)
+              assert any(x['id']==browser_item['id'] for x in matched)
               from kanpass_webbridge import KanPassWebBridge
               bridge=object.__new__(KanPassWebBridge)
               bridge.kanpass=manager
