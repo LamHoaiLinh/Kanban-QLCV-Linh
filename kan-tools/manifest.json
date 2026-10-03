@@ -1,14 +1,14 @@
 {
   "schema": 1,
-  "kanToolVersion": "2.5.0",
-  "installerVersion": "2.1.0",
+  "kanToolVersion": "2.5.1",
+  "installerVersion": "2.2.0",
   "pythonFallback": {
     "version": "3.13.16",
     "url": "https://www.python.org/ftp/python/3.13.16/python-3.13.16-amd64.exe"
   },
   "components": {
     "runtime": {
-      "version": "1.8.0",
+      "version": "1.8.1",
       "files": [
         "kan-tools/runtime/kanmedia-server.py",
         "kan-tools/runtime/kanmedia-worker.py"
@@ -23,10 +23,10 @@
       "source": "office-tools/signing-agent/package/kanban_signing_agent.py"
     },
     "pythonPackages": {
-      "version": "2026.10.01.1"
+      "version": "2026.10.03.1"
     },
     "ytDlp": {
-      "version": "2026.10.01.1",
+      "version": "2026.10.03.1",
       "channel": "nightly"
     },
     "node": {
@@ -38,5 +38,5 @@
       "source": "BtbN/FFmpeg-Builds"
     }
   },
-  "bootstrapVersion": "2.1.0"
+  "bootstrapVersion": "2.2.0"
 }
