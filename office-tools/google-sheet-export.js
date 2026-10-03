@@ -19,7 +19,7 @@ let tokenState={clientId:'',accessToken:'',expiresAt:0};
 export function renderGoogleSheetExporter(host,api={}){
   const settings=loadSettings();
   const origin=location.origin;
-  host.innerHTML=\`
+  host.innerHTML=`
     <div class="office-card">
       <div class="office-card-title-row">
         <div>
@@ -33,7 +33,7 @@ export function renderGoogleSheetExporter(host,api={}){
         <span>URL Apps Script hoặc Script ID</span>
         <input id="gsExportScriptUrl" type="text" autocomplete="off"
           placeholder="https://script.google.com/.../projects/xxxxxxxx/edit"
-          value="\${escapeHtml(settings.lastScriptUrl||'')}">
+          value="${escapeHtml(settings.lastScriptUrl||'')}">
         <small>Ví dụ: mở Apps Script cần xuất → Ctrl+L → Ctrl+C → dán vào đây.</small>
       </label>
 
@@ -62,8 +62,8 @@ export function renderGoogleSheetExporter(host,api={}){
         <span>Google OAuth Web Client ID</span>
         <input id="gsExportClientId" type="text" autocomplete="off"
           placeholder="xxxxxxxx.apps.googleusercontent.com"
-          value="\${escapeHtml(settings.clientId||'')}">
-        <small>Authorized JavaScript origin cần có: <code>\${escapeHtml(origin)}</code></small>
+          value="${escapeHtml(settings.clientId||'')}">
+        <small>Authorized JavaScript origin cần có: <code>${escapeHtml(origin)}</code></small>
       </label>
 
       <div class="office-toolbar">
@@ -78,7 +78,7 @@ export function renderGoogleSheetExporter(host,api={}){
           2. Enable <strong>Google Apps Script API</strong> và <strong>Google Sheets API</strong>.<br>
           3. Cấu hình OAuth consent screen; nếu app đang Testing thì thêm chính email Google của anh vào Test users.<br>
           4. Credentials → Create credentials → OAuth client ID → <strong>Web application</strong>.<br>
-          5. Authorized JavaScript origins → thêm <code>\${escapeHtml(origin)}</code>.<br>
+          5. Authorized JavaScript origins → thêm <code>${escapeHtml(origin)}</code>.<br>
           6. Copy Client ID và dán vào ô phía trên.<br>
           7. Vào <code>https://script.google.com/home/usersettings</code> và bật <strong>Google Apps Script API</strong> một lần.
         </div>
@@ -88,7 +88,7 @@ export function renderGoogleSheetExporter(host,api={}){
     <div class="office-warning">
       FULL Snapshot có source code nguyên văn. Nếu project đang hard-code API key, password hoặc token thì chúng cũng sẽ nằm trong JSON; không chia sẻ file công khai.
     </div>
-  \`;
+  `;
 
   const clientInput=host.querySelector('#gsExportClientId');
   const scriptInput=host.querySelector('#gsExportScriptUrl');
@@ -138,8 +138,8 @@ export function renderGoogleSheetExporter(host,api={}){
       api.setStatus?.('Đang tạo file JSON…',96);
       if(api.saveBlob)await api.saveBlob(blob,filename,'KAN AI FULL Snapshot JSON');
       else downloadBlob(blob,filename);
-      api.endBusy?.(\`Đã xuất \${filename} · \${formatBytes(blob.size)}\`);
-      setLocalState(stateEl,\`Đã xuất \${snapshot.sheets?.length||0} sheet + \${snapshot.appsScript?.files?.length||0} file Apps Script · \${formatBytes(blob.size)}\`);
+      api.endBusy?.(`Đã xuất ${filename} · ${formatBytes(blob.size)}`);
+      setLocalState(stateEl,`Đã xuất ${snapshot.sheets?.length||0} sheet + ${snapshot.appsScript?.files?.length||0} file Apps Script · ${formatBytes(blob.size)}`);
     }catch(error){
       const friendly=friendlyGoogleError(error);
       if(api.showError)api.showError(new Error(friendly));
@@ -179,7 +179,7 @@ function ensureGoogleIdentity(){
   if(globalThis.google?.accounts?.oauth2)return Promise.resolve();
   if(gisPromise)return gisPromise;
   gisPromise=new Promise((resolve,reject)=>{
-    const existing=document.querySelector(\`script[src="\${GIS_SRC}"]\`);
+    const existing=document.querySelector(`script[src="${GIS_SRC}"]`);
     if(existing){
       const timer=setInterval(()=>{
         if(globalThis.google?.accounts?.oauth2){clearInterval(timer);resolve()}
@@ -224,12 +224,12 @@ async function getAccessToken(clientId){
   });
 }
 async function googleJson(url,token){
-  const response=await fetch(url,{headers:{Authorization:\`Bearer \${token}\`},cache:'no-store'});
+  const response=await fetch(url,{headers:{Authorization:`Bearer ${token}`},cache:'no-store'});
   const text=await response.text();
   let data=null;
   try{data=text?JSON.parse(text):{}}catch{data={raw:text}}
   if(!response.ok){
-    const message=data?.error?.message||data?.error_description||text||\`HTTP \${response.status}\`;
+    const message=data?.error?.message||data?.error_description||text||`HTTP ${response.status}`;
     const error=new Error(message);
     error.status=response.status;
     error.google=data;
@@ -239,7 +239,7 @@ async function googleJson(url,token){
 }
 
 async function buildFullSnapshot(scriptId,token,onProgress=()=>{}){
-  const scriptBase=\`https://script.googleapis.com/v1/projects/\${encodeURIComponent(scriptId)}\`;
+  const scriptBase=`https://script.googleapis.com/v1/projects/${encodeURIComponent(scriptId)}`;
   onProgress('Đang đọc thông tin project Apps Script…',15);
   const project=await googleJson(scriptBase,token);
   onProgress('Đang đọc source .gs / .html / appsscript.json…',28);
@@ -272,7 +272,7 @@ async function buildFullSnapshot(scriptId,token,onProgress=()=>{}){
       ')'
     ].join(',');
     const sheetUrl=
-      \`https://sheets.googleapis.com/v4/spreadsheets/\${encodeURIComponent(project.parentId)}?includeGridData=true&fields=\${encodeURIComponent(fields)}\`;
+      `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(project.parentId)}?includeGridData=true&fields=${encodeURIComponent(fields)}`;
     spreadsheet=await googleJson(sheetUrl,token);
     onProgress('Đang nén cấu trúc Sheet cho AI…',76);
   }
@@ -300,7 +300,7 @@ async function buildFullSnapshot(scriptId,token,onProgress=()=>{}){
     workbook:compact?compact.workbook:{
       id:project.parentId||null,
       name:null,
-      url:project.parentId?\`https://docs.google.com/spreadsheets/d/\${project.parentId}/edit\`:null
+      url:project.parentId?`https://docs.google.com/spreadsheets/d/${project.parentId}/edit`:null
     },
     styles,
     namedRanges:compact?.namedRanges||[],
@@ -309,7 +309,7 @@ async function buildFullSnapshot(scriptId,token,onProgress=()=>{}){
       scriptId:project.scriptId||scriptId,
       title:project.title||null,
       parentId:project.parentId||null,
-      url:\`https://script.google.com/home/projects/\${scriptId}/edit\`,
+      url:`https://script.google.com/home/projects/${scriptId}/edit`,
       files
     },
     warnings:spreadsheet?[]:['Project Apps Script này không có parentId Google Sheet nên snapshot chỉ chứa Apps Script.']
@@ -320,7 +320,7 @@ function compactSpreadsheet(api,styles,styleMap){
   const workbook={
     id:api.spreadsheetId,
     name:api.properties?.title||'Google_Sheet',
-    url:\`https://docs.google.com/spreadsheets/d/\${api.spreadsheetId}/edit\`,
+    url:`https://docs.google.com/spreadsheets/d/${api.spreadsheetId}/edit`,
     locale:api.properties?.locale||null,
     timeZone:api.properties?.timeZone||null
   };
@@ -474,9 +474,9 @@ function metadataRuns(map){
 }
 function gridRangeToA1(range){
   if(!range||range.startRowIndex==null||range.startColumnIndex==null||range.endRowIndex==null||range.endColumnIndex==null)return null;
-  const a=\`\${columnLetter(range.startColumnIndex+1)}\${range.startRowIndex+1}\`;
-  const b=\`\${columnLetter(range.endColumnIndex)}\${range.endRowIndex}\`;
-  return a===b?a:\`\${a}:\${b}\`;
+  const a=`${columnLetter(range.startColumnIndex+1)}${range.startRowIndex+1}`;
+  const b=`${columnLetter(range.endColumnIndex)}${range.endRowIndex}`;
+  return a===b?a:`${a}:${b}`;
 }
 function columnLetter(n){
   let s='';
@@ -497,7 +497,7 @@ function scriptFileName(name,type){
 function makeFilename(snapshot){
   const base=safeName(snapshot.workbook?.name||snapshot.appsScript?.title||'Google_Sheet');
   const stamp=new Date().toISOString().replace(/[-:]/g,'').slice(0,15).replace('T','_');
-  return \`AI_FULL_SNAPSHOT_\${base}_\${stamp}.json\`;
+  return `AI_FULL_SNAPSHOT_${base}_${stamp}.json`;
 }
 function safeName(value){
   return String(value||'snapshot').replace(/[\\/:*?"<>|]/g,'_').replace(/\s+/g,' ').trim()||'snapshot';
