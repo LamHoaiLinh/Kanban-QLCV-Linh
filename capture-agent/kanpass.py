@@ -427,6 +427,44 @@ class KanPassManager:
             history.insert(0, {"password": old_password, "changed_at": now_iso()})
         return history[:MAX_HISTORY]
 
+    def find_identity_duplicates(self, data: dict, exclude_id: str = "") -> list[dict]:
+        service = _clean(data.get("service"), 80).casefold()
+        if not service:
+            return []
+        tax_id = "".join(ch for ch in _clean(data.get("tax_id"), 40) if ch.isalnum()).casefold()
+        company_id = _clean(data.get("company_id"), 100).casefold()
+        company = _clean(data.get("company"), 120).casefold()
+        username = _clean(data.get("username"), 250).casefold()
+        mode = ""
+        wanted = ()
+        if tax_id:
+            mode, wanted = "tax", (tax_id,)
+        elif company_id:
+            mode, wanted = "company_id", (company_id,)
+        elif company and username:
+            mode, wanted = "company_user", (company, username)
+        else:
+            return []
+        out = []
+        for item in self.list_items():
+            if str(item.get("id") or "") == str(exclude_id or ""):
+                continue
+            if _clean(item.get("service"), 80).casefold() != service:
+                continue
+            if mode == "tax":
+                actual = "".join(ch for ch in _clean(item.get("tax_id"), 40) if ch.isalnum()).casefold()
+                match = actual == wanted[0]
+            elif mode == "company_id":
+                match = _clean(item.get("company_id"), 100).casefold() == wanted[0]
+            else:
+                match = (
+                    _clean(item.get("company"), 120).casefold() == wanted[0]
+                    and _clean(item.get("username"), 250).casefold() == wanted[1]
+                )
+            if match:
+                out.append(item)
+        return out
+
     def password_reuse_info(self, entry_id: str, new_password: str) -> dict | None:
         if not entry_id or not new_password:
             return None
@@ -940,17 +978,29 @@ class KanPassManager:
             try:
                 entry_id = id_by_label.get(pick.get(), "")
                 new_password = fields["password"].get()
-                reused = self.password_reuse_info(entry_id, new_password) if entry_id and new_password else None
-                if reused and reused.get("kind") == "history":
-                    when = reused.get("changed_at") or "trước đây"
-                    if not messagebox.askyesno("KanPass", f"Mật khẩu này đã từng được sử dụng ({when}).\nMột số ngân hàng không cho dùng lại mật khẩu cũ.\n\nVẫn lưu?", parent=win):
-                        return
                 payload = {key: var.get() for key, var in fields.items()}
                 payload.update({
                     "id": entry_id,
                     "window_match": ctx.get("title") or "",
                     "app_exe": ctx.get("exe") or ""
                 })
+                if not entry_id:
+                    duplicates = self.find_identity_duplicates(payload)
+                    if len(duplicates) == 1:
+                        dup = duplicates[0]
+                        use_existing = messagebox.askyesno(
+                            "KanPass - Có tài khoản trùng định danh",
+                            f"Đã có “{dup.get('title') or 'Tài khoản'}” cùng dịch vụ và cùng MST/Company ID hoặc Công ty + username.\n\nChọn Có để cập nhật tài khoản đã có. Chọn Không để vẫn tạo một hồ sơ mới.",
+                            parent=win
+                        )
+                        if use_existing:
+                            entry_id = dup["id"]
+                            payload["id"] = entry_id
+                reused = self.password_reuse_info(entry_id, new_password) if entry_id and new_password else None
+                if reused and reused.get("kind") == "history":
+                    when = reused.get("changed_at") or "trước đây"
+                    if not messagebox.askyesno("KanPass", f"Mật khẩu này đã từng được sử dụng ({when}).\nMột số ngân hàng không cho dùng lại mật khẩu cũ.\n\nVẫn lưu?", parent=win):
+                        return
                 saved = self.save_item(payload)
                 messagebox.showinfo("KanPass", f"Đã lưu: {saved['title']}", parent=win)
                 win.destroy()
@@ -987,6 +1037,12 @@ class KanPassManager:
             if path == "/kanpass/save" and method == "POST":
                 payload = dict(body or {})
                 payload["password"] = ""
+                if not str(payload.get("id") or ""):
+                    duplicates = self.find_identity_duplicates(payload)
+                    if len(duplicates) == 1 and not bool(payload.get("createDuplicate")):
+                        dup = duplicates[0]
+                        return 409, {"ok": False, "duplicate": True, "duplicateId": dup["id"], "duplicateTitle": dup.get("title") or "Tài khoản", "message": "Đã có tài khoản cùng định danh."}
+                payload.pop("createDuplicate", None)
                 return 200, {"ok": True, "item": self.save_item(payload)}
             if path == "/kanpass/delete" and method == "POST":
                 entry_id = str((body or {}).get("id") or "")
