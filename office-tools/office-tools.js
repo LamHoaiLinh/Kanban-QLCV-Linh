@@ -233,7 +233,15 @@ function renderKanPassDetail(host,item,ctx){
     const body={id:value('kpId'),title:value('kpTitle'),service:value('kpService'),company:value('kpCompany'),company_id:value('kpCompanyId'),tax_id:value('kpTaxId'),username:value('kpUsername'),password:value('kpPassword'),url:value('kpUrl'),window_match:value('kpWindow'),app_exe:value('kpExe'),field_order:value('kpOrder')};
     try{
       setStatus('Đang lưu KanPass…');
-      const data=await kanPassFetch('/kanpass/save',{method:'POST',body});
+      let data;
+      try{data=await kanPassFetch('/kanpass/save',{method:'POST',body})}
+      catch(error){
+        if(error.status===409 && error.data?.reuse){
+          const when=error.data.changed_at?(' Lần lưu trước: '+error.data.changed_at+'.'):'';
+          if(!confirm('Mật khẩu này đã từng được sử dụng.'+when+' Một số ngân hàng không cho dùng lại mật khẩu cũ. Vẫn lưu?')){setStatus('Đã giữ nguyên mật khẩu.');return}
+          data=await kanPassFetch('/kanpass/save',{method:'POST',body:{...body,allowReuse:true}});
+        }else throw error;
+      }
       ctx.onSelected(data.item.id);setStatus('Đã lưu '+(data.item.title||'tài khoản')+'.');await ctx.loadList();
       const refreshed=await kanPassFetch('/kanpass/item?id='+encodeURIComponent(data.item.id));renderKanPassDetail(host,refreshed.item,ctx);
     }catch(error){setStatus(error.message)}
