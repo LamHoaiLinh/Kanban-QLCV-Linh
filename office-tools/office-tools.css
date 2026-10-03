@@ -472,3 +472,10 @@
 .kanpass-json-bar span,.kanpass-json-actions span{font-size:10.5px;line-height:1.4;color:var(--muted)}
 .kanpass-json-buttons{display:flex;gap:7px;flex:0 0 auto;flex-wrap:wrap;justify-content:flex-end}
 @media(max-width:760px){.kanpass-json-bar,.kanpass-json-actions{align-items:stretch;flex-direction:column}.kanpass-json-buttons{justify-content:stretch}.kanpass-json-buttons .office-btn,.kanpass-json-actions>.office-btn{width:100%}}
+
+
+/* ===== v5.2 KanPass Web Bridge ===== */
+.kanpass-web-bar{display:grid;grid-template-columns:minmax(0,1fr) minmax(330px,.75fr);gap:12px;align-items:center;margin:0 0 12px;padding:12px;border:1.5px solid var(--border);border-radius:14px;background:var(--panel-soft)}
+.kanpass-web-copy{display:grid;gap:4px;min-width:0}.kanpass-web-copy strong{font-size:12.5px;color:var(--text)}.kanpass-web-copy span{font-size:10.8px;line-height:1.45;color:var(--muted)}.kanpass-web-copy small{font-size:10.2px;color:var(--green-dark);overflow-wrap:anywhere}
+.kanpass-web-open{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}.kanpass-web-open input{width:100%;min-height:38px;border:1.5px solid var(--border);border-radius:10px;background:var(--panel);color:var(--text);padding:8px 10px;font:inherit}
+@media(max-width:900px){.kanpass-web-bar{grid-template-columns:1fr}.kanpass-web-open{grid-template-columns:1fr}.kanpass-web-open .office-btn{width:100%}}
