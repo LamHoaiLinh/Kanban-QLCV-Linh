@@ -8,6 +8,10 @@ on:
       - 'office-tools/kanmedia/**'
       - 'kantool-launcher.js'
       - 'kantool-extra.css'
+      - 'app.js'
+      - 'index.html'
+      - 'styles.css'
+      - 'sw.js'
       - '.github/workflows/check-kantools.yml'
   workflow_dispatch:
 
@@ -47,4 +51,4 @@ jobs:
 
       - name: Check JavaScript syntax
         shell: pwsh
-        run: node -e "const fs=require('fs'); for(const p of ['office-tools/kanmedia/kanmedia.js','kantool-launcher.js','capture-launcher.js']){let s=fs.readFileSync(p,'utf8').replace(/\bexport\s+/g,''); new Function(s); console.log('OK '+p)}"
+        run: node -e "const fs=require('fs'); for(const p of ['app.js','sw.js','office-tools/kanmedia/kanmedia.js','kantool-launcher.js','capture-launcher.js']){let s=fs.readFileSync(p,'utf8').replace(/\bexport\s+/g,''); new Function(s); console.log('OK '+p)}"
