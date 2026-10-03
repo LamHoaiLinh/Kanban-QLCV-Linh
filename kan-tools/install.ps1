@@ -399,8 +399,17 @@ $kopiaExe=Join-Path $BackupDir "kopia.exe"
 $needBackup=Need-Component "backup" @($backupAgent)
 if($needBackup){
   Write-Step "Cap nhat KanBackup"
-  Download-File ([string]$Manifest.components.backup.source) $backupAgent
+  $backupPayload=Join-Path $TempDir "kanbackup-server.py.gz.b64"
+  Download-File ([string]$Manifest.components.backup.source) $backupPayload
+  $encoded=(Get-Content -LiteralPath $backupPayload -Raw -Encoding UTF8).Trim()
+  $compressed=[Convert]::FromBase64String($encoded)
+  $memory=New-Object System.IO.MemoryStream(,$compressed)
+  $gzip=New-Object System.IO.Compression.GZipStream($memory,[System.IO.Compression.CompressionMode]::Decompress)
+  $output=[System.IO.File]::Create($backupAgent)
+  try{$gzip.CopyTo($output)}finally{$output.Dispose();$gzip.Dispose();$memory.Dispose()}
   if((Get-Item $backupAgent).Length -lt 12000){throw "Source KanBackup khong hop le."}
+  & $venvPy -m py_compile $backupAgent
+  if($LASTEXITCODE -ne 0){throw "KanBackup source bi loi cu phap."}
   Stop-Matching "*kanbackup-server.py*"
 }else{
   Write-Host "  KanBackup: khong doi." -ForegroundColor DarkGray
