@@ -8,8 +8,8 @@
   <title>Kanban Cá Nhân</title>
   <link rel="manifest" href="manifest.webmanifest?v=3.2">
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=6.41">
-  <link rel="stylesheet" href="office-tools/office-tools.css?v=5.0.2">
+  <link rel="stylesheet" href="styles.css?v=6.42">
+  <link rel="stylesheet" href="office-tools/office-tools.css?v=5.1.0">
   <link rel="stylesheet" href="office-tools/worksheet-editor.css?v=1.2.0">
   <link rel="stylesheet" href="kantool-extra.css?v=1.2.0">
 </head>
@@ -279,31 +279,41 @@
   </dialog>
 
   <dialog id="guideDialog" class="modal">
-    <form method="dialog" class="modal-card compact-modal guide-modal">
+    <form method="dialog" class="modal-card guide-modal guide-functional">
       <div class="modal-header">
-        <div><div class="eyebrow">HƯỚNG DẪN NHANH</div><h2>Cách sử dụng</h2></div>
+        <div><div class="eyebrow">HƯỚNG DẪN KANBAN</div><h2>Hướng dẫn theo chức năng</h2></div>
         <button class="icon-btn" data-close="guideDialog" type="button" aria-label="Đóng">×</button>
       </div>
-      <div class="guide-list">
-        <div><strong>1. Sắp xếp dự án:</strong> kéo biểu tượng ⠿ ở bên trái tên dự án lên hoặc xuống.</div>
-        <div><strong>2. Sắp xếp cột:</strong> kéo biểu tượng ⠿ ở đầu cột sang trái hoặc phải.</div>
-        <div><strong>3. Di chuyển công việc:</strong> kéo biểu tượng ⠿ trên thẻ sang cột khác hoặc đổi thứ tự trong cùng cột.</div>
-        <div><strong>4. Đổi hình nền:</strong> bấm nút ▧ trên thanh công cụ rồi chọn ảnh.</div>
-        <div><strong>5. Sao lưu:</strong> dùng “Xuất bản sao JSON” trước khi đổi máy hoặc xóa dữ liệu trình duyệt.</div>
-        <div><strong>6. Tự chuyển sang ngày mới:</strong> mở Cài đặt ⚙, bật tính năng rồi chọn cột nguồn và cột đích.</div>
-        <div><strong>7. Nội dung đã xóa:</strong> các công việc bị xóa được lưu gọn dưới dạng văn bản và có thể xem trong Cài đặt.</div>
-        <div><strong>8. Xóa dữ liệu:</strong> mở Cài đặt ⚙, chọn “Xóa toàn bộ dữ liệu”, cân nhắc xuất backup rồi gõ chính xác OK.</div>
-        <div><strong>9. Nhạc làm việc:</strong> bấm “Browse thư mục nhạc” hoặc kéo thả thư mục vào trình phát bên trái. Ctrl + Space để phát hoặc tạm dừng.</div>
-        <div><strong>10. Ghi chú nhanh:</strong> bấm dấu ＋ dưới tên dự án để tạo ghi chú; bấm tên ghi chú để mở và chỉnh sửa.</div>
-        <div><strong>11. Nhập nhanh công việc:</strong> nhấn Ctrl + Enter khi trang Kanban đang được focus, nhập tên rồi nhấn Enter để lưu.</div>
-        <div><strong>12. Chọn nhiều công việc:</strong> Ctrl + click để chọn rời rạc, Shift + click để chọn liên tục, Ctrl + A để chọn toàn bộ thẻ trong cột đang chọn; kéo một thẻ đã chọn để di chuyển cả nhóm hoặc nhấn Delete để chuyển toàn bộ thẻ đã chọn vào Nội dung đã xóa.</div>
-        <div><strong>13. Đồng hồ & báo thức:</strong> bấm trực tiếp vào đồng hồ để mở cửa sổ. Có thể đặt phút/giây, chọn thời gian mẫu, thử chuông và dùng nút TẮT cạnh đồng hồ khi báo thức đang reo.</div>
-        <div><strong>14. Sinh nhật / Ngày giỗ:</strong> trong cửa sổ Đồng hồ, mở tab “Sinh nhật / Ngày giỗ”. Sinh nhật dùng dương lịch, ngày giỗ dùng âm lịch; nhập dd/mm hoặc dd/mm/yyyy nếu biết năm. Có thể tìm theo tên hoặc lọc theo tháng.</div>
-        <div><strong>15. Dải nhắc ngày đặc biệt:</strong> KanBan nhắc trước 2 ngày, ngày mai và hôm nay. Có thể bỏ tick “Nhắc” ngay trên dải để ẩn chữ chạy.</div>
-        <div><strong>16. Sao lưu lịch nhắc:</strong> danh sách sinh nhật/ngày giỗ và Lịch Công việc đều được lưu chung trong “Xuất bản sao JSON” và được khôi phục khi nhập lại file backup.</div>
-        <div><strong>17. Lịch Công việc:</strong> trong cửa sổ Đồng hồ, mở tab “Lịch Công việc”, nhập nội dung và ngày thực hiện. Có thể chọn lặp hàng tháng hoặc hàng năm; KanBan vẫn nhắc trước 2 ngày, ngày mai và hôm nay bằng dải màu riêng.</div>
-        <div><strong>18. Năm sinh/năm giỗ:</strong> có thể nhập dd/mm nếu không nhớ năm; nếu biết năm thì nhập dd/mm/yyyy. Việc nhắc vẫn lặp hằng năm theo ngày/tháng.</div>
-        <div><strong>19. Chia sẻ ngày gia đình:</strong> trong tab “Sinh nhật / Ngày giỗ”, dùng “Xuất JSON” để tạo file riêng và gửi cho người khác. “Nhập JSON” sẽ gộp thêm vào danh sách hiện có và tự bỏ qua mục trùng.</div>
+      <div class="guide-groups">
+        <details open><summary>Bảng công việc & ghi chú</summary><div class="guide-group-body">
+          <p><strong>Dự án / cột / thẻ:</strong> kéo biểu tượng ⠿ để sắp xếp. Ctrl+click chọn rời rạc, Shift+click chọn liên tục, Ctrl+A chọn toàn bộ thẻ trong cột; Delete chuyển thẻ đã chọn vào Nội dung đã xóa.</p>
+          <p><strong>Nhập nhanh:</strong> Ctrl+Enter khi trang KanBan đang focus. Ghi chú nhanh nằm dưới tên dự án; bấm ＋ để tạo thêm.</p>
+          <p><strong>Tự chuyển ngày mới:</strong> mở ⚙ Cài đặt để chọn cột nguồn và cột đích.</p>
+        </div></details>
+        <details><summary>Đồng hồ, báo thức & lịch nhắc</summary><div class="guide-group-body">
+          <p><strong>Đồng hồ:</strong> bấm trực tiếp vào đồng hồ để mở. Có thể đặt phút/giây, sửa các preset và tắt chuông ngay bằng nút TẮT.</p>
+          <p><strong>Sinh nhật / Ngày giỗ:</strong> sinh nhật dùng dương lịch, ngày giỗ dùng âm lịch Việt Nam. Có thể nhập dd/mm hoặc dd/mm/yyyy, tìm theo tên và lọc theo tháng.</p>
+          <p><strong>Lịch Công việc:</strong> hỗ trợ ngày cụ thể, lặp hàng tháng hoặc hằng năm; KanBan nhắc trước 2 ngày, ngày mai và hôm nay.</p>
+        </div></details>
+        <details><summary>KanPass · tài khoản & mật khẩu</summary><div class="guide-group-body">
+          <p><strong>Alt+A:</strong> đặt con trỏ vào ô đầu tiên của vùng đăng nhập rồi nhấn Alt+A. Nếu có nhiều công ty/tài khoản phù hợp, KanPass sẽ hỏi bạn chọn.</p>
+          <p><strong>Alt+P:</strong> sau khi nhập hoặc đổi thông tin đăng nhập, nhấn Alt+P. KanPass tự đọc các trường Windows cho phép; riêng ô password được bảo vệ sẽ yêu cầu bạn nhập trong popup.</p>
+          <p><strong>Nhiều công ty:</strong> mỗi dịch vụ có thể có nhiều hồ sơ. Nên đặt Tên tài khoản dễ nhận biết và lưu Công ty/MST/Company ID. KanPass giữ tối đa 5 mật khẩu cũ và cảnh báo nếu bạn dùng lại mật khẩu đã từng đặt.</p>
+          <p><strong>Quản lý:</strong> mở CÔNG CỤ → KanPass để tìm theo tên tài khoản, công ty, MST hoặc username; mật khẩu chỉ hiện khi bạn chủ động bấm xem.</p>
+        </div></details>
+        <details><summary>CÔNG CỤ & phím tắt Windows</summary><div class="guide-group-body">
+          <p><strong>Chụp:</strong> Alt+C chụp nhanh; Alt+X chụp dài theo khung cố định. PDF, IMG, Excel, KanPaint, KanMedia và KanPass nằm trong CÔNG CỤ.</p>
+          <p><strong>Cài/cập nhật:</strong> chuột phải nút CÔNG CỤ → Cập nhật / sửa KanBan Tools. File cài đặt một lần sẽ tự bổ sung thành phần còn thiếu và đăng ký chạy cùng Windows.</p>
+        </div></details>
+        <details><summary>Sao lưu, nhập dữ liệu & đổi máy</summary><div class="guide-group-body">
+          <p><strong>Xuất bản sao JSON:</strong> xuất chung dự án/công việc/ghi chú, lịch nhắc, đồng hồ, cài đặt và KanPass. Phần KanPass nằm trong file KDBX đã mã hóa, không xuất mật khẩu dạng chữ thường.</p>
+          <p><strong>Nhập dữ liệu:</strong> KanBan đọc file rồi cho bạn chọn từng nhóm muốn nhập; các nhóm không chọn được giữ nguyên trên máy hiện tại.</p>
+          <p><strong>Đổi máy:</strong> sau khi nhập KanPass trên máy mới, cần mật khẩu chính của KDBX để xác nhận lần đầu.</p>
+        </div></details>
+        <details><summary>Giao diện, nhạc & dữ liệu đã xóa</summary><div class="guide-group-body">
+          <p><strong>Giao diện:</strong> ▧ đổi hình nền, ◐ đổi sáng/tối. Trình phát nhạc ở sidebar hỗ trợ Browse thư mục; Ctrl+Space phát/tạm dừng.</p>
+          <p><strong>Nội dung đã xóa:</strong> xem trong ⚙ Cài đặt. Trước khi xóa toàn bộ dữ liệu, nên xuất một bản sao JSON.</p>
+        </div></details>
       </div>
       <div class="modal-actions right-actions"><button class="primary-btn" value="close">Đã hiểu</button></div>
     </form>
@@ -719,6 +729,22 @@
     </form>
   </dialog>
 
+  <dialog id="importSelectDialog" class="modal">
+    <form method="dialog" class="modal-card compact-modal import-select-modal">
+      <div class="modal-header">
+        <div><div class="eyebrow">NHẬP BẢN SAO JSON</div><h2>Chọn dữ liệu muốn nhập</h2></div>
+        <button class="icon-btn" value="cancel" type="submit" aria-label="Đóng">×</button>
+      </div>
+      <p class="import-select-note">Chỉ các nhóm được chọn mới thay thế dữ liệu tương ứng. Những phần khác trên máy hiện tại được giữ nguyên.</p>
+      <div id="importSectionList" class="import-section-list"></div>
+      <div class="import-select-actions"><button id="importSelectAllBtn" class="secondary-btn" type="button">Chọn / bỏ chọn tất cả</button></div>
+      <div class="modal-actions split-actions">
+        <button class="secondary-btn" value="cancel">Hủy</button>
+        <button id="importSectionsConfirmBtn" class="primary-btn" value="import">Nhập các mục đã chọn</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="confirmDialog" class="modal">
     <form method="dialog" class="modal-card confirm-card">
       <div class="confirm-icon">!</div><h2 id="confirmTitle">Xác nhận</h2><p id="confirmMessage"></p>
@@ -729,12 +755,12 @@
   <div id="globalTooltip" class="global-tooltip" role="tooltip" hidden></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="dragdrop.js?v=3.3"></script>
-  <script src="app.js?v=5.1"></script>
+  <script src="app.js?v=5.2"></script>
   <script src="music-player.js?v=3.3"></script>
   <script src="kalo-launcher.js?v=1.0.5"></script>
   <script src="capture-launcher.js?v=1.5.0"></script>
   <script src="kantool-launcher.js?v=1.5.0"></script>
-  <script type="module" src="office-tools/office-tools.js?v=5.9.0"></script>
+  <script type="module" src="office-tools/office-tools.js?v=6.0.0"></script>
   <script type="module" src="game-launcher.js?v=1.71"></script>
 </body>
 </html>
