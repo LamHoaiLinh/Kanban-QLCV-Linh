@@ -68,8 +68,6 @@ def dpapi_unprotect(data: bytes) -> bytes:
     try:
         return ctypes.string_at(out_blob.pbData, out_blob.cbData)
     finally:
-        if description:
-            kernel32.LocalFree(description)
         kernel32.LocalFree(out_blob.pbData)
         _ = keepalive
 
@@ -419,7 +417,7 @@ class KanPassManager:
             entry = self._entry_by_id(entry_id) if entry_id else None
             creating = entry is None
             old_meta = _parse_meta(entry.notes) if entry is not None else {}
-            old_password = entry.password or "" if entry is not None else ""
+            old_password = (entry.password or "") if entry is not None else ""
             requested_password = str(data.get("password") or "")
             new_password = requested_password if requested_password else old_password
             item_seed = {
