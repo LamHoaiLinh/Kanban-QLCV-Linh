@@ -2,9 +2,12 @@ name: Check KanBan Tools
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, 'feature/**' ]
     paths:
       - 'kan-tools/**'
+      - 'capture-agent/**'
+      - 'office-tools/office-tools.js'
+      - 'office-tools/office-tools.css'
       - 'office-tools/kanmedia/**'
       - 'kantool-launcher.js'
       - 'kantool-extra.css'
@@ -32,7 +35,7 @@ jobs:
 
       - name: Check Python syntax
         shell: pwsh
-        run: python -m py_compile kan-tools/runtime/kanmedia-server.py kan-tools/runtime/kanmedia-worker.py capture-agent/capture_agent.py office-tools/signing-agent/package/kanban_signing_agent.py
+        run: python -m py_compile kan-tools/runtime/kanmedia-server.py kan-tools/runtime/kanmedia-worker.py capture-agent/capture_agent.py capture-agent/kanpass.py office-tools/signing-agent/package/kanban_signing_agent.py
 
       - name: Check PowerShell installer syntax
         shell: pwsh
@@ -51,4 +54,4 @@ jobs:
 
       - name: Check JavaScript syntax
         shell: pwsh
-        run: node -e "const fs=require('fs'); for(const p of ['app.js','sw.js','office-tools/kanmedia/kanmedia.js','kantool-launcher.js','capture-launcher.js']){let s=fs.readFileSync(p,'utf8').replace(/\bexport\s+/g,''); new Function(s); console.log('OK '+p)}"
+        run: node -e "const fs=require('fs'); for(const p of ['app.js','sw.js','office-tools/office-tools.js','office-tools/kanmedia/kanmedia.js','kantool-launcher.js','capture-launcher.js']){let s=fs.readFileSync(p,'utf8').replace(/^\s*import\s+.*$/gm,'').replace(/\bexport\s+/g,''); new Function(s); console.log('OK '+p)}"
