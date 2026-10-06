@@ -375,7 +375,6 @@ if simple in s:
 replace_once(
     "src/game/gameState.ts",
     """    this.drawToFull();
-
     this.phase = 'play';""",
     """    this.drawToFull();
 
