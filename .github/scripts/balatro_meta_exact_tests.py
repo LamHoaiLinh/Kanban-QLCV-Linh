@@ -184,7 +184,8 @@ describe('Balatro exact meta progression', () => {
     profile.blankRedeemed = 10;
     profile.playingCardsShopBought = 20;
     profile.bestAnte = 12;
-    profile.discoveredBosses = Array.from({ length: 25 }, (_, i) => `boss-${i}` as any);
+    profile.totalHands = Math.max(profile.totalHands, 1);
+    profile.discoveredBosses = Array.from({ length: 23 }, (_, i) => `boss-${i}` as any);
     profile.minHandSizeEver = 5;
     profile = refreshMetaUnlocks(profile);
 
