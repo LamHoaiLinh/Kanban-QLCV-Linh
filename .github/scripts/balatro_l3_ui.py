@@ -77,8 +77,8 @@ function closeItemInfo() {
 
 function showItemInfo(card: JokerCard | ConsumableCard, type: 'joker' | 'consumable', anchor: HTMLElement) {
   itemInfoKind.textContent = type === 'joker'
-    ? `${card.rarity.toUpperCase()} JOKER`
-    : card.type.toUpperCase();
+    ? `${(card as JokerCard).rarity.toUpperCase()} JOKER`
+    : (card as ConsumableCard).type.toUpperCase();
   itemInfoName.textContent = card.name;
   itemInfoDesc.textContent = card.description;
 
