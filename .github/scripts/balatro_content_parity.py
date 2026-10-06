@@ -691,3 +691,370 @@ replace_once(
 )
 
 print("Deck and Voucher behavior applied.")
+
+
+# ===========================================================================
+# 4. Tarot / Spectral execution, Plasma/Observatory scoring, cashout, Anaglyph.
+# ===========================================================================
+
+# Replace consumable execution with the complete content set.
+game_path = root / "src/game/gameState.ts"
+s = game_path.read_text(encoding="utf-8")
+a = s.find("  private applyConsumableWithTargets(card: ConsumableCard, targetIds: readonly string[]) {")
+b = s.find("  private createShopState(): ShopState {", a)
+if a < 0 or b < 0:
+    raise SystemExit("Could not locate applyConsumableWithTargets")
+apply_consumable = r"""  private applyConsumableWithTargets(card: ConsumableCard, targetIds: readonly string[]) {
+    const effect = card.effect;
+
+    if ((card.type === 'tarot' || card.type === 'planet') && card.key !== 'the-fool') {
+      this.lastConsumableKey = card.key;
+    }
+
+    if (effect.kind === 'planet') {
+      this.upgradeHandLevel(effect.handType);
+      return;
+    }
+    if (effect.kind === 'money') {
+      const gain = effect.mode === 'double-up-to-20'
+        ? Math.min(20, this.money)
+        : Math.max(0, effect.amount ?? 0);
+      this.money += gain;
+      return;
+    }
+    if (effect.kind === 'enhance-selected') {
+      for (const id of targetIds) {
+        this.mutateCardEverywhere(id, (target) => {
+          target.enhancement = effect.enhancement;
+          target.baseChips = effect.enhancement === 'stone'
+            ? 50
+            : target.rank === 14 ? 11 : target.rank >= 11 ? 10 : target.rank;
+        });
+      }
+      return;
+    }
+    if (effect.kind === 'convert-suit') {
+      for (const id of targetIds) this.mutateCardEverywhere(id, (target) => { target.suit = effect.suit; });
+      return;
+    }
+    if (effect.kind === 'destroy-selected') {
+      for (const id of targetIds) this.destroyCardEverywhere(id);
+      return;
+    }
+    if (effect.kind === 'copy-right-to-left') {
+      const order = this.targetMode?.candidateIds ?? targetIds;
+      const sorted = targetIds.slice().sort((x, y) => order.indexOf(x) - order.indexOf(y));
+      const leftId = sorted[0];
+      const source = this.findRunCard(sorted[1]);
+      if (!leftId || !source) return;
+      this.mutateCardEverywhere(leftId, (target) => {
+        target.suit = source.suit;
+        target.rank = source.rank;
+        target.enhancement = source.enhancement;
+        target.seal = source.seal;
+        target.edition = source.edition;
+        target.baseChips = source.baseChips;
+      });
+      return;
+    }
+    if (effect.kind === 'edition-selected') {
+      for (const id of targetIds) {
+        const edition = effect.edition === 'random'
+          ? this.pick(['foil', 'holographic', 'polychrome'] as const)
+          : effect.edition;
+        this.mutateCardEverywhere(id, (target) => { target.edition = edition; });
+      }
+      return;
+    }
+    if (effect.kind === 'seal-selected') {
+      for (const id of targetIds) this.mutateCardEverywhere(id, (target) => { target.seal = effect.seal; });
+      return;
+    }
+    if (effect.kind === 'duplicate-selected') {
+      const source = targetIds[0] ? this.findRunCard(targetIds[0]) : null;
+      if (!source) return;
+      for (let i = 0; i < effect.copies; i++) {
+        const copy = cloneCard(source);
+        copy.id = this.makeRunId('copy');
+        this.ownedDeck.push(copy);
+        if (this.phase === 'play') this.hand.push(cloneCard(copy));
+      }
+      return;
+    }
+    if (effect.kind === 'immolate-selected') {
+      for (const id of targetIds) this.destroyCardEverywhere(id);
+      this.money += effect.money;
+      return;
+    }
+    if (effect.kind === 'create-consumables') {
+      const catalog = effect.type === 'tarot' ? TAROT_CATALOG : PLANET_CATALOG;
+      for (let i = 0; i < effect.count && this.consumables.length < this.consumableCapacity(); i++) {
+        this.consumables.push(this.makeConsumableFromCatalog(this.pick(catalog)));
+      }
+      return;
+    }
+    if (effect.kind === 'repeat-last-consumable') {
+      if (!this.lastConsumableKey) return;
+      const template = [...TAROT_CATALOG, ...PLANET_CATALOG].find((entry) => entry.key === this.lastConsumableKey);
+      if (template && this.consumables.length < this.consumableCapacity()) {
+        this.consumables.push(this.makeConsumableFromCatalog(template));
+      }
+      return;
+    }
+    if (effect.kind === 'joker-edition-chance') {
+      if (this.jokers.length > 0 && this.rng() < effect.chance) {
+        const target = this.pick(this.jokers);
+        target.edition = this.pick(['foil','holographic','polychrome'] as const);
+      }
+      return;
+    }
+    if (effect.kind === 'rank-up-selected') {
+      for (const id of targetIds) {
+        this.mutateCardEverywhere(id, (target) => {
+          target.rank = target.rank === 14 ? 2 : (target.rank + 1) as Rank;
+          target.baseChips = target.rank === 14 ? 11 : target.rank >= 11 ? 10 : target.rank;
+        });
+      }
+      return;
+    }
+    if (effect.kind === 'temperance') {
+      const value = this.jokers.reduce((sum, joker) => sum + joker.sellValue, 0);
+      this.money += Math.min(effect.cap, value);
+      return;
+    }
+    if (effect.kind === 'create-random-joker') {
+      if (this.jokers.length >= this.jokerCapacity()) return;
+      const pool = this.availableJokerTemplates(effect.rarity);
+      if (pool.length > 0) this.jokers.push(this.makeJokerFromTemplate(this.pick(pool), false));
+      return;
+    }
+    if (effect.kind === 'spectral-familiar') {
+      if (this.hand.length > 0) {
+        const destroyed = this.pick(this.hand);
+        this.destroyCardEverywhere(destroyed.id);
+      }
+      const standard = buildStandardDeck();
+      const filtered = standard.filter((source) => {
+        if (effect.mode === 'ace') return source.rank === 14;
+        if (effect.mode === 'face') return source.rank >= 11 && source.rank <= 13;
+        return source.rank >= 2 && source.rank <= 10;
+      });
+      const enhancePool = ENHANCEMENT_OFFERS.filter((value) => value !== 'stone');
+      for (let i = 0; i < effect.create; i++) {
+        const source = cloneCard(this.pick(filtered));
+        source.id = this.makeRunId('spectral-card');
+        source.enhancement = this.pick(enhancePool);
+        source.baseChips = source.rank === 14 ? 11 : source.rank >= 11 ? 10 : source.rank;
+        this.ownedDeck.push(cloneCard(source));
+        if (this.phase === 'play') this.hand.push(source);
+      }
+      return;
+    }
+    if (effect.kind === 'spectral-wraith') {
+      if (this.jokers.length < this.jokerCapacity()) {
+        const pool = this.availableJokerTemplates('rare');
+        if (pool.length > 0) this.jokers.push(this.makeJokerFromTemplate(this.pick(pool), false));
+      }
+      this.money = 0;
+      return;
+    }
+    if (effect.kind === 'spectral-sigil') {
+      const suit = this.pick(SUITS);
+      for (const handCard of [...this.hand]) this.mutateCardEverywhere(handCard.id, (target) => { target.suit = suit; });
+      return;
+    }
+    if (effect.kind === 'spectral-ouija') {
+      const rank = this.pick(RANKS);
+      for (const handCard of [...this.hand]) {
+        this.mutateCardEverywhere(handCard.id, (target) => {
+          target.rank = rank;
+          target.baseChips = rank === 14 ? 11 : rank >= 11 ? 10 : rank;
+        });
+      }
+      this.config.handSize = Math.max(1, this.config.handSize - 1);
+      this.roundHandSize = Math.max(1, this.roundHandSize - 1);
+      return;
+    }
+    if (effect.kind === 'spectral-ectoplasm') {
+      if (this.jokers.length === 0) return;
+      const target = this.pick(this.jokers);
+      target.edition = 'negative';
+      this.ectoplasmUses += 1;
+      this.config.handSize = Math.max(1, this.config.handSize - this.ectoplasmUses);
+      this.roundHandSize = Math.max(1, this.roundHandSize - this.ectoplasmUses);
+      return;
+    }
+    if (effect.kind === 'spectral-ankh') {
+      if (this.jokers.length === 0) return;
+      const source = this.pick(this.jokers);
+      const copy = cloneJoker(source);
+      copy.id = this.makeRunId('ankh');
+      if (copy.edition === 'negative') copy.edition = 'base';
+      this.jokers = [source, copy];
+      return;
+    }
+    if (effect.kind === 'spectral-hex') {
+      if (this.jokers.length === 0) return;
+      const source = this.pick(this.jokers);
+      source.edition = 'polychrome';
+      this.jokers = [source];
+      return;
+    }
+    if (effect.kind === 'spectral-soul') {
+      if (this.jokers.length >= this.jokerCapacity()) return;
+      const pool = this.availableJokerTemplates('mythic');
+      if (pool.length > 0) this.jokers.push(this.makeJokerFromTemplate(this.pick(pool), false));
+      return;
+    }
+    if (effect.kind === 'spectral-black-hole') {
+      for (const type of Object.keys(this.handLevels) as PokerHandType[]) this.upgradeHandLevel(type);
+      return;
+    }
+  }
+
+"""
+s = s[:a] + apply_consumable + s[b:]
+game_path.write_text(s, encoding="utf-8")
+
+# Observatory XMult and Plasma balancing happen after Joker/card resolution, before tally.
+replace_once(
+    "src/game/gameState.ts",
+    """    this.roundScore += breakdown.total;
+    this.money += breakdown.moneyDelta;""",
+    """    if (this.vouchers.includes('observatory')) {
+      const matchingPlanets = this.consumables.filter((card) =>
+        card.type === 'planet' && card.effect.kind === 'planet' && card.effect.handType === hand.type
+      ).length;
+      if (matchingPlanets > 0) {
+        const before = breakdown.finalMult;
+        breakdown.finalMult *= Math.pow(1.5, matchingPlanets);
+        breakdown.steps.push({
+          source: `Observatory ×${Math.pow(1.5, matchingPlanets).toFixed(2)} Mult`,
+          stage: 'joker',
+          multMul: Math.pow(1.5, matchingPlanets),
+          chipsBefore: breakdown.finalChips,
+          chipsAfter: breakdown.finalChips,
+          multBefore: before,
+          multAfter: breakdown.finalMult,
+        });
+        breakdown.total = Math.floor(breakdown.finalChips * breakdown.finalMult);
+      }
+    }
+    if (this.deckKey === 'plasma') {
+      const balanced = (breakdown.finalChips + breakdown.finalMult) / 2;
+      breakdown.steps.push({
+        source: 'Plasma Deck balance',
+        stage: 'joker',
+        chipsBefore: breakdown.finalChips,
+        chipsAfter: balanced,
+        multBefore: breakdown.finalMult,
+        multAfter: balanced,
+      });
+      breakdown.finalChips = balanced;
+      breakdown.finalMult = balanced;
+      breakdown.total = Math.floor(balanced * balanced);
+    }
+
+    this.roundScore += breakdown.total;
+    this.money += breakdown.moneyDelta;""",
+)
+
+# Voucher interest caps.
+replace_once(
+    "src/game/gameState.ts",
+    """    const interest = isGreenDeck ? 0 : Math.min(5, Math.floor(Math.max(0, this.money) / 5));""",
+    """    const interestCap = this.vouchers.includes('money-tree') ? 20 : this.vouchers.includes('seed-money') ? 10 : 5;
+    const interest = isGreenDeck ? 0 : Math.min(interestCap, Math.floor(Math.max(0, this.money) / 5));""",
+)
+
+# Anaglyph produces one Double Tag after every Boss victory.
+replace_once(
+    "src/game/gameState.ts",
+    """    let tagBonus = 0;
+    if (clearedBlind === 2 && this.investmentTags > 0) {""",
+    """    if (clearedBlind === 2 && this.deckKey === 'anaglyph') this.doubleTags += 1;
+
+    let tagBonus = 0;
+    if (clearedBlind === 2 && this.investmentTags > 0) {""",
+)
+
+# Boss reroll Vouchers.
+replace_once(
+    "src/game/gameState.ts",
+    """  targetForPreview(): number {
+    return this.targetForCurrentBlind();
+  }""",
+    """  rerollBossBlind(): boolean {
+    if (this.phase !== 'blind-select' || this.blindIndex !== 2 || this.money < 10) return false;
+    const unlimited = this.vouchers.includes('retcon');
+    const oneShot = this.vouchers.includes('directors-cut');
+    if (!unlimited && (!oneShot || this.bossRerollsUsed >= 1)) return false;
+    const pool = this.ante === 8 ? SHOWDOWN_BOSS_KEYS : REGULAR_BOSS_KEYS;
+    const choices = pool.filter((key) => key !== this.bossBlindKey);
+    if (choices.length === 0) return false;
+    this.money -= 10;
+    this.bossRerollsUsed += 1;
+    this.bossBlindKey = this.pick(choices);
+    this.target = this.targetForCurrentBlind();
+    this.emit();
+    return true;
+  }
+
+  targetForPreview(): number {
+    return this.targetForCurrentBlind();
+  }""",
+)
+
+# Reset per-Ante Boss reroll count.
+replace_once(
+    "src/game/gameState.ts",
+    """      this.anteVoucher = null;
+      this.antePlayedCardIds.clear();""",
+    """      this.anteVoucher = null;
+      this.antePlayedCardIds.clear();
+      this.bossRerollsUsed = 0;""",
+)
+
+# Snapshot V4: persist new content state.
+replace_once(
+    "src/game/gameState.ts",
+    """      bossForcedCardId: this.bossForcedCardId,
+    };""",
+    """      bossForcedCardId: this.bossForcedCardId,
+      lastConsumableKey: this.lastConsumableKey,
+      ectoplasmUses: this.ectoplasmUses,
+      consumableSlotDelta: this.consumableSlotDelta,
+      jokerSlotDelta: this.jokerSlotDelta,
+      bossRerollsUsed: this.bossRerollsUsed,
+    };""",
+)
+
+replace_once(
+    "src/game/gameState.ts",
+    """    this.bossForcedCardId = next.bossForcedCardId ?? null;
+    this.shopVisit = next.shop?.visit ?? this.completedShopCount();""",
+    """    this.bossForcedCardId = next.bossForcedCardId ?? null;
+    this.lastConsumableKey = next.lastConsumableKey ?? null;
+    this.ectoplasmUses = next.ectoplasmUses ?? 0;
+    this.consumableSlotDelta = next.consumableSlotDelta ?? 0;
+    this.jokerSlotDelta = next.jokerSlotDelta ?? 0;
+    this.bossRerollsUsed = next.bossRerollsUsed ?? 0;
+    this.shopVisit = next.shop?.visit ?? this.completedShopCount();""",
+)
+
+replace_once(
+    "src/game/gameState.ts",
+    """      bossForcedCardId: null,
+    };
+  }""",
+    """      bossForcedCardId: null,
+      lastConsumableKey: null,
+      ectoplasmUses: 0,
+      consumableSlotDelta: 0,
+      jokerSlotDelta: 0,
+      bossRerollsUsed: 0,
+    };
+  }""",
+)
+
+print("Tarot/Spectral execution and advanced Deck/Voucher scoring applied.")
