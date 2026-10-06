@@ -916,14 +916,17 @@ apply_consumable = r"""  private applyConsumableWithTargets(card: ConsumableCard
 s = s[:a] + apply_consumable + s[b:]
 game_path.write_text(s, encoding="utf-8")
 
-# Observatory XMult and Plasma balancing happen after Joker/card resolution, before tally.
+# Observatory XMult and Plasma balancing are applied before hand settlement.
+# Earlier pipeline revisions tally breakdown.total before handsLeft is decremented,
+# so compensate roundScore by the exact delta after changing the final score.
 game_path = root / "src/game/gameState.ts"
 score_src = game_path.read_text(encoding="utf-8")
-score_anchor = "    this.roundScore += breakdown.total;"
+score_anchor = "    this.handsLeft -= 1;"
 score_at = score_src.find(score_anchor)
 if score_at < 0:
-    raise SystemExit("Could not locate score tally anchor")
-score_insert = r"""    if (this.vouchers.includes('observatory')) {
+    raise SystemExit("Could not locate hand settlement anchor")
+score_insert = r"""    const contentParityOriginalTotal = breakdown.total;
+    if (this.vouchers.includes('observatory')) {
       const matchingPlanets = this.consumables.filter((card) =>
         card.type === 'planet' && card.effect.kind === 'planet' && card.effect.handType === hand.type
       ).length;
@@ -956,6 +959,7 @@ score_insert = r"""    if (this.vouchers.includes('observatory')) {
       breakdown.finalMult = balanced;
       breakdown.total = Math.floor(balanced * balanced);
     }
+    this.roundScore += breakdown.total - contentParityOriginalTotal;
 
 """
 score_src = score_src[:score_at] + score_insert + score_src[score_at:]
