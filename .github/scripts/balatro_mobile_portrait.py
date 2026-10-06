@@ -35,10 +35,10 @@ old = """function updateResponsiveHudVars() {
 
   const root = document.documentElement;
   root.style.setProperty('--ui-scale', scale.toFixed(3));
-  root.style.setProperty('--ui-edge', `\${edge}px`);
-  root.style.setProperty('--sidebar-layout-height', `\${sidebarHeight}px`);
-  root.style.setProperty('--hud-top-left', `\${hudTopLeft}px`);
-  root.style.setProperty('--hud-top-layout-width', `\${hudTopWidth}px`);
+  root.style.setProperty('--ui-edge', `${edge}px`);
+  root.style.setProperty('--sidebar-layout-height', `${sidebarHeight}px`);
+  root.style.setProperty('--hud-top-left', `${hudTopLeft}px`);
+  root.style.setProperty('--hud-top-layout-width', `${hudTopWidth}px`);
 }"""
 new = """function updateResponsiveHudVars() {
   const width = window.innerWidth || 1280;
