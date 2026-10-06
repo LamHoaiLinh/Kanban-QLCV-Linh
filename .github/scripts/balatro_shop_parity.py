@@ -272,6 +272,11 @@ replace_once(
 )
 replace_once(
     "src/game/gameState.ts",
+    "  ConsumableEffect,\n",
+    "",
+)
+replace_once(
+    "src/game/gameState.ts",
     """interface ConsumableTemplate {
   key: string;
   name: string;
