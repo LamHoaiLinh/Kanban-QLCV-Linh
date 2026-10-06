@@ -258,3 +258,436 @@ export function planetForHand(type: PokerHandType): ConsumableCatalogEntry {
 (root / "src/game/balatroShop.ts").write_text(catalog, encoding="utf-8")
 
 print("Full Balatro content catalogs applied: 15 Deck keys, 32 Vouchers, 22 Tarot, 18 Spectral.")
+
+
+# ===========================================================================
+# 3. Full Deck behavior + Voucher mechanics + complete consumable execution.
+# ===========================================================================
+
+# Import Voucher upgrade map.
+replace_once(
+    "src/game/gameState.ts",
+    """  VOUCHERS,
+  boosterConfig,""",
+    """  VOUCHERS,
+  VOUCHER_UPGRADE_BASE,
+  boosterConfig,""",
+)
+
+# Replace 5-deck catalog with all 15.
+game_path = root / "src/game/gameState.ts"
+s = game_path.read_text(encoding="utf-8")
+a = s.find("export const DECKS: Record<DeckKey, DeckDef> = {")
+b = s.find("export const STAKES:", a)
+if a < 0 or b < 0:
+    raise SystemExit("Could not locate DECKS block")
+decks = r"""export const DECKS: Record<DeckKey, DeckDef> = {
+  red: { key: 'red', name: 'Red Deck', description: '+1 Discard every round.' },
+  blue: { key: 'blue', name: 'Blue Deck', description: '+1 Hand every round.' },
+  yellow: { key: 'yellow', name: 'Yellow Deck', description: 'Start with $10 extra.' },
+  green: { key: 'green', name: 'Green Deck', description: 'No interest; cashout pays $2 per unused Hand and $1 per unused Discard.' },
+  black: { key: 'black', name: 'Black Deck', description: '+1 Joker slot, -1 Hand every round.' },
+  magic: { key: 'magic', name: 'Magic Deck', description: 'Start with Crystal Ball and 2 copies of The Fool.' },
+  nebula: { key: 'nebula', name: 'Nebula Deck', description: 'Start with Telescope and -1 consumable slot.' },
+  ghost: { key: 'ghost', name: 'Ghost Deck', description: 'Spectral cards may appear in the Shop; start with Hex.' },
+  abandoned: { key: 'abandoned', name: 'Abandoned Deck', description: 'Start with no face cards.' },
+  checkered: { key: 'checkered', name: 'Checkered Deck', description: 'Start with 26 Spades and 26 Hearts.' },
+  zodiac: { key: 'zodiac', name: 'Zodiac Deck', description: 'Start with Tarot Merchant, Planet Merchant and Overstock.' },
+  painted: { key: 'painted', name: 'Painted Deck', description: '+2 Hand Size, -1 Joker slot.' },
+  anaglyph: { key: 'anaglyph', name: 'Anaglyph Deck', description: 'Gain a Double Tag after defeating each Boss Blind.' },
+  plasma: { key: 'plasma', name: 'Plasma Deck', description: 'Balance Chips and Mult when scoring; base Blind size is doubled.' },
+  erratic: { key: 'erratic', name: 'Erratic Deck', description: 'All starting card ranks and suits are randomized.' },
+};
+
+"""
+s = s[:a] + decks + s[b:]
+game_path.write_text(s, encoding="utf-8")
+
+# Extra persistent run fields.
+replace_once(
+    "src/game/gameState.ts",
+    """  bossForcedCardId: string | null = null;
+  private concealNextDraw = false;""",
+    """  bossForcedCardId: string | null = null;
+  lastConsumableKey: string | null = null;
+  ectoplasmUses = 0;
+  consumableSlotDelta = 0;
+  jokerSlotDelta = 0;
+  bossRerollsUsed = 0;
+  private concealNextDraw = false;""",
+)
+
+# Capacity now respects Deck/Voucher/Spectral modifiers.
+s = game_path.read_text(encoding="utf-8")
+a = s.find("  jokerCapacity(): number {")
+b = s.find("  consumableCapacity(): number {", a)
+if a < 0 or b < 0:
+    raise SystemExit("Could not locate jokerCapacity")
+joker_capacity = r"""  jokerCapacity(): number {
+    const deckBonus = this.deckKey === 'black' ? 1 : 0;
+    return Math.max(1,
+      MAX_JOKERS
+      + deckBonus
+      + this.jokerSlotDelta
+      + this.jokers.filter((joker) => (joker.edition ?? 'base') === 'negative').length
+    );
+  }
+
+"""
+s = s[:a] + joker_capacity + s[b:]
+game_path.write_text(s, encoding="utf-8")
+
+s = game_path.read_text(encoding="utf-8")
+a = s.find("  consumableCapacity(): number {")
+b = s.find("  canBuyOffer(", a)
+if a < 0 or b < 0:
+    raise SystemExit("Could not locate consumableCapacity")
+cons_capacity = r"""  consumableCapacity(): number {
+    const crystalBall = this.vouchers.includes('crystal-ball') ? 1 : 0;
+    return Math.max(0,
+      MAX_CONSUMABLES
+      + crystalBall
+      + this.consumableSlotDelta
+      + this.consumables.filter((card) => (card.edition ?? 'base') === 'negative').length
+    );
+  }
+
+"""
+s = s[:a] + cons_capacity + s[b:]
+game_path.write_text(s, encoding="utf-8")
+
+# Full run setup for every Deck.
+s = game_path.read_text(encoding="utf-8")
+a = s.find("  configureRun(deckKey: DeckKey, stakeKey: StakeKey, seed?: number) {")
+b = s.find("  private rollAnteOptions()", a)
+if a < 0 or b < 0:
+    raise SystemExit("Could not locate configureRun")
+configure = r"""  configureRun(deckKey: DeckKey, stakeKey: StakeKey, seed?: number) {
+    if (typeof seed === 'number' && Number.isFinite(seed)) {
+      this.config.seed = Math.max(1, Math.floor(seed)) >>> 0;
+      this.rng = this.createTrackedRng(this.config.seed);
+    }
+
+    this.deckKey = deckKey;
+    this.stakeKey = stakeKey;
+    this.ante = 1;
+    this.blindIndex = 0;
+    this.config.handSize = 8;
+    this.config.handsPerRound = 4;
+    this.config.discardsPerRound = 3;
+    this.config.startingMoney = 4;
+    this.consumableSlotDelta = 0;
+    this.jokerSlotDelta = 0;
+    this.lastConsumableKey = null;
+    this.ectoplasmUses = 0;
+    this.bossRerollsUsed = 0;
+
+    if (STAKES[stakeKey].order >= STAKES.blue.order) this.config.discardsPerRound -= 1;
+    if (deckKey === 'red') this.config.discardsPerRound += 1;
+    if (deckKey === 'blue') this.config.handsPerRound += 1;
+    if (deckKey === 'black') this.config.handsPerRound -= 1;
+    if (deckKey === 'painted') {
+      this.config.handSize += 2;
+      this.jokerSlotDelta -= 1;
+    }
+    if (deckKey === 'nebula') this.consumableSlotDelta -= 1;
+
+    this.money = deckKey === 'yellow' ? 14 : 4;
+    this.ownedDeck = buildStandardDeck();
+
+    if (deckKey === 'abandoned') {
+      this.ownedDeck = this.ownedDeck.filter((card) => card.rank < 11 || card.rank > 13);
+    } else if (deckKey === 'checkered') {
+      for (const card of this.ownedDeck) {
+        if (card.suit === 'clubs') card.suit = 'spades';
+        else if (card.suit === 'diamonds') card.suit = 'hearts';
+      }
+    } else if (deckKey === 'erratic') {
+      for (const card of this.ownedDeck) {
+        card.suit = this.pick(SUITS);
+        card.rank = this.pick(RANKS);
+        card.baseChips = card.rank === 14 ? 11 : card.rank >= 11 ? 10 : card.rank;
+      }
+    }
+
+    this.deck = [];
+    this.discardPile = [];
+    this.hand = [];
+    this.selected.clear();
+    this.jokers = [];
+    this.consumables = [];
+    this.shop = null;
+    this.booster = null;
+    this.targetMode = null;
+    this.vouchers = [];
+    this.anteVoucher = null;
+    this.lastCashout = null;
+    this.handLevels = makeInitialHandLevels();
+    this.skippedBlinds = 0;
+    this.doubleTags = 0;
+    this.investmentTags = 0;
+    this.couponNextShop = false;
+    this.couponShopVisit = null;
+    this.d6NextShop = false;
+    this.juggleNextBlind = 0;
+    this.handsPlayedRun = 0;
+    this.discardsUsedRun = 0;
+    this.antePlayedCardIds.clear();
+    this.bossFaceDownCardIds.clear();
+    this.verdantLeafActive = false;
+    this.crimsonDebuffedJokerId = null;
+    this.bossForcedCardId = null;
+    this.handPlayCounts = Object.fromEntries(
+      (Object.keys(HAND_BASE) as PokerHandType[]).map((type) => [type, 0]),
+    ) as Record<PokerHandType, number>;
+    this.shopVisit = 0;
+
+    if (deckKey === 'magic') {
+      this.grantVoucherKey('crystal-ball');
+      const fool = TAROT_CATALOG.find((card) => card.key === 'the-fool');
+      if (fool) {
+        this.consumables.push(this.makeConsumableFromCatalog(fool));
+        this.consumables.push(this.makeConsumableFromCatalog(fool));
+      }
+    } else if (deckKey === 'nebula') {
+      this.grantVoucherKey('telescope');
+    } else if (deckKey === 'ghost') {
+      const hex = SPECTRAL_CATALOG.find((card) => card.key === 'hex');
+      if (hex) this.consumables.push(this.makeConsumableFromCatalog(hex));
+    } else if (deckKey === 'zodiac') {
+      this.grantVoucherKey('tarot-merchant');
+      this.grantVoucherKey('planet-merchant');
+      this.grantVoucherKey('overstock');
+    }
+
+    this.rollAnteOptions();
+    this.prepareBlindSelect();
+  }
+
+"""
+s = s[:a] + configure + s[b:]
+game_path.write_text(s, encoding="utf-8")
+
+# Plasma doubles Blind requirements.
+replace_once(
+    "src/game/gameState.ts",
+    """    return Math.round(base * blindMult);
+  }""",
+    """    const deckMult = this.deckKey === 'plasma' ? 2 : 1;
+    return Math.round(base * blindMult * deckMult);
+  }""",
+)
+
+# Full voucher application helper.
+s = game_path.read_text(encoding="utf-8")
+a = s.find("  private grantVoucherKey(key: VoucherKey): boolean {")
+b = s.find("  private applySingleTag(", a)
+if a < 0 or b < 0:
+    raise SystemExit("Could not locate grantVoucherKey")
+voucher_apply = r"""  private grantVoucherKey(key: VoucherKey): boolean {
+    if (this.vouchers.includes(key)) return false;
+    this.vouchers.push(key);
+
+    if (key === 'grabber' || key === 'nacho-tong') this.config.handsPerRound += 1;
+    if (key === 'wasteful' || key === 'recyclomancy') this.config.discardsPerRound += 1;
+    if (key === 'antimatter') this.jokerSlotDelta += 1;
+    if (key === 'paint-brush' || key === 'palette') this.config.handSize += 1;
+    if (key === 'hieroglyph') {
+      this.ante = Math.max(1, this.ante - 1);
+      this.config.handsPerRound = Math.max(1, this.config.handsPerRound - 1);
+    }
+    if (key === 'petroglyph') {
+      this.ante = Math.max(1, this.ante - 1);
+      this.config.discardsPerRound = Math.max(0, this.config.discardsPerRound - 1);
+    }
+    return true;
+  }
+
+"""
+s = s[:a] + voucher_apply + s[b:]
+game_path.write_text(s, encoding="utf-8")
+
+# Voucher pool respects base -> upgrade dependency.
+s = game_path.read_text(encoding="utf-8")
+a = s.find("  private createShopState(): ShopState {")
+b = s.find("  private createShopOffers(", a)
+if a < 0 or b < 0:
+    raise SystemExit("Could not locate createShopState")
+shop_state = r"""  private createShopState(): ShopState {
+    const visit = ++this.shopVisit;
+    if (this.couponNextShop) {
+      this.couponShopVisit = visit;
+      this.couponNextShop = false;
+    } else {
+      this.couponShopVisit = null;
+    }
+
+    if (!this.anteVoucher || this.anteVoucher.sold) {
+      const voucherPool = (Object.keys(VOUCHERS) as VoucherKey[]).filter((key) => {
+        if (this.vouchers.includes(key)) return false;
+        const baseKey = VOUCHER_UPGRADE_BASE[key];
+        return !baseKey || this.vouchers.includes(baseKey);
+      });
+      const key = voucherPool.length ? this.pick(voucherPool) : 'blank';
+      this.anteVoucher = { ...VOUCHERS[key], sold: false };
+    }
+
+    const state: ShopState = {
+      visit,
+      offers: this.createShopOffers(visit, 0),
+      boosters: this.createBoosterOffers(visit),
+      voucher: cloneVoucherOffer(this.anteVoucher),
+      rerolls: 0,
+      rerollCost: this.d6NextShop ? 0 : this.rerollBaseCost(),
+    };
+    this.d6NextShop = false;
+    return state;
+  }
+
+"""
+s = s[:a] + shop_state + s[b:]
+game_path.write_text(s, encoding="utf-8")
+
+# Shop slot count + Magic Trick card access.
+s = game_path.read_text(encoding="utf-8")
+a = s.find("  private createShopOffers(visit: number, rerolls: number): ShopOffer[] {")
+b = s.find("  private createBoosterOffers(", a)
+if a < 0 or b < 0:
+    raise SystemExit("Could not locate createShopOffers")
+shop_offers = r"""  private createShopOffers(visit: number, rerolls: number): ShopOffer[] {
+    const slotCount = 2
+      + (this.vouchers.includes('overstock') ? 1 : 0)
+      + (this.vouchers.includes('overstock-plus') ? 1 : 0);
+
+    return Array.from({ length: slotCount }, (_, index) => {
+      const roll = this.rng();
+      let item: ShopItem;
+      if (roll < 0.56) item = this.makeJokerItem();
+      else if (this.vouchers.includes('magic-trick') && roll < 0.69) item = this.makePlayingCardItem();
+      else item = this.makeConsumableItem();
+      return this.makeShopOffer(visit, rerolls, index, item);
+    });
+  }
+
+"""
+s = s[:a] + shop_offers + s[b:]
+game_path.write_text(s, encoding="utf-8")
+
+# Voucher-aware reroll and discounts.
+s = game_path.read_text(encoding="utf-8")
+a = s.find("  private rerollBaseCost(): number {")
+b = s.find("  private makeJokerFromTemplate", a)
+if a < 0 or b < 0:
+    raise SystemExit("Could not locate rerollBaseCost region")
+prefix = s[a:b]
+start = prefix.find("  private rerollBaseCost(): number {")
+end = prefix.find("\n  }", start) + 4
+old_func = prefix[start:end]
+new_func = """  private rerollBaseCost(): number {
+    let reduction = 0;
+    if (this.vouchers.includes('reroll-surplus')) reduction += 2;
+    if (this.vouchers.includes('reroll-glut')) reduction += 2;
+    return Math.max(1, SHOP_REROLL_BASE_COST - reduction);
+  }"""
+s = s[:a] + prefix[:start] + new_func + prefix[end:] + s[b:]
+game_path.write_text(s, encoding="utf-8")
+
+replace_once(
+    "src/game/gameState.ts",
+    """    return this.vouchers.includes('clearance-sale')
+      ? Math.max(1, Math.ceil(base * 0.75))
+      : base;""",
+    """    if (this.vouchers.includes('liquidation')) return Math.max(1, Math.floor(base * 0.5 + 0.5));
+    if (this.vouchers.includes('clearance-sale')) return Math.max(1, Math.floor(base * 0.75 + 0.5));
+    return base;""",
+)
+
+# Consumable shop probabilities: Spectral only naturally in Ghost Deck.
+s = game_path.read_text(encoding="utf-8")
+a = s.find("  private makeConsumableTemplate(): ConsumableCatalogEntry {")
+b = s.find("  private makePlayingCardItem(): ShopItem {", a)
+if a < 0 or b < 0:
+    raise SystemExit("Could not locate makeConsumableTemplate")
+cons_template = r"""  private makeConsumableTemplate(): ConsumableCatalogEntry {
+    let tarotWeight = this.vouchers.includes('tarot-tycoon') ? 4
+      : this.vouchers.includes('tarot-merchant') ? 2 : 1;
+    let planetWeight = this.vouchers.includes('planet-tycoon') ? 4
+      : this.vouchers.includes('planet-merchant') ? 2 : 1;
+    const spectralWeight = this.deckKey === 'ghost' ? 0.8 : 0;
+    const total = tarotWeight + planetWeight + spectralWeight;
+    let roll = this.rng() * total;
+    if ((roll -= tarotWeight) < 0) return this.pick(TAROT_CATALOG);
+    if ((roll -= planetWeight) < 0) return this.pick(PLANET_CATALOG);
+    return this.pick(SPECTRAL_CATALOG);
+  }
+
+"""
+s = s[:a] + cons_template + s[b:]
+game_path.write_text(s, encoding="utf-8")
+
+# Illusion controls modifications on playing cards sold in the Shop.
+s = game_path.read_text(encoding="utf-8")
+a = s.find("  private makePlayingCardItem(): ShopItem {")
+b = s.find("  private findOffer(", a)
+if a < 0 or b < 0:
+    raise SystemExit("Could not locate makePlayingCardItem")
+playing_item = r"""  private makePlayingCardItem(): ShopItem {
+    const suit = this.pick(SUITS);
+    const rank = this.pick(RANKS);
+    const card = makeCard(suit, rank);
+
+    if (this.vouchers.includes('illusion')) {
+      if (this.rng() < 0.45) {
+        card.enhancement = this.pick(ENHANCEMENT_OFFERS);
+        if (card.enhancement === 'stone') card.baseChips = 50;
+      }
+      if (this.rng() < 0.22) card.edition = this.pick(EDITION_OFFERS);
+      if (this.rng() < 0.25) card.seal = this.pick(['red','blue','gold','purple'] as const);
+    }
+
+    const name = `${RANK_LABEL[rank]} of ${titleCase(suit)}${card.edition !== 'base' ? ` (${titleCase(card.edition)})` : ''}`;
+    return {
+      kind: 'playing-card',
+      card,
+      name,
+      description: card.enhancement === 'none' ? 'Add this card to your deck.' : `Add a ${titleCase(card.enhancement)} card to your deck.`,
+      price: card.edition === 'base' ? 4 : 6,
+      sellValue: 1,
+    };
+  }
+
+"""
+s = s[:a] + playing_item + s[b:]
+game_path.write_text(s, encoding="utf-8")
+
+# Editions appear on Jokers more often under Hone / Glow Up.
+replace_once(
+    "src/game/gameState.ts",
+    """    return { kind: 'joker', joker: this.makeJokerFromTemplate(this.pick(chosen)) };""",
+    """    const joker = this.makeJokerFromTemplate(this.pick(chosen));
+    const editionBoost = this.vouchers.includes('glow-up') ? 4 : this.vouchers.includes('hone') ? 2 : 1;
+    const editionRoll = this.rng();
+    if (editionRoll < 0.02 * editionBoost) joker.edition = 'polychrome';
+    else if (editionRoll < 0.06 * editionBoost) joker.edition = 'holographic';
+    else if (editionRoll < 0.12 * editionBoost) joker.edition = 'foil';
+    return { kind: 'joker', joker };""",
+)
+
+# Omen Globe + Telescope affect Pack composition.
+replace_once(
+    "src/game/gameState.ts",
+    """    if (type === 'arcana') item = { kind: 'consumable', consumable: this.makeConsumableFromCatalog(this.pick(TAROT_CATALOG)) };
+    else if (type === 'celestial') item = { kind: 'consumable', consumable: this.makeConsumableFromCatalog(this.pick(PLANET_CATALOG)) };""",
+    """    if (type === 'arcana') {
+      const catalog = this.vouchers.includes('omen-globe') && this.rng() < 0.20 ? SPECTRAL_CATALOG : TAROT_CATALOG;
+      item = { kind: 'consumable', consumable: this.makeConsumableFromCatalog(this.pick(catalog)) };
+    }
+    else if (type === 'celestial') {
+      const template = index === 0 && this.vouchers.includes('telescope')
+        ? planetForHand(this.mostPlayedHandType())
+        : this.pick(PLANET_CATALOG);
+      item = { kind: 'consumable', consumable: this.makeConsumableFromCatalog(template) };
+    }""",
+)
+
+print("Deck and Voucher behavior applied.")
