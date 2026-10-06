@@ -251,6 +251,10 @@ describe('Balatro exact meta progression', () => {
     const reset = recordCashout(profile, 4, 5, 'cash-11');
     expect(reset.interestStreak).toBe(0);
     expect(reset.maxInterestStreak).toBe(10);
+
+    const nextRun = recordRunStart(profile);
+    expect(nextRun.interestStreak).toBe(0);
+    expect(nextRun.maxInterestStreak).toBe(10);
   });
 
   it('exposes exact lock text for Decks, Jokers and Vouchers', () => {
