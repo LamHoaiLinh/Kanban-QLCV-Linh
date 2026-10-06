@@ -22,6 +22,8 @@ on:
       - ".github/scripts/balatro_content_parity.py"
       - ".github/scripts/balatro_meta_exact_tests.py"
       - ".github/scripts/balatro_meta_exact.py"
+      - ".github/scripts/balatro_mobile_portrait.py"
+      - ".github/scripts/balatro_reliability_cert.py"
 
 permissions:
   contents: write
@@ -69,6 +71,8 @@ jobs:
           python3 .github/scripts/balatro_content_tests.py .open-poker-build
           python3 .github/scripts/balatro_meta_exact.py .open-poker-build
           python3 .github/scripts/balatro_meta_exact_tests.py .open-poker-build
+          python3 .github/scripts/balatro_mobile_portrait.py .open-poker-build
+          python3 .github/scripts/balatro_reliability_cert.py .open-poker-build
 
       - name: Build Open Poker
         run: |
@@ -77,7 +81,7 @@ jobs:
           npm ci --no-audit --no-fund
           npm run gen-art
           npm run typecheck
-          npm run test
+          RELIABILITY_SEEDS=750 npm run test
           npm run build
 
       - name: Stage game for Kanban
@@ -120,7 +124,9 @@ jobs:
             '- Seeded New Run flow with stable text-to-seed hashing' \
             '- Complete 24 Tag catalog and 28 Boss Blind catalog including 5 showdown Bosses' \
             '- Boss runtime save/restore + concealed-card rendering + Crimson/Verdant/Pillar/Cerulean effects' \
-            '- Automated 10-seed full-run smoke simulation in CI' \
+            '- Reliability Certification: 750 randomized full-run seeds per build' \
+            '- Reliability invariants: finite state, card conservation, capacity, deterministic RNG, save/restore equivalence, Boss liveness' \
+            '- Portrait mobile UI: safe-area layout, horizontal-scroll lock and long-press text-selection protection' \
             '- Content parity: 15 Decks + 32 Vouchers + 22 Tarot + 12 Planet + 18 Spectral' \
             '- Magic/Nebula/Ghost/Abandoned/Checkered/Zodiac/Painted/Anaglyph/Plasma/Erratic Deck behavior' \
             '- Full Voucher upgrade pairs including Observatory/Omen Globe/Antimatter/Retcon/Palette' \
