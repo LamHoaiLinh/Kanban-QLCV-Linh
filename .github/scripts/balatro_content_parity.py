@@ -337,12 +337,15 @@ joker_capacity = r"""  jokerCapacity(): number {
 s = s[:a] + joker_capacity + s[b:]
 game_path.write_text(s, encoding="utf-8")
 
-s = game_path.read_text(encoding="utf-8")
-a = s.find("  consumableCapacity(): number {")
-b = s.find("  canBuyOffer(", a)
-if a < 0 or b < 0:
-    raise SystemExit("Could not locate consumableCapacity")
-cons_capacity = r"""  consumableCapacity(): number {
+replace_once(
+    "src/game/gameState.ts",
+    """  consumableCapacity(): number {
+    const crystalBall = this.vouchers.includes('crystal-ball') ? 1 : 0;
+    return MAX_CONSUMABLES
+      + crystalBall
+      + this.consumables.filter((card) => (card.edition ?? 'base') === 'negative').length;
+  }""",
+    """  consumableCapacity(): number {
     const crystalBall = this.vouchers.includes('crystal-ball') ? 1 : 0;
     return Math.max(0,
       MAX_CONSUMABLES
@@ -350,11 +353,8 @@ cons_capacity = r"""  consumableCapacity(): number {
       + this.consumableSlotDelta
       + this.consumables.filter((card) => (card.edition ?? 'base') === 'negative').length
     );
-  }
-
-"""
-s = s[:a] + cons_capacity + s[b:]
-game_path.write_text(s, encoding="utf-8")
+  }""",
+)
 
 # Full run setup for every Deck.
 s = game_path.read_text(encoding="utf-8")
