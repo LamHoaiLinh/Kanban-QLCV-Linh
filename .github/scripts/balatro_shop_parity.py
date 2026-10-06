@@ -264,6 +264,46 @@ export function planetForHand(type: PokerHandType): ConsumableCatalogEntry {
 # ---------------------------------------------------------------------------
 # 3. GameState: imports/catalog wiring.
 # ---------------------------------------------------------------------------
+# Remove prototype-only declarations made obsolete by L2.
+replace_once(
+    "src/game/gameState.ts",
+    "  RunSnapshotV2,\n",
+    "",
+)
+replace_once(
+    "src/game/gameState.ts",
+    """interface ConsumableTemplate {
+  key: string;
+  name: string;
+  description: string;
+  type: ConsumableCard['type'];
+  price: number;
+  effect: ConsumableEffect;
+}
+
+""",
+    "",
+)
+replace_once(
+    "src/game/gameState.ts",
+    """const PLANET_HANDS: PokerHandType[] = [
+  'High Card',
+  'Pair',
+  'Two Pair',
+  'Three of a Kind',
+  'Straight',
+  'Flush',
+  'Full House',
+  'Four of a Kind',
+];
+
+""",
+    "",
+)
+
+# ---------------------------------------------------------------------------
+# 3. GameState: imports/catalog wiring.
+# ---------------------------------------------------------------------------
 replace_once(
     "src/game/gameState.ts",
     "  ShopItem,\n  ShopOffer,\n  ShopState,\n  ScoreBreakdown,",
@@ -940,6 +980,16 @@ replace_once(
     this.shopVisit = 0;""",
 )
 
+# Old random target picker is obsolete now that consumables use explicit target mode.
+game_path = root / "src/game/gameState.ts"
+game_source = game_path.read_text(encoding="utf-8")
+picker_start = game_source.find("  private pickOwnedDeckCard(")
+picker_end = game_source.find("  private pick<T>(", picker_start)
+if picker_start < 0 or picker_end < 0:
+    raise SystemExit("Could not locate obsolete pickOwnedDeckCard")
+game_source = game_source[:picker_start] + game_source[picker_end:]
+game_path.write_text(game_source, encoding="utf-8")
+
 # Snapshot V3.
 replace_once(
     "src/game/gameState.ts",
@@ -1003,6 +1053,15 @@ replace_once(
         lastCashout: null,
       };
     }""",
+)
+replace_once(
+    "src/game/gameState.ts",
+    """    return {
+      ...legacy,
+      version: 2,""",
+    """    return {
+      ...legacy,
+      version: 3,""",
 )
 replace_once(
     "src/game/gameState.ts",
@@ -1112,6 +1171,18 @@ replace_once(
           updateHud();
         }
       });""",
+)
+
+replace_once(
+    "src/main.ts",
+    """function shopItemPrice(item: ShopItem): number {
+  if (item.kind === 'joker') return item.joker.price;
+  if (item.kind === 'consumable') return item.consumable.price;
+  return item.price;
+}
+
+""",
+    "",
 )
 
 # Shop UI uses discounted price.
