@@ -644,8 +644,10 @@ replace_once(
     """  private unlockedJokerKeys: Set<string> | null = null;
   private unlockedVoucherKeys: Set<VoucherKey> | null = null;
 
+  metaHandsPlayedRun = 0;
   metaCardsPlayedRun = 0;
   metaFaceCardsPlayedRun = 0;
+  metaDiscardActionsRun = 0;
   metaCardsDiscardedRun = 0;
   metaShopSpendRun = 0;
   metaShopRerollsRun = 0;
@@ -702,8 +704,10 @@ gs = game.read_text(encoding="utf-8")
 anchor = "    this.rollAnteOptions();\n    this.prepareBlindSelect();"
 if anchor not in gs:
     raise SystemExit("Could not locate configureRun terminal anchor")
-reset = r"""    this.metaCardsPlayedRun = 0;
+reset = r"""    this.metaHandsPlayedRun = 0;
+    this.metaCardsPlayedRun = 0;
     this.metaFaceCardsPlayedRun = 0;
+    this.metaDiscardActionsRun = 0;
     this.metaCardsDiscardedRun = 0;
     this.metaShopSpendRun = 0;
     this.metaShopRerollsRun = 0;
@@ -732,6 +736,7 @@ replace_once(
     """    const cards = this.selectedCards(orderIds);
     const hand = evaluateHand(cards);""",
     """    const cards = this.selectedCards(orderIds);
+    this.metaHandsPlayedRun += 1;
     this.metaCardsPlayedRun += cards.length;
     this.metaFaceCardsPlayedRun += cards.filter((card) => card.rank >= 11 && card.rank <= 13).length;
     const hand = evaluateHand(cards);""",
@@ -747,7 +752,7 @@ cards_at = gs.find("    const cards = this.selectedCards(orderIds);", discard_at
 if cards_at < 0:
     raise SystemExit("Could not locate discard cards line")
 cards_end = cards_at + len("    const cards = this.selectedCards(orderIds);")
-gs = gs[:cards_end] + "\n    this.metaCardsDiscardedRun += cards.length;" + gs[cards_end:]
+gs = gs[:cards_end] + "\n    this.metaDiscardActionsRun += 1;\n    this.metaCardsDiscardedRun += cards.length;" + gs[cards_end:]
 game.write_text(gs, encoding="utf-8")
 
 # Claiming—not merely seeing—a Tag discovers it.
