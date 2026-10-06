@@ -540,6 +540,7 @@ function firstActiveFaceIndex(hand: EvaluatedHand, options: ScoreHandOptions): n
 function extraRetriggersForScoringCard(
   card: PlayingCard,
   cardIndex: number,
+  hand: EvaluatedHand,
   options: ScoreHandOptions,
 ): number {
   let extra = 0;
@@ -562,7 +563,6 @@ function applyOnScoredJokers(
   card: PlayingCard,
   firstFaceIndex: number,
   cardIndex: number,
-  hand: EvaluatedHand,
   options: ScoreHandOptions,
   score: MutableScore,
   rng: () => number,
