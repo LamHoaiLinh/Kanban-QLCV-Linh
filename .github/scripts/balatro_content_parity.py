@@ -694,11 +694,6 @@ replace_once(
 print("Deck and Voucher behavior applied.")
 
 
-print("CONTENT_DEBUG_PRE_STAGE4")
-_debug_src = (root / "src/game/gameState.ts").read_text(encoding="utf-8")
-print("playSelected@", _debug_src.find("playSelected("), "scoreHand@", _debug_src.find("scoreHand("), "breakdown@", _debug_src.find("breakdown ="))
-print(_debug_src[_debug_src.find("playSelected("):_debug_src.find("playSelected(")+1800])
-
 # ===========================================================================
 # 4. Tarot / Spectral execution, Plasma/Observatory scoring, cashout, Anaglyph.
 # ===========================================================================
