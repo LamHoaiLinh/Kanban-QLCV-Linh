@@ -317,6 +317,13 @@ export const JOKER_LIBRARY_SIZE = JOKER_TEMPLATES.length;
 src = src[:start] + pool + src[end:]
 game_path.write_text(src, encoding="utf-8")
 
+# Remove the prototype Ante curve; L3 supplies Stake-specific curves above.
+replace_once(
+    "src/game/gameState.ts",
+    "const ANTE_BASE: number[] = [300, 800, 2000, 5000, 11000, 20000, 35000, 50000];\n",
+    "",
+)
+
 # ---------------------------------------------------------------------------
 # Progression state
 # ---------------------------------------------------------------------------
