@@ -31,3 +31,7 @@ Kanban customizations:
 - Complete 24 Tag catalog and 28 Boss Blind catalog including 5 showdown Bosses
 - Boss runtime save/restore + concealed-card rendering + Crimson/Verdant/Pillar/Cerulean effects
 - Automated 10-seed full-run smoke simulation in CI
+- Content parity: 15 Decks + 32 Vouchers + 22 Tarot + 12 Planet + 18 Spectral
+- Magic/Nebula/Ghost/Abandoned/Checkered/Zodiac/Painted/Anaglyph/Plasma/Erratic Deck behavior
+- Full Voucher upgrade pairs including Observatory/Omen Globe/Antimatter/Retcon/Palette
+- Full Tarot and Spectral execution including Fool/Wheel/Strength/Temperance/Soul/Black Hole
