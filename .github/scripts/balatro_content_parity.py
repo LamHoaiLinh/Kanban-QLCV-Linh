@@ -917,12 +917,20 @@ s = s[:a] + apply_consumable + s[b:]
 game_path.write_text(s, encoding="utf-8")
 
 # Observatory XMult and Plasma balancing happen after the base hand score is tallied.
-# The Boss pipeline always contains the Tooth settlement block, so use that as
-# a stable final-score anchor and compensate roundScore by the score delta.
-replace_once(
-    "src/game/gameState.ts",
-    """    if (this.blindIndex === 2 && this.bossBlindKey === 'tooth') {""",
-    """    const contentParityOriginalTotal = breakdown.total;
+# Anchor on the Tooth money settlement body because previous patches may rewrite
+# the surrounding condition while retaining this unique statement.
+game_path = root / "src/game/gameState.ts"
+score_src = game_path.read_text(encoding="utf-8")
+tooth_marker = "      breakdown.moneyDelta -= cards.length;"
+tooth_body = score_src.find(tooth_marker)
+if tooth_body < 0:
+    raise SystemExit("Could not locate Tooth money settlement body")
+line_start = score_src.rfind("\n", 0, tooth_body) + 1
+# Insert before the full Tooth block by scanning backward to its nearest if.
+block_start = score_src.rfind("    if (", 0, line_start)
+if block_start < 0:
+    raise SystemExit("Could not locate Tooth condition before settlement body")
+score_insert = r"""    const contentParityOriginalTotal = breakdown.total;
     if (this.vouchers.includes('observatory')) {
       const matchingPlanets = this.consumables.filter((card) =>
         card.type === 'planet' && card.effect.kind === 'planet' && card.effect.handType === hand.type
@@ -959,8 +967,9 @@ replace_once(
     }
     this.roundScore += breakdown.total - contentParityOriginalTotal;
 
-    if (this.blindIndex === 2 && this.bossBlindKey === 'tooth') {""",
-)
+"""
+score_src = score_src[:block_start] + score_insert + score_src[block_start:]
+game_path.write_text(score_src, encoding="utf-8")
 
 # Voucher interest caps.
 replace_once(
