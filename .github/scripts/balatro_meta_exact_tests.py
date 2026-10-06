@@ -171,7 +171,7 @@ describe('Balatro exact meta progression', () => {
     expect(profile.unlockedVouchers.sort()).toEqual([...baseKeys].sort());
 
     profile.totalShopSpend = 2500;
-    profile.maxVouchersInRun = 10;
+    profile.maxVouchersRedeemedRun = 10;
     profile.maxEditionJokers = 5;
     profile.totalRerolls = 100;
     profile.tarotPackUsed = 25;
@@ -209,7 +209,7 @@ describe('Balatro exact meta progression', () => {
     profile = recordBossClear(profile, 'wall', 'High Card', 'boss-high');
     profile = recordRunCounters(profile, { hands: 200, faceCardsPlayed: 300 });
     profile = recordLiveState(profile, {
-      ante: 8, money: 20, handSize: 8, vouchers: 0,
+      ante: 8, money: 20, handSize: 8, vouchersRedeemed: 0,
       polychromeJokers: 2, editionJokers: 2,
       suitCounts: { spades: 30, hearts: 30, diamonds: 30, clubs: 30 },
     });
