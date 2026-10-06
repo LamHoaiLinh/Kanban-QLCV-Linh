@@ -921,10 +921,10 @@ game_path.write_text(s, encoding="utf-8")
 # so compensate roundScore by the exact delta after changing the final score.
 game_path = root / "src/game/gameState.ts"
 score_src = game_path.read_text(encoding="utf-8")
-score_anchor = "    this.handsLeft -= 1;"
+score_anchor = "    this.lastScore = breakdown;"
 score_at = score_src.find(score_anchor)
 if score_at < 0:
-    raise SystemExit("Could not locate hand settlement anchor")
+    raise SystemExit("Could not locate lastScore settlement anchor")
 score_insert = r"""    const contentParityOriginalTotal = breakdown.total;
     if (this.vouchers.includes('observatory')) {
       const matchingPlanets = this.consumables.filter((card) =>
