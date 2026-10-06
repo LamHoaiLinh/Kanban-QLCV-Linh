@@ -8,8 +8,18 @@ if len(sys.argv) != 2:
 
 root = Path(sys.argv[1]).resolve()
 
+# Update earlier L3 deck-count regression now that content parity has all 15 Decks.
+l3 = root / "tests/unit/balatroProgressionParity.test.ts"
+if l3.exists():
+    l3_text = l3.read_text(encoding="utf-8")
+    l3_text = l3_text.replace(
+        "it('exposes five Decks and all eight Stakes', () => {\n    expect(Object.keys(DECKS)).toHaveLength(5);",
+        "it('exposes all fifteen Decks and all eight Stakes', () => {\n    expect(Object.keys(DECKS)).toHaveLength(15);",
+    )
+    l3.write_text(l3_text, encoding="utf-8")
+
 tests = r"""import { describe, expect, it } from 'vitest';
-import { DECKS, GameState, STAKES } from '../../src/game/gameState';
+import { DECKS, GameState } from '../../src/game/gameState';
 import {
   PLANET_CATALOG,
   SPECTRAL_CATALOG,
@@ -17,7 +27,7 @@ import {
   VOUCHERS,
   targetRule,
 } from '../../src/game/balatroShop';
-import type { DeckKey, JokerCard, VoucherKey } from '../../src/game/types';
+import type { DeckKey, VoucherKey } from '../../src/game/types';
 
 function addTestJokers(state: GameState) {
   for (const key of ['joker', 'hanging-chad', 'photograph']) {
@@ -187,6 +197,7 @@ describe('Balatro content parity pack', () => {
     const state = new GameState({ seed: 7801 });
     state.configureRun('anaglyph', 'white', 7801);
     state.blindIndex = 2;
+    state.bossBlindKey = 'wall';
     state.startBlind();
     state.target = 1;
     state.selected = new Set([state.hand[0].id]);
