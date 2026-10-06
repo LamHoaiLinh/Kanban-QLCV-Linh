@@ -920,13 +920,13 @@ game_path.write_text(s, encoding="utf-8")
 # tallies it. Locate the final scoreHand call structurally, independent of later Boss rewrites.
 game_path = root / "src/game/gameState.ts"
 score_src = game_path.read_text(encoding="utf-8")
-call_start = score_src.find("    const breakdown = scoreHand(")
+call_start = score_src.find("const breakdown = scoreHand(")
 if call_start < 0:
     raise SystemExit("Could not locate final scoreHand call")
-call_end = score_src.find("\n    });", call_start)
+call_end = score_src.find("});", call_start)
 if call_end < 0:
     raise SystemExit("Could not locate end of final scoreHand call")
-call_end += len("\n    });")
+call_end += len("});")
 score_insert = r"""
     if (this.vouchers.includes('observatory')) {
       const matchingPlanets = this.consumables.filter((card) =>
