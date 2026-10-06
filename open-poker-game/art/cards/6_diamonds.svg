@@ -20,11 +20,11 @@
   <rect x="16" y="15" width="224" height="330" rx="18" fill="none" stroke="url(#card-6-diamonds-gold)" stroke-width="2"/>
   <rect x="24" y="23" width="208" height="314" rx="13" fill="none" stroke="#d8c89e" stroke-opacity="0.34" stroke-width="1"/>
   <g>
-    <text transform="translate(128 188)" x="0" y="0" font-size="150" text-anchor="middle" dominant-baseline="middle" fill="#b4142a" stroke="#680814" stroke-width="0.7" paint-order="stroke fill" font-family="Georgia, 'Times New Roman', serif" font-weight="700">&#9830;</text>
+    <text transform="translate(128 168)" x="0" y="0" font-size="150" text-anchor="middle" dominant-baseline="middle" fill="#b4142a" stroke="#680814" stroke-width="0.7" paint-order="stroke fill" font-family="Georgia, 'Times New Roman', serif" font-weight="700">&#9830;</text>
   </g>
     <g>
       <text transform="translate(55 68)" x="0" y="0" font-size="98" text-anchor="middle" dominant-baseline="middle" fill="#b4142a" stroke="#fff7df" stroke-width="1.1" paint-order="stroke fill" font-family="'Trebuchet MS', Arial, sans-serif" font-weight="900">6</text>
-      <text transform="translate(48 132)" x="0" y="0" font-size="34" text-anchor="middle" dominant-baseline="middle" fill="#b4142a" stroke="#680814" stroke-width="0.7" paint-order="stroke fill" font-family="Georgia, 'Times New Roman', serif" font-weight="700">&#9830;</text>
+      <text transform="translate(48 116)" x="0" y="0" font-size="34" text-anchor="middle" dominant-baseline="middle" fill="#b4142a" stroke="#680814" stroke-width="0.7" paint-order="stroke fill" font-family="Georgia, 'Times New Roman', serif" font-weight="700">&#9830;</text>
     </g>
     <g transform="translate(256 360) rotate(180)">
       <text transform="translate(55 68)" x="0" y="0" font-size="98" text-anchor="middle" dominant-baseline="middle" fill="#b4142a" stroke="#fff7df" stroke-width="1.1" paint-order="stroke fill" font-family="'Trebuchet MS', Arial, sans-serif" font-weight="900">6</text>

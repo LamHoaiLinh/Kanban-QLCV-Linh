@@ -9,8 +9,8 @@
 #kanban-close-game{position:fixed;z-index:100000;right:12px;top:12px;width:42px;height:42px;border:1px solid rgba(255,255,255,.35);border-radius:12px;background:rgba(15,24,22,.72);color:#fff;font:700 28px/1 system-ui;cursor:pointer;backdrop-filter:blur(8px)}
 #kanban-close-game:hover{background:rgba(180,45,45,.86)}
 </style>
-  <script type="module" crossorigin src="./assets/index-DhL8xIG1.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-BMLPdDMD.css">
+  <script type="module" crossorigin src="./assets/index-B-kJI18I.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-zJ4HJDGY.css">
 </head>
   <body>
     <div id="app">
@@ -157,6 +157,30 @@
         </section>
       </div>
 
+
+      <div id="run-info-overlay" class="kanban-game-panel-overlay hidden" aria-hidden="true">
+        <section class="kanban-game-panel run-info-panel" aria-label="Run Info">
+          <div class="panel-kicker">RUN INFO</div>
+          <div class="panel-tabs"><button class="panel-tab active" type="button">Poker Hands</button></div>
+          <div class="run-info-head"><span>Level</span><span>Hand</span><span>Chips × Mult</span><span>Played</span></div>
+          <div id="run-info-list" class="run-info-list"></div>
+          <button id="btn-run-info-back" class="panel-back-btn" type="button">Back</button>
+        </section>
+      </div>
+
+      <div id="options-overlay" class="kanban-game-panel-overlay hidden" aria-hidden="true">
+        <section class="kanban-game-panel options-panel" aria-label="Options">
+          <div class="panel-kicker">OPTIONS</div>
+          <div class="options-stack">
+            <button id="btn-option-sfx" class="options-menu-btn" type="button">Sound Effects: On</button>
+            <button id="btn-option-music" class="options-menu-btn" type="button">Music: On</button>
+            <button id="btn-option-new-run" class="options-menu-btn danger" type="button">New Run</button>
+            <button id="btn-option-return" class="options-menu-btn" type="button">Save &amp; Return to Kanban</button>
+          </div>
+          <button id="btn-options-back" class="panel-back-btn" type="button">Back</button>
+        </section>
+      </div>
+
       <div id="overlay" class="overlay hidden">
         <div class="overlay-card">
           <div id="overlay-title" class="overlay-title">Game Over</div>
@@ -171,6 +195,5 @@
       <button id="btn-mute" class="mute-btn" aria-label="Mute">🔊</button>
     </div>
   <button id="kanban-close-game" type="button" aria-label="Đóng game">×</button>
-<script>document.getElementById('kanban-close-game').addEventListener('click',()=>parent.postMessage({type:'open-poker-close'},'*'));</script>
 </body>
 </html>

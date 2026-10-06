@@ -4,4 +4,9 @@ License: MIT (see LICENSE_OPEN_POKER.txt)
 Kanban customizations:
 - Card ranks 2..A enlarged more than 2x for readability
 - Sort Hand: Straight (S)
-- Sort Hand: Flush (F)
+- Sort Hand: Flush (F) with sticky auto-sort
+- Play Hand hotkey: Left/Right Ctrl
+- Discard hotkey: Left/Right Shift
+- Run Info: hand level, Chips x Mult, played count
+- Options: SFX, music, new run, save and return
+- Current run autosaves/restores; ESC closes panel or returns to Kanban
