@@ -9,8 +9,8 @@
 #kanban-close-game{position:fixed;z-index:100000;right:12px;top:12px;width:42px;height:42px;border:1px solid rgba(255,255,255,.35);border-radius:12px;background:rgba(15,24,22,.72);color:#fff;font:700 28px/1 system-ui;cursor:pointer;backdrop-filter:blur(8px)}
 #kanban-close-game:hover{background:rgba(180,45,45,.86)}
 </style>
-  <script type="module" crossorigin src="./assets/index-BEYCIt-Q.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-B-YtLpZw.css">
+  <script type="module" crossorigin src="./assets/index-zYSIo64V.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Kum39wz3.css">
 </head>
   <body>
     <div id="app">
@@ -183,12 +183,25 @@
         </section>
       </div>
 
+      <div id="collection-overlay" class="kanban-game-panel-overlay hidden" aria-hidden="true">
+        <section class="kanban-game-panel collection-panel" aria-label="Collection">
+          <div class="panel-kicker">COLLECTION</div>
+          <div id="collection-stats" class="collection-stats"></div>
+          <h3 class="collection-title">Deck / Stake Progress</h3>
+          <div id="collection-decks" class="collection-decks"></div>
+          <h3 class="collection-title">Jokers</h3>
+          <div id="collection-jokers" class="collection-jokers"></div>
+          <button id="btn-collection-back" class="panel-back-btn" type="button">Back</button>
+        </section>
+      </div>
+
       <div id="options-overlay" class="kanban-game-panel-overlay hidden" aria-hidden="true">
         <section class="kanban-game-panel options-panel" aria-label="Options">
           <div class="panel-kicker">OPTIONS</div>
           <div class="options-stack">
             <button id="btn-option-sfx" class="options-menu-btn" type="button">Sound Effects: On</button>
             <button id="btn-option-music" class="options-menu-btn" type="button">Music: On</button>
+            <button id="btn-option-collection" class="options-menu-btn" type="button">Collection</button>
             <button id="btn-option-new-run" class="options-menu-btn danger" type="button">New Run</button>
             <button id="btn-option-return" class="options-menu-btn" type="button">Save &amp; Return to Kanban</button>
           </div>
@@ -212,6 +225,11 @@
           <label class="setup-stake-label" for="setup-stake">Stake</label>
           <select id="setup-stake" class="setup-stake"></select>
           <p id="setup-stake-desc" class="setup-stake-desc"></p>
+          <label class="setup-stake-label" for="setup-seed">Seed</label>
+          <div class="setup-seed-row">
+            <input id="setup-seed" class="setup-seed" type="text" inputmode="text" placeholder="Blank = random seed">
+            <button id="btn-setup-random-seed" class="btn btn-ghost" type="button">Random</button>
+          </div>
           <button id="btn-setup-start" class="btn btn-play" type="button">Play</button>
         </section>
       </div>
