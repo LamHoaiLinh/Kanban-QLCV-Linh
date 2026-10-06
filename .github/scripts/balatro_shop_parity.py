@@ -109,8 +109,7 @@ export interface CashoutSummary {
 replace_once(
     "src/game/types.ts",
     "export interface ShopOffer {",
-    insert_types + "
-export interface ShopOffer {",
+    insert_types + "\nexport interface ShopOffer {",
 )
 
 replace_once(
