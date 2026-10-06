@@ -9,8 +9,8 @@
 #kanban-close-game{position:fixed;z-index:100000;right:12px;top:12px;width:42px;height:42px;border:1px solid rgba(255,255,255,.35);border-radius:12px;background:rgba(15,24,22,.72);color:#fff;font:700 28px/1 system-ui;cursor:pointer;backdrop-filter:blur(8px)}
 #kanban-close-game:hover{background:rgba(180,45,45,.86)}
 </style>
-  <script type="module" crossorigin src="./assets/index-DYg-jOUV.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-C6DEIX3p.css">
+  <script type="module" crossorigin src="./assets/index-BxJTxHLA.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BXjqMRIK.css">
 </head>
   <body>
     <div id="app">
@@ -145,12 +145,20 @@
 
           <div class="shop-body">
             <div class="shop-market">
-              <div class="shop-section-title">Cards</div>
-              <div id="shop-offers" class="shop-offers"></div>
-              <div class="shop-section-title">Booster Packs</div>
-              <div id="shop-boosters" class="shop-boosters"></div>
-              <div class="shop-section-title">Voucher</div>
-              <div id="shop-voucher" class="shop-voucher"></div>
+              <section class="shop-card-market">
+                <div class="shop-section-title">Cards</div>
+                <div id="shop-offers" class="shop-offers"></div>
+              </section>
+              <div class="shop-lower-market">
+                <section class="shop-voucher-zone">
+                  <div class="shop-section-title">Voucher</div>
+                  <div id="shop-voucher" class="shop-voucher"></div>
+                </section>
+                <section class="shop-booster-zone">
+                  <div class="shop-section-title">Booster Packs</div>
+                  <div id="shop-boosters" class="shop-boosters"></div>
+                </section>
+              </div>
             </div>
             <aside id="shop-inventory" class="shop-inventory"></aside>
           </div>
@@ -185,6 +193,34 @@
             <button id="btn-option-return" class="options-menu-btn" type="button">Save &amp; Return to Kanban</button>
           </div>
           <button id="btn-options-back" class="panel-back-btn" type="button">Back</button>
+        </section>
+      </div>
+
+      <aside id="item-info" class="item-info hidden" aria-live="polite">
+        <button id="btn-item-info-close" class="item-info-close" type="button" aria-label="Close">×</button>
+        <div id="item-info-kind" class="item-info-kind">JOKER</div>
+        <h3 id="item-info-name">Joker</h3>
+        <p id="item-info-desc"></p>
+        <div id="item-info-meta" class="item-info-meta"></div>
+      </aside>
+
+      <div id="setup-overlay" class="setup-overlay hidden" data-testid="setup-overlay">
+        <section class="setup-panel">
+          <div class="setup-kicker">NEW RUN</div>
+          <h2>Choose Deck &amp; Stake</h2>
+          <div id="setup-decks" class="setup-decks"></div>
+          <label class="setup-stake-label" for="setup-stake">Stake</label>
+          <select id="setup-stake" class="setup-stake"></select>
+          <p id="setup-stake-desc" class="setup-stake-desc"></p>
+          <button id="btn-setup-start" class="btn btn-play" type="button">Play</button>
+        </section>
+      </div>
+
+      <div id="blind-select-overlay" class="blind-select-overlay hidden" data-testid="blind-select-overlay">
+        <section class="blind-select-panel">
+          <div class="setup-kicker">ANTE <span id="blind-select-ante"></span></div>
+          <h2>Choose Blind</h2>
+          <div id="blind-select-cards" class="blind-select-cards"></div>
         </section>
       </div>
 

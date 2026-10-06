@@ -17,4 +17,8 @@ Kanban customizations:
 - Balatro Shop parity: 2 shop cards + 2 Booster Packs + Voucher
 - Arcana/Celestial/Standard/Buffoon/Spectral packs with Normal/Jumbo/Mega
 - Tarot/Spectral target selection + Planet immediate upgrades
-- Interest, unused-hand cashout, pack/target autosave via snapshot V3
+- Interest, unused-hand cashout, pack/target autosave
+- Balatro L3: Deck/Stake selection + Blind Select + Skip/Tag flow
+- Boss Blind effects + cumulative Stake rules + Eternal/Perishable/Rental Jokers
+- First deep Joker set: 50 functional Jokers with scaling and retriggers
+- Left-click Joker/Consumable info card + Balatro-like Shop composition
