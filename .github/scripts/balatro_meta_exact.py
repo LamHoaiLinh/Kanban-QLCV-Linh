@@ -60,7 +60,7 @@ export interface MetaProfile {
   minHandSizeEver: number;
   maxPolychromeJokers: number;
   maxEditionJokers: number;
-  maxVouchersInRun: number;
+  maxVouchersRedeemedRun: number;
   maxSuitCards: Record<Suit, number>;
 
   unlockedDecks: DeckKey[];
@@ -185,7 +185,7 @@ export function createDefaultMetaProfile(): MetaProfile {
     minHandSizeEver: 8,
     maxPolychromeJokers: 0,
     maxEditionJokers: 0,
-    maxVouchersInRun: 0,
+    maxVouchersRedeemedRun: 0,
     maxSuitCards: blankSuits(),
 
     unlockedDecks: ['red'],
@@ -249,7 +249,7 @@ export function loadMetaProfile(storage: StorageLike): MetaProfile {
       minHandSizeEver: Math.max(1, asNumber(parsed.minHandSizeEver, 8)),
       maxPolychromeJokers: asNumber(parsed.maxPolychromeJokers),
       maxEditionJokers: asNumber(parsed.maxEditionJokers),
-      maxVouchersInRun: asNumber(parsed.maxVouchersInRun),
+      maxVouchersRedeemedRun: asNumber((parsed as any).maxVouchersRedeemedRun ?? (parsed as any).maxVouchersInRun),
       maxSuitCards: { ...blankSuits(), ...(parsed.maxSuitCards ?? {}) },
       highestStakeCleared: { ...(parsed.highestStakeCleared ?? {}) },
       discoveredJokers: unique(parsed.discoveredJokers ?? []),
@@ -366,7 +366,7 @@ export function refreshMetaUnlocks(input: MetaProfile): MetaProfile {
   const vouchers = new Set<VoucherKey>(BASE_VOUCHERS);
   profile.discoveredVouchers.forEach((key) => vouchers.add(key));
   if (profile.totalShopSpend >= 2500) vouchers.add('overstock-plus');
-  if (profile.maxVouchersInRun >= 10) vouchers.add('liquidation');
+  if (profile.maxVouchersRedeemedRun >= 10) vouchers.add('liquidation');
   if (profile.maxEditionJokers >= 5) vouchers.add('glow-up');
   if (profile.totalRerolls >= 100) vouchers.add('reroll-glut');
   if (profile.tarotPackUsed >= 25) vouchers.add('omen-globe');
@@ -417,7 +417,7 @@ export function recordLiveState(
     ante: number;
     money: number;
     handSize: number;
-    vouchers: number;
+    vouchersRedeemed: number;
     polychromeJokers: number;
     editionJokers: number;
     suitCounts: Record<Suit, number>;
@@ -431,7 +431,7 @@ export function recordLiveState(
     bestAnte: Math.max(input.bestAnte, state.ante),
     maxMoney: Math.max(input.maxMoney, state.money),
     minHandSizeEver: Math.min(input.minHandSizeEver, state.handSize),
-    maxVouchersInRun: Math.max(input.maxVouchersInRun, state.vouchers),
+    maxVouchersRedeemedRun: Math.max(input.maxVouchersRedeemedRun, state.vouchersRedeemed),
     maxPolychromeJokers: Math.max(input.maxPolychromeJokers, state.polychromeJokers),
     maxEditionJokers: Math.max(input.maxEditionJokers, state.editionJokers),
   };
@@ -612,7 +612,7 @@ export function jokerUnlockDescription(profile: MetaProfile, key: string): strin
 export function voucherUnlockDescription(profile: MetaProfile, key: VoucherKey): string {
   if (!VOUCHER_UPGRADE_BASE[key]) return 'Base Voucher; available from the start.';
   if (key === 'overstock-plus') return `Spend $2500 in Shops (${Math.min(profile.totalShopSpend, 2500)}/2500).`;
-  if (key === 'liquidation') return `Redeem 10 Vouchers in one run (${Math.min(profile.maxVouchersInRun, 10)}/10).`;
+  if (key === 'liquidation') return `Redeem 10 Vouchers in one run (${Math.min(profile.maxVouchersRedeemedRun, 10)}/10).`;
   if (key === 'glow-up') return `Have 5 Foil/Holographic/Polychrome Jokers at once (${Math.min(profile.maxEditionJokers, 5)}/5).`;
   if (key === 'reroll-glut') return `Reroll Shops 100 times (${Math.min(profile.totalRerolls, 100)}/100).`;
   if (key === 'omen-globe') return `Use 25 Tarot cards from Booster Packs (${Math.min(profile.tarotPackUsed, 25)}/25).`;
@@ -662,6 +662,7 @@ replace_once(
   metaTarotPackUsedRun = 0;
   metaPlanetPackUsedRun = 0;
   metaBlankRedeemedRun = 0;
+  metaVouchersRedeemedRun = 0;
   metaCashoutSerial = 0;
   metaLastCashoutInterest = 0;
   metaLastCashoutCap = 5;
@@ -722,6 +723,7 @@ reset = r"""    this.metaHandsPlayedRun = 0;
     this.metaTarotPackUsedRun = 0;
     this.metaPlanetPackUsedRun = 0;
     this.metaBlankRedeemedRun = 0;
+    this.metaVouchersRedeemedRun = 0;
     this.metaCashoutSerial = 0;
     this.metaLastCashoutInterest = 0;
     this.metaLastCashoutCap = 5;
@@ -861,6 +863,7 @@ v_block = v_block.replace(
     "    this.money -= voucher.price;",
     """    this.money -= voucher.price;
     this.metaShopSpendRun += voucher.price;
+    this.metaVouchersRedeemedRun += 1;
     if (voucher.key === 'blank') this.metaBlankRedeemedRun += 1;""",
     1,
 )
@@ -1269,7 +1272,7 @@ function syncMetaProgression() {
     ante: state.ante,
     money: state.money,
     handSize: state.config.handSize,
-    vouchers: state.vouchers.length,
+    vouchersRedeemed: state.metaVouchersRedeemedRun,
     polychromeJokers: state.jokers.filter((joker) => joker.edition === 'polychrome').length,
     editionJokers,
     suitCounts,
