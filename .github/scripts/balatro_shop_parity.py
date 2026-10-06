@@ -1766,4 +1766,203 @@ describe('Balatro shop / booster parity', () => {
 """
 (root / "tests/unit/balatroShopParity.test.ts").write_text(tests, encoding="utf-8")
 
+
+# ---------------------------------------------------------------------------
+# 8. Update upstream unit tests whose old six-offer shop assumptions are obsolete.
+# ---------------------------------------------------------------------------
+legacy_test = root / "tests/unit/gameState.test.ts"
+legacy = legacy_test.read_text(encoding="utf-8")
+legacy = legacy.replace(
+    "expect(state.shop?.offers).toHaveLength(6);",
+    "expect(state.shop?.offers).toHaveLength(2);\\n    expect(state.shop?.boosters).toHaveLength(2);",
+)
+
+old = """  it('buys a deck card and adds it to the persistent deck', () => {
+    const state = new GameState({ seed: 45 });
+    clearBlindIntoShop(state);
+    state.money = 99;
+    const deckBefore = state.ownedDeck.length;
+    const offer = state.shop!.offers.find((o) => o.item.kind === 'playing-card')!;
+
+    expect(state.buyOffer(offer.id)).toBe(true);
+
+    expect(state.money).toBeLessThan(99);
+    expect(state.ownedDeck.length).toBe(deckBefore + 1);
+    expect(offer.sold).toBe(true);
+  });"""
+new = """  it('takes a playing card from a Standard Pack and adds it to the persistent deck', () => {
+    const state = new GameState({ seed: 45 });
+    clearBlindIntoShop(state);
+    state.money = 99;
+    const deckBefore = state.ownedDeck.length;
+    const offer = state.shop!.boosters[0];
+    offer.type = 'standard';
+    offer.size = 'normal';
+    offer.name = 'Standard Pack';
+    offer.price = 0;
+    offer.sold = false;
+
+    expect(state.openBooster(offer.id)).toBe(true);
+    const choice = state.booster!.choices[0];
+    expect(choice.item.kind).toBe('playing-card');
+    expect(state.chooseBooster(choice.id)).toBe('applied');
+
+    expect(state.ownedDeck.length).toBe(deckBefore + 1);
+  });"""
+if old not in legacy:
+    raise SystemExit("Could not update legacy deck-card shop test")
+legacy = legacy.replace(old, new, 1)
+
+old = """  it('buys and sells jokers while respecting the slot limit', () => {
+    const state = new GameState({ seed: 46 });
+    clearBlindIntoShop(state);
+    state.money = 99;
+    const firstJokerOffer = state.shop!.offers.find((o) => o.item.kind === 'joker')!;
+
+    expect(state.buyOffer(firstJokerOffer.id)).toBe(true);
+    expect(state.jokers).toHaveLength(1);
+
+    for (let i = state.jokers.length; i < MAX_JOKERS; i++) {
+      state.jokers.push({
+        id: \`manual-\${i}\`,
+        key: 'manual',
+        name: 'Manual Joker',
+        description: '+1 Mult',
+        rarity: 'common',
+        price: 1,
+        sellValue: 1,
+        effect: { kind: 'mult', amount: 1 },
+      });
+    }
+    const secondJokerOffer = state.shop!.offers.find((o) => o.item.kind === 'joker' && !o.sold)!;
+    expect(state.canBuyOffer(secondJokerOffer.id)).toBe(false);
+
+    const soldId = state.jokers[0].id;
+    const moneyBeforeSell = state.money;
+    expect(state.sellJoker(soldId)).toBe(true);
+    expect(state.jokers).toHaveLength(MAX_JOKERS - 1);
+    expect(state.money).toBeGreaterThan(moneyBeforeSell);
+  });"""
+new = """  it('takes Jokers from Buffoon Packs while respecting the slot limit', () => {
+    const state = new GameState({ seed: 46 });
+    clearBlindIntoShop(state);
+    state.money = 99;
+    const offer = state.shop!.boosters[0];
+    offer.type = 'buffoon';
+    offer.size = 'normal';
+    offer.name = 'Buffoon Pack';
+    offer.price = 0;
+    offer.sold = false;
+
+    expect(state.openBooster(offer.id)).toBe(true);
+    const choice = state.booster!.choices[0];
+    expect(choice.item.kind).toBe('joker');
+    expect(state.chooseBooster(choice.id)).toBe('applied');
+    expect(state.jokers).toHaveLength(1);
+
+    for (let i = state.jokers.length; i < MAX_JOKERS; i++) {
+      state.jokers.push({
+        id: \`manual-\${i}\`,
+        key: 'manual',
+        name: 'Manual Joker',
+        description: '+1 Mult',
+        rarity: 'common',
+        price: 1,
+        sellValue: 1,
+        effect: { kind: 'mult', amount: 1 },
+      });
+    }
+
+    const soldId = state.jokers[0].id;
+    const moneyBeforeSell = state.money;
+    expect(state.sellJoker(soldId)).toBe(true);
+    expect(state.jokers).toHaveLength(MAX_JOKERS - 1);
+    expect(state.money).toBeGreaterThan(moneyBeforeSell);
+  });"""
+if old not in legacy:
+    raise SystemExit("Could not update legacy Joker shop test")
+legacy = legacy.replace(old, new, 1)
+
+old = """  it('buys and uses a consumable from the shop', () => {
+    const state = new GameState({ seed: 48 });
+    clearBlindIntoShop(state);
+    state.money = 99;
+    const offer = state.shop!.offers.find((o) => o.item.kind === 'consumable')!;
+
+    expect(state.buyOffer(offer.id)).toBe(true);
+    expect(state.consumables).toHaveLength(1);
+
+    const before = state.toSnapshot();
+    if (before.version !== 2) throw new Error('expected v2 snapshot');
+    expect(state.useConsumable(state.consumables[0].id)).toBe(true);
+    const after = state.toSnapshot();
+    if (after.version !== 2) throw new Error('expected v2 snapshot');
+
+    expect(state.consumables).toHaveLength(0);
+    expect(
+      JSON.stringify(after.handLevels) !== JSON.stringify(before.handLevels)
+        || JSON.stringify(after.ownedDeck) !== JSON.stringify(before.ownedDeck),
+    ).toBe(true);
+  });"""
+new = """  it('uses a Planet directly from a Celestial Pack', () => {
+    const state = new GameState({ seed: 48 });
+    clearBlindIntoShop(state);
+    state.money = 99;
+    const before = JSON.stringify(state.handLevels);
+    const offer = state.shop!.boosters[0];
+    offer.type = 'celestial';
+    offer.size = 'normal';
+    offer.name = 'Celestial Pack';
+    offer.price = 0;
+    offer.sold = false;
+
+    expect(state.openBooster(offer.id)).toBe(true);
+    const choice = state.booster!.choices[0];
+    expect(choice.item.kind).toBe('consumable');
+    expect(state.chooseBooster(choice.id)).toBe('applied');
+
+    expect(JSON.stringify(state.handLevels)).not.toBe(before);
+  });"""
+if old not in legacy:
+    raise SystemExit("Could not update legacy consumable shop test")
+legacy = legacy.replace(old, new, 1)
+
+old = """  it('round-trips shop inventory and persistent deck snapshots', () => {
+    const state = new GameState({ seed: 2233 });
+    clearBlindIntoShop(state);
+    state.money = 99;
+    const deckOffer = state.shop!.offers.find((o) => o.item.kind === 'playing-card')!;
+    const jokerOffer = state.shop!.offers.find((o) => o.item.kind === 'joker')!;
+    state.buyOffer(deckOffer.id);
+    state.buyOffer(jokerOffer.id);
+
+    const snapshot = state.toSnapshot();
+    const restored = GameState.fromSnapshot(snapshot);
+
+    expect(restored.toSnapshot()).toEqual(snapshot);
+    expect(restored.ownedDeck.length).toBe(state.ownedDeck.length);
+    expect(restored.jokers.length).toBe(1);
+    expect(restored.shop?.offers).toHaveLength(6);
+  });"""
+new = """  it('round-trips Balatro-style shop, Booster and Voucher state', () => {
+    const state = new GameState({ seed: 2233 });
+    clearBlindIntoShop(state);
+    state.money = 99;
+
+    const snapshot = state.toSnapshot();
+    const restored = GameState.fromSnapshot(snapshot);
+
+    expect(restored.toSnapshot()).toEqual(snapshot);
+    expect(restored.ownedDeck.length).toBe(state.ownedDeck.length);
+    expect(restored.shop?.offers).toHaveLength(2);
+    expect(restored.shop?.boosters).toHaveLength(2);
+    expect(restored.shop?.voucher).toEqual(state.shop?.voucher);
+  });"""
+if old not in legacy:
+    raise SystemExit("Could not update legacy snapshot shop test")
+legacy = legacy.replace(old, new, 1)
+
+legacy_test.write_text(legacy, encoding="utf-8")
+
+
 print("Balatro Shop + Booster + Consumable parity patch applied.")
