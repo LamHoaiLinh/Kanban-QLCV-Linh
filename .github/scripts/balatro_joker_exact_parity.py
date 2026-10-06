@@ -52,6 +52,14 @@ replace_once(
   | { kind: 'mythic-worldtree' };""",
 )
 
+
+# L4 no longer needs the shop helper planetForHand after exact parity rewiring.
+replace_once(
+    "src/game/gameState.ts",
+    "  planetForHand,\n",
+    "",
+)
+
 # ===========================================================================
 # 2. Exact fixes to the original 50 + 20 custom Mythic Jokers.
 # ===========================================================================
@@ -532,7 +540,6 @@ function firstActiveFaceIndex(hand: EvaluatedHand, options: ScoreHandOptions): n
 function extraRetriggersForScoringCard(
   card: PlayingCard,
   cardIndex: number,
-  hand: EvaluatedHand,
   options: ScoreHandOptions,
 ): number {
   let extra = 0;
@@ -822,7 +829,7 @@ export function scoreHand(
       const retrigger = trigger > 0;
       const debuffed = isCardDebuffed(card, options);
       triggerPlayingCard(card, score, rng, retrigger, debuffed);
-      if (!debuffed) applyOnScoredJokers(card, faceIndex, cardIndex, hand, options, score, rng, retrigger);
+      if (!debuffed) applyOnScoredJokers(card, faceIndex, cardIndex, options, score, rng, retrigger);
     }
   }
 
