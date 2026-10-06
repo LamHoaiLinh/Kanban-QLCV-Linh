@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <radialGradient id="chip-blue" cx="0.35" cy="0.28" r="0.72">
+      <stop offset="0" stop-color="#9de8ff"/>
+      <stop offset="0.55" stop-color="#2474d7"/>
+      <stop offset="1" stop-color="#0d225b"/>
+    </radialGradient>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="#0d0908"/>
+  <circle cx="32" cy="32" r="25" fill="url(#chip-blue)" stroke="#f8df93" stroke-width="2"/>
+  <g fill="#fff8df">
+    <rect x="29" y="5" width="6" height="11" rx="1"/>
+    <rect x="29" y="48" width="6" height="11" rx="1"/>
+    <rect x="48" y="29" width="11" height="6" rx="1"/>
+    <rect x="5" y="29" width="11" height="6" rx="1"/>
+  </g>
+  <circle cx="32" cy="32" r="15" fill="none" stroke="#fff8df" stroke-dasharray="3 3" stroke-width="2"/>
+  <text x="32" y="40" font-size="21" text-anchor="middle" fill="#fff8df" font-family="'Trebuchet MS', Arial, sans-serif" font-weight="900">$</text>
+</svg>

@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>open-poker - Balatro-like</title>
+  <style>
+#kanban-close-game{position:fixed;z-index:100000;right:12px;top:12px;width:42px;height:42px;border:1px solid rgba(255,255,255,.35);border-radius:12px;background:rgba(15,24,22,.72);color:#fff;font:700 28px/1 system-ui;cursor:pointer;backdrop-filter:blur(8px)}
+#kanban-close-game:hover{background:rgba(180,45,45,.86)}
+</style>
+  <script type="module" crossorigin src="./assets/index-DhL8xIG1.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BMLPdDMD.css">
+</head>
+  <body>
+    <div id="app">
+      <div id="splash-screen" class="splash-screen" data-testid="splash-screen" aria-live="polite">
+        <div class="splash-inner">
+          <img class="splash-logo" src="./art/ui/open-poker-logo.png" alt="Open Poker" draggable="false" />
+          <div class="splash-load-row">
+            <span id="splash-status">Preparing deck</span>
+            <span id="splash-percent">0%</span>
+          </div>
+          <div class="splash-progress" role="progressbar" aria-label="Loading assets">
+            <span id="splash-progress-bar"></span>
+          </div>
+        </div>
+      </div>
+
+      <div id="canvas-host"></div>
+
+      <!-- TOP: jokers + consumables -->
+      <header class="hud-top">
+        <div class="slot-row jokers">
+          <div class="joker-slots" id="joker-slots"></div>
+          <div class="slot-count" id="joker-count">0/5</div>
+        </div>
+        <div class="slot-row consumables">
+          <div class="consumable-slots" id="consumable-slots"></div>
+          <div class="slot-count" id="consumable-count">0/2</div>
+        </div>
+      </header>
+
+      <!-- LEFT SIDEBAR (HUD) -->
+      <aside class="sidebar">
+        <section class="block blind-block">
+          <div class="block-header" id="blind-name">Small Blind</div>
+          <div class="blind-body">
+            <div class="blind-badge" id="blind-badge"><span>SMALL<br />BLIND</span></div>
+            <div class="blind-info">
+              <div class="blind-info-label">Score at least</div>
+              <div class="blind-target">
+                <span class="chip-icon">*</span>
+                <span id="blind-target" class="num">300</span>
+              </div>
+              <div class="blind-info-label">
+                Reward: <span id="blind-reward" class="gold">$$$</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="block round-score-block">
+          <div class="block-label">Round<br />score</div>
+          <div class="round-score-value">
+            <span class="chip-icon">*</span>
+            <span id="round-score" class="num">0</span>
+          </div>
+        </section>
+
+        <section class="block hand-block">
+          <div class="hand-type" id="hand-type">-</div>
+          <div class="chips-mult-row">
+            <div class="chips-pill"><span id="chips" class="num">0</span></div>
+            <div class="x-sep">X</div>
+            <div class="mult-pill"><span id="mult" class="num">0</span></div>
+          </div>
+        </section>
+
+        <section class="block actions-block">
+          <div class="action-grid">
+            <button id="btn-runinfo" class="big-btn red">
+              <span class="big-btn-label">Run</span>
+              <span class="big-btn-sub">Info</span>
+            </button>
+            <div class="counter-card">
+              <div class="counter-label">Hands</div>
+              <div id="hands-left" class="counter-value blue">4</div>
+            </div>
+            <div class="counter-card">
+              <div class="counter-label">Discards</div>
+              <div id="discards-left" class="counter-value red">3</div>
+            </div>
+          </div>
+          <div class="action-grid">
+            <button id="btn-options" class="big-btn orange">
+              <span class="big-btn-label">Options</span>
+              <span class="big-btn-sub">=</span>
+            </button>
+            <div class="counter-card">
+              <div class="counter-label">Ante</div>
+              <div id="ante" class="counter-value blue">1<span class="counter-total">/8</span></div>
+            </div>
+            <div class="counter-card">
+              <div class="counter-label">Round</div>
+              <div id="round" class="counter-value blue">1</div>
+            </div>
+          </div>
+          <div class="money-row">
+            <span id="money" class="money">$4</span>
+          </div>
+        </section>
+      </aside>
+
+      <div class="hand-counter" id="hand-counter">0/8</div>
+      <div class="deck-counter" id="deck-counter">52/52</div>
+
+      <div class="actionbar">
+        <div class="sort-controls" aria-label="Sort hand">
+          <span class="sort-label">Sort</span>
+          <button id="btn-sort-straight" class="btn sort-btn" type="button" title="Sort for Straight (S)">Straight <span class="sort-key">S</span></button>
+          <button id="btn-sort-flush" class="btn sort-btn" type="button" title="Sort for Flush (F)">Flush <span class="sort-key">F</span></button>
+        </div>
+        <button id="btn-play" class="btn btn-play" data-testid="btn-play">Play Hand</button>
+        <button id="btn-discard" class="btn btn-discard" data-testid="btn-discard">Discard</button>
+      </div>
+
+      <div id="score-popup" class="score-popup hidden">
+        <div id="popup-hand" class="popup-hand">Pair</div>
+        <div id="popup-total" class="popup-total">0</div>
+      </div>
+
+      <div id="shop-overlay" class="shop-overlay hidden" data-testid="shop-overlay">
+        <section id="shop-panel" class="shop-panel" aria-label="Shop">
+          <header class="shop-header">
+            <div>
+              <div class="shop-kicker">Blind cleared</div>
+              <h2>Shop</h2>
+            </div>
+            <div class="shop-status">
+              <span id="shop-money" class="shop-money">$0</span>
+              <span id="shop-next-blind" class="shop-next-blind">Small Blind</span>
+            </div>
+          </header>
+
+          <div class="shop-body">
+            <div id="shop-offers" class="shop-offers"></div>
+            <aside id="shop-inventory" class="shop-inventory"></aside>
+          </div>
+
+          <footer class="shop-footer">
+            <button id="btn-shop-reroll" class="btn btn-ghost" data-testid="btn-shop-reroll">
+              Reroll <span id="shop-reroll-cost">$5</span>
+            </button>
+            <button id="btn-shop-next" class="btn btn-play" data-testid="btn-shop-next">Next Blind</button>
+          </footer>
+        </section>
+      </div>
+
+      <div id="overlay" class="overlay hidden">
+        <div class="overlay-card">
+          <div id="overlay-title" class="overlay-title">Game Over</div>
+          <div id="overlay-sub" class="overlay-sub"></div>
+          <button id="overlay-restart" class="btn btn-play" data-testid="btn-restart">New Run</button>
+        </div>
+      </div>
+
+      <span id="seed" hidden></span>
+
+      <button id="btn-music-mute" class="mute-btn music-mute-btn" aria-label="Mute Music">🎵</button>
+      <button id="btn-mute" class="mute-btn" aria-label="Mute">🔊</button>
+    </div>
+  <button id="kanban-close-game" type="button" aria-label="Đóng game">×</button>
+<script>document.getElementById('kanban-close-game').addEventListener('click',()=>parent.postMessage({type:'open-poker-close'},'*'));</script>
+</body>
+</html>
