@@ -63,6 +63,8 @@ jobs:
           python3 .github/scripts/balatro_meta_core.py .open-poker-build
           python3 .github/scripts/balatro_meta_ui.py .open-poker-build
           python3 .github/scripts/balatro_meta_tests.py .open-poker-build
+          echo "DEBUG_GAMESTATE_SCORE"
+          grep -n -E "playSelected|scoreHand|breakdown|roundScore|handsLeft" .open-poker-build/src/game/gameState.ts | head -160 || true
           python3 .github/scripts/balatro_content_parity.py .open-poker-build
           python3 .github/scripts/balatro_content_tests.py .open-poker-build
 
