@@ -20,6 +20,50 @@ def replace_once(path: str, old: str, new: str) -> None:
     p.write_text(s.replace(old, new, 1), encoding="utf-8")
 
 
+# Fix an upstream object-pool gap: main.ts reuses CardObject instances and
+# calls resetForCard(), but the current upstream class does not define it.
+card_object = root / "src/render/CardObject.ts"
+card_source = card_object.read_text(encoding="utf-8")
+if "resetForCard(card: PlayingCard)" not in card_source:
+    anchor = "  /** Animate to a target slot transform; preserves selection lift. */\n"
+    if anchor not in card_source:
+        raise SystemExit("CardObject method anchor not found")
+    method = """  /** Reset a pooled visual object so it can safely represent another card. */
+  resetForCard(card: PlayingCard) {
+    gsap.killTweensOf(this.position);
+    gsap.killTweensOf(this.rotation);
+    gsap.killTweensOf(this.scale);
+
+    this.card = card;
+    this.selected = false;
+    this.hovered = false;
+    this.baseY = 0;
+    this.baseZ = 0;
+    this.baseRotZ = 0;
+    this.handIndex = 0;
+    delete this.userData.keepAlive;
+
+    this.position.set(0, 0, 0);
+    this.rotation.set(0, 0, 0);
+    this.scale.set(1, 1, 1);
+
+    this.glowMesh.visible = false;
+    this.glowMaterial.uniforms.uOpacity.value = 0;
+
+    const front = this.faceMesh.material as THREE.MeshStandardMaterial;
+    front.map = getCardTexture(card);
+    front.emissive.setHex(0x000000);
+    front.emissiveIntensity = 0;
+    front.needsUpdate = true;
+
+    this.faceMesh.userData.cardObject = this;
+    this.backMesh.userData.cardObject = this;
+  }
+
+"""
+    card_source = card_source.replace(anchor, method + anchor, 1)
+    card_object.write_text(card_source, encoding="utf-8")
+
 # Hand sorting wiring.
 replace_once(
     "src/main.ts",
