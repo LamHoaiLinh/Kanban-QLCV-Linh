@@ -497,10 +497,10 @@ replace_once(
 # Verdant Leaf ends after selling any Joker.
 replace_once(
     "src/game/gameState.ts",
-    """    this.money += this.jokers[idx].sellValue;
-    this.jokers.splice(idx, 1);""",
-    """    this.money += this.jokers[idx].sellValue;
-    this.jokers.splice(idx, 1);
+    """    const [joker] = this.jokers.splice(idx, 1);
+    this.money += joker.sellValue;""",
+    """    const [joker] = this.jokers.splice(idx, 1);
+    this.money += joker.sellValue;
     if (this.blindIndex === 2 && this.bossBlindKey === 'verdant-leaf') this.verdantLeafActive = false;""",
 )
 
