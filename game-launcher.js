@@ -12,7 +12,7 @@ const games=[
  {id:'dailucnghe',title:'Đại Lục Nghề Nghiệp',sub:'Idle nghề nghiệp · chế tạo · chiến đấu · 3 Slot',icon:'◆',url:'dai-luc-nghe-nghiep/index.html?v=1.0.4',close:'dai-luc-nghe-nghiep-close'},
  {id:'tinhnhanh',title:'Tính Nhanh',sub:'72 kỹ năng · cá nhân hóa · cửu chương · Nhìn Che Tính',icon:'🧮',url:'tinh-nhanh-game/index.html?v=3.3.0',close:'tinh-nhanh-game-close'},
  {id:'drift1k',title:'DRIFT CAR',sub:'Drift 1 nút · 1–4 người · tranh pin nhiên liệu',icon:'🏎️',url:'drift1k-game/index.html?v=1.0.1',close:'drift1k-game-close'},
- {id:'openpoker',title:'Open Poker',sub:'Poker roguelike · 15 Deck · 32 Voucher · Full Tarot/Spectral · 70 Joker',icon:'♠',url:'open-poker-game/index.html?v=1.7.0',close:'open-poker-close'},
+ {id:'openpoker',title:'Open Poker',sub:'Poker roguelike · Meta chuẩn Balatro · Seeded Practice · Collection 8 tab',icon:'♠',url:'open-poker-game/index.html?v=1.8.0',close:'open-poker-close'},
  {id:'stocksim',title:'StockSim VN',sub:'Mô phỏng thị trường sống · IPO/BCTC/phá sản · Long/Short · SL/TP',icon:'📈',url:'stock-sim-vn/index.html?v=2.1.3',close:'stocksim-close'}
 ];
 if(btn){btn.addEventListener('click',openHub);window.addEventListener('message',e=>{if(games.some(g=>g.close===e.data?.type))closeGame()});window.addEventListener('keydown',e=>{if(e.key==='Escape'&&hub&&!hub.hidden){hub.hidden=true}else if(e.key==='Escape'&&overlay&&!overlay.hidden)closeGame()})}
