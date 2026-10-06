@@ -1774,7 +1774,7 @@ legacy_test = root / "tests/unit/gameState.test.ts"
 legacy = legacy_test.read_text(encoding="utf-8")
 legacy = legacy.replace(
     "expect(state.shop?.offers).toHaveLength(6);",
-    "expect(state.shop?.offers).toHaveLength(2);\\n    expect(state.shop?.boosters).toHaveLength(2);",
+    "expect(state.shop?.offers).toHaveLength(2);\n    expect(state.shop?.boosters).toHaveLength(2);",
 )
 
 old = """  it('buys a deck card and adds it to the persistent deck', () => {
