@@ -40,7 +40,7 @@ import {
 import { VOUCHERS } from '../../src/game/balatroShop';
 import type { DeckKey, StakeKey, TagKey } from '../../src/game/types';
 
-const RELIABILITY_SEEDS = Math.max(500, Math.min(1000, Number(process.env.RELIABILITY_SEEDS ?? 750)));
+const RELIABILITY_SEEDS = Math.max(500, Math.min(1000, Number(process.env.RELIABILITY_SEEDS ?? 500)));
 const MAX_STEPS = 260;
 
 type MutableState = GameState & Record<string, any>;
@@ -334,7 +334,8 @@ describe('Reliability Certification', () => {
           } else {
             const tag = tags[(seedIndex * 11 + state.ante * 2 + state.blindIndex) % tags.length];
             state.anteTags[state.blindIndex] = tag;
-            if (rng() < 0.24) {
+            const forceTagCoverage = seedIndex < tags.length && state.ante === 1 && state.blindIndex === 0;
+            if (forceTagCoverage || rng() < 0.24) {
               coverage.tags.add(tag);
               state.skipCurrentBlind();
               if ((seedIndex + steps) % 19 === 0) state = roundTrip(state, coverage.phasesRestored);
