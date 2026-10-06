@@ -12,6 +12,9 @@ on:
       - ".github/scripts/balatro_l3_tests.py"
       - ".github/scripts/balatro_l3_ui.py"
       - ".github/scripts/balatro_progression_core.py"
+      - ".github/scripts/balatro_joker_exact_tests.py"
+      - ".github/scripts/balatro_mythic_ui.py"
+      - ".github/scripts/balatro_joker_exact_parity.py"
 
 permissions:
   contents: write
@@ -49,6 +52,9 @@ jobs:
           python3 .github/scripts/balatro_progression_core.py .open-poker-build
           python3 .github/scripts/balatro_l3_ui.py .open-poker-build
           python3 .github/scripts/balatro_l3_tests.py .open-poker-build
+          python3 .github/scripts/balatro_joker_exact_parity.py .open-poker-build
+          python3 .github/scripts/balatro_mythic_ui.py .open-poker-build
+          python3 .github/scripts/balatro_joker_exact_tests.py .open-poker-build
 
       - name: Build Open Poker
         run: |
@@ -92,6 +98,10 @@ jobs:
             '- Boss Blind effects + cumulative Stake rules + Eternal/Perishable/Rental Jokers' \
             '- First deep Joker set: 50 functional Jokers with scaling and retriggers' \
             '- Left-click Joker/Consumable info card + Balatro-like Shop composition' \
+            '- Joker Exact Parity: per-card/on-held/independent timing, Red Seal/Mime/retrigger order' \
+            '- Exact live counters for Misprint/Runner/Ride the Bus/Green/Ice Cream/Loyalty/Castle' \
+            '- Boss-debuff-aware Joker/Card interactions + single-roll Glass shatter settlement' \
+            '- 20 Mythic Jokers above Rare with dedicated rarity visuals and 2% natural roll' \
             > open-poker-game/SOURCE_INFO.txt
           rm -rf .open-poker-build
 
