@@ -1043,15 +1043,11 @@ replace_once(
 # Remove the old renderer-side score calculator. The engine is now authoritative.
 main_path = root / "src/main.ts"
 main_source = main_path.read_text(encoding="utf-8")
-main_source, removed = re.subn(
-    r"function cardScoreDeltas\\(card: PlayingCard\\): \\{ chipsDelta: number; multDelta: number; multMul: number \\} \\{.*?\\n\\}\\n\\n// Floating value above a scoring card\\.",
-    "// Floating value above a scoring card.",
-    main_source,
-    count=1,
-    flags=re.S,
-)
-if removed != 1:
-    raise SystemExit("Could not remove legacy cardScoreDeltas()")
+legacy_start = main_source.find("function cardScoreDeltas(")
+legacy_end = main_source.find("// Floating value above a scoring card.", legacy_start)
+if legacy_start < 0 or legacy_end < 0:
+    raise SystemExit("Could not locate legacy cardScoreDeltas()")
+main_source = main_source[:legacy_start] + main_source[legacy_end:]
 
 event_replay = r"""  const scoringIds = new Set(br.hand.scoringCards.map((card) => card.id));
 
