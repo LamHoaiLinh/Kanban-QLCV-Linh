@@ -916,27 +916,25 @@ apply_consumable = r"""  private applyConsumableWithTargets(card: ConsumableCard
 s = s[:a] + apply_consumable + s[b:]
 game_path.write_text(s, encoding="utf-8")
 
-# Observatory XMult and Plasma balancing are applied before hand settlement.
-# Earlier pipeline revisions tally breakdown.total before handsLeft is decremented,
-# so compensate roundScore by the exact delta after changing the final score.
-game_path = root / "src/game/gameState.ts"
-score_src = game_path.read_text(encoding="utf-8")
-score_anchor = "    this.lastScore = breakdown;"
-score_at = score_src.find(score_anchor)
-if score_at < 0:
-    raise SystemExit("Could not locate lastScore settlement anchor")
-score_insert = r"""    const contentParityOriginalTotal = breakdown.total;
+# Observatory XMult and Plasma balancing happen after the base hand score is tallied.
+# The Boss pipeline always contains the Tooth settlement block, so use that as
+# a stable final-score anchor and compensate roundScore by the score delta.
+replace_once(
+    "src/game/gameState.ts",
+    """    if (this.blindIndex === 2 && this.bossBlindKey === 'tooth') {""",
+    """    const contentParityOriginalTotal = breakdown.total;
     if (this.vouchers.includes('observatory')) {
       const matchingPlanets = this.consumables.filter((card) =>
         card.type === 'planet' && card.effect.kind === 'planet' && card.effect.handType === hand.type
       ).length;
       if (matchingPlanets > 0) {
         const before = breakdown.finalMult;
-        breakdown.finalMult *= Math.pow(1.5, matchingPlanets);
+        const multiplier = Math.pow(1.5, matchingPlanets);
+        breakdown.finalMult *= multiplier;
         breakdown.steps.push({
-          source: `Observatory ×${Math.pow(1.5, matchingPlanets).toFixed(2)} Mult`,
+          source: `Observatory ×${multiplier.toFixed(2)} Mult`,
           stage: 'joker',
-          multMul: Math.pow(1.5, matchingPlanets),
+          multMul: multiplier,
           chipsBefore: breakdown.finalChips,
           chipsAfter: breakdown.finalChips,
           multBefore: before,
@@ -961,9 +959,8 @@ score_insert = r"""    const contentParityOriginalTotal = breakdown.total;
     }
     this.roundScore += breakdown.total - contentParityOriginalTotal;
 
-"""
-score_src = score_src[:score_at] + score_insert + score_src[score_at:]
-game_path.write_text(score_src, encoding="utf-8")
+    if (this.blindIndex === 2 && this.bossBlindKey === 'tooth') {""",
+)
 
 # Voucher interest caps.
 replace_once(
