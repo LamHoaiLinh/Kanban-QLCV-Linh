@@ -897,3 +897,725 @@ gs = gs.replace(
 game.write_text(gs, encoding="utf-8")
 
 print("Balatro exact meta core applied.")
+
+
+# ===========================================================================
+# UI/session integration: seeded practice isolation, 8-tab Collection, exact
+# lock tooltips, per-Joker Stake stickers and progression event syncing.
+# ===========================================================================
+replace_once(
+    "src/main.ts",
+    """import {
+  discoverBoss, discoverJoker, discoverTag, loadMetaProfile, makeMetaRunId,
+  maxUnlockedStakeOrder, recordRunFinish, recordRunStart, refreshMetaUnlocks,
+  saveMetaProfile, seedFromText,
+} from './game/metaProgression';""",
+    """import {
+  canProgressMeta, collectionDiscoveryCount, deckUnlockDescription,
+  discoverConsumable, discoverJoker, discoverTag, discoverVoucher,
+  isSeededRunInput, jokerUnlockDescription, loadMetaProfile, makeMetaRunId,
+  maxUnlockedStakeOrder, recordBossClear, recordCashout, recordLiveState,
+  recordRunCounters, recordRunFinish, recordRunStart, refreshMetaUnlocks,
+  saveMetaProfile, seedFromText, stakeStickerName, voucherUnlockDescription,
+} from './game/metaProgression';""",
+)
+
+replace_once(
+    "src/main.ts",
+    """import { evaluateHand } from './game/pokerEngine';""",
+    """import { evaluateHand } from './game/pokerEngine';
+import { PLANET_CATALOG, SPECTRAL_CATALOG, TAROT_CATALOG, VOUCHERS } from './game/balatroShop';""",
+)
+
+replace_once(
+    "src/main.ts",
+    """  metaRunId?: string;
+  savedAt: number;""",
+    """  metaRunId?: string;
+  seededRun?: boolean;
+  savedAt: number;""",
+)
+replace_once(
+    "src/main.ts",
+    """      metaRunId,
+      savedAt: Date.now(),""",
+    """      metaRunId,
+      seededRun,
+      savedAt: Date.now(),""",
+)
+
+replace_once(
+    "src/main.ts",
+    """let metaProfile = refreshMetaUnlocks(loadMetaProfile(localStorage));
+state.setUnlockedJokerKeys(metaProfile.unlockedJokers);
+let metaRunId = restoredRun?.metaRunId ?? makeMetaRunId(state.config.seed);""",
+    """let metaProfile = refreshMetaUnlocks(loadMetaProfile(localStorage));
+state.setUnlockedJokerKeys(metaProfile.unlockedJokers);
+state.setUnlockedVoucherKeys(metaProfile.unlockedVouchers);
+let metaRunId = restoredRun?.metaRunId ?? makeMetaRunId(state.config.seed);
+let seededRun = restoredRun?.seededRun ?? false;
+
+const metaSeen = {
+  hands: 0,
+  cardsPlayed: 0,
+  faceCardsPlayed: 0,
+  discards: 0,
+  cardsDiscarded: 0,
+  shopSpend: 0,
+  rerolls: 0,
+  tarotShopBought: 0,
+  planetShopBought: 0,
+  playingCardsShopBought: 0,
+  tarotPackUsed: 0,
+  planetPackUsed: 0,
+  blankRedeemed: 0,
+  cashouts: 0,
+  claimedTags: 0,
+  bossClears: 0,
+};
+
+function resetMetaSeen() {
+  metaSeen.hands = state.metaHandsPlayedRun;
+  metaSeen.cardsPlayed = state.metaCardsPlayedRun;
+  metaSeen.faceCardsPlayed = state.metaFaceCardsPlayedRun;
+  metaSeen.discards = state.metaDiscardActionsRun;
+  metaSeen.cardsDiscarded = state.metaCardsDiscardedRun;
+  metaSeen.shopSpend = state.metaShopSpendRun;
+  metaSeen.rerolls = state.metaShopRerollsRun;
+  metaSeen.tarotShopBought = state.metaTarotShopBoughtRun;
+  metaSeen.planetShopBought = state.metaPlanetShopBoughtRun;
+  metaSeen.playingCardsShopBought = state.metaPlayingCardsShopBoughtRun;
+  metaSeen.tarotPackUsed = state.metaTarotPackUsedRun;
+  metaSeen.planetPackUsed = state.metaPlanetPackUsedRun;
+  metaSeen.blankRedeemed = state.metaBlankRedeemedRun;
+  metaSeen.cashouts = state.metaCashoutSerial;
+  metaSeen.claimedTags = state.metaClaimedTagSerial;
+  metaSeen.bossClears = state.metaBossClearSerial;
+}""",
+)
+
+replace_once(
+    "src/main.ts",
+    """const collectionStats = $('collection-stats');
+const collectionDecks = $('collection-decks');
+const collectionJokers = $('collection-jokers');
+const btnCollectionBack = $<HTMLButtonElement>('btn-collection-back');""",
+    """const collectionStats = $('collection-stats');
+const collectionTabs = $('collection-tabs');
+const collectionGrid = $('collection-grid');
+const btnCollectionBack = $<HTMLButtonElement>('btn-collection-back');
+const setupSeedMode = $('setup-seed-mode');""",
+)
+
+main = root / "src/main.ts"
+src = main.read_text(encoding="utf-8")
+a = src.find("function renderCollection() {")
+b = src.find("function renderSetup() {", a)
+if a < 0 or b < 0:
+    raise SystemExit("Could not locate Collection/meta sync block")
+
+collection_sync = r"""type CollectionTab = 'decks' | 'jokers' | 'vouchers' | 'tarot' | 'planet' | 'spectral' | 'blinds' | 'tags';
+let collectionTab: CollectionTab = 'decks';
+
+const COLLECTION_TABS: Array<[CollectionTab, string]> = [
+  ['decks', 'Decks'],
+  ['jokers', 'Jokers'],
+  ['vouchers', 'Vouchers'],
+  ['tarot', 'Tarot'],
+  ['planet', 'Planet'],
+  ['spectral', 'Spectral'],
+  ['blinds', 'Blinds'],
+  ['tags', 'Tags'],
+];
+
+function showCollectionInfo(kind: string, name: string, desc: string, meta: string, anchor: HTMLElement) {
+  itemInfoKind.textContent = kind;
+  itemInfoName.textContent = name;
+  itemInfoDesc.textContent = desc;
+  itemInfoMeta.textContent = meta;
+  itemInfo.classList.remove('hidden');
+  const rect = anchor.getBoundingClientRect();
+  const box = itemInfo.getBoundingClientRect();
+  const left = Math.min(window.innerWidth - box.width - 12, Math.max(12, rect.left));
+  const top = Math.min(window.innerHeight - box.height - 12, Math.max(12, rect.bottom + 8));
+  itemInfo.style.left = `${left}px`;
+  itemInfo.style.top = `${top}px`;
+}
+
+function makeCollectionCard(options: {
+  kind: string;
+  name: string;
+  description: string;
+  status: 'locked' | 'undiscovered' | 'discovered';
+  meta?: string;
+  condition?: string;
+  className?: string;
+}): HTMLElement {
+  const card = document.createElement('article');
+  card.className = `collection-card ${options.status}${options.className ? ` ${options.className}` : ''}`;
+  const status = document.createElement('span');
+  status.className = 'collection-card-status';
+  status.textContent = options.status === 'locked'
+    ? 'LOCKED'
+    : options.status === 'undiscovered' ? 'NOT DISCOVERED' : 'DISCOVERED';
+  const name = document.createElement('strong');
+  name.textContent = options.status === 'undiscovered' ? '???' : options.name;
+  const desc = document.createElement('p');
+  desc.textContent = options.status === 'locked'
+    ? (options.condition ?? 'Complete the unlock condition.')
+    : options.status === 'undiscovered'
+      ? 'Available, but not yet discovered in a normal unseeded run.'
+      : options.description;
+  const meta = document.createElement('small');
+  meta.textContent = options.meta ?? '';
+  card.append(status, name, desc, meta);
+  const detail = options.status === 'locked'
+    ? `Unlock: ${options.condition ?? 'Complete the unlock condition.'}`
+    : options.meta ?? (options.status === 'undiscovered' ? 'Obtain this item in a normal unseeded run to discover it.' : '');
+  card.title = `${options.name}\n${detail}`.trim();
+  card.tabIndex = 0;
+  const open = () => showCollectionInfo(
+    options.status === 'locked' ? `LOCKED ${options.kind}` : options.kind,
+    options.name,
+    options.status === 'undiscovered' ? 'Not discovered yet.' : options.description,
+    detail,
+    card,
+  );
+  card.addEventListener('click', open);
+  card.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      open();
+    }
+  });
+  return card;
+}
+
+function renderCollection() {
+  const discovered = collectionDiscoveryCount(metaProfile);
+  collectionStats.textContent = seededRun
+    ? `SEEDED PRACTICE · META OFF · Collection ${discovered} discovered · Profile is read-only this run`
+    : `Collection ${discovered} · Runs ${metaProfile.runsFinished}/${metaProfile.runsStarted} · Wins ${metaProfile.wins} · Best Ante ${metaProfile.bestAnte}`;
+
+  collectionTabs.replaceChildren();
+  for (const [key, label] of COLLECTION_TABS) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `collection-tab${collectionTab === key ? ' active' : ''}`;
+    button.textContent = label;
+    button.addEventListener('click', () => {
+      collectionTab = key;
+      renderCollection();
+      audio.play('buttonClick');
+    });
+    collectionTabs.appendChild(button);
+  }
+
+  collectionGrid.replaceChildren();
+
+  if (collectionTab === 'decks') {
+    (Object.keys(DECKS) as DeckKey[]).forEach((key) => {
+      const unlocked = metaProfile.unlockedDecks.includes(key);
+      const cleared = Number(metaProfile.highestStakeCleared[key] ?? -1);
+      const sticker = cleared >= 0 ? `${stakeStickerName(cleared)} Stake sticker` : 'No win sticker yet';
+      collectionGrid.appendChild(makeCollectionCard({
+        kind: 'DECK',
+        name: DECKS[key].name,
+        description: DECKS[key].description,
+        status: unlocked ? 'discovered' : 'locked',
+        meta: unlocked ? sticker : '',
+        condition: deckUnlockDescription(metaProfile, key),
+        className: `deck-${key}`,
+      }));
+    });
+    return;
+  }
+
+  if (collectionTab === 'jokers') {
+    for (const joker of JOKER_CATALOG) {
+      const unlocked = metaProfile.unlockedJokers.includes(joker.key);
+      const found = metaProfile.discoveredJokers.includes(joker.key);
+      const sticker = Number(metaProfile.jokerStakeStickers[joker.key] ?? -1);
+      const stickerText = sticker >= 0 ? `${stakeStickerName(sticker)} Stake sticker` : 'No Stake sticker';
+      const custom = joker.rarity === 'mythic' ? ' · CUSTOM MYTHIC' : '';
+      collectionGrid.appendChild(makeCollectionCard({
+        kind: `${joker.rarity.toUpperCase()} JOKER`,
+        name: joker.name,
+        description: joker.description,
+        status: !unlocked ? 'locked' : found ? 'discovered' : 'undiscovered',
+        meta: `${stickerText}${custom}`,
+        condition: jokerUnlockDescription(metaProfile, joker.key),
+        className: `joker-${joker.rarity}`,
+      }));
+    }
+    return;
+  }
+
+  if (collectionTab === 'vouchers') {
+    (Object.keys(VOUCHERS) as Array<keyof typeof VOUCHERS>).forEach((key) => {
+      const voucher = VOUCHERS[key];
+      const unlocked = metaProfile.unlockedVouchers.includes(key);
+      const found = metaProfile.discoveredVouchers.includes(key);
+      collectionGrid.appendChild(makeCollectionCard({
+        kind: 'VOUCHER',
+        name: voucher.name,
+        description: voucher.description,
+        status: !unlocked ? 'locked' : found ? 'discovered' : 'undiscovered',
+        meta: `Redeem $${voucher.price}`,
+        condition: voucherUnlockDescription(metaProfile, key),
+      }));
+    });
+    return;
+  }
+
+  if (collectionTab === 'tarot' || collectionTab === 'planet' || collectionTab === 'spectral') {
+    const catalog = collectionTab === 'tarot' ? TAROT_CATALOG : collectionTab === 'planet' ? PLANET_CATALOG : SPECTRAL_CATALOG;
+    const foundKeys = collectionTab === 'tarot'
+      ? metaProfile.discoveredTarots
+      : collectionTab === 'planet' ? metaProfile.discoveredPlanets : metaProfile.discoveredSpectrals;
+    for (const item of catalog) {
+      const found = foundKeys.includes(item.key);
+      collectionGrid.appendChild(makeCollectionCard({
+        kind: collectionTab.toUpperCase(),
+        name: item.name,
+        description: item.description,
+        status: found ? 'discovered' : 'undiscovered',
+        meta: `Price $${item.price}`,
+      }));
+    }
+    return;
+  }
+
+  if (collectionTab === 'blinds') {
+    const smallFound = metaProfile.runsFinished > 0 || metaProfile.totalHands > 0;
+    collectionGrid.appendChild(makeCollectionCard({
+      kind: 'BLIND', name: 'Small Blind', description: 'First Blind of an Ante.', status: smallFound ? 'discovered' : 'undiscovered',
+    }));
+    collectionGrid.appendChild(makeCollectionCard({
+      kind: 'BLIND', name: 'Big Blind', description: 'Second Blind of an Ante.', status: smallFound ? 'discovered' : 'undiscovered',
+    }));
+    (Object.keys(BOSS_BLINDS) as Array<keyof typeof BOSS_BLINDS>).forEach((key) => {
+      const boss = BOSS_BLINDS[key];
+      const found = metaProfile.discoveredBosses.includes(key);
+      collectionGrid.appendChild(makeCollectionCard({
+        kind: 'BOSS BLIND',
+        name: boss.name,
+        description: boss.description,
+        status: found ? 'discovered' : 'undiscovered',
+        meta: `Target ×${boss.targetMult}`,
+      }));
+    });
+    return;
+  }
+
+  (Object.keys(TAGS) as Array<keyof typeof TAGS>).forEach((key) => {
+    const tag = TAGS[key];
+    const found = metaProfile.discoveredTags.includes(key);
+    collectionGrid.appendChild(makeCollectionCard({
+      kind: 'TAG',
+      name: tag.name,
+      description: tag.description,
+      status: found ? 'discovered' : 'undiscovered',
+    }));
+  });
+}
+
+function syncMetaProgression() {
+  if (!canProgressMeta(seededRun)) {
+    state.setUnlockedJokerKeys(metaProfile.unlockedJokers);
+    state.setUnlockedVoucherKeys(metaProfile.unlockedVouchers);
+    resetMetaSeen();
+    if (activeGamePanel === 'collection') renderCollection();
+    return;
+  }
+
+  const delta = {
+    hands: Math.max(0, state.metaHandsPlayedRun - metaSeen.hands),
+    cardsPlayed: Math.max(0, state.metaCardsPlayedRun - metaSeen.cardsPlayed),
+    faceCardsPlayed: Math.max(0, state.metaFaceCardsPlayedRun - metaSeen.faceCardsPlayed),
+    discards: Math.max(0, state.metaDiscardActionsRun - metaSeen.discards),
+    cardsDiscarded: Math.max(0, state.metaCardsDiscardedRun - metaSeen.cardsDiscarded),
+    shopSpend: Math.max(0, state.metaShopSpendRun - metaSeen.shopSpend),
+    rerolls: Math.max(0, state.metaShopRerollsRun - metaSeen.rerolls),
+    tarotShopBought: Math.max(0, state.metaTarotShopBoughtRun - metaSeen.tarotShopBought),
+    planetShopBought: Math.max(0, state.metaPlanetShopBoughtRun - metaSeen.planetShopBought),
+    playingCardsShopBought: Math.max(0, state.metaPlayingCardsShopBoughtRun - metaSeen.playingCardsShopBought),
+    tarotPackUsed: Math.max(0, state.metaTarotPackUsedRun - metaSeen.tarotPackUsed),
+    planetPackUsed: Math.max(0, state.metaPlanetPackUsedRun - metaSeen.planetPackUsed),
+    blankRedeemed: Math.max(0, state.metaBlankRedeemedRun - metaSeen.blankRedeemed),
+  };
+  metaProfile = recordRunCounters(metaProfile, delta, false);
+
+  metaSeen.hands = state.metaHandsPlayedRun;
+  metaSeen.cardsPlayed = state.metaCardsPlayedRun;
+  metaSeen.faceCardsPlayed = state.metaFaceCardsPlayedRun;
+  metaSeen.discards = state.metaDiscardActionsRun;
+  metaSeen.cardsDiscarded = state.metaCardsDiscardedRun;
+  metaSeen.shopSpend = state.metaShopSpendRun;
+  metaSeen.rerolls = state.metaShopRerollsRun;
+  metaSeen.tarotShopBought = state.metaTarotShopBoughtRun;
+  metaSeen.planetShopBought = state.metaPlanetShopBoughtRun;
+  metaSeen.playingCardsShopBought = state.metaPlayingCardsShopBoughtRun;
+  metaSeen.tarotPackUsed = state.metaTarotPackUsedRun;
+  metaSeen.planetPackUsed = state.metaPlanetPackUsedRun;
+  metaSeen.blankRedeemed = state.metaBlankRedeemedRun;
+
+  const suitCounts = { spades: 0, hearts: 0, diamonds: 0, clubs: 0 };
+  for (const card of state.ownedDeck) suitCounts[card.suit] += 1;
+  const editionJokers = state.jokers.filter((joker) =>
+    joker.edition === 'foil' || joker.edition === 'holographic' || joker.edition === 'polychrome'
+  ).length;
+  metaProfile = recordLiveState(metaProfile, {
+    ante: state.ante,
+    money: state.money,
+    handSize: state.config.handSize,
+    vouchers: state.vouchers.length,
+    polychromeJokers: state.jokers.filter((joker) => joker.edition === 'polychrome').length,
+    editionJokers,
+    suitCounts,
+  }, false);
+
+  for (const joker of state.jokers) metaProfile = discoverJoker(metaProfile, joker.key);
+  for (const voucher of state.vouchers) metaProfile = discoverVoucher(metaProfile, voucher);
+  for (const consumable of state.consumables) metaProfile = discoverConsumable(metaProfile, consumable.type, consumable.key);
+  if (state.booster) {
+    for (const choice of state.booster.choices) {
+      if (choice.item.kind === 'joker') metaProfile = discoverJoker(metaProfile, choice.item.joker.key);
+      if (choice.item.kind === 'consumable') {
+        metaProfile = discoverConsumable(metaProfile, choice.item.consumable.type, choice.item.consumable.key);
+      }
+    }
+  }
+
+  if (state.metaClaimedTagSerial > metaSeen.claimedTags && state.metaLastClaimedTagKey) {
+    metaProfile = discoverTag(metaProfile, state.metaLastClaimedTagKey);
+    metaSeen.claimedTags = state.metaClaimedTagSerial;
+  }
+
+  if (state.metaBossClearSerial > metaSeen.bossClears && state.metaLastClearedBossKey) {
+    metaProfile = recordBossClear(
+      metaProfile,
+      state.metaLastClearedBossKey,
+      state.metaLastClearedBossHandType,
+      `${metaRunId}:boss:${state.metaBossClearSerial}`,
+    );
+    metaSeen.bossClears = state.metaBossClearSerial;
+  }
+
+  if (state.metaCashoutSerial > metaSeen.cashouts) {
+    metaProfile = recordCashout(
+      metaProfile,
+      state.metaLastCashoutInterest,
+      state.metaLastCashoutCap,
+      `${metaRunId}:cashout:${state.metaCashoutSerial}`,
+    );
+    metaSeen.cashouts = state.metaCashoutSerial;
+  }
+
+  if ((state.phase === 'win' || state.phase === 'game-over') && !metaProfile.settledRunIds.includes(metaRunId)) {
+    metaProfile = recordRunFinish(metaProfile, metaRunId, {
+      won: state.phase === 'win',
+      deck: state.deckKey,
+      stake: state.stakeKey,
+      ante: state.ante,
+      money: state.money,
+      jokerKeys: state.jokers.map((joker) => joker.key),
+      handPlayCounts: state.handPlayCounts,
+    }, false);
+  }
+
+  metaProfile = refreshMetaUnlocks(metaProfile);
+  state.setUnlockedJokerKeys(metaProfile.unlockedJokers);
+  state.setUnlockedVoucherKeys(metaProfile.unlockedVouchers);
+  saveMetaProfile(localStorage, metaProfile);
+  if (activeGamePanel === 'collection') renderCollection();
+}
+
+"""
+src = src[:a] + collection_sync + src[b:]
+main.write_text(src, encoding="utf-8")
+
+replace_once(
+    "src/main.ts",
+    """    button.disabled = !deckUnlocked;""",
+    """    button.disabled = false;
+    button.setAttribute('aria-disabled', String(!deckUnlocked));
+    button.title = deckUnlocked ? deck.description : deckUnlockDescription(metaProfile, key);""",
+)
+replace_once(
+    "src/main.ts",
+    """    const desc = document.createElement('span');
+    desc.textContent = deck.description;""",
+    """    const desc = document.createElement('span');
+    desc.textContent = deckUnlocked ? deck.description : deckUnlockDescription(metaProfile, key);""",
+)
+replace_once(
+    "src/main.ts",
+    """    button.addEventListener('click', () => {
+      if (!deckUnlocked) return;
+      selectedSetupDeck = key;""",
+    """    button.addEventListener('click', () => {
+      if (!deckUnlocked) {
+        showCollectionInfo('LOCKED DECK', deck.name, deck.description, deckUnlockDescription(metaProfile, key), button);
+        return;
+      }
+      selectedSetupDeck = key;""",
+)
+
+replace_once(
+    "index.html",
+    """          <div class="setup-seed-row">
+            <input id="setup-seed" class="setup-seed" type="text" inputmode="text" placeholder="Blank = random seed">
+            <button id="btn-setup-random-seed" class="btn btn-ghost" type="button">Random</button>
+          </div>
+          <button id="btn-setup-start" class="btn btn-play" type="button">Play</button>""",
+    """          <div class="setup-seed-row">
+            <input id="setup-seed" class="setup-seed" type="text" inputmode="text" placeholder="Blank = Normal Run">
+            <button id="btn-setup-random-seed" class="btn btn-ghost" type="button">Practice Seed</button>
+          </div>
+          <p id="setup-seed-mode" class="setup-seed-mode normal">NORMAL RUN · Meta progression enabled</p>
+          <button id="btn-setup-start" class="btn btn-play" type="button">Play</button>""",
+)
+
+html = root / "index.html"
+hs = html.read_text(encoding="utf-8")
+ha = hs.find('      <div id="collection-overlay"')
+hb = hs.find('      <div id="options-overlay"', ha)
+if ha < 0 or hb < 0:
+    raise SystemExit("Could not locate Collection overlay bounds")
+collection_markup = """      <div id="collection-overlay" class="kanban-game-panel-overlay hidden" aria-hidden="true">
+        <section class="kanban-game-panel collection-panel" aria-label="Collection">
+          <div class="panel-kicker">COLLECTION</div>
+          <div id="collection-stats" class="collection-stats"></div>
+          <nav id="collection-tabs" class="collection-tabs" aria-label="Collection categories"></nav>
+          <div id="collection-grid" class="collection-grid"></div>
+          <button id="btn-collection-back" class="panel-back-btn" type="button">Back</button>
+        </section>
+      </div>
+
+"""
+hs = hs[:ha] + collection_markup + hs[hb:]
+html.write_text(hs, encoding="utf-8")
+
+replace_once(
+    "src/main.ts",
+    """btnSetupStart.addEventListener('click', () => {
+  const seed = seedFromText(setupSeedInput.value);
+  metaRunId = makeMetaRunId(seed);
+  metaProfile = recordRunStart(metaProfile);
+  saveMetaProfile(localStorage, metaProfile);
+  state.setUnlockedJokerKeys(metaProfile.unlockedJokers);
+  state.configureRun(selectedSetupDeck, setupStakeEl.value as StakeKey, seed);
+  setupSeedInput.value = String(seed);
+  resetHandPlayCounts();""",
+    """btnSetupStart.addEventListener('click', () => {
+  const seedText = setupSeedInput.value.trim();
+  seededRun = isSeededRunInput(seedText);
+  const seed = seedFromText(seedText);
+  metaRunId = makeMetaRunId(seed);
+  metaProfile = recordRunStart(metaProfile, seededRun);
+  saveMetaProfile(localStorage, metaProfile);
+  state.setUnlockedJokerKeys(metaProfile.unlockedJokers);
+  state.setUnlockedVoucherKeys(metaProfile.unlockedVouchers);
+  state.configureRun(selectedSetupDeck, setupStakeEl.value as StakeKey, seed);
+  resetMetaSeen();
+  resetHandPlayCounts();""",
+)
+
+replace_once(
+    "src/main.ts",
+    """btnSetupRandomSeed.addEventListener('click', () => {
+  setupSeedInput.value = String(seedFromText(''));
+  audio.play('buttonClick');
+});""",
+    """function refreshSeedMode() {
+  const practice = isSeededRunInput(setupSeedInput.value);
+  setupSeedMode.textContent = practice
+    ? 'SEEDED PRACTICE · Meta / unlocks / discovery / Stake stickers disabled'
+    : 'NORMAL RUN · Meta progression enabled';
+  setupSeedMode.classList.toggle('practice', practice);
+  setupSeedMode.classList.toggle('normal', !practice);
+}
+
+setupSeedInput.addEventListener('input', refreshSeedMode);
+btnSetupRandomSeed.addEventListener('click', () => {
+  setupSeedInput.value = String(seedFromText(''));
+  refreshSeedMode();
+  audio.play('buttonClick');
+});""",
+)
+
+replace_once(
+    "src/main.ts",
+    """  metaRunId = makeMetaRunId(state.config.seed);
+  setupSeedInput.value = '';
+  selectedSetupDeck = metaProfile.unlockedDecks.includes(state.deckKey) ? state.deckKey : 'red';""",
+    """  metaRunId = makeMetaRunId(state.config.seed);
+  seededRun = false;
+  setupSeedInput.value = '';
+  refreshSeedMode();
+  resetMetaSeen();
+  selectedSetupDeck = metaProfile.unlockedDecks.includes(state.deckKey) ? state.deckKey : 'red';""",
+)
+
+replace_once(
+    "src/main.ts",
+    """    if (joker.counter !== undefined) meta.push(`Current ${joker.counter}`);
+    if (joker.suit) meta.push(`Target ${joker.suit}`);""",
+    """    if (joker.counter !== undefined) meta.push(`Current ${joker.counter}`);
+    if (joker.suit) meta.push(`Target ${joker.suit}`);
+    const stakeSticker = Number(metaProfile.jokerStakeStickers[joker.key] ?? -1);
+    if (stakeSticker >= 0) meta.push(`${stakeStickerName(stakeSticker)} Stake Sticker`);""",
+)
+
+main = root / "src/main.ts"
+src = main.read_text(encoding="utf-8")
+needle = "      slot.textContent = shortName(joker.name);"
+if needle not in src:
+    raise SystemExit("Could not locate Joker inventory slot text")
+src = src.replace(
+    needle,
+    """      slot.textContent = shortName(joker.name);
+      const stakeSticker = Number(metaProfile.jokerStakeStickers[joker.key] ?? -1);
+      if (stakeSticker >= 0) {
+        const badge = document.createElement('span');
+        badge.className = `joker-stake-sticker stake-${stakeSticker}`;
+        badge.textContent = stakeStickerName(stakeSticker).slice(0, 1);
+        badge.title = `${stakeStickerName(stakeSticker)} Stake Sticker`;
+        slot.appendChild(badge);
+      }""",
+    1,
+)
+main.write_text(src, encoding="utf-8")
+
+replace_once(
+    "src/main.ts",
+    """reflowHand(0.6);
+updateHud();
+saveCurrentRun();""",
+    """refreshSeedMode();
+reflowHand(0.6);
+updateHud();
+saveCurrentRun();""",
+)
+
+style = root / "src/style.css"
+with style.open("a", encoding="utf-8") as f:
+    f.write(r"""
+.setup-deck-card.locked {
+  pointer-events: auto !important;
+  opacity: .55 !important;
+}
+.setup-seed-mode {
+  margin: -5px 0 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  text-align: center;
+  font: 9px "Silkscreen", monospace;
+  line-height: 1.5;
+}
+.setup-seed-mode.normal { background: #244e3c; color: #bfffd8; border: 2px solid #4e9c72; }
+.setup-seed-mode.practice { background: #5a3b20; color: #ffe0a2; border: 2px solid #b37c35; }
+
+.collection-panel { width: min(1080px, calc(100vw - 28px)) !important; }
+.collection-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 10px 0;
+  padding-bottom: 5px;
+  overflow-x: auto;
+}
+.collection-tab {
+  flex: 0 0 auto;
+  border: 2px solid #172326;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #68787b;
+  color: #eef3f4;
+  font: 9px "Silkscreen", monospace;
+  cursor: pointer;
+}
+.collection-tab.active {
+  background: linear-gradient(180deg,#ff695c,#d83c32);
+  border-color: #69241e;
+  box-shadow: 0 3px 0 #59221d;
+}
+.collection-grid {
+  display: grid;
+  grid-template-columns: repeat(5,minmax(0,1fr));
+  gap: 8px;
+  max-height: 56vh;
+  overflow: auto;
+  padding: 3px;
+}
+.collection-card {
+  min-height: 132px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px;
+  border: 2px solid #566a6f;
+  border-radius: 10px;
+  background: linear-gradient(180deg,#dfe3e5,#b9c2c6);
+  color: #27373a;
+  cursor: pointer;
+}
+.collection-card strong { font: 10px "Silkscreen", monospace; line-height: 1.35; }
+.collection-card p { margin: 0; flex: 1; font-size: 13px; line-height: 1.15; }
+.collection-card small { min-height: 20px; font: 8px "Silkscreen", monospace; color: #76571b; line-height: 1.35; }
+.collection-card-status {
+  align-self: flex-start;
+  padding: 3px 5px;
+  border-radius: 5px;
+  background: #44765a;
+  color: #fff;
+  font: 7px "Silkscreen", monospace;
+}
+.collection-card.locked {
+  background: #3e4b4e;
+  color: #bac4c6;
+  border-color: #202b2d;
+}
+.collection-card.locked .collection-card-status { background: #803931; }
+.collection-card.locked small { color: #d1aa77; }
+.collection-card.undiscovered {
+  filter: grayscale(.78);
+  opacity: .72;
+}
+.collection-card.undiscovered .collection-card-status { background: #6a6d70; }
+.collection-card.joker-mythic.discovered {
+  background: linear-gradient(145deg,#39204e,#755026);
+  color: #fff4ca;
+  border-color: #e6c151;
+}
+.collection-card.joker-mythic.discovered small { color: #ffe29a; }
+
+.joker-slot.filled { position: relative; }
+.joker-stake-sticker {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  min-width: 19px;
+  height: 19px;
+  display: grid;
+  place-items: center;
+  padding: 0 3px;
+  border-radius: 50%;
+  border: 2px solid rgba(0,0,0,.55);
+  background: #e9ecec;
+  color: #172326;
+  font: 8px "Silkscreen", monospace;
+  box-shadow: 0 2px 0 rgba(0,0,0,.5);
+}
+.joker-stake-sticker.stake-7 { box-shadow: 0 0 0 2px #d6ab35, 0 2px 0 rgba(0,0,0,.5); }
+
+@media (max-width: 980px) {
+  .collection-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+}
+@media (max-width: 650px) {
+  .collection-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+""")
+
+print("Balatro exact meta UI/session integration applied.")
