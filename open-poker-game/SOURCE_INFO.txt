@@ -35,3 +35,7 @@ Kanban customizations:
 - Magic/Nebula/Ghost/Abandoned/Checkered/Zodiac/Painted/Anaglyph/Plasma/Erratic Deck behavior
 - Full Voucher upgrade pairs including Observatory/Omen Globe/Antimatter/Retcon/Palette
 - Full Tarot and Spectral execution including Fool/Wheel/Strength/Temperance/Soul/Black Hole
+- Exact Meta Progression: per-Deck Stakes, individual Deck/Joker/Voucher unlock conditions
+- Seeded practice runs are meta-ineligible: no unlocks, discovery, stats or Stake stickers
+- Collection tabs: Decks/Jokers/Vouchers/Tarot/Planet/Spectral/Blinds/Tags
+- Permanent highest-Stake stickers on Jokers held through winning Ante 8
