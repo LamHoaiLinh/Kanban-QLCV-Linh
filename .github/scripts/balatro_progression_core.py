@@ -308,7 +308,6 @@ pool = r"""const JOKER_TEMPLATES: JokerTemplate[] = [
   { key: 'loyalty-card', name: 'Loyalty Card', description: 'Every 6th played hand gives x4 Mult.', rarity: 'uncommon', price: 5, effect: { kind: 'loyalty-xmult', every: 6, amount: 4 } },
   { key: 'the-duo', name: 'The Duo', description: 'x2 Mult if the hand contains a Pair.', rarity: 'rare', price: 8, effect: { kind: 'hand-xmult', handTypes: ['Pair','Two Pair','Three of a Kind','Full House','Four of a Kind','Five of a Kind','Flush House','Flush Five'], amount: 2 } },
   { key: 'the-trio', name: 'The Trio', description: 'x3 Mult if the hand contains Three of a Kind.', rarity: 'rare', price: 8, effect: { kind: 'hand-xmult', handTypes: ['Three of a Kind','Full House','Four of a Kind','Five of a Kind','Flush House','Flush Five'], amount: 3 } },
-  { key: 'cashback', name: 'Cashback', description: '+$1 when a Blind is cleared.', rarity: 'common', price: 5, effect: { kind: 'economy-clear', amount: 1 } },
 ];
 
 export const JOKER_LIBRARY_SIZE = JOKER_TEMPLATES.length;
