@@ -232,7 +232,7 @@ export function boosterDisplayName(type: BoosterType, size: BoosterSize): string
 }
 
 export function targetRule(effect: ConsumableEffect): { min: number; max: number; instruction: string } | null {
-  if ('min' not in effect || 'max' not in effect) return null;
+  if (!(('min' in effect) && ('max' in effect))) return null;
   const instruction =
     effect.kind === 'copy-right-to-left' ? 'Select exactly 2 cards. Left becomes a copy of right.'
     : effect.kind === 'destroy-selected' ? 'Select cards to destroy.'
