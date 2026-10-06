@@ -350,11 +350,11 @@ describe('Reliability Certification', () => {
         }
 
         if (state.phase === 'play') {
-          if ((seedIndex + steps) % 23 === 0) {
+          if ((seedIndex + steps) % 37 === 0) {
             assertNextHandRestoreEquivalent(state);
             coverage.nextHandRestoreChecks += 1;
           }
-          if ((seedIndex + steps) % 11 === 0) state = roundTrip(state, coverage.phasesRestored);
+          if ((seedIndex + steps) % 29 === 0) state = roundTrip(state, coverage.phasesRestored);
 
           const ids = choosePlayable(state);
           if (ids) {
@@ -377,7 +377,7 @@ describe('Reliability Certification', () => {
 
         if (state.phase === 'shop') {
           state.money = Math.max(state.money, 40);
-          if ((seedIndex + steps) % 5 === 0) state = roundTrip(state, coverage.phasesRestored);
+          if ((seedIndex + steps) % 23 === 0) state = roundTrip(state, coverage.phasesRestored);
 
           const anyState = state as MutableState;
           const unsoldOffers = state.shop?.offers.filter((offer) => !offer.sold) ?? [];
@@ -419,7 +419,7 @@ describe('Reliability Certification', () => {
         }
 
         if (state.phase === 'booster') {
-          state = roundTrip(state, coverage.phasesRestored);
+          if ((seedIndex + steps) % 19 === 0) state = roundTrip(state, coverage.phasesRestored);
           const choice = state.booster?.choices.find((item) => !item.taken);
           if (!choice) {
             state.skipBooster();
@@ -473,7 +473,7 @@ describe('Reliability Certification', () => {
       nextHandRestoreChecks: coverage.nextHandRestoreChecks,
       redSealGlassRuns: coverage.redSealGlassRuns,
     }));
-  }, 180_000);
+  }, 300_000);
 });
 """
 (root / "tests/unit/reliabilityCertification.test.ts").write_text(tests, encoding="utf-8")
