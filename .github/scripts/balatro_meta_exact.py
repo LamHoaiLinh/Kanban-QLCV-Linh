@@ -1458,15 +1458,26 @@ replace_once(
   selectedSetupDeck = metaProfile.unlockedDecks.includes(state.deckKey) ? state.deckKey : 'red';""",
 )
 
-replace_once(
-    "src/main.ts",
-    """    if (joker.counter !== undefined) meta.push(`Current ${joker.counter}`);
-    if (joker.suit) meta.push(`Target ${joker.suit}`);""",
-    """    if (joker.counter !== undefined) meta.push(`Current ${joker.counter}`);
-    if (joker.suit) meta.push(`Target ${joker.suit}`);
-    const stakeSticker = Number(metaProfile.jokerStakeStickers[joker.key] ?? -1);
-    if (stakeSticker >= 0) meta.push(`${stakeStickerName(stakeSticker)} Stake Sticker`);""",
-)
+main = root / "src/main.ts"
+src = main.read_text(encoding="utf-8")
+info_at = src.find("function showItemInfo(")
+meta_at = src.find("  itemInfoMeta.textContent = meta.join(' · ');", info_at)
+if info_at < 0 or meta_at < 0:
+    raise SystemExit("Could not locate final Joker info meta line")
+stake_info = r"""  if (joker) {
+    const permanentStake = Number(metaProfile.jokerStakeStickers[joker.key] ?? -1);
+    if (permanentStake >= 0) meta.push(`${stakeStickerName(permanentStake)} Stake Sticker`);
+  }
+"""
+src = src[:meta_at] + stake_info + src[meta_at:]
+
+live_at = src.find("        if (live) baseMeta.push(live);", info_at)
+if live_at >= 0:
+    live_sticker = r"""        const permanentStake = Number(metaProfile.jokerStakeStickers[openJoker.key] ?? -1);
+        if (permanentStake >= 0) baseMeta.push(`${stakeStickerName(permanentStake)} Stake Sticker`);
+"""
+    src = src[:live_at] + live_sticker + src[live_at:]
+main.write_text(src, encoding="utf-8")
 
 main = root / "src/main.ts"
 src = main.read_text(encoding="utf-8")
