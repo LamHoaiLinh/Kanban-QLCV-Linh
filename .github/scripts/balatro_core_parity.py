@@ -1089,7 +1089,7 @@ event_replay = r"""  const scoringIds = new Set(br.hand.scoringCards.map((card) 
       }
 
       if (step.jokerId) {
-        const slot = jokerSlotsEl.querySelector<HTMLElement>(\`[data-joker-id="\${step.jokerId}"]\`);
+        const slot = jokerSlotsEl.querySelector<HTMLElement>(`[data-joker-id="${step.jokerId}"]`);
         if (slot) {
           gsap.fromTo(
             slot,
