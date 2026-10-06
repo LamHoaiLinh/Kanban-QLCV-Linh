@@ -916,21 +916,18 @@ apply_consumable = r"""  private applyConsumableWithTargets(card: ConsumableCard
 s = s[:a] + apply_consumable + s[b:]
 game_path.write_text(s, encoding="utf-8")
 
-# Observatory XMult and Plasma balancing happen after the base hand score is tallied.
-# Anchor on the Tooth money settlement body because previous patches may rewrite
-# the surrounding condition while retaining this unique statement.
+# Observatory XMult and Plasma balancing must change breakdown before GameState
+# tallies it. Locate the final scoreHand call structurally, independent of later Boss rewrites.
 game_path = root / "src/game/gameState.ts"
 score_src = game_path.read_text(encoding="utf-8")
-tooth_marker = "      breakdown.moneyDelta -= cards.length;"
-tooth_body = score_src.find(tooth_marker)
-if tooth_body < 0:
-    raise SystemExit("Could not locate Tooth money settlement body")
-line_start = score_src.rfind("\n", 0, tooth_body) + 1
-# Insert before the full Tooth block by scanning backward to its nearest if.
-block_start = score_src.rfind("    if (", 0, line_start)
-if block_start < 0:
-    raise SystemExit("Could not locate Tooth condition before settlement body")
-score_insert = r"""    const contentParityOriginalTotal = breakdown.total;
+call_start = score_src.find("    const breakdown = scoreHand(")
+if call_start < 0:
+    raise SystemExit("Could not locate final scoreHand call")
+call_end = score_src.find("\n    });", call_start)
+if call_end < 0:
+    raise SystemExit("Could not locate end of final scoreHand call")
+call_end += len("\n    });")
+score_insert = r"""
     if (this.vouchers.includes('observatory')) {
       const matchingPlanets = this.consumables.filter((card) =>
         card.type === 'planet' && card.effect.kind === 'planet' && card.effect.handType === hand.type
@@ -965,10 +962,8 @@ score_insert = r"""    const contentParityOriginalTotal = breakdown.total;
       breakdown.finalMult = balanced;
       breakdown.total = Math.floor(balanced * balanced);
     }
-    this.roundScore += breakdown.total - contentParityOriginalTotal;
-
 """
-score_src = score_src[:block_start] + score_insert + score_src[block_start:]
+score_src = score_src[:call_end] + score_insert + score_src[call_end:]
 game_path.write_text(score_src, encoding="utf-8")
 
 # Voucher interest caps.
