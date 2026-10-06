@@ -1824,7 +1824,7 @@ old = """  it('buys and sells jokers while respecting the slot limit', () => {
 
     for (let i = state.jokers.length; i < MAX_JOKERS; i++) {
       state.jokers.push({
-        id: \`manual-\${i}\`,
+        id: `manual-${i}`,
         key: 'manual',
         name: 'Manual Joker',
         description: '+1 Mult',
@@ -1862,7 +1862,7 @@ new = """  it('takes Jokers from Buffoon Packs while respecting the slot limit',
 
     for (let i = state.jokers.length; i < MAX_JOKERS; i++) {
       state.jokers.push({
-        id: \`manual-\${i}\`,
+        id: `manual-${i}`,
         key: 'manual',
         name: 'Manual Joker',
         description: '+1 Mult',
