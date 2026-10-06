@@ -542,3 +542,193 @@ replace_once(
 )
 
 print("Balatro meta core stage 2 applied.")
+
+
+# ---------------------------------------------------------------------------
+# Stage 3: concealment visuals + save/restore stability for Boss runtime.
+# ---------------------------------------------------------------------------
+
+replace_once(
+    "src/game/types.ts",
+    """  handsPlayedRun: number;
+}""",
+    """  handsPlayedRun: number;
+  discardsUsedRun: number;
+  antePlayedCardIds: string[];
+  bossFaceDownCardIds: string[];
+  verdantLeafActive: boolean;
+  crimsonDebuffedJokerId: string | null;
+  bossForcedCardId: string | null;
+}""",
+)
+
+replace_once(
+    "src/game/gameState.ts",
+    """  antePlayedCardIds = new Set<string>();
+  verdantLeafActive = false;""",
+    """  antePlayedCardIds = new Set<string>();
+  bossFaceDownCardIds = new Set<string>();
+  verdantLeafActive = false;""",
+)
+
+replace_once(
+    "src/game/gameState.ts",
+    """  bossForcedCardId: string | null = null;
+  private unlockedJokerKeys: Set<string> | null = null;""",
+    """  bossForcedCardId: string | null = null;
+  private concealNextDraw = false;
+  private unlockedJokerKeys: Set<string> | null = null;""",
+)
+
+replace_once(
+    "src/game/gameState.ts",
+    """    this.antePlayedCardIds.clear();
+    this.verdantLeafActive = false;""",
+    """    this.antePlayedCardIds.clear();
+    this.bossFaceDownCardIds.clear();
+    this.verdantLeafActive = false;""",
+)
+
+replace_once(
+    "src/game/gameState.ts",
+    """  drawToFull() {
+    while (this.hand.length < this.roundHandSize && this.deck.length > 0) {
+      this.hand.push(this.deck.pop()!);
+    }
+  }""",
+    """  private drawBossCards(count: number) {
+    for (let i = 0; i < count && this.deck.length > 0; i++) {
+      const card = this.deck.pop()!;
+      this.hand.push(card);
+      if (this.blindIndex !== 2) continue;
+      if (this.bossBlindKey === 'wheel' && this.rng() < 1 / 7) this.bossFaceDownCardIds.add(card.id);
+      if (this.bossBlindKey === 'mark' && card.rank >= 11 && card.rank <= 13) this.bossFaceDownCardIds.add(card.id);
+      if (this.bossBlindKey === 'fish' && this.concealNextDraw) this.bossFaceDownCardIds.add(card.id);
+    }
+    this.concealNextDraw = false;
+  }
+
+  drawToFull() {
+    this.drawBossCards(Math.max(0, this.roundHandSize - this.hand.length));
+  }""",
+)
+
+replace_once(
+    "src/game/gameState.ts",
+    """    this.drawToFull();
+
+    if (this.blindIndex === 2) {""",
+    """    this.drawToFull();
+
+    if (this.blindIndex === 2) {
+      if (this.bossBlindKey === 'house') for (const card of this.hand) this.bossFaceDownCardIds.add(card.id);""",
+)
+
+replace_once(
+    "src/game/gameState.ts",
+    """    } else {
+      if (this.blindIndex === 2 && this.bossBlindKey === 'hook') {""",
+    """    } else {
+      if (this.blindIndex === 2 && this.bossBlindKey === 'fish') this.concealNextDraw = true;
+      if (this.blindIndex === 2 && this.bossBlindKey === 'hook') {""",
+)
+
+replace_once(
+    "src/game/gameState.ts",
+    """      if (this.blindIndex === 2 && this.bossBlindKey === 'serpent') {
+        for (let i = 0; i < 3 && this.deck.length > 0; i++) this.hand.push(this.deck.pop()!);
+      } else {""",
+    """      if (this.blindIndex === 2 && this.bossBlindKey === 'serpent') {
+        this.drawBossCards(3);
+      } else {""",
+)
+
+replace_once(
+    "src/game/gameState.ts",
+    """    if (this.blindIndex === 2 && this.bossBlindKey === 'serpent') {
+      for (let i = 0; i < 3 && this.deck.length > 0; i++) this.hand.push(this.deck.pop()!);
+    } else {""",
+    """    if (this.blindIndex === 2 && this.bossBlindKey === 'serpent') {
+      this.drawBossCards(3);
+    } else {""",
+)
+
+replace_once(
+    "src/game/gameState.ts",
+    """  currentSkipTag(): TagKey | null {""",
+    """  isCardFaceDown(cardId: string): boolean {
+    return this.bossFaceDownCardIds.has(cardId);
+  }
+
+  currentSkipTag(): TagKey | null {""",
+)
+
+replace_once(
+    "src/game/gameState.ts",
+    """      handsPlayedRun: this.handsPlayedRun,
+    };""",
+    """      handsPlayedRun: this.handsPlayedRun,
+      discardsUsedRun: this.discardsUsedRun,
+      antePlayedCardIds: [...this.antePlayedCardIds],
+      bossFaceDownCardIds: [...this.bossFaceDownCardIds],
+      verdantLeafActive: this.verdantLeafActive,
+      crimsonDebuffedJokerId: this.crimsonDebuffedJokerId,
+      bossForcedCardId: this.bossForcedCardId,
+    };""",
+)
+
+replace_once(
+    "src/game/gameState.ts",
+    """    this.handsPlayedRun = next.handsPlayedRun;
+    this.shopVisit = next.shop?.visit ?? this.completedShopCount();""",
+    """    this.handsPlayedRun = next.handsPlayedRun;
+    this.discardsUsedRun = next.discardsUsedRun ?? 0;
+    this.antePlayedCardIds = new Set(next.antePlayedCardIds ?? []);
+    this.bossFaceDownCardIds = new Set(next.bossFaceDownCardIds ?? []);
+    this.verdantLeafActive = next.verdantLeafActive ?? false;
+    this.crimsonDebuffedJokerId = next.crimsonDebuffedJokerId ?? null;
+    this.bossForcedCardId = next.bossForcedCardId ?? null;
+    this.shopVisit = next.shop?.visit ?? this.completedShopCount();""",
+)
+
+replace_once(
+    "src/game/gameState.ts",
+    """      handsPlayedRun: 0,
+    };
+  }""",
+    """      handsPlayedRun: 0,
+      discardsUsedRun: 0,
+      antePlayedCardIds: [],
+      bossFaceDownCardIds: [],
+      verdantLeafActive: false,
+      crimsonDebuffedJokerId: null,
+      bossForcedCardId: null,
+    };
+  }""",
+)
+
+# Insert setFaceDown immediately before the moveTo method (avoid relying on comments).
+replace_once(
+    "src/render/CardObject.ts",
+    """  moveTo(target: { x: number; y: number; z?: number; rotZ?: number }, duration = 0.45, delay = 0) {""",
+    """  setFaceDown(hidden: boolean) {
+    const front = this.faceMesh.material as THREE.MeshStandardMaterial;
+    front.map = hidden ? getBackTexture() : getCardTexture(this.card);
+    front.needsUpdate = true;
+  }
+
+  moveTo(target: { x: number; y: number; z?: number; rotZ?: number }, duration = 0.45, delay = 0) {""",
+)
+
+replace_once(
+    "src/main.ts",
+    """function reflowHand(duration = 0.4) {
+  applyActiveHandSort();
+  syncHandOrder();""",
+    """function reflowHand(duration = 0.4) {
+  applyActiveHandSort();
+  syncHandOrder();
+  for (const card of state.hand) objects.get(card.id)?.setFaceDown(state.isCardFaceDown(card.id));""",
+)
+
+print("Balatro meta core stage 3 applied.")
