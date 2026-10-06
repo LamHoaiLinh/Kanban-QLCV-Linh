@@ -8,6 +8,7 @@ on:
       - ".github/scripts/customize_open_poker.py"
       - ".github/scripts/enhance_open_poker_ux.py"
       - ".github/scripts/balatro_core_parity.py"
+      - ".github/scripts/balatro_shop_parity.py"
 
 permissions:
   contents: write
@@ -41,6 +42,7 @@ jobs:
           python3 .github/scripts/customize_open_poker.py .open-poker-build
           python3 .github/scripts/enhance_open_poker_ux.py .open-poker-build
           python3 .github/scripts/balatro_core_parity.py .open-poker-build
+          python3 .github/scripts/balatro_shop_parity.py .open-poker-build
 
       - name: Build Open Poker
         run: |
@@ -76,6 +78,10 @@ jobs:
             '- Full playing-card modifiers: enhancements, seals, editions' \
             '- Deterministic Lucky/Glass rolls + Glass shatter + money effects' \
             '- Drag Joker order affects scoring left-to-right' \
+            '- Balatro Shop parity: 2 shop cards + 2 Booster Packs + Voucher' \
+            '- Arcana/Celestial/Standard/Buffoon/Spectral packs with Normal/Jumbo/Mega' \
+            '- Tarot/Spectral target selection + Planet immediate upgrades' \
+            '- Interest, unused-hand cashout, pack/target autosave via snapshot V3' \
             > open-poker-game/SOURCE_INFO.txt
           rm -rf .open-poker-build
 
