@@ -1019,6 +1019,13 @@ with style.open("a", encoding="utf-8") as f:
 # ---------------------------------------------------------------------------
 # 6. Parity regression tests: deterministic modifier/order behavior.
 # ---------------------------------------------------------------------------
+# Upstream prototype rounded final Chips × Mult; Balatro floors the result.
+replace_once(
+    "tests/unit/pokerEngine.test.ts",
+    "expect(score.total).toBe(113);",
+    "expect(score.total).toBe(112);",
+)
+
 tests = r"""import { describe, expect, it } from 'vitest';
 import { makeCard } from '../../src/game/cards';
 import { evaluateHand, scoreHand } from '../../src/game/pokerEngine';
