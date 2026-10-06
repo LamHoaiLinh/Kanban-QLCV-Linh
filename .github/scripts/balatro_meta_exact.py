@@ -670,7 +670,11 @@ replace_once(
   metaLastClaimedTagKey: TagKey | null = null;
   metaBossClearSerial = 0;
   metaLastClearedBossKey: BossBlindKey | null = null;
-  metaLastClearedBossHandType: PokerHandType | null = null;""",
+  metaLastClearedBossHandType: PokerHandType | null = null;
+  metaBoosterChoiceSerial = 0;
+  metaLastBoosterJokerKey: string | null = null;
+  metaLastBoosterConsumableType: 'tarot' | 'planet' | 'spectral' | null = null;
+  metaLastBoosterConsumableKey: string | null = null;""",
 )
 
 replace_once(
@@ -732,6 +736,10 @@ reset = r"""    this.metaHandsPlayedRun = 0;
     this.metaBossClearSerial = 0;
     this.metaLastClearedBossKey = null;
     this.metaLastClearedBossHandType = null;
+    this.metaBoosterChoiceSerial = 0;
+    this.metaLastBoosterJokerKey = null;
+    this.metaLastBoosterConsumableType = null;
+    this.metaLastBoosterConsumableKey = null;
     this.rollAnteOptions();
     this.prepareBlindSelect();"""
 gs = gs.replace(anchor, reset, 1)
@@ -839,6 +847,10 @@ replace_once(
     """  private finishBoosterChoice(choice: BoosterChoice): 'applied' {
     choice.taken = true;""",
     """  private finishBoosterChoice(choice: BoosterChoice): 'applied' {
+    this.metaBoosterChoiceSerial += 1;
+    this.metaLastBoosterJokerKey = choice.item.kind === 'joker' ? choice.item.joker.key : null;
+    this.metaLastBoosterConsumableType = choice.item.kind === 'consumable' ? choice.item.consumable.type : null;
+    this.metaLastBoosterConsumableKey = choice.item.kind === 'consumable' ? choice.item.consumable.key : null;
     if (choice.item.kind === 'consumable') {
       if (choice.item.consumable.type === 'tarot') this.metaTarotPackUsedRun += 1;
       if (choice.item.consumable.type === 'planet') this.metaPlanetPackUsedRun += 1;
@@ -975,6 +987,7 @@ const metaSeen = {
   cashouts: 0,
   claimedTags: 0,
   bossClears: 0,
+  boosterChoices: 0,
 };
 
 function resetMetaSeen() {
@@ -994,6 +1007,7 @@ function resetMetaSeen() {
   metaSeen.cashouts = state.metaCashoutSerial;
   metaSeen.claimedTags = state.metaClaimedTagSerial;
   metaSeen.bossClears = state.metaBossClearSerial;
+  metaSeen.boosterChoices = state.metaBoosterChoiceSerial;
 }""",
 )
 
@@ -1281,13 +1295,21 @@ function syncMetaProgression() {
   for (const joker of state.jokers) metaProfile = discoverJoker(metaProfile, joker.key);
   for (const voucher of state.vouchers) metaProfile = discoverVoucher(metaProfile, voucher);
   for (const consumable of state.consumables) metaProfile = discoverConsumable(metaProfile, consumable.type, consumable.key);
-  if (state.booster) {
-    for (const choice of state.booster.choices) {
-      if (choice.item.kind === 'joker') metaProfile = discoverJoker(metaProfile, choice.item.joker.key);
-      if (choice.item.kind === 'consumable') {
-        metaProfile = discoverConsumable(metaProfile, choice.item.consumable.type, choice.item.consumable.key);
-      }
+
+  // Pack content becomes "discovered" only when actually taken/used, not merely
+  // because it was visible among the choices.
+  if (state.metaBoosterChoiceSerial > metaSeen.boosterChoices) {
+    if (state.metaLastBoosterJokerKey) {
+      metaProfile = discoverJoker(metaProfile, state.metaLastBoosterJokerKey);
     }
+    if (state.metaLastBoosterConsumableType && state.metaLastBoosterConsumableKey) {
+      metaProfile = discoverConsumable(
+        metaProfile,
+        state.metaLastBoosterConsumableType,
+        state.metaLastBoosterConsumableKey,
+      );
+    }
+    metaSeen.boosterChoices = state.metaBoosterChoiceSerial;
   }
 
   if (state.metaClaimedTagSerial > metaSeen.claimedTags && state.metaLastClaimedTagKey) {
