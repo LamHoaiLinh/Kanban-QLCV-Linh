@@ -22,3 +22,7 @@ Kanban customizations:
 - Boss Blind effects + cumulative Stake rules + Eternal/Perishable/Rental Jokers
 - First deep Joker set: 50 functional Jokers with scaling and retriggers
 - Left-click Joker/Consumable info card + Balatro-like Shop composition
+- Joker Exact Parity: per-card/on-held/independent timing, Red Seal/Mime/retrigger order
+- Exact live counters for Misprint/Runner/Ride the Bus/Green/Ice Cream/Loyalty/Castle
+- Boss-debuff-aware Joker/Card interactions + single-roll Glass shatter settlement
+- 20 Mythic Jokers above Rare with dedicated rarity visuals and 2% natural roll
