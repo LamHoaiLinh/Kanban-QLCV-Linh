@@ -271,6 +271,7 @@ replace_once(
   boosterConfig,""",
     """  VOUCHERS,
   VOUCHER_UPGRADE_BASE,
+  planetForHand,
   boosterConfig,""",
 )
 
