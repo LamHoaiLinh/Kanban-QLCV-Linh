@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/build-open-poker.yml"
       - ".github/scripts/customize_open_poker.py"
+      - ".github/scripts/enhance_open_poker_ux.py"
 
 permissions:
   contents: write
@@ -35,7 +36,9 @@ jobs:
           git clone --depth 1 https://github.com/alexis-labs/open-poker.git .open-poker-build
 
       - name: Apply Kanban customization
-        run: python3 .github/scripts/customize_open_poker.py .open-poker-build
+        run: |
+          python3 .github/scripts/customize_open_poker.py .open-poker-build
+          python3 .github/scripts/enhance_open_poker_ux.py .open-poker-build
 
       - name: Build Open Poker
         run: |
@@ -59,7 +62,12 @@ jobs:
             'Kanban customizations:' \
             '- Card ranks 2..A enlarged more than 2x for readability' \
             '- Sort Hand: Straight (S)' \
-            '- Sort Hand: Flush (F)' \
+            '- Sort Hand: Flush (F) with sticky auto-sort' \
+            '- Play Hand hotkey: Left/Right Ctrl' \
+            '- Discard hotkey: Left/Right Shift' \
+            '- Run Info: hand level, Chips x Mult, played count' \
+            '- Options: SFX, music, new run, save and return' \
+            '- Current run autosaves/restores; ESC closes panel or returns to Kanban' \
             > open-poker-game/SOURCE_INFO.txt
           rm -rf .open-poker-build
 
