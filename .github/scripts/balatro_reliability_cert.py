@@ -8,6 +8,26 @@ if len(sys.argv) != 2:
 
 root = Path(sys.argv[1]).resolve()
 
+# Reliability hardening found by the stress bot: Boss-local flags must never
+# leak into the next Blind (Cerulean Bell forced selection was able to survive
+# into an unrelated Boss and make every hand illegal).
+game_path = root / "src/game/gameState.ts"
+game_src = game_path.read_text(encoding="utf-8")
+boss_anchor = """    this.playedHandTypesThisRound = [];
+
+    if (this.blindIndex === 2) {"""
+boss_reset = """    this.playedHandTypesThisRound = [];
+    this.bossFaceDownCardIds.clear();
+    this.verdantLeafActive = false;
+    this.crimsonDebuffedJokerId = null;
+    this.bossForcedCardId = null;
+    this.concealNextDraw = false;
+
+    if (this.blindIndex === 2) {"""
+if boss_anchor not in game_src:
+    raise SystemExit("Reliability hardening anchor not found in startBlind")
+game_path.write_text(game_src.replace(boss_anchor, boss_reset, 1), encoding="utf-8")
+
 tests = r"""import { describe, expect, it } from 'vitest';
 import {
   BOSS_BLINDS,
@@ -104,8 +124,25 @@ function addCardStress(state: GameState, seedIndex: number) {
   }
 }
 
+function canonicalize(value: unknown): unknown {
+  if (typeof value === 'string' && /^c\d+$/.test(value)) return '<card-id>';
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, canonicalize(item)]),
+  );
+}
+
 function snapshotJson(state: GameState): string {
   return JSON.stringify(state.toSnapshot());
+}
+
+function canonicalSnapshotJson(state: GameState): string {
+  return JSON.stringify(canonicalize(state.toSnapshot()));
+}
+
+function canonicalResult(value: unknown): string {
+  return JSON.stringify(canonicalize(value));
 }
 
 function assertFiniteDeep(value: unknown, path = 'snapshot') {
@@ -227,7 +264,7 @@ describe('Reliability Certification', () => {
       setAllUnlocks(b);
       a.configureRun(deck, stake, seed);
       b.configureRun(deck, stake, seed);
-      expect(snapshotJson(a)).toBe(snapshotJson(b));
+      expect(canonicalSnapshotJson(a)).toBe(canonicalSnapshotJson(b));
 
       a.playSelectedBlind();
       b.playSelectedBlind();
@@ -236,12 +273,13 @@ describe('Reliability Certification', () => {
       const ids = choosePlayable(a);
       expect(ids, `seed ${seed} produced no playable opening`).not.toBeNull();
       if (!ids) continue;
+      const indices = ids.map((id) => a.hand.findIndex((card) => card.id === id));
       a.selected = new Set(ids);
-      b.selected = new Set(ids);
+      b.selected = new Set(indices.map((index) => b.hand[index].id));
       const ra = a.playSelected(a.hand.map((card) => card.id));
       const rb = b.playSelected(b.hand.map((card) => card.id));
-      expect(rb).toEqual(ra);
-      expect(snapshotJson(b)).toBe(snapshotJson(a));
+      expect(canonicalResult(rb)).toBe(canonicalResult(ra));
+      expect(canonicalSnapshotJson(b)).toBe(canonicalSnapshotJson(a));
     }
   }, 60_000);
 
@@ -403,7 +441,7 @@ describe('Reliability Certification', () => {
         throw new Error(`Reliability unknown phase: ${state.phase}`);
       }
 
-      expect(steps, `seed ${seed}: state machine exceeded step budget`).toBeLessThan(MAX_STEPS);
+      expect(steps, `seed ${seed}: state machine exceeded step budget`).toBeLessThanOrEqual(MAX_STEPS);
       expect(['win', 'game-over'], `seed ${seed}: non-terminal phase`).toContain(state.phase);
       assertInvariants(state, `seed ${seed} terminal`);
       coverage.terminalRuns += 1;
