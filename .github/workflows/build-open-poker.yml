@@ -7,6 +7,7 @@ on:
       - ".github/workflows/build-open-poker.yml"
       - ".github/scripts/customize_open_poker.py"
       - ".github/scripts/enhance_open_poker_ux.py"
+      - ".github/scripts/balatro_core_parity.py"
 
 permissions:
   contents: write
@@ -39,6 +40,7 @@ jobs:
         run: |
           python3 .github/scripts/customize_open_poker.py .open-poker-build
           python3 .github/scripts/enhance_open_poker_ux.py .open-poker-build
+          python3 .github/scripts/balatro_core_parity.py .open-poker-build
 
       - name: Build Open Poker
         run: |
@@ -46,6 +48,8 @@ jobs:
           cd .open-poker-build
           npm ci --no-audit --no-fund
           npm run gen-art
+          npm run typecheck
+          npm run test
           npm run build
 
       - name: Stage game for Kanban
@@ -68,6 +72,10 @@ jobs:
             '- Run Info: hand level, Chips x Mult, played count' \
             '- Options: SFX, music, new run, save and return' \
             '- Current run autosaves/restores; ESC closes panel or returns to Kanban' \
+            '- Balatro Core Parity: ordered scoring/retriggers/held-card/Joker pass' \
+            '- Full playing-card modifiers: enhancements, seals, editions' \
+            '- Deterministic Lucky/Glass rolls + Glass shatter + money effects' \
+            '- Drag Joker order affects scoring left-to-right' \
             > open-poker-game/SOURCE_INFO.txt
           rm -rf .open-poker-build
 
