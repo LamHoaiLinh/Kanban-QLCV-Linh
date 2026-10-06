@@ -298,6 +298,10 @@ export function stakeUnlocked(profile: MetaProfile, deck: DeckKey, stake: StakeK
   return STAKES[stake].order <= maxUnlockedStakeOrder(profile, deck);
 }
 
+export function discoveredBlindCount(profile: MetaProfile): number {
+  return profile.discoveredBosses.length + (profile.totalHands > 0 ? 2 : 0);
+}
+
 export function collectionDiscoveryCount(profile: MetaProfile): number {
   return unique([
     ...profile.unlockedDecks.map((key) => `deck:${key}`),
@@ -379,7 +383,7 @@ export function refreshMetaUnlocks(input: MetaProfile): MetaProfile {
   if (profile.blankRedeemed >= 10) vouchers.add('antimatter');
   if (profile.playingCardsShopBought >= 20) vouchers.add('illusion');
   if (profile.bestAnte >= 12) vouchers.add('petroglyph');
-  if (profile.discoveredBosses.length >= 25) vouchers.add('retcon');
+  if (discoveredBlindCount(profile) >= 25) vouchers.add('retcon');
   if (profile.minHandSizeEver <= 5) vouchers.add('palette');
   profile.unlockedVouchers = [...vouchers];
 
@@ -625,7 +629,7 @@ export function voucherUnlockDescription(profile: MetaProfile, key: VoucherKey):
   if (key === 'antimatter') return `Redeem Blank 10 times (${Math.min(profile.blankRedeemed, 10)}/10).`;
   if (key === 'illusion') return `Buy 20 playing cards from Shops (${Math.min(profile.playingCardsShopBought, 20)}/20).`;
   if (key === 'petroglyph') return `Reach Ante 12 (${Math.min(profile.bestAnte, 12)}/12).`;
-  if (key === 'retcon') return `Discover 25 Boss Blinds (${Math.min(profile.discoveredBosses.length, 25)}/25).`;
+  if (key === 'retcon') return `Discover 25 Blinds (${Math.min(discoveredBlindCount(profile), 25)}/25).`;
   if (key === 'palette') return `Reduce Hand Size to 5 or less (best ${profile.minHandSizeEver}).`;
   return 'Unlock its base Voucher and complete its condition.';
 }
