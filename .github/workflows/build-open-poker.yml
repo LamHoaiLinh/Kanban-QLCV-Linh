@@ -9,6 +9,9 @@ on:
       - ".github/scripts/enhance_open_poker_ux.py"
       - ".github/scripts/balatro_core_parity.py"
       - ".github/scripts/balatro_shop_parity.py"
+      - ".github/scripts/balatro_l3_tests.py"
+      - ".github/scripts/balatro_l3_ui.py"
+      - ".github/scripts/balatro_progression_core.py"
 
 permissions:
   contents: write
@@ -43,6 +46,9 @@ jobs:
           python3 .github/scripts/enhance_open_poker_ux.py .open-poker-build
           python3 .github/scripts/balatro_core_parity.py .open-poker-build
           python3 .github/scripts/balatro_shop_parity.py .open-poker-build
+          python3 .github/scripts/balatro_progression_core.py .open-poker-build
+          python3 .github/scripts/balatro_l3_ui.py .open-poker-build
+          python3 .github/scripts/balatro_l3_tests.py .open-poker-build
 
       - name: Build Open Poker
         run: |
@@ -81,7 +87,11 @@ jobs:
             '- Balatro Shop parity: 2 shop cards + 2 Booster Packs + Voucher' \
             '- Arcana/Celestial/Standard/Buffoon/Spectral packs with Normal/Jumbo/Mega' \
             '- Tarot/Spectral target selection + Planet immediate upgrades' \
-            '- Interest, unused-hand cashout, pack/target autosave via snapshot V3' \
+            '- Interest, unused-hand cashout, pack/target autosave' \
+            '- Balatro L3: Deck/Stake selection + Blind Select + Skip/Tag flow' \
+            '- Boss Blind effects + cumulative Stake rules + Eternal/Perishable/Rental Jokers' \
+            '- First deep Joker set: 50 functional Jokers with scaling and retriggers' \
+            '- Left-click Joker/Consumable info card + Balatro-like Shop composition' \
             > open-poker-game/SOURCE_INFO.txt
           rm -rf .open-poker-build
 
