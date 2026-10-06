@@ -15,6 +15,9 @@ on:
       - ".github/scripts/balatro_joker_exact_tests.py"
       - ".github/scripts/balatro_mythic_ui.py"
       - ".github/scripts/balatro_joker_exact_parity.py"
+      - ".github/scripts/balatro_meta_tests.py"
+      - ".github/scripts/balatro_meta_ui.py"
+      - ".github/scripts/balatro_meta_core.py"
 
 permissions:
   contents: write
@@ -55,6 +58,9 @@ jobs:
           python3 .github/scripts/balatro_joker_exact_parity.py .open-poker-build
           python3 .github/scripts/balatro_mythic_ui.py .open-poker-build
           python3 .github/scripts/balatro_joker_exact_tests.py .open-poker-build
+          python3 .github/scripts/balatro_meta_core.py .open-poker-build
+          python3 .github/scripts/balatro_meta_ui.py .open-poker-build
+          python3 .github/scripts/balatro_meta_tests.py .open-poker-build
 
       - name: Build Open Poker
         run: |
@@ -102,6 +108,11 @@ jobs:
             '- Exact live counters for Misprint/Runner/Ride the Bus/Green/Ice Cream/Loyalty/Castle' \
             '- Boss-debuff-aware Joker/Card interactions + single-roll Glass shatter settlement' \
             '- 20 Mythic Jokers above Rare with dedicated rarity visuals and 2% natural roll' \
+            '- Persistent meta progression: Deck/Stake unlocks, Joker unlock/discovery and Collection' \
+            '- Seeded New Run flow with stable text-to-seed hashing' \
+            '- Complete 24 Tag catalog and 28 Boss Blind catalog including 5 showdown Bosses' \
+            '- Boss runtime save/restore + concealed-card rendering + Crimson/Verdant/Pillar/Cerulean effects' \
+            '- Automated 10-seed full-run smoke simulation in CI' \
             > open-poker-game/SOURCE_INFO.txt
           rm -rf .open-poker-build
 
