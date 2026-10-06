@@ -227,8 +227,8 @@ function assertNextHandRestoreEquivalent(state: GameState) {
 
   const leftResult = left.playSelected(left.hand.map((card) => card.id));
   const rightResult = right.playSelected(right.hand.map((card) => card.id));
-  expect(rightResult).toEqual(leftResult);
-  expect(snapshotJson(right)).toBe(snapshotJson(left));
+  expect(canonicalResult(rightResult)).toBe(canonicalResult(leftResult));
+  expect(canonicalSnapshotJson(right)).toBe(canonicalSnapshotJson(left));
 }
 
 function useTargetMode(state: GameState): boolean {
