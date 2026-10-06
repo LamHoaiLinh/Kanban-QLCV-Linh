@@ -10,3 +10,7 @@ Kanban customizations:
 - Run Info: hand level, Chips x Mult, played count
 - Options: SFX, music, new run, save and return
 - Current run autosaves/restores; ESC closes panel or returns to Kanban
+- Balatro Core Parity: ordered scoring/retriggers/held-card/Joker pass
+- Full playing-card modifiers: enhancements, seals, editions
+- Deterministic Lucky/Glass rolls + Glass shatter + money effects
+- Drag Joker order affects scoring left-to-right
