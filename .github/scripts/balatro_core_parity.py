@@ -1145,15 +1145,11 @@ event_replay = r"""  const scoringIds = new Set(br.hand.scoringCards.map((card) 
   });
 
 """
-main_source, replaced = re.subn(
-    r"  const scoringIds = new Set\\(br\\.hand\\.scoringCards\\.map\\(\\(c\\) => c\\.id\\)\\);.*?(?=  gsap\\.delayedCall\\(totalAt \\+ 1\\.2, \\(\\) => \\{)",
-    lambda _m: event_replay,
-    main_source,
-    count=1,
-    flags=re.S,
-)
-if replaced != 1:
-    raise SystemExit("Could not replace legacy score animation with trigger-log replay")
+replay_start = main_source.find("  const scoringIds = new Set(br.hand.scoringCards.map((c) => c.id));")
+replay_end = main_source.find("  gsap.delayedCall(totalAt + 1.2, () => {", replay_start)
+if replay_start < 0 or replay_end < 0:
+    raise SystemExit("Could not locate legacy score animation block")
+main_source = main_source[:replay_start] + event_replay + main_source[replay_end:]
 main_path.write_text(main_source, encoding="utf-8")
 
 # ---------------------------------------------------------------------------
