@@ -392,7 +392,11 @@ export function refreshMetaUnlocks(input: MetaProfile): MetaProfile {
 
 export function recordRunStart(input: MetaProfile, seeded = false): MetaProfile {
   if (!canProgressMeta(seeded)) return input;
-  return refreshMetaUnlocks({ ...input, runsStarted: input.runsStarted + 1 });
+  return refreshMetaUnlocks({
+    ...input,
+    runsStarted: input.runsStarted + 1,
+    interestStreak: 0,
+  });
 }
 
 export function recordRunCounters(input: MetaProfile, delta: MetaCounterDelta, seeded = false): MetaProfile {
