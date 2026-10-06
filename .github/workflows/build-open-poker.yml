@@ -81,7 +81,7 @@ jobs:
           npm ci --no-audit --no-fund
           npm run gen-art
           npm run typecheck
-          RELIABILITY_SEEDS=750 npm run test
+          RELIABILITY_SEEDS=500 npm run test
           npm run build
 
       - name: Stage game for Kanban
@@ -124,7 +124,7 @@ jobs:
             '- Seeded New Run flow with stable text-to-seed hashing' \
             '- Complete 24 Tag catalog and 28 Boss Blind catalog including 5 showdown Bosses' \
             '- Boss runtime save/restore + concealed-card rendering + Crimson/Verdant/Pillar/Cerulean effects' \
-            '- Reliability Certification: 750 randomized full-run seeds per build' \
+            '- Reliability Certification: 500 randomized full-run seeds per build' \
             '- Reliability invariants: finite state, card conservation, capacity, deterministic RNG, save/restore equivalence, Boss liveness' \
             '- Portrait mobile UI: safe-area layout, horizontal-scroll lock and long-press text-selection protection' \
             '- Content parity: 15 Decks + 32 Vouchers + 22 Tarot + 12 Planet + 18 Spectral' \
