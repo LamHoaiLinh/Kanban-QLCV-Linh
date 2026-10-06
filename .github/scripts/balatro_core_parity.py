@@ -852,6 +852,13 @@ replace_once(
 # ---------------------------------------------------------------------------
 # 4. Main UI: pass visible order into engine + Joker drag/reorder + capacities.
 # ---------------------------------------------------------------------------
+# MAX_JOKERS/MAX_CONSUMABLES become dynamic because Negative editions add slots.
+replace_once(
+    "src/main.ts",
+    "import { GameState, MAX_CONSUMABLES, MAX_JOKERS } from './game/gameState';",
+    "import { GameState } from './game/gameState';",
+)
+
 replace_once(
     "src/main.ts",
     "  const br = state.playSelected();",
