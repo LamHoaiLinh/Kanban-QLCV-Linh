@@ -170,6 +170,27 @@ function reflowHand(duration = 0.4) {
   syncHandOrder();""",
 )
 
+# Preserve the exact visible handOrder when cards leave the hand.
+replace_once(
+    "src/main.ts",
+    "  const playedCards = state.selectedCards();",
+    """  const handById = new Map(state.hand.map((card) => [card.id, card]));
+  const playedCards = handOrder
+    .filter((id) => state.selected.has(id))
+    .map((id) => handById.get(id))
+    .filter((card): card is PlayingCard => Boolean(card));""",
+)
+replace_once(
+    "src/main.ts",
+    "  const cards = state.selectedCards();\n  const avgX = cards.reduce",
+    """  const handById = new Map(state.hand.map((card) => [card.id, card]));
+  const cards = handOrder
+    .filter((id) => state.selected.has(id))
+    .map((id) => handById.get(id))
+    .filter((card): card is PlayingCard => Boolean(card));
+  const avgX = cards.reduce""",
+)
+
 # Count only actual played hands (not previews/selections).
 replace_once(
     "src/main.ts",
@@ -474,10 +495,41 @@ if anchor not in s:
 s = s.replace(anchor, panel_markup + "\n" + anchor, 1)
 p.write_text(s, encoding="utf-8")
 
+# ---------- index.html: Play / Discard hotkey hints ----------
+replace_once(
+    "index.html",
+    '<button id="btn-play" class="btn btn-play" data-testid="btn-play">Play Hand</button>',
+    '<button id="btn-play" class="btn btn-play" data-testid="btn-play">Play Hand <span class="action-hotkey">Ctrl</span></button>',
+)
+replace_once(
+    "index.html",
+    '<button id="btn-discard" class="btn btn-discard" data-testid="btn-discard">Discard</button>',
+    '<button id="btn-discard" class="btn btn-discard" data-testid="btn-discard">Discard <span class="action-hotkey">Shift</span></button>',
+)
+
 # ---------- style.css: Balatro-like panel styling ----------
 style = root / "src/style.css"
 with style.open("a", encoding="utf-8") as f:
     f.write(r"""
+/* Kanban: inline keyboard hints */
+.action-hotkey {
+  display: inline-grid;
+  place-items: center;
+  min-width: 42px;
+  height: 22px;
+  margin-left: 8px;
+  padding: 0 6px;
+  border: 1px solid rgba(255,255,255,.46);
+  border-radius: 6px;
+  background: rgba(0,0,0,.24);
+  color: #fff8d9;
+  font-family: "Silkscreen", monospace;
+  font-size: 9px;
+  line-height: 1;
+  box-shadow: inset 0 -2px 0 rgba(0,0,0,.22);
+}
+.btn:disabled .action-hotkey { opacity: .55; }
+
 /* Kanban: Balatro-like Run Info / Options */
 .kanban-game-panel-overlay {
   position: absolute;
