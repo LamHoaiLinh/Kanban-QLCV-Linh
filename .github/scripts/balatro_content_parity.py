@@ -1058,3 +1058,104 @@ replace_once(
 )
 
 print("Tarot/Spectral execution and advanced Deck/Voucher scoring applied.")
+
+
+# ===========================================================================
+# 5. Deck unlock availability + Boss reroll UI + import fixes.
+# ===========================================================================
+
+replace_once(
+    "src/game/gameState.ts",
+    """  BossBlindKey,
+  Suit,""",
+    """  BossBlindKey,
+  Suit,
+  Rank,""",
+)
+
+meta_path = root / "src/game/metaProgression.ts"
+meta_src = meta_path.read_text(encoding="utf-8")
+old = r"""  if (profile.bestAnte >= 4 || profile.wins >= 1) decks.add('blue');
+  if (profile.wins >= 1) decks.add('yellow');
+  if (profile.wins >= 2) decks.add('green');
+  if (profile.wins >= 3) decks.add('black');
+  profile.unlockedDecks = [...decks];"""
+new = r"""  if (profile.bestAnte >= 4 || profile.wins >= 1) decks.add('blue');
+  if (profile.wins >= 1) decks.add('yellow');
+  if (profile.wins >= 2) decks.add('green');
+  if (profile.wins >= 3) decks.add('black');
+
+  if (Number(profile.highestStakeCleared.red ?? -1) >= 0) decks.add('magic');
+  if (Number(profile.highestStakeCleared.blue ?? -1) >= 0) decks.add('nebula');
+  if (Number(profile.highestStakeCleared.yellow ?? -1) >= 0) decks.add('ghost');
+  if (Number(profile.highestStakeCleared.green ?? -1) >= 0) decks.add('abandoned');
+  if (Number(profile.highestStakeCleared.black ?? -1) >= 0) decks.add('checkered');
+
+  const globalStake = maxClearedStake(profile);
+  if (globalStake >= STAKES.red.order) decks.add('zodiac');
+  if (globalStake >= STAKES.green.order) decks.add('painted');
+  if (globalStake >= STAKES.black.order) decks.add('anaglyph');
+  if (globalStake >= STAKES.blue.order) decks.add('plasma');
+  if (globalStake >= STAKES.orange.order) decks.add('erratic');
+
+  profile.unlockedDecks = [...decks];"""
+if old not in meta_src:
+    raise SystemExit("Meta deck unlock anchor not found")
+meta_path.write_text(meta_src.replace(old, new, 1), encoding="utf-8")
+
+replace_once(
+    "src/game/gameState.ts",
+    """      const unowned = (Object.keys(VOUCHERS) as VoucherKey[]).filter((key) => !this.vouchers.includes(key));
+      if (unowned.length > 0) this.grantVoucherKey(this.pick(unowned));""",
+    """      const unowned = (Object.keys(VOUCHERS) as VoucherKey[]).filter((key) => {
+        if (this.vouchers.includes(key)) return false;
+        const baseKey = VOUCHER_UPGRADE_BASE[key];
+        return !baseKey || this.vouchers.includes(baseKey);
+      });
+      if (unowned.length > 0) this.grantVoucherKey(this.pick(unowned));""",
+)
+
+replace_once(
+    "src/main.ts",
+    """      actions.appendChild(play);
+
+      if (index < 2) {""",
+    """      actions.appendChild(play);
+
+      if (index === 2 && (state.vouchers.includes('directors-cut') || state.vouchers.includes('retcon'))) {
+        const rerollBoss = document.createElement('button');
+        rerollBoss.type = 'button';
+        rerollBoss.className = 'btn btn-ghost';
+        rerollBoss.textContent = `Reroll Boss · $10`;
+        rerollBoss.disabled = state.money < 10
+          || (state.vouchers.includes('directors-cut') && !state.vouchers.includes('retcon') && state.bossRerollsUsed >= 1);
+        rerollBoss.addEventListener('click', () => {
+          if (!state.rerollBossBlind()) return;
+          audio.play('buttonClick');
+          updateHud();
+        });
+        actions.appendChild(rerollBoss);
+      }
+
+      if (index < 2) {""",
+)
+
+style = root / "src/style.css"
+with style.open("a", encoding="utf-8") as f:
+    f.write(r"""
+.setup-decks {
+  grid-template-columns: repeat(5,minmax(0,1fr)) !important;
+  max-height: 46vh;
+  overflow: auto;
+  padding: 4px;
+}
+.setup-deck-card { min-height: 112px !important; }
+@media (max-width: 1100px) {
+  .setup-decks { grid-template-columns: repeat(3,minmax(0,1fr)) !important; }
+}
+@media (max-width: 700px) {
+  .setup-decks { grid-template-columns: repeat(2,minmax(0,1fr)) !important; }
+}
+""")
+
+print("Meta Deck availability and voucher Boss-reroll UI applied.")
