@@ -311,8 +311,8 @@ replace_once(
 )
 replace_once(
     "src/game/gameState.ts",
-    "  RunSnapshotV2,",
-    "  RunSnapshotV2,\n  RunSnapshotV3,",
+    "  RunSnapshotV1,",
+    "  RunSnapshotV1,\n  RunSnapshotV3,",
 )
 replace_once(
     "src/game/gameState.ts",
