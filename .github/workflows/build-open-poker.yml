@@ -36,6 +36,7 @@ jobs:
 
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           root = Path(".open-poker-build")
 
@@ -258,22 +259,20 @@ jobs:
           (root / "src/game/handSort.ts").write_text(hand_sort + "\n", encoding="utf-8")
 
           # ---- Sort controls in the HUD ----
-          replace_once(
-              "index.html",
-              """      <div class="actionbar">
-                <button id="btn-play" class="btn btn-play" data-testid="btn-play">Play Hand</button>
-                <button id="btn-discard" class="btn btn-discard" data-testid="btn-discard">Discard</button>
-              </div>""",
-              """      <div class="actionbar">
-                <div class="sort-controls" aria-label="Sort hand">
-                  <span class="sort-label">Sort</span>
-                  <button id="btn-sort-straight" class="btn sort-btn" type="button" title="Sort for Straight (S)">Straight <span class="sort-key">S</span></button>
-                  <button id="btn-sort-flush" class="btn sort-btn" type="button" title="Sort for Flush (F)">Flush <span class="sort-key">F</span></button>
-                </div>
-                <button id="btn-play" class="btn btn-play" data-testid="btn-play">Play Hand</button>
-                <button id="btn-discard" class="btn btn-discard" data-testid="btn-discard">Discard</button>
-              </div>""",
-          )
+          p = root / "index.html"
+          s = p.read_text(encoding="utf-8")
+          if 'id="btn-sort-straight"' not in s:
+              anchor = '      <div class="actionbar">\n'
+              if anchor not in s:
+                  raise SystemExit("Actionbar anchor not found in index.html")
+              markup = """        <div class="sort-controls" aria-label="Sort hand">
+          <span class="sort-label">Sort</span>
+          <button id="btn-sort-straight" class="btn sort-btn" type="button" title="Sort for Straight (S)">Straight <span class="sort-key">S</span></button>
+          <button id="btn-sort-flush" class="btn sort-btn" type="button" title="Sort for Flush (F)">Flush <span class="sort-key">F</span></button>
+        </div>
+"""
+              s = s.replace(anchor, anchor + markup, 1)
+              p.write_text(s, encoding="utf-8")
 
           style = root / "src/style.css"
           with style.open("a", encoding="utf-8") as f:
@@ -328,74 +327,58 @@ jobs:
           }
           """)
 
-          # ---- Enlarge rank 2..A by >2x in both generated SVG and fallback canvas ----
-          replace_once(
-              "scripts/generate-dummy-art.mjs",
-              """function cornerIndex(rank, suit) {
-            const rankSize = rank === '10' ? 37 : 45;
-            return `    <g>
-                ${rankText(rank, suit, 33, 47, rankSize)}
-                ${suitText(suit, 33, 84, 30)}
-              </g>
-              <g transform="translate(256 360) rotate(180)">
-                ${rankText(rank, suit, 33, 47, rankSize)}
-                ${suitText(suit, 33, 84, 30)}
-              </g>`;
-          }""",
-              """function cornerIndex(rank, suit) {
-            // Oversized rank index for quick reading on smaller cards.
-            const rankSize = rank === '10' ? 78 : 98;
-            const rankX = rank === '10' ? 64 : 55;
-            return `    <g>
-                ${rankText(rank, suit, rankX, 68, rankSize)}
-                ${suitText(suit, 48, 132, 34)}
-              </g>
-              <g transform="translate(256 360) rotate(180)">
-                ${rankText(rank, suit, rankX, 68, rankSize)}
-                ${suitText(suit, 48, 132, 34)}
-              </g>`;
-          }""",
-          )
+          # ---- Enlarge rank 2..A by >2x in generated SVG and fallback canvas ----
+          p = root / "scripts/generate-dummy-art.mjs"
+          s = p.read_text(encoding="utf-8")
+          pattern = r"function cornerIndex\(rank, suit\) \{.*?\n\}"
+          replacement = """function cornerIndex(rank, suit) {
+  // Oversized rank index for quick reading on smaller screens/cards.
+  // 10 needs a slightly smaller font so both digits stay safely inside.
+  const rankSize = rank === '10' ? 78 : 98;
+  const rankX = rank === '10' ? 64 : 55;
+  return `    <g>
+      ${rankText(rank, suit, rankX, 68, rankSize)}
+      ${suitText(suit, 48, 132, 34)}
+    </g>
+    <g transform="translate(256 360) rotate(180)">
+      ${rankText(rank, suit, rankX, 68, rankSize)}
+      ${suitText(suit, 48, 132, 34)}
+    </g>`;
+}"""
+          s, n = re.subn(pattern, lambda _m: replacement, s, count=1, flags=re.S)
+          if n != 1:
+              raise SystemExit("cornerIndex patch failed")
+          p.write_text(s, encoding="utf-8")
 
-          replace_once(
-              "src/render/cardTextures.ts",
-              """    ctx.fillStyle = color;
-            ctx.textAlign = 'left';
-            ctx.font = 'bold 56px "Trebuchet MS", sans-serif';
-            ctx.fillText(rankStr, 22, 70);
-            ctx.font = 'bold 48px serif';
-            ctx.fillText(suitGlyph, 22, 118);
+          p = root / "src/render/cardTextures.ts"
+          s = p.read_text(encoding="utf-8")
+          pattern = r"""    ctx\.fillStyle = color;
+    ctx\.textAlign = 'left';
+    ctx\.font = 'bold 56px "Trebuchet MS", sans-serif';.*?    ctx\.restore\(\);"""
+          replacement = """    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const rankSize = rankStr === '10' ? 78 : 98;
+    const rankX = rankStr === '10' ? 64 : 55;
+    ctx.font = `900 ${rankSize}px "Trebuchet MS", sans-serif`;
+    ctx.fillText(rankStr, rankX, 68);
+    ctx.font = 'bold 34px serif';
+    ctx.fillText(suitGlyph, 48, 132);
 
-            ctx.save();
-            ctx.translate(W - 22, H - 30);
-            ctx.rotate(Math.PI);
-            ctx.textAlign = 'left';
-            ctx.font = 'bold 56px "Trebuchet MS", sans-serif';
-            ctx.fillText(rankStr, 0, 0);
-            ctx.font = 'bold 48px serif';
-            ctx.fillText(suitGlyph, 0, 48);
-            ctx.restore();""",
-              """    ctx.fillStyle = color;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            const rankSize = rankStr === '10' ? 78 : 98;
-            const rankX = rankStr === '10' ? 64 : 55;
-            ctx.font = `900 ${rankSize}px "Trebuchet MS", sans-serif`;
-            ctx.fillText(rankStr, rankX, 68);
-            ctx.font = 'bold 34px serif';
-            ctx.fillText(suitGlyph, 48, 132);
-
-            ctx.save();
-            ctx.translate(W, H);
-            ctx.rotate(Math.PI);
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.font = `900 ${rankSize}px "Trebuchet MS", sans-serif`;
-            ctx.fillText(rankStr, rankX, 68);
-            ctx.font = 'bold 34px serif';
-            ctx.fillText(suitGlyph, 48, 132);
-            ctx.restore();""",
-          )
+    ctx.save();
+    ctx.translate(W, H);
+    ctx.rotate(Math.PI);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `900 ${rankSize}px "Trebuchet MS", sans-serif`;
+    ctx.fillText(rankStr, rankX, 68);
+    ctx.font = 'bold 34px serif';
+    ctx.fillText(suitGlyph, 48, 132);
+    ctx.restore();"""
+          s, n = re.subn(pattern, lambda _m: replacement, s, count=1, flags=re.S)
+          if n != 1:
+              raise SystemExit("cardTextures rank patch failed")
+          p.write_text(s, encoding="utf-8")
           PY
 
           cd .open-poker-build
