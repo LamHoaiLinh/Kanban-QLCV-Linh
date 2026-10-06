@@ -917,11 +917,13 @@ s = s[:a] + apply_consumable + s[b:]
 game_path.write_text(s, encoding="utf-8")
 
 # Observatory XMult and Plasma balancing happen after Joker/card resolution, before tally.
-replace_once(
-    "src/game/gameState.ts",
-    """    this.roundScore += breakdown.total;
-    this.money += breakdown.moneyDelta;""",
-    """    if (this.vouchers.includes('observatory')) {
+game_path = root / "src/game/gameState.ts"
+score_src = game_path.read_text(encoding="utf-8")
+score_anchor = "    this.roundScore += breakdown.total;"
+score_at = score_src.find(score_anchor)
+if score_at < 0:
+    raise SystemExit("Could not locate score tally anchor")
+score_insert = r"""    if (this.vouchers.includes('observatory')) {
       const matchingPlanets = this.consumables.filter((card) =>
         card.type === 'planet' && card.effect.kind === 'planet' && card.effect.handType === hand.type
       ).length;
@@ -955,9 +957,9 @@ replace_once(
       breakdown.total = Math.floor(balanced * balanced);
     }
 
-    this.roundScore += breakdown.total;
-    this.money += breakdown.moneyDelta;""",
-)
+"""
+score_src = score_src[:score_at] + score_insert + score_src[score_at:]
+game_path.write_text(score_src, encoding="utf-8")
 
 # Voucher interest caps.
 replace_once(
