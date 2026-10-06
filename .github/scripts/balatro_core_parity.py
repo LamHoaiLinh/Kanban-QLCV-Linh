@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -1015,6 +1016,149 @@ with style.open("a", encoding="utf-8") as f:
   box-shadow: 0 0 18px rgba(255,210,74,.55);
 }
 """)
+
+# ---------------------------------------------------------------------------
+# 5b. Renderer replays the engine's exact trigger log.
+# ---------------------------------------------------------------------------
+replace_once(
+    "src/main.ts",
+    """function tweenNumber(el: HTMLElement, from: number, to: number, duration: number, tickName?: string) {
+  const value = { v: from };""",
+    """function formatScoreNumber(value: number): string {
+  const rounded = Math.round(value * 100) / 100;
+  return Number.isInteger(rounded)
+    ? rounded.toLocaleString()
+    : rounded.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+function tweenNumber(el: HTMLElement, from: number, to: number, duration: number, tickName?: string) {
+  const value = { v: from };""",
+)
+replace_once(
+    "src/main.ts",
+    "      el.textContent = Math.round(next).toLocaleString();",
+    "      el.textContent = formatScoreNumber(next);",
+)
+
+# Remove the old renderer-side score calculator. The engine is now authoritative.
+main_path = root / "src/main.ts"
+main_source = main_path.read_text(encoding="utf-8")
+main_source, removed = re.subn(
+    r"function cardScoreDeltas\\(card: PlayingCard\\): \\{ chipsDelta: number; multDelta: number; multMul: number \\} \\{.*?\\n\\}\\n\\n// Floating value above a scoring card\\.",
+    "// Floating value above a scoring card.",
+    main_source,
+    count=1,
+    flags=re.S,
+)
+if removed != 1:
+    raise SystemExit("Could not remove legacy cardScoreDeltas()")
+
+event_replay = r"""  const scoringIds = new Set(br.hand.scoringCards.map((card) => card.id));
+
+  // Non-scoring played cards fade, but remain on the table until tally finishes.
+  for (const card of playedCards) {
+    if (scoringIds.has(card.id)) continue;
+    const obj = objects.get(card.id);
+    if (!obj) continue;
+    const material = obj.faceMesh.material as Material;
+    material.transparent = true;
+    gsap.to(material, { opacity: 0.5, duration: 0.2 });
+  }
+
+  // Replay the exact engine log. This keeps Red Seal, Steel, Lucky, Editions and
+  // left-to-right Joker order visually consistent with the actual score.
+  const replaySteps = br.steps.filter((step) =>
+    step.stage !== 'base'
+    && step.stage !== 'destruction'
+    && step.stage !== 'end_round'
+  );
+  const replayStagger = 0.19;
+  const firstDelay = 0.15;
+
+  replaySteps.forEach((step, index) => {
+    const delay = firstDelay + index * replayStagger;
+    gsap.delayedCall(delay, () => {
+      if (step.cardId) {
+        const obj = objects.get(step.cardId);
+        if (obj) {
+          obj.pulse(step.retrigger ? 1.28 : 1.18, 0.34);
+          obj.flash(step.retrigger ? 0x8de8ff : 0xffd24a, 0.42);
+          spawnCardScoreFloat(obj, step);
+          audio.play(step.retrigger ? 'multTick' : 'chipTick', {
+            volume: 0.22,
+            pitch: step.retrigger ? 1.18 : 1,
+            pan: panFromX(obj.position.x),
+          });
+        }
+      }
+
+      if (step.jokerId) {
+        const slot = jokerSlotsEl.querySelector<HTMLElement>(\`[data-joker-id="\${step.jokerId}"]\`);
+        if (slot) {
+          gsap.fromTo(
+            slot,
+            { scale: 1, y: 0 },
+            { scale: 1.18, y: -8, duration: 0.16, yoyo: true, repeat: 1, ease: 'power2.out' },
+          );
+          spawnSlotScoreFloat(slot, labelsForJokerStep(step));
+        }
+        audio.play('multTick', { volume: 0.24, pitch: 1.06 });
+      }
+
+      if (step.chipsAfter !== undefined && step.chipsBefore !== undefined && step.chipsAfter !== step.chipsBefore) {
+        tweenNumber(chipsEl, step.chipsBefore, step.chipsAfter, 0.18, 'chipTick');
+        gsap.fromTo(chipsEl, { scale: 1 }, { scale: 1.14, duration: 0.12, yoyo: true, repeat: 1 });
+      }
+      if (step.multAfter !== undefined && step.multBefore !== undefined && step.multAfter !== step.multBefore) {
+        tweenNumber(multEl, step.multBefore, step.multAfter, 0.18, 'multTick');
+        gsap.fromTo(multEl, { scale: 1 }, { scale: 1.18, duration: 0.12, yoyo: true, repeat: 1 });
+      }
+    });
+  });
+
+  const destructionSteps = br.steps.filter((step) => step.stage === 'destruction');
+  const destructionStart = firstDelay + replaySteps.length * replayStagger;
+  destructionSteps.forEach((step, index) => {
+    gsap.delayedCall(destructionStart + index * 0.22, () => {
+      if (!step.cardId) return;
+      const obj = objects.get(step.cardId);
+      if (!obj) return;
+      obj.flash(0xff3f4f, 0.65);
+      obj.pulse(1.3, 0.4);
+      const worldPos = sceneHandle.createVector3();
+      obj.getWorldPosition(worldPos);
+      sceneHandle.emitBurst(worldPos, {
+        count: 26,
+        color: sceneHandle.createColor('#8de8ff'),
+        speed: 3.2,
+        spread: 1.2,
+        life: 1.1,
+        size: 18,
+      });
+      audio.play('scorePop', { volume: 0.38, pitch: 1.25 });
+    });
+  });
+
+  const totalAt = destructionStart + destructionSteps.length * 0.22 + 0.35;
+  gsap.delayedCall(totalAt, () => revealScoreTotal(br));
+
+  const prev = state.roundScore - br.total;
+  gsap.delayedCall(totalAt + 0.05, () => {
+    tweenNumber(roundScoreEl, prev, state.roundScore, 1.0, 'chipTick');
+    gsap.fromTo(roundScoreEl, { scale: 1 }, { scale: 1.25, duration: 0.18, yoyo: true, repeat: 1, ease: 'power2.out' });
+  });
+
+"""
+main_source, replaced = re.subn(
+    r"  const scoringIds = new Set\\(br\\.hand\\.scoringCards\\.map\\(\\(c\\) => c\\.id\\)\\);.*?(?=  gsap\\.delayedCall\\(totalAt \\+ 1\\.2, \\(\\) => \\{)",
+    lambda _m: event_replay,
+    main_source,
+    count=1,
+    flags=re.S,
+)
+if replaced != 1:
+    raise SystemExit("Could not replace legacy score animation with trigger-log replay")
+main_path.write_text(main_source, encoding="utf-8")
 
 # ---------------------------------------------------------------------------
 # 6. Parity regression tests: deterministic modifier/order behavior.
