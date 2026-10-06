@@ -225,3 +225,320 @@ replace_once(
 )
 
 print("Balatro meta core stage 1 applied.")
+
+
+# ---------------------------------------------------------------------------
+# Stage 2: Tag effects, unlock-filtered generation, missing Boss behavior.
+# ---------------------------------------------------------------------------
+
+# Complete Tag behavior and helper pools.
+src = game.read_text(encoding="utf-8")
+a = src.find("  private applySingleTag(tag: Exclude<TagKey, 'double'>) {")
+b = src.find("  targetForPreview(): number {", a)
+if a < 0 or b < 0:
+    raise SystemExit("Could not locate applySingleTag")
+
+tag_logic = r"""  private availableJokerTemplates(rarity?: JokerRarity): JokerTemplate[] {
+    let pool = JOKER_TEMPLATES;
+    if (this.unlockedJokerKeys) pool = pool.filter((joker) => this.unlockedJokerKeys!.has(joker.key));
+    if (rarity) pool = pool.filter((joker) => joker.rarity === rarity);
+    return pool;
+  }
+
+  private addTaggedJoker(rarity: JokerRarity | null, edition: Edition = 'base'): boolean {
+    const bonus = edition === 'negative' ? 1 : 0;
+    if (this.jokers.length >= this.jokerCapacity() + bonus) return false;
+    const pool = this.availableJokerTemplates(rarity ?? undefined);
+    if (pool.length === 0) return false;
+    const joker = this.makeJokerFromTemplate(this.pick(pool), false);
+    joker.edition = edition;
+    this.jokers.push(joker);
+    return true;
+  }
+
+  private addTagConsumable(type: ConsumableCard['type']) {
+    if (this.consumables.length >= this.consumableCapacity()) return;
+    const catalog = type === 'tarot' ? TAROT_CATALOG : type === 'planet' ? PLANET_CATALOG : SPECTRAL_CATALOG;
+    this.consumables.push(this.makeConsumableFromCatalog(this.pick(catalog)));
+  }
+
+  private mostPlayedHandType(): PokerHandType {
+    return (Object.keys(this.handPlayCounts) as PokerHandType[])
+      .sort((a, b) => (this.handPlayCounts[b] ?? 0) - (this.handPlayCounts[a] ?? 0))[0] ?? 'High Card';
+  }
+
+  private grantVoucherKey(key: VoucherKey): boolean {
+    if (this.vouchers.includes(key)) return false;
+    this.vouchers.push(key);
+    if (key === 'grabber') this.config.handsPerRound += 1;
+    if (key === 'wasteful') this.config.discardsPerRound += 1;
+    return true;
+  }
+
+  private applySingleTag(tag: Exclude<TagKey, 'double'>) {
+    if (tag === 'uncommon') this.addTaggedJoker('uncommon');
+    else if (tag === 'rare') this.addTaggedJoker('rare');
+    else if (tag === 'negative') this.addTaggedJoker(null, 'negative');
+    else if (tag === 'foil') this.addTaggedJoker(null, 'foil');
+    else if (tag === 'holographic') this.addTaggedJoker(null, 'holographic');
+    else if (tag === 'polychrome') this.addTaggedJoker(null, 'polychrome');
+    else if (tag === 'investment') this.investmentTags += 1;
+    else if (tag === 'voucher') {
+      const unowned = (Object.keys(VOUCHERS) as VoucherKey[]).filter((key) => !this.vouchers.includes(key));
+      if (unowned.length > 0) this.grantVoucherKey(this.pick(unowned));
+    } else if (tag === 'coupon') this.couponNextShop = true;
+    else if (tag === 'juggle') this.juggleNextBlind += 3;
+    else if (tag === 'd6') this.d6NextShop = true;
+    else if (tag === 'speed') this.money += Math.max(5, this.skippedBlinds * 5);
+    else if (tag === 'economy') this.money += Math.min(40, Math.max(0, this.money));
+    else if (tag === 'standard') {
+      const standard = buildStandardDeck();
+      for (let i = 0; i < 2; i++) {
+        const picked = this.pick(standard);
+        this.ownedDeck.push({ ...picked, id: this.makeRunId('tag-card') });
+      }
+    } else if (tag === 'charm') this.addTagConsumable('tarot');
+    else if (tag === 'meteor') this.addTagConsumable('planet');
+    else if (tag === 'ethereal') this.addTagConsumable('spectral');
+    else if (tag === 'buffoon') this.addTaggedJoker(null);
+    else if (tag === 'handy') this.money += this.handsPlayedRun;
+    else if (tag === 'garbage') this.money += this.discardsUsedRun;
+    else if (tag === 'orbital') {
+      const type = this.mostPlayedHandType();
+      for (let i = 0; i < 3; i++) this.upgradeHandLevel(type);
+    } else if (tag === 'top-up') {
+      const common = this.availableJokerTemplates('common');
+      for (let i = 0; i < 2 && common.length > 0 && this.jokers.length < this.jokerCapacity(); i++) {
+        this.jokers.push(this.makeJokerFromTemplate(this.pick(common), false));
+      }
+    } else if (tag === 'boss') {
+      const pool = this.ante === 8 ? SHOWDOWN_BOSS_KEYS : REGULAR_BOSS_KEYS;
+      const choices = pool.filter((key) => key !== this.bossBlindKey);
+      if (choices.length > 0) this.bossBlindKey = this.pick(choices);
+    }
+  }
+
+"""
+src = src[:a] + tag_logic + src[b:]
+game.write_text(src, encoding="utf-8")
+
+# Natural shops/Buffoon obey meta unlocks.
+replace_once(
+    "src/game/gameState.ts",
+    """    const pool = JOKER_TEMPLATES.filter((template) => template.rarity === rarity);
+    return { kind: 'joker', joker: this.makeJokerFromTemplate(this.pick(pool.length ? pool : JOKER_TEMPLATES)) };""",
+    """    const pool = this.availableJokerTemplates(rarity);
+    const fallback = this.availableJokerTemplates();
+    const chosen = pool.length ? pool : fallback.length ? fallback : JOKER_TEMPLATES.filter((joker) => joker.rarity === 'common');
+    return { kind: 'joker', joker: this.makeJokerFromTemplate(this.pick(chosen)) };""",
+)
+
+# Boss debuffs: Club, Pillar, Verdant Leaf.
+replace_once(
+    "src/game/gameState.ts",
+    """    if (this.bossBlindKey === 'plant' && card.rank >= 11 && card.rank <= 13) return true;
+    return false;""",
+    """    if (this.bossBlindKey === 'plant' && card.rank >= 11 && card.rank <= 13) return true;
+    if (this.bossBlindKey === 'club' && card.suit === 'clubs') return true;
+    if (this.bossBlindKey === 'pillar' && this.antePlayedCardIds.has(card.id)) return true;
+    if (this.bossBlindKey === 'verdant-leaf' && this.verdantLeafActive) return true;
+    return false;""",
+)
+
+replace_once(
+    "src/game/gameState.ts",
+    """    const bossDebuffSuits: Suit[] = boss === 'goad' ? ['spades']
+      : boss === 'window' ? ['diamonds']
+      : boss === 'head' ? ['hearts']
+      : [];""",
+    """    const bossDebuffSuits: Suit[] = boss === 'goad' ? ['spades']
+      : boss === 'window' ? ['diamonds']
+      : boss === 'head' ? ['hearts']
+      : boss === 'club' ? ['clubs']
+      : [];""",
+)
+
+replace_once(
+    "src/game/gameState.ts",
+    """  isJokerDebuffed(joker: JokerCard): boolean {
+    if (joker.sticker === 'perishable' && (joker.perishableRounds ?? 0) <= 0) return true;
+    return this.blindIndex === 2
+      && this.bossBlindKey === 'crimson-heart'
+      && this.crimsonDebuffedJokerId === joker.id;
+  }""",
+    """  isJokerDebuffed(joker: JokerCard): boolean {
+    if (joker.sticker === 'perishable' && (joker.perishableRounds ?? 0) <= 0) return true;
+    return this.blindIndex === 2 && this.bossBlindKey === 'crimson-heart' && this.crimsonDebuffedJokerId === joker.id;
+  }""",
+)
+
+# If old L4 exact parity has not yet extended isJokerDebuffed with Crimson, patch the simpler form.
+p = root / "src/game/gameState.ts"
+s = p.read_text(encoding="utf-8")
+simple = """  isJokerDebuffed(joker: JokerCard): boolean {
+    return joker.sticker === 'perishable' && (joker.perishableRounds ?? 0) <= 0;
+  }"""
+if simple in s:
+    s = s.replace(simple, """  isJokerDebuffed(joker: JokerCard): boolean {
+    if (joker.sticker === 'perishable' && (joker.perishableRounds ?? 0) <= 0) return true;
+    return this.blindIndex === 2 && this.bossBlindKey === 'crimson-heart' && this.crimsonDebuffedJokerId === joker.id;
+  }""", 1)
+    p.write_text(s, encoding="utf-8")
+
+# Boss start behaviors that affect game logic rather than only visuals.
+replace_once(
+    "src/game/gameState.ts",
+    """    this.drawToFull();
+
+    this.phase = 'play';""",
+    """    this.drawToFull();
+
+    if (this.blindIndex === 2) {
+      if (this.bossBlindKey === 'amber-acorn' && this.jokers.length > 1) this.jokers = shuffle(this.jokers, this.rng);
+      if (this.bossBlindKey === 'verdant-leaf') this.verdantLeafActive = true;
+      if (this.bossBlindKey === 'crimson-heart') this.crimsonDebuffedJokerId = this.jokers.length ? this.pick(this.jokers).id : null;
+      if (this.bossBlindKey === 'cerulean-bell') {
+        this.bossForcedCardId = this.hand.length ? this.pick(this.hand).id : null;
+        if (this.bossForcedCardId) this.selected.add(this.bossForcedCardId);
+      }
+    }
+
+    this.phase = 'play';""",
+)
+
+# Forced selection cannot be removed.
+replace_once(
+    "src/game/gameState.ts",
+    """    if (this.selected.has(cardId)) {
+      this.selected.delete(cardId);
+      this.emit();
+      return false;
+    }""",
+    """    if (this.selected.has(cardId)) {
+      if (this.blindIndex === 2 && this.bossBlindKey === 'cerulean-bell' && this.bossForcedCardId === cardId) return true;
+      this.selected.delete(cardId);
+      this.emit();
+      return false;
+    }""",
+)
+
+replace_once(
+    "src/game/gameState.ts",
+    """    if (this.bossBlindKey === 'psychic' && selected.length !== 5) return 'The Psychic: play exactly 5 cards';""",
+    """    if (this.bossBlindKey === 'psychic' && selected.length !== 5) return 'The Psychic: play exactly 5 cards';
+    if (this.bossBlindKey === 'cerulean-bell' && this.bossForcedCardId && !this.selected.has(this.bossForcedCardId)) {
+      return 'Cerulean Bell: the forced card must be played';
+    }""",
+)
+
+# Ox/Pillar/Crimson post-hand state.
+replace_once(
+    "src/game/gameState.ts",
+    """    if (this.blindIndex === 2 && this.bossBlindKey === 'tooth') {
+      this.money -= cards.length;
+      breakdown.moneyDelta -= cards.length;
+    }""",
+    """    if (this.blindIndex === 2 && this.bossBlindKey === 'tooth') {
+      this.money -= cards.length;
+      breakdown.moneyDelta -= cards.length;
+    }
+    if (this.blindIndex === 2 && this.bossBlindKey === 'ox' && hand.type === this.mostPlayedHandType()) this.money = 0;
+    for (const card of cards) this.antePlayedCardIds.add(card.id);
+    if (this.blindIndex === 2 && this.bossBlindKey === 'crimson-heart') {
+      this.crimsonDebuffedJokerId = this.jokers.length ? this.pick(this.jokers).id : null;
+    }""",
+)
+
+# Hook / Serpent after-play draw behavior.
+replace_once(
+    "src/game/gameState.ts",
+    """    } else {
+      this.drawToFull();
+    }
+
+    this.emit();
+    return breakdown;""",
+    """    } else {
+      if (this.blindIndex === 2 && this.bossBlindKey === 'hook') {
+        for (let i = 0; i < 2 && this.hand.length > 0; i++) {
+          const idx = Math.floor(this.rng() * this.hand.length);
+          const [hooked] = this.hand.splice(idx, 1);
+          this.discardPile.push(hooked);
+        }
+      }
+      if (this.blindIndex === 2 && this.bossBlindKey === 'serpent') {
+        for (let i = 0; i < 3 && this.deck.length > 0; i++) this.hand.push(this.deck.pop()!);
+      } else {
+        this.drawToFull();
+      }
+      if (this.blindIndex === 2 && this.bossBlindKey === 'cerulean-bell') {
+        this.bossForcedCardId = this.hand.length ? this.pick(this.hand).id : null;
+        if (this.bossForcedCardId) this.selected.add(this.bossForcedCardId);
+      }
+    }
+
+    this.emit();
+    return breakdown;""",
+)
+
+# Discard counter and Serpent behavior.
+replace_once(
+    "src/game/gameState.ts",
+    """    this.discardsLeft -= 1;
+    this.selected.clear();""",
+    """    this.discardsLeft -= 1;
+    this.discardsUsedRun += 1;
+    this.selected.clear();""",
+)
+
+replace_once(
+    "src/game/gameState.ts",
+    """    this.drawToFull();
+    this.emit();
+    return cards;""",
+    """    if (this.blindIndex === 2 && this.bossBlindKey === 'serpent') {
+      for (let i = 0; i < 3 && this.deck.length > 0; i++) this.hand.push(this.deck.pop()!);
+    } else {
+      this.drawToFull();
+    }
+    if (this.blindIndex === 2 && this.bossBlindKey === 'cerulean-bell') {
+      this.bossForcedCardId = this.hand.length ? this.pick(this.hand).id : null;
+      if (this.bossForcedCardId) this.selected.add(this.bossForcedCardId);
+    }
+    this.emit();
+    return cards;""",
+)
+
+# Verdant Leaf ends after selling any Joker.
+replace_once(
+    "src/game/gameState.ts",
+    """    this.money += this.jokers[idx].sellValue;
+    this.jokers.splice(idx, 1);""",
+    """    this.money += this.jokers[idx].sellValue;
+    this.jokers.splice(idx, 1);
+    if (this.blindIndex === 2 && this.bossBlindKey === 'verdant-leaf') this.verdantLeafActive = false;""",
+)
+
+# Voucher Tag and shop purchase share permanent voucher application.
+replace_once(
+    "src/game/gameState.ts",
+    """    if (!this.vouchers.includes(voucher.key)) this.vouchers.push(voucher.key);
+
+    if (voucher.key === 'grabber') this.config.handsPerRound += 1;
+    if (voucher.key === 'wasteful') this.config.discardsPerRound += 1;""",
+    """    this.grantVoucherKey(voucher.key);""",
+)
+
+# Pillar history resets each new Ante.
+replace_once(
+    "src/game/gameState.ts",
+    """      this.blindIndex = 0;
+      this.ante += 1;
+      this.anteVoucher = null;""",
+    """      this.blindIndex = 0;
+      this.ante += 1;
+      this.anteVoucher = null;
+      this.antePlayedCardIds.clear();""",
+)
+
+print("Balatro meta core stage 2 applied.")
