@@ -59,6 +59,7 @@ export interface MetaProfile {
   maxInterestStreak: number;
   minHandSizeEver: number;
   maxPolychromeJokers: number;
+  maxEditionJokers: number;
   maxVouchersInRun: number;
   maxSuitCards: Record<Suit, number>;
 
@@ -183,6 +184,7 @@ export function createDefaultMetaProfile(): MetaProfile {
     maxInterestStreak: 0,
     minHandSizeEver: 8,
     maxPolychromeJokers: 0,
+    maxEditionJokers: 0,
     maxVouchersInRun: 0,
     maxSuitCards: blankSuits(),
 
@@ -246,6 +248,7 @@ export function loadMetaProfile(storage: StorageLike): MetaProfile {
       maxInterestStreak: asNumber(parsed.maxInterestStreak),
       minHandSizeEver: Math.max(1, asNumber(parsed.minHandSizeEver, 8)),
       maxPolychromeJokers: asNumber(parsed.maxPolychromeJokers),
+      maxEditionJokers: asNumber(parsed.maxEditionJokers),
       maxVouchersInRun: asNumber(parsed.maxVouchersInRun),
       maxSuitCards: { ...blankSuits(), ...(parsed.maxSuitCards ?? {}) },
       highestStakeCleared: { ...(parsed.highestStakeCleared ?? {}) },
@@ -364,7 +367,7 @@ export function refreshMetaUnlocks(input: MetaProfile): MetaProfile {
   profile.discoveredVouchers.forEach((key) => vouchers.add(key));
   if (profile.totalShopSpend >= 2500) vouchers.add('overstock-plus');
   if (profile.maxVouchersInRun >= 10) vouchers.add('liquidation');
-  if (profile.maxPolychromeJokers >= 5) vouchers.add('glow-up');
+  if (profile.maxEditionJokers >= 5) vouchers.add('glow-up');
   if (profile.totalRerolls >= 100) vouchers.add('reroll-glut');
   if (profile.tarotPackUsed >= 25) vouchers.add('omen-globe');
   if (profile.planetPackUsed >= 25) vouchers.add('observatory');
@@ -416,6 +419,7 @@ export function recordLiveState(
     handSize: number;
     vouchers: number;
     polychromeJokers: number;
+    editionJokers: number;
     suitCounts: Record<Suit, number>;
   },
   seeded = false,
@@ -429,6 +433,7 @@ export function recordLiveState(
     minHandSizeEver: Math.min(input.minHandSizeEver, state.handSize),
     maxVouchersInRun: Math.max(input.maxVouchersInRun, state.vouchers),
     maxPolychromeJokers: Math.max(input.maxPolychromeJokers, state.polychromeJokers),
+    maxEditionJokers: Math.max(input.maxEditionJokers, state.editionJokers),
   };
   (Object.keys(state.suitCounts) as Suit[]).forEach((suit) => {
     next.maxSuitCards[suit] = Math.max(next.maxSuitCards[suit] ?? 0, state.suitCounts[suit] ?? 0);
@@ -608,7 +613,7 @@ export function voucherUnlockDescription(profile: MetaProfile, key: VoucherKey):
   if (!VOUCHER_UPGRADE_BASE[key]) return 'Base Voucher; available from the start.';
   if (key === 'overstock-plus') return `Spend $2500 in Shops (${Math.min(profile.totalShopSpend, 2500)}/2500).`;
   if (key === 'liquidation') return `Redeem 10 Vouchers in one run (${Math.min(profile.maxVouchersInRun, 10)}/10).`;
-  if (key === 'glow-up') return `Have 5 Jokers with Editions at once (${Math.min(profile.maxPolychromeJokers, 5)}/5 tracked).`;
+  if (key === 'glow-up') return `Have 5 Foil/Holographic/Polychrome Jokers at once (${Math.min(profile.maxEditionJokers, 5)}/5).`;
   if (key === 'reroll-glut') return `Reroll Shops 100 times (${Math.min(profile.totalRerolls, 100)}/100).`;
   if (key === 'omen-globe') return `Use 25 Tarot cards from Booster Packs (${Math.min(profile.tarotPackUsed, 25)}/25).`;
   if (key === 'observatory') return `Use 25 Planet cards from Booster Packs (${Math.min(profile.planetPackUsed, 25)}/25).`;
