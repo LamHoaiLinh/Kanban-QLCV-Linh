@@ -9,8 +9,8 @@
 #kanban-close-game{position:fixed;z-index:100000;right:12px;top:12px;width:42px;height:42px;border:1px solid rgba(255,255,255,.35);border-radius:12px;background:rgba(15,24,22,.72);color:#fff;font:700 28px/1 system-ui;cursor:pointer;backdrop-filter:blur(8px)}
 #kanban-close-game:hover{background:rgba(180,45,45,.86)}
 </style>
-  <script type="module" crossorigin src="./assets/index-BvbkDQlH.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-WtlERsqK.css">
+  <script type="module" crossorigin src="./assets/index-DYg-jOUV.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-C6DEIX3p.css">
 </head>
   <body>
     <div id="app">
@@ -144,7 +144,14 @@
           </header>
 
           <div class="shop-body">
-            <div id="shop-offers" class="shop-offers"></div>
+            <div class="shop-market">
+              <div class="shop-section-title">Cards</div>
+              <div id="shop-offers" class="shop-offers"></div>
+              <div class="shop-section-title">Booster Packs</div>
+              <div id="shop-boosters" class="shop-boosters"></div>
+              <div class="shop-section-title">Voucher</div>
+              <div id="shop-voucher" class="shop-voucher"></div>
+            </div>
             <aside id="shop-inventory" class="shop-inventory"></aside>
           </div>
 
@@ -178,6 +185,37 @@
             <button id="btn-option-return" class="options-menu-btn" type="button">Save &amp; Return to Kanban</button>
           </div>
           <button id="btn-options-back" class="panel-back-btn" type="button">Back</button>
+        </section>
+      </div>
+
+      <div id="booster-overlay" class="booster-overlay hidden" data-testid="booster-overlay">
+        <section class="booster-panel">
+          <header class="booster-header">
+            <div>
+              <div id="booster-kind" class="booster-kicker">Arcana Pack</div>
+              <h2 id="booster-name">Arcana Pack</h2>
+            </div>
+            <div id="booster-picks" class="booster-picks">Choose 1</div>
+          </header>
+          <div id="booster-choices" class="booster-choices"></div>
+          <footer class="booster-footer">
+            <button id="btn-booster-skip" class="btn btn-ghost" type="button">Skip</button>
+          </footer>
+        </section>
+      </div>
+
+      <div id="target-overlay" class="target-overlay hidden" data-testid="target-overlay">
+        <section class="target-panel">
+          <header>
+            <div class="booster-kicker">Use Consumable</div>
+            <h2 id="target-name">The Magician</h2>
+            <p id="target-instruction">Select card(s)</p>
+          </header>
+          <div id="target-cards" class="target-cards"></div>
+          <footer class="target-footer">
+            <button id="btn-target-cancel" class="btn btn-ghost" type="button">Cancel</button>
+            <button id="btn-target-confirm" class="btn btn-play" type="button">Use</button>
+          </footer>
         </section>
       </div>
 
