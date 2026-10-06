@@ -358,20 +358,6 @@ replace_once(
       : [];""",
 )
 
-replace_once(
-    "src/game/gameState.ts",
-    """  isJokerDebuffed(joker: JokerCard): boolean {
-    if (joker.sticker === 'perishable' && (joker.perishableRounds ?? 0) <= 0) return true;
-    return this.blindIndex === 2
-      && this.bossBlindKey === 'crimson-heart'
-      && this.crimsonDebuffedJokerId === joker.id;
-  }""",
-    """  isJokerDebuffed(joker: JokerCard): boolean {
-    if (joker.sticker === 'perishable' && (joker.perishableRounds ?? 0) <= 0) return true;
-    return this.blindIndex === 2 && this.bossBlindKey === 'crimson-heart' && this.crimsonDebuffedJokerId === joker.id;
-  }""",
-)
-
 # If old L4 exact parity has not yet extended isJokerDebuffed with Crimson, patch the simpler form.
 p = root / "src/game/gameState.ts"
 s = p.read_text(encoding="utf-8")
