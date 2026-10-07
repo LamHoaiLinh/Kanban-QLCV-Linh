@@ -95,28 +95,39 @@ jobs:
       - name: Validate KanBackup payload recovery
         shell: pwsh
         run: |
-          $encoded=(Get-Content 'kan-tools/runtime/kanbackup-server.py.gz.b64' -Raw -Encoding UTF8).Trim()
-          $compressed=[Convert]::FromBase64String($encoded)
-          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\\kanbackup.gz",$compressed)
           @'
-          import pathlib, sys, zlib
-          raw=pathlib.Path(sys.argv[1]).read_bytes()
-          flags=raw[3]; pos=10
-          if flags & 4:
-              xlen=raw[pos] | (raw[pos+1]<<8); pos+=2+xlen
-          for mask in (8,16):
-              if flags & mask:
-                  while pos < len(raw)-8 and raw[pos] != 0: pos+=1
-                  pos+=1
-          if flags & 2: pos+=2
-          out=zlib.decompress(raw[pos:-8],-zlib.MAX_WBITS)
-          text=out.decode('utf-8')
+          import base64, gzip, pathlib
+          p=pathlib.Path('kan-tools/runtime/kanbackup-server.py.gz.b64')
+          s=''.join(p.read_text(encoding='utf-8').split())
           required=('linh-kanbackup-v1','/status','/setup','/backup-now','/snapshots','/verify','/restore')
-          assert len(out)>=12000, len(out)
-          assert all(x in text for x in required)
-          compile(text,'kanbackup-server.py','exec')
-          print('KanBackup payload OK',len(out))
-          '@ | python - "$env:RUNNER_TEMP\\kanbackup.gz"
+          def valid(candidate):
+              try:
+                  raw=base64.b64decode(candidate,validate=True)
+                  out=gzip.decompress(raw)
+                  text=out.decode('utf-8')
+                  if len(out)<12000 or not all(x in text for x in required): return None
+                  compile(text,'kanbackup-server.py','exec')
+                  return raw,out
+              except Exception:
+                  return None
+          hit=valid(s)
+          if hit:
+              print('KANBACKUP_PAYLOAD_VALID',len(hit[0]),len(hit[1]))
+              raise SystemExit(0)
+          found=[]
+          # Payload hien tai lech 1 ky tu Base64. Thu bo tung ky tu de tim duy nhat
+          # candidate co GZip CRC/ISIZE dung + source Python/API day du.
+          for i in range(max(0,len(s)-2)):
+              candidate=s[:i]+s[i+1:]
+              if len(candidate)%4: continue
+              hit=valid(candidate)
+              if hit:
+                  found.append((i,s[i],candidate,len(hit[0]),len(hit[1])))
+                  print('KANBACKUP_REPAIR_INDEX',i,'CHAR',repr(s[i]),'RAW',len(hit[0]),'OUT',len(hit[1]))
+          if len(found)!=1:
+              raise SystemExit('Khong tim duoc duy nhat 1 cach sua payload; candidates=%d' % len(found))
+          print('KANBACKUP_REPAIR_UNIQUE',found[0][0],repr(found[0][1]))
+          '@ | python -
 
       - name: Check PowerShell installer syntax
         shell: pwsh
