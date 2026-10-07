@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "kanToolVersion": "2.8.0",
-  "installerVersion": "2.4.0",
+  "kanToolVersion": "2.8.1",
+  "installerVersion": "2.4.1",
   "pythonFallback": {
     "version": "3.13.16",
     "url": "https://www.python.org/ftp/python/3.13.16/python-3.13.16-amd64.exe"
@@ -15,7 +15,7 @@
       ]
     },
     "capture": {
-      "version": "6.2.1",
+      "version": "6.2.2",
       "source": "capture-agent/capture_agent.py",
       "kanpassSource": "capture-agent/kanpass.py",
       "webBridgeSource": "capture-agent/kanpass_webbridge.py"
@@ -40,7 +40,7 @@
       "source": "BtbN/FFmpeg-Builds"
     },
     "backup": {
-      "version": "1.0.0",
+      "version": "1.0.1",
       "source": "kan-tools/runtime/kanbackup-server.py.gz.b64"
     },
     "kopia": {
