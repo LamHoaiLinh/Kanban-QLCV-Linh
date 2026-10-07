@@ -1052,7 +1052,7 @@ class Overlay:
         return source.transform((width,height),perspective,coeffs,resample=resample)
 
     def find_vertical_overlap(self,previous,current):
-        from PIL import ImageChops, ImageFilter, ImageStat
+        from PIL import Image, ImageChops, ImageFilter, ImageStat
         if previous.width!=current.width or previous.width<8:return 0
         h=min(previous.height,current.height)
         if h<48:return 0
