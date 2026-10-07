@@ -403,58 +403,50 @@ if($needBackup){
   Download-File ([string]$Manifest.components.backup.source) $backupPayload
   $encoded=(Get-Content -LiteralPath $backupPayload -Raw -Encoding UTF8).Trim()
   $compressed=[Convert]::FromBase64String($encoded)
+  $gzipBin=Join-Path $TempDir "kanbackup-server.py.gz"
+  [System.IO.File]::WriteAllBytes($gzipBin,$compressed)
 
-  # Thu GZip chuan truoc. Payload KanBackup cu tung co footer CRC sai du
-  # phan DEFLATE va kich thuoc giai nen van hop le. Neu gap dung loi nay,
-  # fallback se bo qua footer CRC nhung van kiem ISIZE + py_compile phia duoi.
-  $gzipOk=$false
-  try{
-    $memory=New-Object System.IO.MemoryStream(,$compressed)
-    $gzip=New-Object System.IO.Compression.GZipStream($memory,[System.IO.Compression.CompressionMode]::Decompress)
-    $output=[System.IO.File]::Create($backupAgent)
-    try{$gzip.CopyTo($output);$gzipOk=$true}finally{
-      $output.Dispose();$gzip.Dispose();$memory.Dispose()
-    }
-  }catch{
-    $gzipOk=$false
-    Write-Host "  GZip footer CRC khong hop le. Dang phuc hoi KanBackup tu DEFLATE payload..." -ForegroundColor Yellow
-    Remove-Item -LiteralPath $backupAgent -Force -ErrorAction SilentlyContinue
-  }
-
-  if(-not $gzipOk){
-    if($compressed.Length -lt 19 -or $compressed[0] -ne 0x1f -or $compressed[1] -ne 0x8b){
-      throw "Payload KanBackup khong phai GZip hop le."
-    }
-    $offset=10
-    $flags=[int]$compressed[3]
-    if(($flags -band 4) -ne 0){
-      if($offset+2 -gt $compressed.Length-8){throw "Header GZip KanBackup bi hong."}
-      $xlen=[int]$compressed[$offset] -bor ([int]$compressed[$offset+1] -shl 8)
-      $offset+=2+$xlen
-    }
-    foreach($flagMask in @(8,16)){
-      if(($flags -band $flagMask) -ne 0){
-        while($offset -lt $compressed.Length-8 -and $compressed[$offset] -ne 0){$offset++}
-        $offset++
-      }
-    }
-    if(($flags -band 2) -ne 0){$offset+=2}
-    $rawLength=$compressed.Length-$offset-8
-    if($rawLength -le 0){throw "DEFLATE payload KanBackup bi rong/hong."}
-
-    $raw=New-Object byte[] $rawLength
-    [Array]::Copy($compressed,$offset,$raw,0,$rawLength)
-    $memory=New-Object System.IO.MemoryStream(,$raw)
-    $deflate=New-Object System.IO.Compression.DeflateStream($memory,[System.IO.Compression.CompressionMode]::Decompress)
-    $output=[System.IO.File]::Create($backupAgent)
-    try{$deflate.CopyTo($output)}finally{$output.Dispose();$deflate.Dispose();$memory.Dispose()}
-
-    $expectedSize=[BitConverter]::ToUInt32($compressed,$compressed.Length-4)
-    $actualSize=[uint64](Get-Item -LiteralPath $backupAgent).Length
-    if($expectedSize -gt 0 -and $actualSize -ne [uint64]$expectedSize){
-      throw "KanBackup giai nen sai kich thuoc: $actualSize / $expectedSize byte."
-    }
-  }
+  # Payload cu co footer GZip hong. Khong dung GZipStream/.NET de tranh
+  # CRC/ISIZE footer lam dung bo cai. Python zlib giai nen dung DEFLATE
+  # stream ben trong, sau do tu kiem tra source + py_compile.
+  $recoverScript=@'
+import pathlib, struct, sys, zlib
+src=pathlib.Path(sys.argv[1])
+dst=pathlib.Path(sys.argv[2])
+raw=src.read_bytes()
+if len(raw)<20 or raw[:3]!=b"\x1f\x8b\x08":
+    raise SystemExit("Payload KanBackup khong phai GZip hop le.")
+flags=raw[3]
+pos=10
+if flags & 4:
+    if pos+2>len(raw)-8: raise SystemExit("Header GZip KanBackup bi hong.")
+    xlen=raw[pos] | (raw[pos+1]<<8); pos+=2+xlen
+for mask in (8,16):
+    if flags & mask:
+        while pos < len(raw)-8 and raw[pos] != 0: pos += 1
+        pos += 1
+if flags & 2: pos += 2
+if pos>=len(raw)-8: raise SystemExit("DEFLATE KanBackup bi rong/hong.")
+try:
+    out=zlib.decompress(raw[pos:-8], -zlib.MAX_WBITS)
+except Exception as exc:
+    raise SystemExit("Khong phuc hoi duoc DEFLATE KanBackup: "+str(exc))
+if len(out)<12000:
+    raise SystemExit("KanBackup phuc hoi bi thieu: %d byte." % len(out))
+try:
+    text=out.decode("utf-8")
+except UnicodeDecodeError as exc:
+    raise SystemExit("KanBackup khong phai UTF-8: "+str(exc))
+required=("linh-kanbackup-v1","/status","/setup","/backup-now","/snapshots","/verify","/restore")
+missing=[x for x in required if x not in text]
+if missing:
+    raise SystemExit("KanBackup source thieu API: "+", ".join(missing))
+compile(text, str(dst), "exec")
+dst.write_bytes(out)
+print("KanBackup recovered:",len(out),"bytes")
+'@
+  & $venvPy -c $recoverScript $gzipBin $backupAgent
+  if($LASTEXITCODE -ne 0){throw "Khong phuc hoi duoc source KanBackup tu payload."}
 
   if((Get-Item $backupAgent).Length -lt 12000){throw "Source KanBackup khong hop le."}
   & $venvPy -m py_compile $backupAgent
