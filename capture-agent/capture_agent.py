@@ -1052,37 +1052,104 @@ class Overlay:
         return source.transform((width,height),perspective,coeffs,resample=resample)
 
     def find_vertical_overlap(self,previous,current):
-        import zlib
+        from PIL import ImageChops, ImageFilter, ImageStat
         if previous.width!=current.width or previous.width<8:return 0
         h=min(previous.height,current.height)
-        min_overlap=max(28,int(h*.08)); max_overlap=min(h-1,int(h*.82))
-        if max_overlap<=min_overlap:return 0
-        margin=max(1,previous.width//40)
-        p=previous.convert('L').crop((margin,0,previous.width-margin,previous.height))
-        q=current.convert('L').crop((margin,0,current.width-margin,current.height))
-        width=p.width; pb=p.tobytes(); qb=q.tobytes()
-        ph=[]; pi=[]; qh=[]; qi=[]
-        for y in range(p.height):
-            row=pb[y*width:(y+1)*width]; ph.append(zlib.crc32(row)); pi.append((max(row)-min(row))>18)
-        for y in range(q.height):
-            row=qb[y*width:(y+1)*width]; qh.append(zlib.crc32(row)); qi.append((max(row)-min(row))>18)
-        best_ratio=0.0; best_info=0; best_overlap=0; strong=[]
-        for overlap in range(min_overlap,max_overlap+1):
-            start=p.height-overlap; info=0; matched=0
-            for j in range(overlap):
-                if pi[start+j] or qi[j]:
-                    info+=1
-                    if ph[start+j]==qh[j]:matched+=1
-            ratio=(matched/info) if info else 0.0
-            required=max(10,int(overlap*.035))
-            if info>=required and ratio>=.965:strong.append((ratio,overlap))
-            if ratio>best_ratio or (ratio==best_ratio and info>best_info):
-                best_ratio=ratio; best_info=info; best_overlap=overlap
-        required=max(10,int(best_overlap*.035))
-        if best_info<required or best_ratio<.965:return 0
-        ambiguous=[item for item in strong if abs(item[1]-best_overlap)>3 and item[0]>=best_ratio-.01]
-        if ambiguous:return 0
-        return best_overlap
+        if h<48:return 0
+
+        # Chỉ so khung cuối của ảnh đã ghép với khung hiện tại.
+        # Thu nhỏ theo chiều ngang để giảm nhiễu anti-alias nhưng giữ nguyên trục Y.
+        prev=previous.crop((0,previous.height-h,previous.width,previous.height)).convert('L')
+        cur=current.crop((0,0,current.width,h)).convert('L')
+        margin=max(2,previous.width//40)
+        prev=prev.crop((margin,0,prev.width-margin,h))
+        cur=cur.crop((margin,0,cur.width-margin,h))
+        try:resample=Image.Resampling.BILINEAR
+        except AttributeError:
+            from PIL import Image
+            resample=Image.BILINEAR
+        sample_w=max(40,min(112,prev.width//8))
+        prev=prev.resize((sample_w,h),resample)
+        cur=cur.resize((sample_w,h),resample)
+
+        # Nhận diện vùng header/footer cố định lặp lại giữa hai lần chụp.
+        # Các vùng này không được dùng làm mốc ghép vì chúng không cuộn theo nội dung.
+        prev_bytes=prev.tobytes(); cur_bytes=cur.tobytes()
+        def common_edge_rows(from_bottom=False,max_frac=.20):
+            limit=max(4,int(h*max_frac)); same=0; soft_bad=0
+            for k in range(limit):
+                y=h-1-k if from_bottom else k
+                a=prev_bytes[y*sample_w:(y+1)*sample_w]
+                b=cur_bytes[y*sample_w:(y+1)*sample_w]
+                err=sum(abs(x-yv) for x,yv in zip(a,b))/sample_w
+                if err<=3.5:
+                    same=k+1; soft_bad=0
+                elif err<=7.0 and soft_bad<1:
+                    same=k+1; soft_bad+=1
+                else:
+                    break
+            return same
+
+        sticky_top=common_edge_rows(False,.24)
+        sticky_bottom=common_edge_rows(True,.16)
+        prev_edge=prev.filter(ImageFilter.FIND_EDGES)
+        cur_edge=cur.filter(ImageFilter.FIND_EDGES)
+
+        # Cho phép overlap gần như toàn khung. Bản cũ chỉ tìm tới 82% nên
+        # cuộn ít một sẽ không bao giờ tìm thấy phần trùng và bị lặp ảnh.
+        min_overlap=max(24,int(h*.04)); max_overlap=h
+
+        def measure(overlap):
+            base_top=max(4,int(h*.035)); base_bottom=max(2,int(h*.02))
+            top_guard=min(max(base_top,sticky_top+2),max(4,overlap-20))
+            bottom_guard=min(max(base_bottom,sticky_bottom+2),max(2,overlap-top_guard-16))
+            y0=top_guard; y1=overlap-bottom_guard
+            if y1-y0<16:
+                y0=max(0,min(sticky_top+1,overlap-16)); y1=overlap
+            if y1-y0<12:return None
+
+            p0=h-overlap+y0; p1=h-overlap+y1
+            a=prev.crop((0,p0,sample_w,p1)); b=cur.crop((0,y0,sample_w,y1))
+            ea=prev_edge.crop((0,p0,sample_w,p1)); eb=cur_edge.crop((0,y0,sample_w,y1))
+
+            # Chỉ chấm điểm trên vùng có cạnh/chữ; nền trắng/đen lớn không được
+            # phép tạo ra "khớp giả".
+            mask=ImageChops.lighter(ea,eb).point(lambda v:255 if v>=14 else 0)
+            info=mask.histogram()[255]; area=sample_w*(y1-y0)
+            if info<max(30,int(area*.006)):return None
+            gray_diff=ImageChops.difference(a,b)
+            edge_diff=ImageChops.difference(ea,eb)
+            gray_score=ImageStat.Stat(gray_diff,mask).mean[0]
+            edge_score=ImageStat.Stat(edge_diff,mask).mean[0]
+            return gray_score*.75+edge_score*.25,info
+
+        step=max(1,h//360)
+        candidates=[]
+        for overlap in range(min_overlap,max_overlap+1,step):
+            result=measure(overlap)
+            if result:candidates.append((result[0],overlap,result[1]))
+        if not candidates:return 0
+
+        # Nếu nhiều vị trí gần như bằng nhau, ưu tiên overlap lớn hơn:
+        # đúng với thao tác cuộn ngắn và tránh lặp nguyên từng khung.
+        min_score=min(item[0] for item in candidates)
+        tolerance=.35 if min_score<2.0 else .15
+        near=[item for item in candidates if item[0]<=min_score+tolerance]
+        best=max(near,key=lambda item:item[1])
+
+        # Tinh chỉnh từng pixel quanh nghiệm thô.
+        refined=[]
+        for overlap in range(max(min_overlap,best[1]-step),min(max_overlap,best[1]+step)+1):
+            result=measure(overlap)
+            if result:refined.append((result[0],overlap,result[1]))
+        if refined:
+            local_min=min(item[0] for item in refined)
+            local_tol=.20 if local_min<2.0 else .08
+            best=max([item for item in refined if item[0]<=local_min+local_tol],key=lambda item:item[1])
+
+        # Không đủ giống thì an toàn hơn là không cắt mất nội dung.
+        if best[0]>18:return 0
+        return best[1]
 
     def stitch_long_frames(self,frames):
         from PIL import Image
