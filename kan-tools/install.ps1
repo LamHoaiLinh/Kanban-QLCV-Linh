@@ -399,56 +399,14 @@ $kopiaExe=Join-Path $BackupDir "kopia.exe"
 $needBackup=Need-Component "backup" @($backupAgent)
 if($needBackup){
   Write-Step "Cap nhat KanBackup"
-  $backupPayload=Join-Path $TempDir "kanbackup-server.py.gz.b64"
-  Download-File ([string]$Manifest.components.backup.source) $backupPayload
-  $encoded=(Get-Content -LiteralPath $backupPayload -Raw -Encoding UTF8).Trim()
-  $compressed=[Convert]::FromBase64String($encoded)
-  $gzipBin=Join-Path $TempDir "kanbackup-server.py.gz"
-  [System.IO.File]::WriteAllBytes($gzipBin,$compressed)
-
-  # Payload cu co footer GZip hong. Khong dung GZipStream/.NET de tranh
-  # CRC/ISIZE footer lam dung bo cai. Python zlib giai nen dung DEFLATE
-  # stream ben trong, sau do tu kiem tra source + py_compile.
-  $recoverScript=@'
-import pathlib, struct, sys, zlib
-src=pathlib.Path(sys.argv[1])
-dst=pathlib.Path(sys.argv[2])
-raw=src.read_bytes()
-if len(raw)<20 or raw[:3]!=b"\x1f\x8b\x08":
-    raise SystemExit("Payload KanBackup khong phai GZip hop le.")
-flags=raw[3]
-pos=10
-if flags & 4:
-    if pos+2>len(raw)-8: raise SystemExit("Header GZip KanBackup bi hong.")
-    xlen=raw[pos] | (raw[pos+1]<<8); pos+=2+xlen
-for mask in (8,16):
-    if flags & mask:
-        while pos < len(raw)-8 and raw[pos] != 0: pos += 1
-        pos += 1
-if flags & 2: pos += 2
-if pos>=len(raw)-8: raise SystemExit("DEFLATE KanBackup bi rong/hong.")
-try:
-    out=zlib.decompress(raw[pos:-8], -zlib.MAX_WBITS)
-except Exception as exc:
-    raise SystemExit("Khong phuc hoi duoc DEFLATE KanBackup: "+str(exc))
-if len(out)<12000:
-    raise SystemExit("KanBackup phuc hoi bi thieu: %d byte." % len(out))
-try:
-    text=out.decode("utf-8")
-except UnicodeDecodeError as exc:
-    raise SystemExit("KanBackup khong phai UTF-8: "+str(exc))
-required=("linh-kanbackup-v1","/status","/setup","/backup-now","/snapshots","/verify","/restore")
-missing=[x for x in required if x not in text]
-if missing:
-    raise SystemExit("KanBackup source thieu API: "+", ".join(missing))
-compile(text, str(dst), "exec")
-dst.write_bytes(out)
-print("KanBackup recovered:",len(out),"bytes")
-'@
-  & $venvPy -c $recoverScript $gzipBin $backupAgent
-  if($LASTEXITCODE -ne 0){throw "Khong phuc hoi duoc source KanBackup tu payload."}
-
+  Download-File ([string]$Manifest.components.backup.source) $backupAgent
   if((Get-Item $backupAgent).Length -lt 12000){throw "Source KanBackup khong hop le."}
+
+  $backupText=Get-Content -LiteralPath $backupAgent -Raw -Encoding UTF8
+  foreach($required in @("linh-kanbackup-v1","/status","/setup","/backup-now","/snapshots","/verify","/restore")){
+    if($backupText -notlike ("*" + $required + "*")){throw ("KanBackup source thieu API: " + $required)}
+  }
+
   & $venvPy -m py_compile $backupAgent
   if($LASTEXITCODE -ne 0){throw "KanBackup source bi loi cu phap."}
   Stop-Matching "*kanbackup-server.py*"
