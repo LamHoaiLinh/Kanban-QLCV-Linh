@@ -92,6 +92,32 @@ jobs:
               shutil.rmtree(root, ignore_errors=True)
           '@ | python -
 
+      - name: Validate KanBackup payload recovery
+        shell: pwsh
+        run: |
+          $encoded=(Get-Content 'kan-tools/runtime/kanbackup-server.py.gz.b64' -Raw -Encoding UTF8).Trim()
+          $compressed=[Convert]::FromBase64String($encoded)
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\\kanbackup.gz",$compressed)
+          @'
+          import pathlib, sys, zlib
+          raw=pathlib.Path(sys.argv[1]).read_bytes()
+          flags=raw[3]; pos=10
+          if flags & 4:
+              xlen=raw[pos] | (raw[pos+1]<<8); pos+=2+xlen
+          for mask in (8,16):
+              if flags & mask:
+                  while pos < len(raw)-8 and raw[pos] != 0: pos+=1
+                  pos+=1
+          if flags & 2: pos+=2
+          out=zlib.decompress(raw[pos:-8],-zlib.MAX_WBITS)
+          text=out.decode('utf-8')
+          required=('linh-kanbackup-v1','/status','/setup','/backup-now','/snapshots','/verify','/restore')
+          assert len(out)>=12000, len(out)
+          assert all(x in text for x in required)
+          compile(text,'kanbackup-server.py','exec')
+          print('KanBackup payload OK',len(out))
+          '@ | python - "$env:RUNNER_TEMP\\kanbackup.gz"
+
       - name: Check PowerShell installer syntax
         shell: pwsh
         run: |
