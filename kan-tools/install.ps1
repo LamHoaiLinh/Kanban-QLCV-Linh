@@ -403,10 +403,58 @@ if($needBackup){
   Download-File ([string]$Manifest.components.backup.source) $backupPayload
   $encoded=(Get-Content -LiteralPath $backupPayload -Raw -Encoding UTF8).Trim()
   $compressed=[Convert]::FromBase64String($encoded)
-  $memory=New-Object System.IO.MemoryStream(,$compressed)
-  $gzip=New-Object System.IO.Compression.GZipStream($memory,[System.IO.Compression.CompressionMode]::Decompress)
-  $output=[System.IO.File]::Create($backupAgent)
-  try{$gzip.CopyTo($output)}finally{$output.Dispose();$gzip.Dispose();$memory.Dispose()}
+
+  # Thu GZip chuan truoc. Payload KanBackup cu tung co footer CRC sai du
+  # phan DEFLATE va kich thuoc giai nen van hop le. Neu gap dung loi nay,
+  # fallback se bo qua footer CRC nhung van kiem ISIZE + py_compile phia duoi.
+  $gzipOk=$false
+  try{
+    $memory=New-Object System.IO.MemoryStream(,$compressed)
+    $gzip=New-Object System.IO.Compression.GZipStream($memory,[System.IO.Compression.CompressionMode]::Decompress)
+    $output=[System.IO.File]::Create($backupAgent)
+    try{$gzip.CopyTo($output);$gzipOk=$true}finally{
+      $output.Dispose();$gzip.Dispose();$memory.Dispose()
+    }
+  }catch{
+    Write-Host "  GZip footer CRC khong hop le. Dang phuc hoi KanBackup tu DEFLATE payload..." -ForegroundColor Yellow
+    Remove-Item -LiteralPath $backupAgent -Force -ErrorAction SilentlyContinue
+  }
+
+  if(-not $gzipOk){
+    if($compressed.Length -lt 19 -or $compressed[0] -ne 0x1f -or $compressed[1] -ne 0x8b){
+      throw "Payload KanBackup khong phai GZip hop le."
+    }
+    $offset=10
+    $flags=[int]$compressed[3]
+    if(($flags -band 4) -ne 0){
+      if($offset+2 -gt $compressed.Length-8){throw "Header GZip KanBackup bi hong."}
+      $xlen=[int]$compressed[$offset] -bor ([int]$compressed[$offset+1] -shl 8)
+      $offset+=2+$xlen
+    }
+    foreach($flagMask in @(8,16)){
+      if(($flags -band $flagMask) -ne 0){
+        while($offset -lt $compressed.Length-8 -and $compressed[$offset] -ne 0){$offset++}
+        $offset++
+      }
+    }
+    if(($flags -band 2) -ne 0){$offset+=2}
+    $rawLength=$compressed.Length-$offset-8
+    if($rawLength -le 0){throw "DEFLATE payload KanBackup bi rong/hong."}
+
+    $raw=New-Object byte[] $rawLength
+    [Array]::Copy($compressed,$offset,$raw,0,$rawLength)
+    $memory=New-Object System.IO.MemoryStream(,$raw)
+    $deflate=New-Object System.IO.Compression.DeflateStream($memory,[System.IO.Compression.CompressionMode]::Decompress)
+    $output=[System.IO.File]::Create($backupAgent)
+    try{$deflate.CopyTo($output)}finally{$output.Dispose();$deflate.Dispose();$memory.Dispose()}
+
+    $expectedSize=[BitConverter]::ToUInt32($compressed,$compressed.Length-4)
+    $actualSize=[uint64](Get-Item -LiteralPath $backupAgent).Length
+    if($expectedSize -gt 0 -and $actualSize -ne [uint64]$expectedSize){
+      throw "KanBackup giai nen sai kich thuoc: $actualSize / $expectedSize byte."
+    }
+  }
+
   if((Get-Item $backupAgent).Length -lt 12000){throw "Source KanBackup khong hop le."}
   & $venvPy -m py_compile $backupAgent
   if($LASTEXITCODE -ne 0){throw "KanBackup source bi loi cu phap."}
