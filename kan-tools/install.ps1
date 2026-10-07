@@ -416,6 +416,7 @@ if($needBackup){
       $output.Dispose();$gzip.Dispose();$memory.Dispose()
     }
   }catch{
+    $gzipOk=$false
     Write-Host "  GZip footer CRC khong hop le. Dang phuc hoi KanBackup tu DEFLATE payload..." -ForegroundColor Yellow
     Remove-Item -LiteralPath $backupAgent -Force -ErrorAction SilentlyContinue
   }
