@@ -35,7 +35,7 @@ jobs:
 
       - name: Check Python syntax
         shell: pwsh
-        run: python -m py_compile kan-tools/runtime/kanmedia-server.py kan-tools/runtime/kanmedia-worker.py capture-agent/capture_agent.py capture-agent/kanpass.py capture-agent/kanpass_webbridge.py office-tools/signing-agent/package/kanban_signing_agent.py
+        run: python -m py_compile kan-tools/runtime/kanmedia-server.py kan-tools/runtime/kanmedia-worker.py kan-tools/runtime/kanbackup-server.py capture-agent/capture_agent.py capture-agent/kanpass.py capture-agent/kanpass_webbridge.py office-tools/signing-agent/package/kanban_signing_agent.py
 
       - name: Smoke test KanPass KDBX and Windows DPAPI
         shell: pwsh
@@ -92,49 +92,19 @@ jobs:
               shutil.rmtree(root, ignore_errors=True)
           '@ | python -
 
-      - name: Validate KanBackup payload recovery
+      - name: Validate KanBackup source contract
         shell: pwsh
         run: |
           @'
-          import base64, pathlib, zlib
-          p=pathlib.Path('kan-tools/runtime/kanbackup-server.py.gz.b64')
-          s=''.join(p.read_text(encoding='utf-8').split())
-          required=('linh-kanbackup-v1','/status','/setup','/backup-now','/snapshots','/verify','/restore')
-          def raw_deflate(candidate):
-              try:
-                  raw=base64.b64decode(candidate,validate=True)
-                  if len(raw)<20 or raw[:3]!=b'\x1f\x8b\x08': return None
-                  flags=raw[3]; pos=10
-                  if flags & 4:
-                      if pos+2>len(raw)-8:return None
-                      xlen=raw[pos] | (raw[pos+1]<<8);pos+=2+xlen
-                  for mask in (8,16):
-                      if flags & mask:
-                          while pos<len(raw)-8 and raw[pos]!=0:pos+=1
-                          pos+=1
-                  if flags & 2:pos+=2
-                  out=zlib.decompress(raw[pos:-8],-zlib.MAX_WBITS)
-                  text=out.decode('utf-8')
-                  if len(out)<12000 or not all(x in text for x in required):return None
-                  compile(text,'kanbackup-server.py','exec')
-                  return raw,out,text
-              except Exception:
-                  return None
-          hit=raw_deflate(s)
-          if hit:
-              print('KANBACKUP_PAYLOAD_DEFLATE_VALID',len(hit[0]),len(hit[1]))
-              raise SystemExit(0)
-          found=[]
-          for i in range(max(0,len(s)-2)):
-              candidate=s[:i]+s[i+1:]
-              if len(candidate)%4:continue
-              hit=raw_deflate(candidate)
-              if hit:
-                  found.append((i,s[i],candidate,len(hit[0]),len(hit[1])))
-                  print('KANBACKUP_REPAIR_INDEX',i,'CHAR',repr(s[i]),'RAW',len(hit[0]),'OUT',len(hit[1]))
-          if len(found)!=1:
-              raise SystemExit('Khong tim duoc duy nhat 1 cach sua payload DEFLATE; candidates=%d' % len(found))
-          print('KANBACKUP_REPAIR_UNIQUE',found[0][0],repr(found[0][1]))
+          from pathlib import Path
+          p=Path('kan-tools/runtime/kanbackup-server.py')
+          text=p.read_text(encoding='utf-8')
+          required=('linh-kanbackup-v1','/ping','/status','/setup','/backup-now','/snapshots','/verify','/restore')
+          assert p.stat().st_size >= 12000, p.stat().st_size
+          missing=[x for x in required if x not in text]
+          assert not missing, missing
+          compile(text,str(p),'exec')
+          print('KanBackup plain source OK',p.stat().st_size,'bytes')
           '@ | python -
 
       - name: Check PowerShell installer syntax
