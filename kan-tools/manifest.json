@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "kanToolVersion": "2.8.4",
-  "installerVersion": "2.4.4",
+  "kanToolVersion": "2.8.5",
+  "installerVersion": "2.4.5",
   "pythonFallback": {
     "version": "3.13.16",
     "url": "https://www.python.org/ftp/python/3.13.16/python-3.13.16-amd64.exe"
@@ -40,8 +40,8 @@
       "source": "BtbN/FFmpeg-Builds"
     },
     "backup": {
-      "version": "1.0.4",
-      "source": "kan-tools/runtime/kanbackup-server.py.gz.b64"
+      "version": "1.1.0",
+      "source": "kan-tools/runtime/kanbackup-server.py"
     },
     "kopia": {
       "version": "0.23.1",
