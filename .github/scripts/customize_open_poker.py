@@ -183,7 +183,7 @@ replace_once(
   },""",
 )
 
-hand_sort = """import type { PlayingCard, Rank, Suit } from './types';
+hand_sort = """import type { PlayingCard, Suit } from './types';
 
 const SUIT_ORDER: Record<Suit, number> = {
   spades: 0,
@@ -192,50 +192,19 @@ const SUIT_ORDER: Record<Suit, number> = {
   clubs: 3,
 };
 
-const STRAIGHT_WINDOWS: Rank[][] = [
-  [14, 13, 12, 11, 10],
-  [13, 12, 11, 10, 9],
-  [12, 11, 10, 9, 8],
-  [11, 10, 9, 8, 7],
-  [10, 9, 8, 7, 6],
-  [9, 8, 7, 6, 5],
-  [8, 7, 6, 5, 4],
-  [7, 6, 5, 4, 3],
-  [6, 5, 4, 3, 2],
-  [5, 4, 3, 2, 14],
-];
-
 function suitThenOriginal(a: PlayingCard, b: PlayingCard, original: Map<string, number>): number {
   return SUIT_ORDER[a.suit] - SUIT_ORDER[b.suit]
     || (original.get(a.id) ?? 0) - (original.get(b.id) ?? 0);
 }
 
+/** Keep all ranks descending for Straight (S); Ace stays high even for A-2-3-4-5.
+ * This only affects visual order, never poker scoring or straight detection. */
 export function sortHandForStraight(cards: readonly PlayingCard[]): PlayingCard[] {
   const original = new Map(cards.map((card, index) => [card.id, index]));
-  const rankSet = new Set(cards.filter((card) => card.enhancement !== 'stone').map((card) => card.rank));
-
-  let bestWindow = STRAIGHT_WINDOWS[0];
-  let bestMatches = -1;
-  for (const window of STRAIGHT_WINDOWS) {
-    const matches = window.reduce((sum, rank) => sum + (rankSet.has(rank) ? 1 : 0), 0);
-    if (matches > bestMatches) {
-      bestMatches = matches;
-      bestWindow = window;
-    }
-  }
-
-  const targetIndex = new Map<Rank, number>(bestWindow.map((rank, index) => [rank, index]));
   return cards.slice().sort((a, b) => {
     const aStone = a.enhancement === 'stone';
     const bStone = b.enhancement === 'stone';
     if (aStone !== bStone) return aStone ? 1 : -1;
-
-    const ai = targetIndex.get(a.rank);
-    const bi = targetIndex.get(b.rank);
-    const aTarget = ai !== undefined;
-    const bTarget = bi !== undefined;
-    if (aTarget !== bTarget) return aTarget ? -1 : 1;
-    if (aTarget && bTarget && ai !== bi) return ai! - bi!;
 
     if (a.rank !== b.rank) return b.rank - a.rank;
     return suitThenOriginal(a, b, original);
