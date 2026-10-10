@@ -446,6 +446,7 @@ export class Engine {
     const bounds=this.renderer.domElement.getBoundingClientRect();
     const active=new Set<object>();
     const projected=new THREE.Vector3();
+    let occlusionRayBudget=2; // avoid frame spikes from many pellets
     for(const bit of this.fish.food.bits){
       active.add(bit);
       let icon=this.foodElements.get(bit);
@@ -472,7 +473,8 @@ export class Engine {
       const now=performance.now();
       let previous=this.foodDepthCache.get(bit);
       // Depth test a handful of food pieces per frame (approx 4Hz each).
-      if(visible&&this.foodOccluders.length&&(!previous||now-previous.last>280)){
+      if(visible&&this.foodOccluders.length&&occlusionRayBudget>0&&(!previous||now-previous.last>280)){
+        occlusionRayBudget--;
         const eye=this.rig.camera.position;
         this.foodDepthRayDirection.copy(bit.pos).sub(eye);
         const range=this.foodDepthRayDirection.length();
