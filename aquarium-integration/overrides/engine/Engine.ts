@@ -20,6 +20,7 @@ import { CameraRig } from './CameraRig';
 import { CurrentField } from './CurrentField';
 import { EnvironmentSystem, type TankDimsWorld } from './Environment';
 import { DecorSystem } from './Decor';
+import { SolidSurfaces } from './SolidSurfaces';
 import { FloraSystem } from './Flora';
 import { FishSystem, type SimEnv, type FoodKind } from './FishSystem';
 
@@ -129,7 +130,7 @@ export class Engine {
       halfW: 0.5, halfD: 0.25, floorY: 0, surfaceY: 0.48,
       current: this.current,
       reducedMotion: false,
-      obstacles: [], shelters: [],tunnels: [],ecoMode:'natural',ecoComfort:1,
+      obstacles: [], shelters: [],tunnels: [],solids:new SolidSurfaces(),ecoMode:'natural',ecoComfort:1,
     };
     // QA-only regression probe. Not enabled on the published KanBan URL.
     if(new URLSearchParams(location.search).get('qa')==='1'){
@@ -150,6 +151,9 @@ export class Engine {
           return this.ecology.snapshot();
         };
       Object.assign(window,{
+        // Explicit QA pages only; inspect actual agents/geometry without persisting fixtures.
+        __kanStabilityWorld:()=>({fish:this.fish,env:this.simEnv,decor:this.decor,
+          renderer:this.renderer,rig:this.rig}),
         __kan42Arrange:()=>this.fish.qaArrange(this.simEnv),
         __kan42Follow:(key:string|null)=>this.followFish(key),
         __kan42Day:(factor:number)=>{this.dayFactor=factor;this.simEnv.dayFactor=factor;},
@@ -255,6 +259,7 @@ export class Engine {
 
   dispose(): void {
     this.disposed = true;
+    this.simEnv.solids?.clear();
     this.renderer.setAnimationLoop(null);
     window.removeEventListener('resize', this.applySize);
     document.removeEventListener('visibilitychange', this.onVisibility);
@@ -267,6 +272,7 @@ export class Engine {
     this.foodLayer=null;
     if(new URLSearchParams(location.search).get('qa')==='1')
       {
+        delete (window as Window & {__kanStabilityWorld?:()=>unknown}).__kanStabilityWorld;
         delete (window as Window & {__kanRealismProbe?:()=>unknown}).__kanRealismProbe;
         delete (window as Window & {__kanEcoFastForward?:(seconds:number)=>unknown}).__kanEcoFastForward;
         delete (window as Window & {__kanFoodProbe?:()=>unknown}).__kanFoodProbe;
@@ -386,6 +392,7 @@ export class Engine {
         halfW: this.dims.halfW, halfD: this.dims.halfD,
         floorY: this.dims.floorY, height: this.dims.height,
       });
+      this.simEnv.solids!.rebuild(this.decor.group);
       const floraOut = this.flora.rebuild(
         config.flora,
         { halfW: this.dims.halfW, halfD: this.dims.halfD, floorY: this.dims.floorY, surfaceY: this.dims.surfaceY },
@@ -491,7 +498,7 @@ export class Engine {
       ray.at(enter+Math.random()*(exit-enter),point);
       const blocked=this.simEnv.obstacles.some(o=>
         point.distanceToSquared(o.pos)<Math.pow(Math.max(.005,o.radius)+.006,2));
-      if(!blocked)return point;
+      if(!blocked&&!this.simEnv.solids?.contains(point,.006))return point;
     }
     return null;
   }

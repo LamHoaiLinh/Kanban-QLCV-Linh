@@ -303,10 +303,16 @@ export class DecorSystem {
           log.position.set(cx,floorY+R*1.12,cz);
           this.group.add(log);
           // A couple of broken branch stubs poking off the bark for character.
-          for (const [ox, oz, ang] of [[-0.06, 0.02, 0.6], [0.05, -0.03, -0.8]] as const) {
-            const stub = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.012, 0.05 * scale + 0.02, 6), wood);
-            stub.position.set(cx + ox * scale, floorY + R * 1.2, cz + oz * scale);
-            stub.rotation.set(0.4, 0, ang);
+          for (const [along, angle] of [[-.22,.65],[.22,2.25]] as const) {
+            const stubLength=.05*scale+.02;
+            const stub = new THREE.Mesh(new THREE.CylinderGeometry(.008,.012,stubLength,6),wood);
+            // Attach stubs OUTSIDE the shell in log-local coordinates. The old
+            // world offsets accidentally put one branch across the split-log bore.
+            const radial=new THREE.Vector3(Math.cos(angle),0,Math.sin(angle));
+            stub.position.copy(radial).multiplyScalar(R+stubLength*.42);
+            stub.position.y=along*len;
+            stub.position.applyQuaternion(log.quaternion).add(log.position);
+            stub.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),radial.applyQuaternion(log.quaternion));
             this.group.add(stub);
           }
           // Hollow interior MUST be clear. Spheres approximate only the bark,

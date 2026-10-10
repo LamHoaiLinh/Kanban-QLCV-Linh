@@ -15,6 +15,7 @@
 import * as THREE from 'three';
 import type { SpeciesDef } from '../types';
 import type { SwimTunnel } from './Decor';
+import type { SolidSurfaces } from './SolidSurfaces';
 import { speciesById } from '../data/species';
 import { getFishAsset } from './FishFactory';
 import { normalizeStock } from '../data/stocking';
@@ -59,6 +60,7 @@ export interface SimEnv {
   obstacles: { pos: THREE.Vector3; radius: number; surface?:'wood'|'plant' }[]; // decor/coral keep-out spheres
   shelters: THREE.Vector3[];                            // hiding spots (decor)
   sampleSurface?:(from:THREE.Vector3,toward:THREE.Vector3)=>{point:THREE.Vector3;normal:THREE.Vector3;surface:string;area?:number}|null;
+  solids?: SolidSurfaces;
   tunnels: SwimTunnel[]; // open corridors exported from the physical wood geometry
 }
 
@@ -94,6 +96,10 @@ interface Agent {
   nextPeck:number;
   nextJump:number;
   hunger: number;           // >0 after feeding starts; seeks food
+  foodTarget?:FoodBit;
+  foodProgress?:{best:number;stalled:number;elapsed:number;checkAt:number};
+  foodCooldown?:number;
+  rejectedFood?:Map<FoodBit,number>;
   feedDistance?: number; // current target range used for smooth approach
   drop?:{stage:'fall'|'dive';velocityY:number;elapsed:number;targetY:number};
   // Critter-specific
@@ -113,7 +119,7 @@ interface Population {
 
 // ── KanAquarium: individual pellets and high-priority rare cookies ──
 export type FoodKind = 'normal' | 'fish-cookie' | 'bear-cookie';
-interface FoodBit {pos:THREE.Vector3;age:number;state:'float'|'sink'|'settled'|'gone';kind:FoodKind;sprite:THREE.Sprite}
+interface FoodBit {radius:number;support?:THREE.Vector3;pos:THREE.Vector3;age:number;state:'float'|'sink'|'settled'|'gone';kind:FoodKind;sprite:THREE.Sprite}
 export class FoodSystem {
   bits:FoodBit[]=[];
   onEat?:()=>void;
@@ -145,7 +151,7 @@ export class FoodSystem {
     sprite.renderOrder=1500;
     // Preserve the exact screen ray: horizontal scattering would shift the pellet
     // away from the pointer, especially with an oblique camera.
-    const bit:FoodBit={pos:new THREE.Vector3(x,startY,z),
+    const bit:FoodBit={radius:kind==='normal'?.0025:.006,pos:new THREE.Vector3(x,startY,z),
       age:0,state:'sink',kind,sprite};
     sprite.position.copy(bit.pos);this.group.add(sprite);this.bits.push(bit);
   }
@@ -153,14 +159,28 @@ export class FoodSystem {
     this.group.remove(bit.sprite);
     const i=this.bits.indexOf(bit);if(i>=0)this.bits.splice(i,1);
   }
-  update(dt:number,floorY:number):void{
+  update(dt:number,floorY:number,solids?:SolidSurfaces):void{
     for(let i=this.bits.length-1;i>=0;i--){
       const b=this.bits[i];b.age+=dt;const special=b.kind!=='normal';
       // Sinking starts immediately when the food is released.
       if(b.state==='sink'){
-        b.pos.y-=dt*(special?.075:.090);
-        b.pos.x+=Math.sin(b.age*2.2+b.pos.z*35)*dt*.003;
-        if(b.pos.y<=floorY+.01){b.pos.y=floorY+.01;b.state='settled'}
+        const start=b.pos.clone();
+        const motion=new THREE.Vector3(Math.sin(b.age*2.2+b.pos.z*35)*.003,-(special?.075:.090),0).multiplyScalar(dt);
+        // Continue downhill after a steep contact; retain continuous collision
+        // detection on that slide so edges and the inner bore remain physical.
+        if(b.support){const inward=motion.dot(b.support);if(inward<0)motion.addScaledVector(b.support,-inward);}
+        const next=start.clone().add(motion);
+        const hit=solids?.sweep(start,next,b.radius);
+        if(hit){
+          b.pos.copy(start).lerp(next,hit.fraction).addScaledVector(hit.normal,.000004);
+          b.support=hit.normal;
+          if(hit.normal.y>=.78)b.state='settled';
+        }else{
+          b.pos.copy(next);
+          // Reacquire gravity once clear of a sloping edge, not levitation.
+          if(b.support&&!solids?.sweep(b.pos,b.pos.clone().add(new THREE.Vector3(0,-.001,0)),b.radius))b.support=undefined;
+        }
+        if(b.pos.y<=floorY+b.radius){b.pos.y=floorY+b.radius;b.state='settled';b.support=new THREE.Vector3(0,1,0)}
       }
       if(b.age>(special?55:26))b.state='gone';
       if(b.state==='gone'){this.remove(b);continue}
@@ -170,7 +190,7 @@ export class FoodSystem {
   }
   get active():boolean{return this.bits.length>0}
   get hasCookie():boolean{return this.bits.some(b=>b.kind!=='normal'&&b.state!=='gone')}
-  nearest(p:THREE.Vector3,maxDist:number,settledOnly:boolean):FoodBit|null{
+  nearest(p:THREE.Vector3,maxDist:number,settledOnly:boolean,accept?:(b:FoodBit)=>boolean):FoodBit|null{
     let best:FoodBit|null=null,score=Infinity;
     for(const b of this.bits){
       if(b.state==='gone'||b.age<(b.kind==='normal'?.35:.45))continue;
@@ -181,7 +201,7 @@ export class FoodSystem {
       if(d>Math.pow(special?maxDist*1.45:maxDist,2))continue;
       // Cookies are preferred when reasonably close, not magically detected across the tank.
       const s=d/(special?1.7:1);
-      if(s<score){score=s;best=b}
+      if(s<score&&(!accept||accept(b))){score=s;best=b}
     }
     return best;
   }
@@ -226,7 +246,8 @@ export class FishSystem {
     actors.forEach((a,i)=>this.pendingDashes.push({key:a.key,at:env.time+i*.45,roll:.25,qa:true}));return actors.length;
   }
   getTelemetry(){return {jump:{...this.jumpStats},fish:this.populations.flatMap(p=>p.agents.map(a=>({
-    key:a.key,pos:a.pos.toArray(),vel:a.vel.toArray(),yaw:a.prevYaw,mode:a.mode,
+    key:a.key,pos:a.pos.toArray(),vel:a.vel.toArray(),yaw:a.prevYaw,pitch:a.prevPitch,anchor:a.anchor.toArray(),mode:a.mode,
+    foodTarget:a.foodTarget?{pos:a.foodTarget.pos.toArray(),age:a.foodTarget.age}:null,foodProgress:a.foodProgress,
     travel:a.travel,collisions:a.collisions,stuck:a.stuckTime,recoveries:a.recoveries,
     history:a.history,peck:a.peck?{stage:a.peck.stage,t:a.peck.t,hz:a.peck.hz,beats:a.peck.beats,surface:a.peck.surface}:null,
     jump:a.jump?{...a.jump}:null,jaw:a.jaw
@@ -321,6 +342,11 @@ export class FishSystem {
     else if(a.pos.z>zmax){a.pos.z=zmax;a.vel.z=Math.min(0,a.vel.z)}
     if(a.pos.y<ymin){a.pos.y=ymin;a.vel.y=Math.max(0,a.vel.y)}
     else if(a.pos.y>ymax){a.pos.y=ymax;a.vel.y=Math.min(0,a.vel.y)}
+    if(a.pos.y<=ymin+.00001){a.acceleration.y=Math.max(0,a.acceleration.y);}
+    if(a.pos.y>=ymax-.00001){a.acceleration.y=Math.min(0,a.acceleration.y);}
+    // A habitat/feeding event may have left an anchor outside this tall fish's
+    // valid envelope. Project the GOAL before it can keep pulling into the clamp.
+    if(a.sp.id==='angelfish')a.anchor.y=THREE.MathUtils.clamp(a.anchor.y,ymin+.008,ymax-.008);
     // Resolve position against solid decorations after steering; avoid popping
     // by removing inward velocity only. A low iteration count bounds CPU cost.
     const radius=this.collisionRadius(a);
@@ -634,7 +660,7 @@ export class FishSystem {
   feed(x: number, z: number, env: SimEnv, kind:FoodKind='normal',
     startY=env.surfaceY-.035): void {
     this.food.scatter(x,z,startY,kind);
-    this.feedTimer = 75;
+    this.feedTimer = 12;
   }
 
   // Find a fish agent by its stable key (for follow-cam / naming).
@@ -653,7 +679,7 @@ export class FishSystem {
   update(dt: number, env: SimEnv): void {
     dt = Math.min(dt, 0.05); // clamp to avoid physics explosions on tab-return
     this.feedTimer = Math.max(0, this.feedTimer - dt);
-    this.food.update(dt, env.floorY);
+    this.food.update(dt, env.floorY, env.solids);
     this.updateSplashes(dt);
     // Director is observational and never alters population sizes or persistence.
     const allAgents=this.populations.flatMap(p=>p.agents);
@@ -874,34 +900,27 @@ export class FishSystem {
     // One event at most can steer a fish through a measured corridor.
     this.habitat.steer(a,steer,dt,env);
 
-    // 6) Feeding overrides almost everything — fish RACE for food.
-    if (this.feedTimer > 0 && this.food.active && (a.mode !== 'rest' || this.food.hasCookie)) {
-      const bottomFeeder = sp.zone === 'bottom';
-      const target = this.food.nearest(a.pos, Math.max(.17,L*6), bottomFeeder);
-      if (target) {
-        this.habitat.cancelFor(a); // feeding outranks a sightseeing event
-        const special=target.kind!=='normal';
-        _v2.copy(target.pos).sub(a.pos);
-        const d = _v2.length();
-        // Food is detected locally, approached with a gradual slowdown and
-        // only swallowed when it reaches the fish's mouth region.
-        a.feedDistance=d;
-        if(d<L*.43+(.003)){ 
-          this.food.eat(target);
-          a.jawTime=.24;
-          a.mode='feed';a.modeT=.26;a.gulp=undefined;
-        } else if(d>1e-6){
-          const dir=_v2.divideScalar(d);
-          const forward=a.vel.lengthSq()>1e-6?dir.dot(a.vel.clone().normalize()):1;
-          // Do not spin 180 degrees instantly for a pellet directly behind the fish.
-          if(forward>-.65||d<L*1.8){
-            if(d<L*1.2)a.jawTime=Math.max(a.jawTime,.085);
-            steer.addScaledVector(dir,special?3.15:2.35);
-            a.mode='feed';a.modeT=Math.max(a.modeT,.45);
-          }
-        }
+    // Bounded, locally visible feeding. Keep the target stable, share slots,
+    // recheck movement of the pellet, and abandon instead of fighting decor.
+    const target=this.feedingTarget(a,env,dt);
+    if(target){
+      this.habitat.cancelFor(a);
+      const offset=target.pos.clone().sub(a.pos),d=offset.length();
+      a.feedDistance=d;
+      const mouth=a.pos.clone().add(new THREE.Vector3(Math.cos(a.prevYaw)*Math.cos(a.prevPitch),
+        Math.sin(a.prevPitch),-Math.sin(a.prevYaw)*Math.cos(a.prevPitch)).multiplyScalar(L*.48));
+      const biteRadius=Math.max(.004,L*.10)+target.radius;
+      if(mouth.distanceTo(target.pos)<biteRadius&&!env.solids?.sweep(mouth,target.pos,.001)){
+        this.food.eat(target);this.releaseFood(a,env,false);
+        a.jawTime=.24;a.mode='feed';a.modeT=.26;a.gulp=undefined;
+      }else if(d>1e-6){
+        const dir=offset.divideScalar(d);
+        // Keep avoidance authoritative: approach only a vetted corridor.
+        if(d<L*1.2)a.jawTime=Math.max(a.jawTime,.085);
+        steer.addScaledVector(dir,target.kind==='normal'?1.65:1.9);
+        a.mode='feed';a.modeT=.45;
       }
-    }
+    }else if(a.mode==='feed'&&a.jawTime<=0){a.mode='cruise';a.modeT=2;}
 
     // 7) Current: drift with the flow, and face into it when it's strong
     //    (rheotaxis) — sells "there is real water in this box".
@@ -986,6 +1005,61 @@ export class FishSystem {
 
     // Body-aware containment and solid collision are resolved after this step
     // in update(), keeping the direction field and physical boundary separate.
+  }
+
+  private releaseFood(a:Agent,env:SimEnv,reject:boolean):void{
+    if(reject&&a.foodTarget){
+      a.rejectedFood??=new Map();a.rejectedFood.set(a.foodTarget,env.time+10);
+      this.newAnchorNear(a,env,.7);
+    }
+    a.foodTarget=undefined;a.foodProgress=undefined;a.feedDistance=undefined;
+    a.foodCooldown=env.time+(reject?2:.65);
+    if(a.mode==='feed'){a.mode='cruise';a.modeT=2;}
+  }
+  private canReachFood(a:Agent,b:FoodBit,env:SimEnv):boolean{
+    const delta=b.pos.clone().sub(a.pos),d=delta.length();
+    const margin=this.verticalClearance(a,env),mouth=a.scale*.48;
+    // A high pellet is only interesting once within the actual mouth envelope.
+    if(b.pos.y>env.surfaceY-margin+mouth*.20||b.pos.y<env.floorY+margin-mouth*.50)return false;
+    if(d<1e-7)return false;
+    const dir=delta.divideScalar(d),center=b.pos.clone().addScaledVector(dir,-mouth);
+    if(center.y<env.floorY+margin||center.y>env.surfaceY-margin)return false;
+    if(Math.abs(center.x)>env.halfW-a.scale*.35||Math.abs(center.z)>env.halfD-a.scale*.35)return false;
+    if(env.solids?.sweep(a.pos,center,this.collisionRadius(a))||env.solids?.sweep(center,b.pos,b.radius*.45))return false;
+    // Steering still uses conservative spheres. Do not select a corridor that
+    // the current fish collision solver itself would reject.
+    const route=new THREE.Line3(a.pos,center),nearest=new THREE.Vector3();
+    for(const ob of env.obstacles){
+      route.closestPointToPoint(ob.pos,true,nearest);
+      if(nearest.distanceTo(ob.pos)<ob.radius+this.collisionRadius(a)+.002)return false;
+    }
+    return true;
+  }
+  private feedingTarget(a:Agent,env:SimEnv,dt:number):FoodBit|null{
+    for(const [b,until] of a.rejectedFood??[])if(b.state==='gone'||until<env.time)a.rejectedFood!.delete(b);
+    if(this.feedTimer<=0||!this.food.active){if(a.foodTarget)this.releaseFood(a,env,false);return null;}
+    let b=a.foodTarget;
+    if(b){
+      const progress=a.foodProgress!,d=a.pos.distanceTo(b.pos);progress.elapsed+=dt;
+      if(d<progress.best-.001){progress.best=d;progress.stalled=0;}else progress.stalled+=dt;
+      const check=env.time>=progress.checkAt;
+      if(check)progress.checkAt=env.time+.25;
+      if(b.state==='gone'||progress.stalled>2.5||progress.elapsed>7||(check&&!this.canReachFood(a,b,env))){
+        this.releaseFood(a,env,b.state!=='gone');return null;
+      }
+      return b;
+    }
+    if(env.time<(a.foodCooldown??0)||a.mode==='rest'&&!this.food.hasCookie)return null;
+    // At most ~2 target searches/second/fish, independent of render FPS.
+    a.foodCooldown=env.time+.45+a.rand*.15;
+    b=this.food.nearest(a.pos,Math.max(.17,a.scale*6),a.sp.zone==='bottom',candidate=>{
+      if((a.rejectedFood?.get(candidate)??0)>env.time)return false;
+      let claimants=0;for(const p of this.populations)for(const other of p.agents)if(other.foodTarget===candidate)claimants++;
+      return claimants<(candidate.kind==='normal'?1:3)&&this.canReachFood(a,candidate,env);
+    })??undefined;
+    if(!b)return null;
+    a.foodTarget=b;a.foodProgress={best:a.pos.distanceTo(b.pos),stalled:0,elapsed:0,checkAt:env.time+.25};
+    return b;
   }
 
   private pickMode(a: Agent, env: SimEnv, activity: number): void {
