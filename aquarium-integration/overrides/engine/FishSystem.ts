@@ -192,7 +192,7 @@ export class FishSystem {
     // Resolve position against solid decorations after steering; avoid popping
     // by removing inward velocity only. A low iteration count bounds CPU cost.
     const radius=this.collisionRadius(a);
-    for(let pass=0;pass<2;pass++){
+    for(let pass=0;pass<6;pass++){
       let moved=false;
       for(const ob of env.obstacles){
         const safe=Math.max(0.005,ob.radius)+radius;
@@ -210,6 +210,48 @@ export class FishSystem {
         moved=true;
       }
       if(!moved)break;
+    }
+    // When several stones/coral skeletons overlap, sequential projection can
+    // push a fish out of one collider and into the next. Search a small set of
+    // reachable positions around the fish instead of letting it clip deeply.
+    const deepestAt=(x:number,y:number,z:number):number=>{
+      let max=0;
+      for(const ob of env.obstacles){
+        const dx=x-ob.pos.x,dy=y-ob.pos.y,dz=z-ob.pos.z;
+        const d=Math.sqrt(dx*dx+dy*dy+dz*dz);
+        max=Math.max(max,ob.radius+radius-d);
+      }
+      return Math.max(0,max);
+    };
+    const initialPenetration=deepestAt(a.pos.x,a.pos.y,a.pos.z);
+    if(initialPenetration>.006){
+      const ox=a.pos.x,oy=a.pos.y,oz=a.pos.z;
+      let bx=ox,by=oy,bz=oz,bestScore=initialPenetration*80;
+      let found=false;
+      const radii=[.018,.04,.075,.12,.19,.27];
+      for(const searchR of radii){
+        for(let k=0;k<16;k++){
+          const theta=k*(Math.PI/8)+a.rand*Math.PI*.5;
+          const px=THREE.MathUtils.clamp(ox+Math.cos(theta)*searchR,xmin,xmax);
+          const pz=THREE.MathUtils.clamp(oz+Math.sin(theta)*searchR,zmin,zmax);
+          for(const dy of [0,-.035,.035,-.08,.08]){
+            const py=THREE.MathUtils.clamp(oy+dy,ymin,ymax);
+            const deep=deepestAt(px,py,pz);
+            const displacement=Math.hypot(px-ox,py-oy,pz-oz);
+            const score=deep*80+displacement*.5;
+            if(score<bestScore){
+              bestScore=score;bx=px;by=py;bz=pz;
+              if(deep<.002){found=true;break}
+            }
+          }
+          if(found)break;
+        }
+        if(found)break;
+      }
+      if(bestScore<initialPenetration*80){
+        a.pos.set(bx,by,bz);
+        if(Math.hypot(bx-ox,by-oy,bz-oz)>.035)a.vel.multiplyScalar(.4);
+      }
     }
   }
   // Test-only probe. No production counters or global simulation timers.
