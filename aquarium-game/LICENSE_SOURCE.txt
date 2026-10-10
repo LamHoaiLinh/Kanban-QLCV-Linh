@@ -1,0 +1,3 @@
+Base project: https://github.com/jamisonhill/aquarium
+License: MIT (see upstream LICENSES.md)
+Customized for KanBan.
