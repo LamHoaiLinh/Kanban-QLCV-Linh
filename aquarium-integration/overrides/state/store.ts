@@ -130,15 +130,18 @@ export const useStore = create<AppState>()(
         const pool = speciesForWater(water).filter((sp) => sp.minGallons <= gallons);
         const fish: Record<string, number> = {};
         let load = 0;
+        let totalFish=0;
         // Fill ~80% of capacity: schools first, then characters, then cleanup crew.
         const shuffled = [...pool].sort(() => Math.random() - 0.5);
         for (const sp of shuffled) {
           if (load >= cap * 0.8) break;
           const groupSize = sp.minGroup > 1 ? sp.minGroup + Math.floor(Math.random() * 5) : (sp.maxPerTank ?? 1);
           const cost = sp.bioload * groupSize;
+          if(totalFish+groupSize>60)continue;
           if (load + cost <= cap * 0.85 && !(sp.mouthIn && Object.keys(fish).length > 0)) {
             fish[sp.id] = groupSize;
             load += cost;
+            totalFish+=groupSize;
           }
         }
         const floraPool = floraForWater(water).sort(() => Math.random() - 0.5).slice(0, 4 + Math.floor(Math.random() * 3));
