@@ -43,6 +43,71 @@ function displace(geo: THREE.BufferGeometry, amount: number, seed = 1): THREE.Bu
   return geo;
 }
 
+// A genuine 360-degree, thick-walled hollow trunk: exterior bark, darker
+// inner bore and TWO annular cut faces. CylinderGeometry(openEnded=true) used
+// to draw only a zero-thickness sheet, which looked like half a log in oblique
+// views. This mesh is manifold around its entire circumference; the bore
+// stays open along the local Y axis for swimming.
+function createHollowBark(radius:number,length:number,seed:number):THREE.BufferGeometry {
+  const radial=32,longitudinal=8,ring=radial+1;
+  const positions:number[]=[],uvs:number[]=[],indices:number[]=[];
+  const groups:Array<{start:number;count:number;material:number}>=[];
+  const outer=(t:number,a:number)=>radius*(1-.065*t)*
+    (1+.045*Math.sin(a*5+seed*3+t*5)+.026*Math.cos(a*9-seed*2+t*3));
+  const inner=(t:number,a:number)=>radius*.59*
+    (1+.025*Math.sin(a*7+t*5+seed));
+  const yAt=(t:number,a:number)=>(t-.5)*length+
+    .003*radius*Math.sin(a*5+seed+t*7);
+  const vertex=(r:number,y:number,a:number,u:number,v:number)=>{
+    positions.push(r*Math.cos(a),y,r*Math.sin(a));
+    uvs.push(u,v);
+    return positions.length/3-1;
+  };
+  for(const inside of [false,true]){
+    const groupStart=indices.length,base=positions.length/3;
+    for(let i=0;i<=longitudinal;i++){
+      const t=i/longitudinal;
+      for(let j=0;j<=radial;j++){
+        const a=j/radial*Math.PI*2;
+        vertex(inside?inner(t,a):outer(t,a),yAt(t,a),a,j/radial,t);
+      }
+    }
+    for(let i=0;i<longitudinal;i++){
+      for(let j=0;j<radial;j++){
+        const a=base+i*ring+j,b=a+ring;
+        if(inside)indices.push(a,a+1,b,b,a+1,b+1);
+        else indices.push(a,b,a+1,b,b+1,a+1);
+      }
+    }
+    groups.push({start:groupStart,count:indices.length-groupStart,
+      material:inside?1:0});
+  }
+  const endStart=indices.length;
+  for(const t of [0,1]){
+    const base=positions.length/3;
+    for(let j=0;j<=radial;j++){
+      const a=j/radial*Math.PI*2,y=yAt(t,a);
+      vertex(outer(t,a),y,a,j/radial,1);
+      vertex(inner(t,a),y,a,j/radial,0);
+    }
+    for(let j=0;j<radial;j++){
+      const k=base+j*2;
+      if(t===1)indices.push(k,k+2,k+1,k+2,k+3,k+1);
+      else indices.push(k,k+1,k+2,k+2,k+1,k+3);
+    }
+  }
+  groups.push({start:endStart,count:indices.length-endStart,material:0});
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  geo.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  for(const g of groups)geo.addGroup(g.start,g.count,g.material);
+  geo.userData.hollowBark={radial,longitudinal,innerFraction:.59,fullCircle:true,
+    cutFaces:2,outerWall:true,innerWall:true};
+  return geo;
+}
+
 export class DecorSystem {
   group = new THREE.Group();
   private materials: THREE.Material[] = [];
@@ -59,6 +124,11 @@ export class DecorSystem {
   }
 
   rebuild(decorIds: string[], dims: { halfW: number; halfD: number; floorY: number; height: number }): DecorOutput {
+    // Each rebuild creates new procedurally tessellated meshes. Dispose old
+    // geometries first so editing wood does not leak GPU buffers over time.
+    this.group.traverse(obj=>{
+      if(obj instanceof THREE.Mesh)obj.geometry.dispose();
+    });
     this.group.clear();
     for (const m of this.materials) m.dispose();
     this.materials = [];
@@ -155,17 +225,22 @@ export class DecorSystem {
         }
         case 'split-log':
         case 'hollow-log': {
-          // An open-ended tube lying on its side — DoubleSide so the bore shows.
           const split=id==='split-log';
-          const wood = this.mat({ map: woodTexture(), color: split?'#584530':'#7a5c3a', roughness: 0.96, side: THREE.DoubleSide });
-          const R = (split?.072:.06) * scale + 0.03, len = (split?.34:.26) * scale + 0.08;
-          const cx = halfW * (split?-.06:.1), cz = halfD * (split?-.3:.2);
-          const bark=displace(new THREE.CylinderGeometry(R,R*1.05,len,20,5,true),
-            split?.075:.045,split?3.4:2.2);
-          const log = new THREE.Mesh(bark, wood);
-          log.rotation.z = Math.PI / 2; // lay the length along X
-          log.rotation.y = 0.2;         // slight angle so it doesn't read as a pipe
-          log.position.set(cx, floorY + R * 0.85, cz);
+          const barkMap=woodTexture();
+          const wood=this.mat({map:barkMap,color:split?'#584530':'#7a5c3a',
+            roughness:.94,side:THREE.DoubleSide});
+          const innerWood=this.mat({map:barkMap,color:split?'#423024':'#523e2d',
+            roughness:.98,side:THREE.DoubleSide});
+          const R=(split?.072:.06)*scale+.03,len=(split?.34:.26)*scale+.08;
+          const cx=halfW*(split?-.06:.1),cz=halfD*(split?-.3:.2);
+          // Real bark thickness with a full round outside and visible annular
+          // end cuts. The hole remains empty and the end rims are solid wood.
+          const bark=createHollowBark(R,len,split?3.4:2.2);
+          const log=new THREE.Mesh(bark,[wood,innerWood]);
+          log.name='hollow-bark-'+id;
+          log.rotation.z=Math.PI/2;
+          log.rotation.y=.2;
+          log.position.set(cx,floorY+R*1.1,cz);
           this.group.add(log);
           // A couple of broken branch stubs poking off the bark for character.
           for (const [ox, oz, ang] of [[-0.06, 0.02, 0.6], [0.05, -0.03, -0.8]] as const) {
@@ -177,19 +252,24 @@ export class DecorSystem {
           // Hollow interior MUST be clear. Spheres approximate only the bark,
           // not the centre of the bore. Shell colliders remain in effect for all
           // free-swimming fish even if they aren't following the tunnel route.
-          const axis=new THREE.Vector3(Math.cos(.2),0,-Math.sin(.2));
-          const sideways=new THREE.Vector3(-axis.z,0,axis.x);
-          for(const u of [-.36,0,.36]){
-            for(let j=0;j<=6;j++){
-              const th=Math.PI*j/6;
-              const shell=log.position.clone().addScaledVector(axis,len*u)
-                .addScaledVector(sideways,Math.cos(th)*R);
-              shell.y+=Math.sin(th)*R;
-              if(shell.y>floorY+.005)
-                out.obstacles.push({pos:shell,radius:Math.max(.005,R*.13)});
+          const axis=new THREE.Vector3(0,1,0).applyQuaternion(log.quaternion).normalize();
+          // The collision shell uses the SAME local orientation as the visual
+          // mesh. Unlike the old upper half-circle, it wraps all 360 degrees.
+          // The collar stays outside the usable bore, so fish can pass through.
+          const colliderR=R*.83;
+          for(const u of [-.38,0,.38]){
+            for(let j=0;j<12;j++){
+              const a=j/12*Math.PI*2;
+              const local=new THREE.Vector3(colliderR*Math.cos(a),len*u,
+                colliderR*Math.sin(a));
+              const shell=local.applyQuaternion(log.quaternion).add(log.position);
+              if(shell.y>floorY+.005){
+                out.obstacles.push({pos:shell,
+                  radius:Math.max(.006,R*.24)});
+              }
             }
           }
-          const innerR=R*.68;
+          const innerR=R*.56;
           out.tunnels.push({
             id,entrance:log.position.clone().addScaledVector(axis,-len*.58),
             middle:log.position.clone(),
