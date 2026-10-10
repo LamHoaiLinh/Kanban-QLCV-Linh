@@ -25,6 +25,20 @@ try{
   let target=await canvas.boundingBox();
   if(!target)throw Error('Canvas has no box');
   // Coordinates purposely in lower-middle glass: formerly disappeared.
+  // Verify that the first pellet starts moving down immediately, not after 1–2 seconds.
+  await page.mouse.click(target.x+target.width*.43,target.y+target.height*.60);
+  await page.waitForSelector('.kan-food-item');
+  const foodY1=await page.$eval('.kan-food-item',el=>Number(el.dataset.worldY));
+  await new Promise(r=>setTimeout(r,480));
+  const foodY2=await page.$eval('.kan-food-item',el=>Number(el.dataset.worldY));
+  if(!(foodY2<foodY1-0.007))throw Error('Food is not sinking immediately: '+foodY1+' -> '+foodY2);
+  // Refresh page to reset the feed counter before verifying the 10th rare cookie.
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.waitForSelector('#kan-food-layer');
+  await page.waitForFunction(()=>!!document.querySelector('#canvas-host canvas'));
+  await new Promise(r=>setTimeout(r,1300));
+  target=await (await page.$('#canvas-host canvas')).boundingBox();
+  if(!target)throw Error('Canvas disappeared after reload');
   for(let k=1;k<=10;k++){
     await page.mouse.click(target.x+target.width*(.33+(k%3)*.08),target.y+target.height*.60);
     const needed=k;
@@ -38,7 +52,7 @@ try{
       });
       if(check.length<k)throw Error('Food indicators absent despite feeding; '+JSON.stringify(check));
       for(const item of check){
-        if(item.w<3||item.w>12)throw Error('Food size invalid '+JSON.stringify(item));
+        if((item.kind==='normal'&&item.w!==10)||(item.kind!=='normal'&&item.w!==25))throw Error('Food size invalid '+JSON.stringify(item));
         if(item.visible!=='visible'||item.opacity==='0')throw Error('Food is hidden: '+JSON.stringify(item));
         if(item.left<0||item.left>1280||item.top<0||item.top>800)throw Error('Food outside viewport '+JSON.stringify(item));
       }
@@ -46,5 +60,5 @@ try{
     }
   }
   const counter=await page.evaluate(()=>document.querySelector('.kanban-aquarium-feed-count')?.textContent);
-  console.log('PASS: 10 consecutive clicks; pellets visible; 10th fish cookie; sizes 5px/10px; counter='+counter);
+  console.log('PASS: 10 consecutive clicks; pellets visible; 10th fish cookie; sizes 10px/25px; counter='+counter);
 }catch(e){console.error(e);process.exitCode=1}finally{await browser?.close();server.kill('SIGTERM')}

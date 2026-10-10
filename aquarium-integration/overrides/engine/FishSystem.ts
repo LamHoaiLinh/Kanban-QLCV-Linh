@@ -110,14 +110,14 @@ export class FoodSystem {
     if(this.bits.length>=65)this.remove(this.bits[0]);
     const files=this.variants[kind],name=files[Math.floor(Math.random()*files.length)];
     const sprite=new THREE.Sprite(this.mats.get(name)!);
-    const size=kind==='normal'?0.006:0.013;
+    const size=kind==='normal'?0.012:0.0325;
     sprite.scale.set(size,size,1);
     // In KanBan we render crisp, 5px/10px HUD sprites projected from these
     // exact world positions, avoiding water shaders and fog swallowing pellets.
     sprite.visible=!new URLSearchParams(location.search).has('kanban');
     sprite.renderOrder=1500;
     const bit:FoodBit={pos:new THREE.Vector3(x+(Math.random()-.5)*.014,surfaceY-.035,z+(Math.random()-.5)*.014),
-      age:0,state:'float',kind,sprite};
+      age:0,state:'sink',kind,sprite};
     sprite.position.copy(bit.pos);this.group.add(sprite);this.bits.push(bit);
   }
   private remove(bit:FoodBit):void{
@@ -127,9 +127,9 @@ export class FoodSystem {
   update(dt:number,floorY:number):void{
     for(let i=this.bits.length-1;i>=0;i--){
       const b=this.bits[i];b.age+=dt;const special=b.kind!=='normal';
-      if(b.state==='float'&&b.age>(special?3.5:1.5))b.state='sink';
+      // Sinking starts immediately when the food is released.
       if(b.state==='sink'){
-        b.pos.y-=dt*(special?.013:.021);
+        b.pos.y-=dt*(special?.040:.046);
         b.pos.x+=Math.sin(b.age*2.2+b.pos.z*35)*dt*.003;
         if(b.pos.y<=floorY+.01){b.pos.y=floorY+.01;b.state='settled'}
       }
