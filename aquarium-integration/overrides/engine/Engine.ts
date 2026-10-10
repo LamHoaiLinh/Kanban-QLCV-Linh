@@ -394,6 +394,21 @@ export class Engine {
       );
       this.simEnv.obstacles = [...decorOut.obstacles.map(o=>({...o,surface:'wood' as const})), ...floraOut.obstacles.map(o=>({...o,surface:'plant' as const}))];
       this.foodOccluders=[...this.decor.group.children,...this.flora.group.children];
+      // Sweep against displayed hardscape geometry; spherical keep-outs
+      // would incorrectly block the hollow interior of a log.
+      this.simEnv.foodSolidHit=(from,to)=>{
+        const delta=to.clone().sub(from),length=delta.length();
+        if(length<1e-7)return null;
+        this.decor.group.updateMatrixWorld(true);
+        const ray=new THREE.Raycaster(from,delta.divideScalar(length),0,length+.002);
+        for(const hit of ray.intersectObjects(this.decor.group.children,true)){
+          if(!hit.face||hit.distance<.000001)continue;
+          const normal=hit.face.normal.clone()
+            .applyNormalMatrix(new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld));
+          if(normal.y>.28)return hit.point.clone();
+        }
+        return null;
+      };
       this.foodDepthCache=new WeakMap();
       this.simEnv.sampleSurface=(from,toward)=>{
         const direction=toward.clone().sub(from).normalize();
