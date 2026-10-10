@@ -126,7 +126,7 @@ function buildFishAsset(sp: SpeciesDef): FishAsset {
     // Snails are rigid — zero amplitude keeps the shell from wobbling.
     uAmp: { value: sp.id.includes('snail') ? 0 : sp.swim.amp },
     uMode: { value: sp.swim.mode },
-    uFinSoftness: { value: sp.invert || sp.shape.eelLike ? 0 : sp.id==='angelfish' ? .064 : sp.shape.finLong ? .045 : .018 },
+    uFinSoftness: { value: sp.invert || sp.shape.eelLike ? 0 : sp.id==='angelfish' ? .085 : sp.shape.finLong ? .045 : .018 },
   };
 
   const map = fishTextureWithEye(sp);
@@ -138,10 +138,10 @@ function buildFishAsset(sp: SpeciesDef): FishAsset {
   });
   const fins = new THREE.MeshStandardMaterial({
     color: new THREE.Color(sp.palette.fin),
-    roughness: sp.shape.finLong?0.78:0.67,
+    roughness: sp.id==='angelfish'?.92:sp.shape.finLong?.78:.67,
     metalness: 0,
     transparent: true,
-    opacity: sp.palette.finOpacity,
+    opacity: sp.id==='angelfish'?sp.palette.finOpacity*.72:sp.palette.finOpacity,
     vertexColors: true, // thin ray-tinted fin membranes
     side: THREE.DoubleSide,
     depthWrite: false,
@@ -288,18 +288,28 @@ function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
       const t=j/columns,u=THREE.MathUtils.lerp(startU,endU,t);
       const x=.5-u*bodyLen;
       const rootY=sign*(bodyProfile(u,sp)*(sign>0?1.12:1));
-      const tipEnvelope=Math.pow(Math.max(0,Math.sin(Math.PI*t)),sh.finLong?.48:1.12)
-        *(.84+.16*t);
-      const tipHeight=rise*sh.height*tipEnvelope*(sp.id==='angelfish'?.54:1);
+      // Real angel dorsals are asymmetric, gently serrated rays — NOT a
+      // uniformly inflated triangular sail. The main lobe curves backward.
+      const arc=sp.id==='angelfish'?
+        Math.pow(Math.max(0,Math.sin(Math.PI*Math.pow(t,.79))),.83):
+        Math.pow(Math.max(0,Math.sin(Math.PI*t)),sh.finLong?.48:1.12);
+      const rayEdge=sp.id==='angelfish'?1+.018*Math.cos(t*Math.PI*16):1;
+      const tipEnvelope=arc*rayEdge*(.86+.14*t);
+      const tipHeight=rise*sh.height*tipEnvelope*
+        (sp.id==='angelfish'?.46:1);
       for(let k=0;k<=rows;k++){
         const w=k/rows;
         const soft=w*w*(3-2*w);
         // Trailing edge bends aft; center is gently curved across Z so
         // specular lighting catches the membrane instead of a flat triangle.
-        const trail=sh.finLong?.060:.013;
+        const trail=sp.id==='angelfish'?.075:sh.finLong?.060:.013;
         const px=x-trail*soft*(.55+.45*t);
-        const py=rootY+sign*tipHeight*w;
-        const pz=(Math.sin(Math.PI*t)*.018+Math.sin(t*15+u*3)*.003)
+        const py=rootY+sign*tipHeight*w*
+          (1+.012*Math.sin(t*16*Math.PI)*w);
+        // Rounded membrane cross-section: a little lateral ridge along each
+        // ray catches light as it folds, unlike a zero-curvature flat plate.
+        const pz=(Math.sin(Math.PI*t)*(sp.id==='angelfish'?.033:.018)
+          +Math.sin(t*15+u*3)*.004+Math.sin(t*34)*.003)
           *soft*sign;
         positions.push(px,py,pz);
         uvs.push(.87+t*.08,.13+.74*w);
@@ -307,8 +317,8 @@ function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
         flutter.push(0);
         finFlex.push(w);
         // Subtle fin rays and edge translucency, not a uniform plastic sheet.
-        const ray=.90+.10*(.5+.5*Math.cos(t*Math.PI*20));
-        const pigment=(1-.13*w)*ray;
+        const ray=.80+.20*(.5+.5*Math.cos(t*Math.PI*20));
+        const pigment=(1-.30*w)*ray;
         colors.push(pigment,pigment*.995,pigment*.98);
       }
     }

@@ -78,6 +78,9 @@ interface Agent {
   modeT: number;            // time left in current mode
   anchor: THREE.Vector3;    // territory / station / school goal
   prevYaw: number;
+  prevPitch: number;
+  moveOrigin: THREE.Vector3;
+  stuckTime: number;
   hunger: number;           // >0 after feeding starts; seeks food
   feedDistance?: number; // current target range used for smooth approach
   drop?:{stage:'fall'|'dive';velocityY:number;elapsed:number;targetY:number};
@@ -189,7 +192,7 @@ export class FishSystem {
   }
   private finSoftness(sp:SpeciesDef):number{
     return !this.softFinsOn||sp.invert||sp.shape.eelLike?0:
-      sp.id==='angelfish'?.064:sp.shape.finLong?.045:.018;
+      sp.id==='angelfish'?.085:sp.shape.finLong?.045:.018;
   }
   resetHabitat():void{this.habitat.reset();}
   getHabitatSnapshot(env:SimEnv){return this.habitat.snapshot(env);}
@@ -202,6 +205,17 @@ export class FishSystem {
     flexible:[...Array(p.mesh.geometry.getAttribute('aFinFlex').count).keys()].filter(i=>
       p.mesh.geometry.getAttribute('aFinFlex').getX(i)>.001).length,
     mouth:[...p.agents].map(a=>a.jaw)}));}
+  getAngelfishMotionSnapshot(env:SimEnv){
+    return this.populations.filter(p=>p.sp.id==='angelfish').flatMap(p=>
+      p.agents.filter(a=>!a.drop).map(a=>({
+        key:a.key,
+        pos:a.pos.toArray(),vel:a.vel.toArray(),speed:a.vel.length(),
+        mode:a.mode,yaw:a.prevYaw,pitch:a.prevPitch,
+        stuckTime:a.stuckTime,finClearance:this.verticalClearance(a,env),
+        anchor:a.anchor.toArray()
+      }))
+    );
+  }
   private pendingDrop:{x:number;z:number}|null=null;
   private splashes:Array<{mesh:THREE.Mesh<THREE.RingGeometry,THREE.MeshBasicMaterial>;age:number}>=[];
   // Soft spherical keep-out zones approximate rocks, wood trunks and larger corals.
@@ -217,7 +231,7 @@ export class FishSystem {
     return Math.min((env.surfaceY-env.floorY)*.43,
       Math.max(.006,a.scale*.20,envelope));
   }
-  private constrain(a:Agent,env:SimEnv):void{
+  private constrain(a:Agent,env:SimEnv,dt=0):void{
     // Broadly elliptical fish body. The forward axis requires more clearance
     // than the side axis; do not clamp the centre directly to the glass.
     const speed=a.vel.length();
@@ -297,6 +311,23 @@ export class FishSystem {
       if(bestScore<initialPenetration*80){
         a.pos.set(bx,by,bz);
         if(Math.hypot(bx-ox,by-oy,bz-oz)>.035)a.vel.multiplyScalar(.4);
+      }
+    }
+    // Detect real displacement AFTER collision resolution, not only velocity:
+    // a fish can have non-zero attempted velocity while pinned to a collider.
+    if(a.sp.id==='angelfish'){
+      const delta=a.pos.distanceTo(a.moveOrigin);
+      a.stuckTime=delta<Math.max(.00004,a.scale*.0007)?
+        a.stuckTime+dt:Math.max(0,a.stuckTime-dt*2);
+      a.moveOrigin.copy(a.pos);
+      if(a.stuckTime>2.5&&!a.drop){
+        a.stuckTime=0;
+        a.mode='cruise';a.modeT=4+Math.random()*3;
+        this.newAnchorNear(a,env,.7);
+        a.vel.y=0;
+        // Reorient gently toward a reachable target, never teleport the fish.
+        const dir=a.anchor.clone().sub(a.pos).setY(0);
+        if(dir.lengthSq()>1e-7)a.vel.addScaledVector(dir.normalize(),.006);
       }
     }
     // IMPORTANT: obstacle resolution can change the velocity direction.
@@ -433,6 +464,9 @@ export class FishSystem {
         if(old){
           agent.pos.copy(old.pos);agent.vel.copy(old.vel);agent.anchor.copy(old.anchor);
           agent.mode=old.mode;agent.modeT=old.modeT;agent.phase=old.phase;
+          agent.prevPitch=old.prevPitch??0;
+          agent.stuckTime=old.stuckTime??0;
+          agent.moveOrigin.copy(old.moveOrigin??old.pos);
           agent.jaw=old.jaw??0;agent.jawTime=old.jawTime??0;
           agent.rand=old.rand;agent.scale=old.scale;agent.hunger=old.hunger;
           agent.drop=old.drop?{...old.drop}:undefined;
@@ -481,6 +515,9 @@ export class FishSystem {
         (Math.random() - 0.5) * env.halfD * 1.4
       ),
       prevYaw: Math.atan2(-initialVelocity.z,initialVelocity.x),
+      prevPitch: 0,
+      moveOrigin: pos.clone(),
+      stuckTime: 0,
       hunger: 0,
     };
     if (isCrawler(sp)) {
@@ -537,7 +574,7 @@ export class FishSystem {
         if (this.animateDrop(a,dt,env)) {/* New fish enters the water before joining normal swimming. */}
         else if (isCrawler(sp)) {this.updateCrawler(a, dt, env);this.habitat.crawl(a,dt,env);}
         else this.updateFish(a, agents, dt, env);
-        if(!isCrawler(sp)&&!a.drop)this.constrain(a,env);
+        if(!isCrawler(sp)&&!a.drop)this.constrain(a,env,dt);
         this.writeInstance(pop, a, dt);
       }
       mesh.instanceMatrix.needsUpdate = true;
@@ -568,11 +605,16 @@ export class FishSystem {
     const steer = _v1.set(0, 0, 0);
 
     // 1) Wall avoidance — smooth quadratic push away from glass and surface.
-    const margin = Math.max(0.065, L * 2.3);
+    const angel=sp.id==='angelfish';
+    // A large angel in a small aquarium was trapped inside overlapping soft
+    // wall margins (.23m for a .1m fish), fighting the hard fin-aware clamp.
+    const margin = angel?Math.max(.035,L*.90):Math.max(.065,L*2.3);
     const push = (d: number) => THREE.MathUtils.clamp((margin - d) / margin, 0, 1) ** 2 * 1.6;
     steer.x += push(a.pos.x + env.halfW) - push(env.halfW - a.pos.x);
     steer.z += push(a.pos.z + env.halfD) - push(env.halfD - a.pos.z);
-    steer.y += push(a.pos.y - env.floorY) - push(env.surfaceY - a.pos.y);
+    const safeY=angel?this.verticalClearance(a,env):0;
+    steer.y += push(a.pos.y-env.floorY-safeY) -
+      push(env.surfaceY-safeY-a.pos.y);
 
     // 2) Obstacle avoidance (decor keep-out spheres).
     for (const ob of env.obstacles) {
@@ -683,11 +725,11 @@ export class FishSystem {
     let targetSpeed=cruise*activity;
     // Visual tempo by species, separate from shared movement archetypes.
     if(sp.id==='betta')targetSpeed*=.77;
-    if(sp.id==='angelfish')targetSpeed*=.86;
+    if(angel)targetSpeed*=1.06;
     if(sp.id==='guppy')targetSpeed*=1.08;
     if(sp.id==='ocellaris-clown')targetSpeed*=.88;
     if(sp.id==='dwarf-gourami'||sp.id==='honey-gourami')targetSpeed*=.82;
-    if (a.mode === 'rest') targetSpeed = cruise * 0.06;
+    if (a.mode === 'rest') targetSpeed = cruise * (angel?.42:.06);
     if(a.mode==='dart')
       targetSpeed=maxSpeed*(sp.id==='betta'?.63:sp.id==='angelfish'?.72:1);
     if(a.mode==='feed'){
@@ -737,9 +779,10 @@ export class FishSystem {
         return;
       }
       if((sp.archetype==='solitary'||sp.archetype==='ambusher'
-          ||sp.archetype==='hoverer')&&p<.16){
+          ||sp.archetype==='hoverer')&&p<(sp.id==='angelfish'?.055:.16)){
         a.mode='rest';a.modeT=4+Math.random()*7;
-        this.anchorToShelter(a,env);
+        if(sp.id==='angelfish')a.anchor.copy(a.pos);
+        else this.anchorToShelter(a,env);
         this.onEcoEvent?.(env.shelters.length?'shelter':'rest');
         return;
       }
@@ -775,9 +818,12 @@ export class FishSystem {
         } else this.newAnchorNear(a, env, 0.4);
         break;
       case 'hoverer':
-        a.mode = r < 0.6 ? 'rest' : 'cruise';
-        a.modeT = 4 + Math.random() * 6;
-        if (a.mode === 'cruise') this.newAnchorNear(a, env, 0.5);
+        // Angelfish hover while still moving forward with their pectorals.
+        // Six-second nearly-frozen rests looked like a stuck, twitching mesh.
+        a.mode=r<(sp.id==='angelfish'?.12:.6)?'rest':'cruise';
+        a.modeT=sp.id==='angelfish'?3+Math.random()*4:4+Math.random()*6;
+        if(a.mode==='cruise')this.newAnchorNear(a,env,.5);
+        else if(sp.id==='angelfish')a.anchor.copy(a.pos);
         break;
       case 'ambusher':
         if (r < 0.75 * (2 - activity)) { a.mode = 'rest'; a.modeT = 6 + Math.random() * 10; this.anchorToShelter(a, env); }
@@ -801,11 +847,24 @@ export class FishSystem {
 
   private newAnchorNear(a: Agent, env: SimEnv, range: number): void {
     const [y0, y1] = this.zoneBand(a.sp, env);
-    a.anchor.set(
-      THREE.MathUtils.clamp(a.anchor.x + (Math.random() - 0.5) * env.halfW * 2 * range, -env.halfW * 0.85, env.halfW * 0.85),
-      THREE.MathUtils.lerp(y0, y1, Math.random()),
-      THREE.MathUtils.clamp(a.anchor.z + (Math.random() - 0.5) * env.halfD * 2 * range, -env.halfD * 0.8, env.halfD * 0.8)
-    );
+    // Angelfish are tall: randomly sampled anchors must be reachable by the
+    // full fin envelope. Try free swimming pockets rather than a position
+    // behind the nearest log collider.
+    const angel=a.sp.id==='angelfish';
+    const safeY=angel?this.verticalClearance(a,env)+.014:0;
+    const lo=Math.max(y0,env.floorY+safeY);
+    const hi=Math.max(lo,Math.min(y1,env.surfaceY-safeY));
+    const baseline=a.pos.clone();
+    for(let attempt=0;attempt<(angel?18:1);attempt++){
+      const nx=THREE.MathUtils.clamp(baseline.x+(Math.random()-.5)*env.halfW*2*range,
+        -env.halfW*.72,env.halfW*.72);
+      const nz=THREE.MathUtils.clamp(baseline.z+(Math.random()-.5)*env.halfD*2*range,
+        -env.halfD*.68,env.halfD*.68);
+      const ny=THREE.MathUtils.lerp(lo,hi,Math.random());
+      a.anchor.set(nx,ny,nz);
+      if(!angel||env.obstacles.every(ob=>a.anchor.distanceTo(ob.pos)>
+        ob.radius+this.collisionRadius(a)+.035))break;
+    }
   }
 
   private anchorToShelter(a: Agent, env: SimEnv): void {
@@ -861,7 +920,9 @@ export class FishSystem {
       : { schooler: 0.15, solitary: 0.6, bottom: 0.8, hoverer: 0.5, ambusher: 1.4, nocturnal: 0.9, surface: 0.2, cleaner: 1.6 }[a.sp.archetype];
     _v2.copy(a.anchor).sub(a.pos);
     const d = _v2.length();
-    if (d > 0.05) steer.addScaledVector(_v2.divideScalar(d), anchorPull * Math.min(1, d * 2));
+    if(d>(a.sp.id==='angelfish'?.018:.05))
+      steer.addScaledVector(_v2.divideScalar(d),
+        anchorPull*(a.sp.id==='angelfish'?2.5:1)*Math.min(1,d*(a.sp.id==='angelfish'?5:2)));
 
     // Bottom dwellers snub the water column: extra downward preference while foraging.
     if ((a.sp.archetype === 'bottom' || a.sp.archetype === 'nocturnal') && a.mode === 'forage') {
@@ -937,16 +998,22 @@ export class FishSystem {
       up = _v3.set(a.wall === 'back' ? 0 : a.wall === 'left' ? 1 : -1, 0, a.wall === 'back' ? 1 : 0);
     } else {
       // Limit body heading rate, avoiding robotic instantaneous 180° spins.
-      const desiredYaw=Math.atan2(-a.vel.z,a.vel.x);
+      const horizontal=Math.hypot(a.vel.x,a.vel.z);
+      // Near-zero horizontal movement used to flip atan2 by 180° every frame
+      // while the fish hovered against the glass. Hold the last stable heading.
+      const desiredYaw=sp.id==='angelfish'&&horizontal<.0035?
+        a.prevYaw:Math.atan2(-a.vel.z,a.vel.x);
       let difference=desiredYaw-a.prevYaw;
       while(difference>Math.PI)difference-=TAU;
       while(difference<-Math.PI)difference+=TAU;
-      const turnRate=sp.swim.turnRate*dt*(sp.id==='betta'?.67:sp.id==='angelfish'?.78:1);
+      const turnRate=sp.swim.turnRate*dt*(sp.id==='betta'?.67:sp.id==='angelfish'?.43:1);
       yaw=a.prevYaw+THREE.MathUtils.clamp(difference,-turnRate,turnRate);
       pitch = Math.asin(THREE.MathUtils.clamp(speed > 1e-5 ? a.vel.y / speed : 0, -1, 1));
       // Normal swimming stays near level; an air-gulping cory points steeply.
       const maxPitch = a.gulp ? 1.25 : 0.5;
-      pitch = THREE.MathUtils.clamp(pitch, -maxPitch, maxPitch);
+      pitch=THREE.MathUtils.clamp(pitch,-maxPitch,
+        sp.id==='angelfish'?.19:maxPitch);
+      if(sp.id==='angelfish')pitch=THREE.MathUtils.damp(a.prevPitch,pitch,2.8,dt);
     }
 
     // Bank into turns: roll proportional to yaw rate × speed (RESEARCH.md §3.2).
@@ -954,7 +1021,10 @@ export class FishSystem {
     if (dYaw > Math.PI) dYaw -= TAU;
     if (dYaw < -Math.PI) dYaw += TAU;
     a.prevYaw = yaw;
-    const targetRoll = THREE.MathUtils.clamp((-dYaw / Math.max(dt, 1e-4)) * speed * 1.4, -0.6, 0.6);
+    a.prevPitch = pitch;
+    const targetRoll=THREE.MathUtils.clamp((-dYaw/Math.max(dt,1e-4))*
+      speed*(sp.id==='angelfish'?.55:1.4),
+      sp.id==='angelfish'?-.18:-.6,sp.id==='angelfish'?.18:.6);
     a.bend = THREE.MathUtils.damp(a.bend, THREE.MathUtils.clamp((dYaw / Math.max(dt, 1e-4)) * 0.5, -0.5, 0.5), 6, dt);
 
     _e.set(targetRoll * 0.6, yaw, pitch, 'YZX');

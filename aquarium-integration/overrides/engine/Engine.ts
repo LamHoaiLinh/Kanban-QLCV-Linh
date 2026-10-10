@@ -179,6 +179,22 @@ export class Engine {
       };
       (window as Window & {__kanVisualFinToggle?:(on:boolean)=>void}).__kanVisualFinToggle=
         (on:boolean)=>this.setSoftFins(on);
+      (window as Window & {__kanAngelfishMotionScene?:(withDecor:boolean)=>void}).__kanAngelfishMotionScene=
+        (withDecor:boolean)=>{
+          if(!this.config)return;
+          this.applyConfig({...this.config,water:'freshwater',gallons:85,
+            name:'Angelfish motion test',fish:{angelfish:6},
+            decor:withDecor?['hollow-log','split-log','driftwood','river-rocks']:[],
+            flora:{},lighting:'daylight'},true);
+          this.setCameraMode('still');
+        };
+      (window as Window & {__kanAngelfishMotionProbe?:()=>unknown}).__kanAngelfishMotionProbe=
+        ()=>({
+          fish:this.fish.getAngelfishMotionSnapshot(this.simEnv),
+          dims:{floorY:this.simEnv.floorY,surfaceY:this.simEnv.surfaceY,
+            halfW:this.simEnv.halfW,halfD:this.simEnv.halfD},
+          physics:this.fish.getPhysicsSnapshot(this.simEnv)
+        });
       (window as Window & {__kanRealismProbe?:()=>unknown}).__kanRealismProbe=()=>({
         name:this.config?.name,
         fish:this.fish.getPhysicsSnapshot(this.simEnv),
@@ -235,6 +251,8 @@ export class Engine {
         delete (window as Window & {__kanFoodProbe?:()=>unknown}).__kanFoodProbe;
         delete (window as Window & {__kanHabitatPopulate?:(id:string,count:number)=>void}).__kanHabitatPopulate;
         delete (window as Window & {__kanVisualHotfixScene?:()=>boolean}).__kanVisualHotfixScene;
+        delete (window as Window & {__kanAngelfishMotionScene?:(withDecor:boolean)=>void}).__kanAngelfishMotionScene;
+        delete (window as Window & {__kanAngelfishMotionProbe?:()=>unknown}).__kanAngelfishMotionProbe;
         delete (window as Window & {__kanVisualFinToggle?:(on:boolean)=>void}).__kanVisualFinToggle;
         delete (window as Window & {__kanFoodTestCamera?:(mode:'orbit'|'cinematic'|'still')=>void}).__kanFoodTestCamera;
       }
