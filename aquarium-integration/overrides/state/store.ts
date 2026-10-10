@@ -11,6 +11,7 @@ import { speciesForWater } from '../data/species';
 import { floraForWater } from '../data/flora';
 import { decorForWater } from '../data/decor';
 import { tankDims } from '../data/tanks';
+import { normalizeStock, sizeFishCap } from '../data/stocking';
 import type { EcoMode } from '../engine/Ecology';
 
 export interface AppState {
@@ -32,6 +33,9 @@ export interface AppState {
   panelOpen: boolean;
   showHud: boolean;                  // dev perf HUD
   reducedMotion: boolean;
+  smartCinema: boolean;
+  resizeSnapshot: TankConfig | null;
+  undoResize: () => void;
   softFinsOn: boolean; // true = natural fin shader, false = original rigid fins
   feedMode: boolean;                 // next tap on the water drops food
   toast: string | null;
@@ -55,6 +59,7 @@ export interface AppState {
 // A share link (#t=...) overrides the persisted current tank on first load.
 const sharedConfig = typeof window !== 'undefined' ? decodeShareHash() : null;
 
+let lastShrinkAt=0;
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
 export const useStore = create<AppState>()(
@@ -74,11 +79,24 @@ export const useStore = create<AppState>()(
       panelOpen: new URLSearchParams(location.search).has('kanban')?true:(window.matchMedia?.('(min-width: 900px)').matches ?? true),
       showHud: false,
       reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
+      smartCinema: true,
+      resizeSnapshot: null,
+      undoResize: () => { const old=get().resizeSnapshot;if(old)set({config:old,resizeSnapshot:null}); },
       softFinsOn: true,
       feedMode: false,
       toast: null,
 
-      setConfig: (patch) => set((s) => ({ config: { ...s.config, ...patch } })),
+      setConfig: (patch) => {
+        const before=get().config;
+        const next=normalizeStock({...before,...patch});
+        const trimmed=Object.values(before.fish).reduce((a,b)=>a+b,0)-Object.values(next.fish).reduce((a,b)=>a+b,0);
+        const shrinking=patch.gallons!==undefined&&patch.gallons<before.gallons;
+        const now=Date.now();
+        const snapshot=shrinking&&now-lastShrinkAt<700&&get().resizeSnapshot?get().resizeSnapshot:structuredClone(before);
+        set({config:next,...(shrinking?{resizeSnapshot:snapshot}:{})});
+        if(shrinking)lastShrinkAt=now;
+        if(trimmed>0)get().showToast(`Đã giảm ${trimmed} sinh vật theo sức chứa. Có thể khôi phục bể trước trong bảng Dung tích.`);
+      },
 
       // Switching water type swaps the whole library, so stock must be cleared —
       // a neon tetra cannot live in a reef. We drop fish/flora but keep size etc.
@@ -99,8 +117,8 @@ export const useStore = create<AppState>()(
       setFishCount: (id, count) =>
         set((s) => {
           const fish = { ...s.config.fish };
-          if (count <= 0) delete fish[id]; else fish[id] = Math.min(count, 60);
-          return { config: { ...s.config, fish } };
+          if (count <= 0) delete fish[id]; else fish[id] = Math.min(count, 100);
+          return { config: normalizeStock({ ...s.config, fish }) };
         }),
 
       setFloraCount: (id, count) =>
@@ -125,7 +143,7 @@ export const useStore = create<AppState>()(
           config: { ...s.config, fishNames: { ...s.config.fishNames, [key]: name } },
         })),
 
-      applyPreset: (preset) => set({ config: structuredClone(preset), followFishKey: null, selectedFishKey: null }),
+      applyPreset: (preset) => set({ config: normalizeStock(structuredClone(preset)), followFishKey: null, selectedFishKey: null }),
 
       // "Surprise me": build a random but sensible tank within capacity.
       randomize: () => {
@@ -142,7 +160,7 @@ export const useStore = create<AppState>()(
           if (load >= cap * 0.8) break;
           const groupSize = sp.minGroup > 1 ? sp.minGroup + Math.floor(Math.random() * 5) : (sp.maxPerTank ?? 1);
           const cost = sp.bioload * groupSize;
-          if(totalFish+groupSize>60)continue;
+          if(totalFish+groupSize>sizeFishCap(gallons))continue;
           if (load + cost <= cap * 0.85 && !(sp.mouthIn && Object.keys(fish).length > 0)) {
             fish[sp.id] = groupSize;
             load += cost;
@@ -179,7 +197,7 @@ export const useStore = create<AppState>()(
           const config=structuredClone(saved);
           if(config.name==='Surprise Tank'||config.name==='Hồ cá bất ngờ')
             config.name='Hồ cá ngẫu nhiên';
-          set({config,followFishKey:null,selectedFishKey:null});
+          set({config:normalizeStock(config),followFishKey:null,selectedFishKey:null});
         }
       },
 
@@ -209,9 +227,11 @@ export const useStore = create<AppState>()(
         audioVolume: s.audioVolume,
         musicOn: s.musicOn,
         ecoMode: s.ecoMode,
+        smartCinema:s.smartCinema,
       }),
       merge: (persisted, current) => {
         const merged = { ...current, ...(persisted as Partial<AppState>) };
+        if(typeof merged.smartCinema!=='boolean')merged.smartCinema=true;
         if(merged.ecoMode!=='natural'&&merged.ecoMode!=='relax')
           merged.ecoMode='natural';
         // A fresh share link always wins over the previously persisted tank.
@@ -219,6 +239,7 @@ export const useStore = create<AppState>()(
         // Keep saved tank keys intact, but migrate built-in random labels.
         if(merged.config?.name==='Surprise Tank'||merged.config?.name==='Hồ cá bất ngờ')
           merged.config={...merged.config,name:'Hồ cá ngẫu nhiên'};
+        merged.config=normalizeStock(merged.config);
         return merged;
       },
     }

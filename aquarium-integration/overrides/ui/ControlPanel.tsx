@@ -131,6 +131,7 @@ function TankTab() {
 
       <div className="section">
         <h2>Dung tích — {presetNameFor(config.gallons)}</h2>
+        <button onClick={()=>useStore.getState().undoResize()} disabled={!useStore.getState().resizeSnapshot}>Khôi phục bể trước khi thu nhỏ</button>
         <div className="slider-row">
           <input
             type="range" min={MIN_GALLONS} max={MAX_GALLONS} step={1}
@@ -555,6 +556,7 @@ function SettingsTab() {
   const musicOn = useStore((s) => s.musicOn);
   const showHud = useStore((s) => s.showHud);
   const reducedMotion = useStore((s) => s.reducedMotion);
+  const smartCinema = useStore(s=>s.smartCinema);
   const softFinsOn = useStore((s)=>s.softFinsOn);
   const set = useStore((s) => s.set);
 
@@ -596,6 +598,8 @@ function SettingsTab() {
 
       <div className="section">
         <h2>Chuyển động và hiệu năng</h2>
+        <button className={smartCinema?'active':''} onClick={()=>set({smartCinema:!smartCinema})}>Điện ảnh thông minh: {smartCinema?'Bật':'Tắt'}</button>
+        <button onClick={()=>getEngine()?.rig.resetView()}>Đặt lại góc nhìn</button>
         <div className="seg">
           <button className={softFinsOn?'active':''} onClick={()=>set({softFinsOn:!softFinsOn})}>
             {softFinsOn?'Vây mềm tự nhiên: Bật':'Vây mềm tự nhiên: Tắt (bản cũ)'}

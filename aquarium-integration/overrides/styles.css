@@ -322,3 +322,9 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .eco-metrics span{color:var(--text-dim);font-size:11px}
 .eco-metrics strong{font-size:14px;font-variant-numeric:tabular-nums;color:var(--text)}
 .eco-note{font-size:11.5px;line-height:1.55;color:var(--text-dim);margin:8px 2px 0}
+
+.kan-camera-help{position:fixed;top:5px;left:50%;transform:translateX(-50%);z-index:15;color:#f0fff8;background:#061e28dc;border-radius:12px;padding:5px 12px;font-size:12px;pointer-events:none;max-width:calc(100vw - 70px);text-align:center}
+.kanban-aquarium-help{top:34px}.kanban-aquarium-stock{top:72px}
+.mobile-gesture{display:none}
+@media(pointer:coarse){.desktop-gesture{display:none}.mobile-gesture{display:inline}}
+@media(max-width:650px){.kan-camera-help{left:8px;transform:none;font-size:11px}.kanban-aquarium-help{top:36px}.kanban-aquarium-stock{top:88px}body:has(.kan-camera-help) .toolbar{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 18px)}}

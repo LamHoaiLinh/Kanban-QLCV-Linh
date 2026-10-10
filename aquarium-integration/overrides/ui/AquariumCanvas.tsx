@@ -6,16 +6,19 @@ import { useEffect, useRef } from 'react';
 import { Engine } from '../engine/Engine';
 import { setEngine, getEngine } from '../engine/engineRef';
 import { useStore } from '../state/store';
+import { normalizeStock, effectiveFishCap } from '../data/stocking';
 
 // Keep all stock changes in one place so buttons and mouse shortcuts behave identically.
 let mostRecentAdded:string|null=null;
 export function addAquariumFish(clientX?:number,clientY?:number):void{
   const s=useStore.getState();
   const total=Object.values(s.config.fish).reduce((sum,n)=>sum+n,0);
-  if(total>=60){s.showToast('Đã đủ 60 sinh vật, hãy bớt cá trước');return;}
+  if(total>=effectiveFishCap(s.config)){s.showToast('Đã đạt sức chứa của bể. Hãy tăng dung tích hoặc bớt cá.');return;}
   const choices=Object.entries(s.config.fish).filter(([id,n])=>n>0&&!id.includes('snail')&&!id.includes('shrimp'));
   const id=choices.length?choices[Math.floor(Math.random()*choices.length)][0]
     :(s.config.water==='freshwater'?'guppy':'green-chromis');
+  const proposed=normalizeStock({...s.config,fish:{...s.config.fish,[id]:(s.config.fish[id]||0)+1}});
+  if((proposed.fish[id]||0)<=(s.config.fish[id]||0)){s.showToast('Loài này đã đạt giới hạn phù hợp với bể.');return;}
   getEngine()?.queueFishDrop(clientX,clientY);
   s.setFishCount(id,(s.config.fish[id]||0)+1);
   mostRecentAdded=id;
@@ -67,10 +70,28 @@ export function AquariumCanvas() {
     engine.callbacks.onRemoveFish=removeAquariumFish;
     engine.callbacks.onFed=(kind,count)=>window.dispatchEvent(new CustomEvent('kanaquarium-fed',{detail:{kind,count}}));
     engine.callbacks.onAutoQuality = (tier) => {
-      useStore.getState().showToast(`Lowered quality to “${tier}” to keep things smooth. You can pin a tier in Settings.`);
+      useStore.getState().showToast(`Đã giảm chất lượng xuống ${tier} để giữ chuyển động mượt. Dữ liệu hồ đã lưu vẫn được giữ nguyên.`);
     };
 
     // Initial sync + granular subscriptions (store → engine).
+    if(new URLSearchParams(location.search).get('qa')==='1')Object.assign(window,{
+      __kan42Store:(action:string)=>{
+        const s=useStore.getState();
+        if(action==='exercise'){
+          s.setConfig({gallons:180,fish:{'neon-tetra':100},fishNames:{'neon-tetra:99':'Linh'}});
+          s.saveTank('QA42');const saved=JSON.stringify(useStore.getState().savedTanks.QA42);
+          s.setConfig({gallons:40});
+          const namedSurvives=Object.entries(useStore.getState().config.fishNames).some(([k,v])=>v==='Linh'&&Number(k.split(':')[1])<(useStore.getState().config.fish['neon-tetra']??0));
+          s.setConfig({gallons:5});const trimmed=Object.values(useStore.getState().config.fish).reduce((a,b)=>a+b,0);
+          const savedUnchanged=saved===JSON.stringify(useStore.getState().savedTanks.QA42);
+          s.undoResize();const restored=Object.values(useStore.getState().config.fish).reduce((a,b)=>a+b,0);
+          const namedRestored=useStore.getState().config.fishNames['neon-tetra:99']==='Linh';
+          s.loadTank('QA42');const reloaded=Object.values(useStore.getState().config.fish).reduce((a,b)=>a+b,0);
+          s.deleteTank('QA42');return {savedUnchanged,trimmed,restored,reloaded,namedSurvives,namedRestored};
+        }
+        return {config:s.config,savedTanks:s.savedTanks};
+      }
+    });
     const s0 = useStore.getState();
     engine.setQuality(s0.quality);
     engine.applyConfig(s0.config);
@@ -78,9 +99,18 @@ export function AquariumCanvas() {
     engine.setSoftFins(s0.softFinsOn);
     engine.setEcoMode(s0.ecoMode);
     engine.setCameraMode(s0.cameraMode);
+    engine.rig.smartCinema=s0.smartCinema;
+    engine.rig.onManual=()=>useStore.getState().set({cameraMode:'orbit',followFishKey:null});
 
+    let resizeTimer:ReturnType<typeof setTimeout>|undefined;
     const unsub = useStore.subscribe((state, prev) => {
-      if (state.config !== prev.config) engine.applyConfig(state.config);
+      if (state.config !== prev.config) {
+        clearTimeout(resizeTimer);
+        const sliderResize=state.config.gallons!==prev.config.gallons&&state.config.name===prev.config.name&&state.config.water===prev.config.water&&state.config.decor===prev.config.decor&&state.config.flora===prev.config.flora;
+        if(sliderResize)resizeTimer=setTimeout(()=>engine.applyConfig(useStore.getState().config),180);
+        else engine.applyConfig(state.config);
+      }
+      if(state.smartCinema!==prev.smartCinema)engine.rig.smartCinema=state.smartCinema;
       if (state.quality !== prev.quality) engine.setQuality(state.quality);
       if (state.feedMode !== prev.feedMode) engine.setFeedMode(state.feedMode);
       if (state.reducedMotion !== prev.reducedMotion) engine.setReducedMotion(state.reducedMotion);
@@ -95,6 +125,7 @@ export function AquariumCanvas() {
     });
 
     return () => {
+      clearTimeout(resizeTimer);
       unsub();
       setEngine(null);
       engine.dispose();

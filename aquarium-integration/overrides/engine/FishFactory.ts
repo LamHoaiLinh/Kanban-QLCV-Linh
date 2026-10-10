@@ -83,6 +83,7 @@ const swimHook = /* glsl */ `
     float lip = 1.0 - smoothstep(0.01, 0.14, s);
     float lowerJaw = 1.0 - smoothstep(-0.01, 0.015, transformed.y);
     transformed.y -= lip * lowerJaw * aDyn.w * 0.042;
+    transformed.x += lip * aDyn.w * 0.025;
     transformed.x -= lip * lowerJaw * aDyn.w * 0.007;
   }
 
@@ -109,11 +110,13 @@ export interface FishAsset {
 
 const assetCache = new Map<string, FishAsset>();
 
-export function getFishAsset(sp: SpeciesDef): FishAsset {
-  let asset = assetCache.get(sp.id);
+export function getFishAsset(sp: SpeciesDef,low=false): FishAsset {
+  const key=sp.id+(low?':low':':full');
+  let asset = assetCache.get(key);
   if (!asset) {
-    asset = buildFishAsset(sp);
-    assetCache.set(sp.id, asset);
+    if(low&&!sp.id.includes('snail')){const full=getFishAsset(sp);asset={geometry:buildFishGeometry(sp,true),materials:full.materials,uniforms:full.uniforms};}
+    else asset = buildFishAsset(sp);
+    assetCache.set(key, asset);
   }
   return asset;
 }
@@ -200,9 +203,9 @@ function bodyProfile(u: number, sp: SpeciesDef): number {
   return (sh.height / 2) * h;
 }
 
-function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
+function buildFishGeometry(sp: SpeciesDef,low=false): THREE.BufferGeometry {
   const sh = sp.shape;
-  const RINGS = 30, SIDES = 16;
+  const RINGS = low?18:30, SIDES = low?12:16;
   const positions: number[] = [];
   const uvs: number[] = [];
   const parts: number[] = [];
@@ -256,7 +259,7 @@ function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
       return v;
     };
     if(part===1||part===2){
-      const rings=sh.finLong?5:3;
+      const rings=low?2:sh.finLong?5:3;
       for(let k=1;k<outline.length-1;k++){
         const ea=outline[k],eb=outline[k+1];
         const centre=append(root[0],root[1],0);
@@ -281,7 +284,7 @@ function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
   // belly along the *whole* root, not triangulated from ONE point. The old
   // fan created a rigid, plastic-looking triangular sail, especially on angels.
   const addMedianFin = (startU:number,endU:number,sign:1|-1,rise:number) => {
-    const columns=sh.finLong?22:13,rows=sh.finLong?8:5;
+    const columns=low?9:sh.finLong?22:13,rows=low?3:sh.finLong?8:5;
     const base=positions.length/3;
     const stride=rows+1;
     for(let j=0;j<=columns;j++){
@@ -336,7 +339,7 @@ function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
     const tipX = -0.5;
     const H = sh.height * (0.55 + sh.tailFork * 0.45) * (sh.finLong ? 1.35 : 1);
     const pts: [number, number][] = [[rootX, 0]];
-    const N = sh.finLong ? 28 : 16;
+    const N = low?10:sh.finLong ? 28 : 16;
     for (let k = 0; k <= N; k++) {
       const t = k / N;                     // 0 top → 1 bottom of trailing edge
       const y = (0.5-t)*H*(1+.007*Math.sin(t*Math.PI*6));
@@ -385,6 +388,43 @@ function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
         [x0-.090,-hh*.76-.047],[x0-.055,-hh*.76-.005]],2,z,side*.12);
     }
   }
+  if(sp.id.includes('shrimp')){
+    // Five pairs of small walking/feeding appendages and two long antennae,
+    // batched with the existing mesh. aPart=3 sculls locally while the crawler rests.
+    for(const side of [-1,1]){
+      for(let leg=0;leg<5;leg++){
+        const x=.28-leg*.085,y=-sh.height*.35,z=side*sh.width*.16;
+        addFin([[x,y],[x-.045,y-.09],[x-.025,y-.085],[x+.01,y]],3,z,side*.55,[x,y]);
+      }
+      addFin([[.39,.015],[.71,.09*side],[.69,.09*side+.008],[.38,.025]],3,side*.05,side*.17,[.39,.015]);
+    }
+  }
+  // Closed tapered fin sheets in the existing material group: no extra draw calls.
+  // Thickness is 0.4–1% body length at roots, fading to a thin rim.
+  const originalVertices=positions.length/3,originalIndices=indices.length;
+  const back=new Map<number,number>();
+  for(let v=finStart;v<originalVertices;v++){
+    const w=parts[v]===3?Math.min(1,flutter[v]/.18):finFlex[v];
+    const thickness=(sh.finLong?.010:.004)*Math.pow(1-w,1.8)+.00035;
+    const z=positions[v*3+2];positions[v*3+2]=z+thickness*.5;
+    const b=positions.length/3;back.set(v,b);
+    positions.push(positions[v*3],positions[v*3+1],z-thickness*.5);
+    uvs.push(uvs[v*2],uvs[v*2+1]);parts.push(parts[v]);flutter.push(flutter[v]);finFlex.push(finFlex[v]);
+    colors.push(colors[v*3],colors[v*3+1],colors[v*3+2]);
+  }
+  const boundary=new Map<string,{a:number;b:number;n:number}>();
+  const pointKey=(v:number)=>[positions[v*3],positions[v*3+1],positions[v*3+2]].map(x=>x.toFixed(5)).join(',');
+  for(let k=RINGS*SIDES*6;k<originalIndices;k+=3){
+    const a=indices[k],b=indices[k+1],c=indices[k+2];
+    indices.push(back.get(c)!,back.get(b)!,back.get(a)!);
+    for(const [u,v] of [[a,b],[b,c],[c,a]]){
+      const x=pointKey(u),y=pointKey(v),key=x<y?x+'|'+y:y+'|'+x;
+      const edge=boundary.get(key);if(edge)edge.n++;else boundary.set(key,{a:u,b:v,n:1});
+    }
+  }
+  for(const {a,b,n} of boundary.values())if(n===1){
+    const aa=back.get(a)!,bb=back.get(b)!;indices.push(a,aa,b,b,aa,bb);
+  }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
@@ -404,7 +444,9 @@ function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
   geo.clearGroups();
   geo.addGroup(0, finIndexStart, 0);
   geo.addGroup(finIndexStart, indices.length - finIndexStart, 1);
-  void finStart;
+  geo.userData.lod=low?'low':'full';
+  geo.userData.taperedFins=true;
+  geo.userData.rootThickness=sh.finLong?.010:.004;
   return geo;
 }
 

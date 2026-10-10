@@ -10,6 +10,7 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
 import type { QualityTier, TankConfig } from '../types';
+import { effectiveFishCap, normalizeStock } from '../data/stocking';
 import { tankDims } from '../data/tanks';
 import { installUnderwaterFog, SharedUniforms } from './shaders';
 import { EcoSystem, type EcoMode } from './Ecology';
@@ -71,8 +72,9 @@ export class Engine {
   private foodDepthRay=new THREE.Raycaster();
   private foodDepthRayDirection=new THREE.Vector3();
   private lastCycleT = 0;
+  private lodIn=0;
   // FPS + draw call counters for the dev HUD.
-  stats = { fps: 60, drawCalls: 0, triangles: 0, fishCount: 0 };
+  stats = { fps: 60, drawCalls: 0, triangles: 0, fishCount: 0,frameP50Ms:16.7,frameP95Ms:16.7,geometries:0,textures:0 };
   readonly ecology=new EcoSystem();
   private ecoMode:EcoMode='natural';
   getEcoSnapshot(){return this.ecology.snapshot();}
@@ -91,6 +93,7 @@ export class Engine {
       antialias: true,
       powerPreference: 'high-performance',
     });
+    this.renderer.info.autoReset=false;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.18;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -137,14 +140,32 @@ export class Engine {
         (seconds:number)=>{
           const steps=Math.min(3600,Math.max(0,Math.ceil(seconds/.05)));
           for(let i=0;i<steps;i++){
-            this.simEnv.time+=.05;
+            this.simEnv.time+=.05;SharedUniforms.uTime.value=this.simEnv.time;
             this.current.time=this.simEnv.time;
             this.ecology.advance(.05,this.ecoMode,this.dayFactor,
               this.fish.food.bits.filter(b=>b.state==='settled').length);
             this.fish.update(.05,this.simEnv);
+            this.rig.observe(this.fish.getLiveEvents(this.simEnv),this.simEnv.obstacles);this.rig.update(.05);
           }
           return this.ecology.snapshot();
         };
+      Object.assign(window,{
+        __kan42Arrange:()=>this.fish.qaArrange(this.simEnv),
+        __kan42Follow:(key:string|null)=>this.followFish(key),
+        __kan42Day:(factor:number)=>{this.dayFactor=factor;this.simEnv.dayFactor=factor;},
+        __kan42Burst:(count:number)=>this.fish.qaBurst(count,this.simEnv),
+        __kan42Resume:()=>this.renderer.setAnimationLoop(this.tick),
+        __kan42Pause:()=>this.enableExternalDrive(),
+        __kan42EcoMode:(mode:EcoMode)=>this.setEcoMode(mode),
+        __kan42Scene:(patch:Partial<TankConfig>)=>{if(this.config)this.applyConfig({...this.config,...patch});},
+        __kan42Action:(key:string,action:'peck'|'dash',roll=.25,surface?:string)=>this.fish.qaAction(key,action,this.simEnv,roll,surface),
+        __kan42Event:(type:Parameters<FishSystem['qaHabitat']>[0])=>this.fish.qaHabitat(type,this.simEnv),
+        __kan42Probe:()=>({telemetry:this.fish.getTelemetry(),camera:this.rig.snapshot(),stats:{...this.stats},
+          physics:this.fish.getPhysicsSnapshot(this.simEnv),config:this.config,quality:this.quality.tier,
+          events:this.fish.getLiveEvents(this.simEnv).map(e=>({...e,worldPositions:e.worldPositions.map(p=>p.toArray())}))}),
+        __kan42Quality:(q:QualityTier)=>this.setQuality(q),
+        __kan42Step:(seconds:number)=>{for(let i=0;i<Math.ceil(seconds/.0166667);i++)this.advance(1/60);},
+      });
       // Test-only evidence of the exact spawn point, even after a fish eats it.
       (window as Window & {__kanFoodProbe?:()=>unknown}).__kanFoodProbe=()=>({
         count:this.clickFoodCount,
@@ -165,7 +186,7 @@ export class Engine {
       // QA-only 60-fish load, does not alter saved tanks or production store.
       (window as Window & {__kanHabitatPopulate?:(id:string,count:number)=>void}).__kanHabitatPopulate=
         (id:string,count:number)=>{
-          if(this.config)this.applyConfig({...this.config,fish:{[id]:Math.min(60,Math.max(0,count))}},true);
+          if(this.config)this.applyConfig({...this.config,gallons:180,fish:{[id]:Math.min(100,Math.max(0,count))}},true);
         };
       // Dedicated screenshot fixture, never persisted in localStorage.
       (window as Window & {__kanVisualHotfixScene?:()=>boolean}).__kanVisualHotfixScene=()=>{
@@ -272,8 +293,7 @@ export class Engine {
     const dpr = Math.min(window.devicePixelRatio || 1, this.quality.pixelRatioCap);
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h);
-    this.rig.camera.aspect = w / h;
-    this.rig.camera.updateProjectionMatrix();
+    this.rig.updateAspect(w/h);
     this.rebuildComposer(w, h);
   };
 
@@ -333,6 +353,9 @@ export class Engine {
   private lastStructureKey = '';
   private lastFishKey = '';
   applyConfig(config: TankConfig, force = false): void {
+    config=normalizeStock(config);
+    const initial=!this.config;
+    const resized=!!this.config&&this.config.gallons!==config.gallons;
     const structureKey = JSON.stringify([
       config.water, Math.round(config.gallons * 10), config.substrate,
       config.background, config.lighting, config.decor, config.flora, this.quality.tier,
@@ -369,9 +392,26 @@ export class Engine {
         this.current,
         decorOut.anchors,
       );
-      this.simEnv.obstacles = [...decorOut.obstacles, ...floraOut.obstacles];
+      this.simEnv.obstacles = [...decorOut.obstacles.map(o=>({...o,surface:'wood' as const})), ...floraOut.obstacles.map(o=>({...o,surface:'plant' as const}))];
       this.foodOccluders=[...this.decor.group.children,...this.flora.group.children];
       this.foodDepthCache=new WeakMap();
+      this.simEnv.sampleSurface=(from,toward)=>{
+        const direction=toward.clone().sub(from).normalize();
+        const ray=new THREE.Raycaster(from,direction,0,.40);
+        this.decor.group.updateMatrixWorld(true);this.flora.group.updateMatrixWorld(true);
+        const hits=ray.intersectObjects(this.foodOccluders,true);
+        const hit=hits.find(h=>h.face&&h.distance>.005);
+        if(!hit?.face)return null;
+        const normal=hit.face.normal.clone().applyNormalMatrix(new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld));
+        if(normal.dot(direction)>0)normal.negate();
+        const inFlora=this.flora.group.children.some(o=>o===hit.object||o.children.includes(hit.object));
+        const mesh=hit.object as THREE.Mesh,vertices=mesh.geometry.getAttribute('position');
+        const a=new THREE.Vector3().fromBufferAttribute(vertices,hit.face.a).applyMatrix4(mesh.matrixWorld);
+        const b=new THREE.Vector3().fromBufferAttribute(vertices,hit.face.b).applyMatrix4(mesh.matrixWorld);
+        const c=new THREE.Vector3().fromBufferAttribute(vertices,hit.face.c).applyMatrix4(mesh.matrixWorld);
+        const area=b.sub(a).cross(c.sub(a)).length()*.5;
+        return {point:hit.point.clone(),normal,surface:inFlora?'plant':'wood',area};
+      };
       this.simEnv.shelters = decorOut.shelters;
       this.simEnv.tunnels = decorOut.tunnels;
       this.fish.resetHabitat();
@@ -381,12 +421,12 @@ export class Engine {
         this.quality, decorOut.airstone,
       );
       SharedUniforms.uSurfaceY.value = this.dims.surfaceY;
-      this.rig.frameTank(this.dims.halfW, this.dims.height, this.dims.floorY + this.dims.height * 0.52);
+      if(initial||resized)this.rig.frameTank(this.dims.halfW, this.dims.height, this.dims.floorY + this.dims.height * 0.52);
     }
 
     if (fishChanged) {
       this.lastFishKey = fishKey;
-      this.fish.rebuild(config.fish, this.simEnv, this.quality.maxFish);
+      this.fish.rebuild(config.fish, this.simEnv, effectiveFishCap(config,this.quality.maxFish),resized);
     }
   }
 
@@ -482,7 +522,7 @@ export class Engine {
   private rememberPointer=(e:PointerEvent):void=>{this.pointerDown={x:e.clientX,y:e.clientY}};
   private onRightClick=(e:MouseEvent):void=>{if(!this.kanAquariumMode)return;e.preventDefault();if(e.shiftKey)this.callbacks.onRemoveFish?.();else this.callbacks.onAddFish?.(e.clientX,e.clientY)};
   private onClick = (e: PointerEvent): void => {
-    if(e.button!==0)return;
+    if(e.button!==0||e.shiftKey||this.rig.lastGestureWasPan||this.rig.lastPointerTravel>8)return;
     if(this.kanAquariumMode){
       if(Math.hypot(e.clientX-this.pointerDown.x,e.clientY-this.pointerDown.y)>9)return;
       const next=this.clickFoodCount+1;
@@ -542,6 +582,7 @@ export class Engine {
 
   screenshot(): string {
     // Render fresh, then read pixels in the same task (buffer isn't preserved).
+    this.renderer.info.reset();
     if (this.composer) this.composer.render();
     else this.renderer.render(this.scene, this.rig.camera);
     return this.renderer.domElement.toDataURL('image/png');
@@ -553,9 +594,10 @@ export class Engine {
 
   private tick = (): void => {
     if (this.disposed) return;
-    const dt = Math.min(this.clock.getDelta(), 0.1);
+    const elapsed=this.clock.getDelta();
+    const dt = Math.min(elapsed, 0.1);
     if (!this.running) return;
-    this.advance(dt);
+    this.advance(dt,elapsed);
   };
 
   /**
@@ -657,7 +699,7 @@ export class Engine {
 
   /** One simulation + render step. Called with real dt by tick(), or with a
    *  fixed dt by the capture driver (which needs stutter-free frame times). */
-  advance(dt: number): void {
+  advance(dt: number,frameElapsed=dt): void {
 
     const t = SharedUniforms.uTime.value + dt;
     SharedUniforms.uTime.value = t;
@@ -677,9 +719,12 @@ export class Engine {
       :1;
     this.fish.update(dt, this.simEnv);
     this.environment.update(this.dayFactor, this.rig.camera);
+    this.rig.observe(this.fish.getLiveEvents(this.simEnv),this.simEnv.obstacles);
     this.rig.update(dt);
+    this.lodIn-=dt;if(this.lodIn<=0){this.lodIn=.5;this.fish.updateLod(this.rig.camera,this.container.clientHeight);}
     this.syncFoodLayer();
 
+    this.renderer.info.reset();
     if (this.composer) this.composer.render();
     else this.renderer.render(this.scene, this.rig.camera);
 
@@ -690,10 +735,13 @@ export class Engine {
     }
 
     // — Stats + automatic quality downgrade —
-    this.frameTimes.push(dt);
+    this.frameTimes.push(frameElapsed);
     if (this.frameTimes.length >= 60) {
       const avg = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length;
       this.stats.fps = Math.round(1 / avg);
+      const sorted=[...this.frameTimes].sort((a,b)=>a-b);
+      this.stats.frameP50Ms=sorted[Math.floor(sorted.length*.50)]*1000;
+      this.stats.frameP95Ms=sorted[Math.floor(sorted.length*.95)]*1000;
       this.frameTimes = [];
       // If the user asked for 'auto' and we can't hold ~28fps, step down a tier.
       if (this.requestedTier === 'auto' && this.stats.fps < 28) {
@@ -707,6 +755,7 @@ export class Engine {
         }
       }
     }
+    this.stats.geometries=this.renderer.info.memory.geometries;this.stats.textures=this.renderer.info.memory.textures;
     this.stats.drawCalls = this.renderer.info.render.calls;
     this.stats.triangles = this.renderer.info.render.triangles;
     this.stats.fishCount = this.fish.populations.reduce((a, p) => a + p.agents.length, 0);

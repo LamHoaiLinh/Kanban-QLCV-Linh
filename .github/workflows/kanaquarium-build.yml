@@ -5,13 +5,15 @@ on:
     paths:
       - '.github/workflows/kanaquarium-build.yml'
       - 'aquarium-integration/**'
+  pull_request:
+    paths: ['.github/workflows/kanaquarium-build.yml', 'aquarium-integration/**']
   workflow_dispatch:
 permissions:
   contents: write
 jobs:
   build-aquarium:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
         with:
@@ -103,6 +105,33 @@ jobs:
           cp aquarium-integration/tests/realism-smoke.mjs _aquarium-build/realism-smoke.mjs
           cd _aquarium-build
           node realism-smoke.mjs
+      - name: Realism 4.2 - audit twenty real routes and staggered breach schedules
+        run: |
+          cp aquarium-integration/tests/realism42-events-smoke.mjs _aquarium-build/realism42-events-smoke.mjs
+          cd _aquarium-build
+          node realism42-events-smoke.mjs
+      - name: Realism 4.2 - real glass, wood and leaf peck surfaces
+        run: |
+          cp aquarium-integration/tests/realism42-surfaces-smoke.mjs _aquarium-build/realism42-surfaces-smoke.mjs
+          cd _aquarium-build
+          node realism42-surfaces-smoke.mjs
+      - name: Realism 4.2 - 100 fish, resizing, peck, breach and camera gestures
+        run: |
+          cp aquarium-integration/tests/realism42-smoke.mjs _aquarium-build/realism42-smoke.mjs
+          cd _aquarium-build
+          node realism42-smoke.mjs
+      - name: Preserve Realism 4.2 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: realism42-review
+          path: |
+            _aquarium-build/realism42-*.png
+            _aquarium-build/realism42-report.json
+            _aquarium-build/realism42-event-audit.json
+            _aquarium-build/realism42-surfaces-review.json
+          if-no-files-found: ignore
+          retention-days: 30
       - name: Commit compiled game into site
         if: github.ref == 'refs/heads/main'
         run: |
