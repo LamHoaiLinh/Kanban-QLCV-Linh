@@ -83,7 +83,7 @@ try{
   // simulation time; do not force random state by patching internals.
   await page.waitForFunction(()=>{
     const e=window.__kanRealismProbe?.().eco;
-    return e&&(e.grazeEvents+e.restEvents+e.shelterEvents)>0;
+    return e&&(e.grazeEvents+e.restEvents+e.shelterEvents+e.schoolEvents)>0;
   },{timeout:35000,polling:1000});
   const natural=await snap();
   if(natural.fish.fish!==beforeFish)throw Error('Natural mode changed tank stock');
@@ -91,7 +91,7 @@ try{
     throw Error('Natural mode escaped tank boundaries');
   if(errors.length)throw Error('Browser JS runtime errors: '+errors.join(' / '));
   console.log('PASS REALISM 3: natural/relax persisted and restored; live ecology indicators, simulated feeding/cleaning, autonomous activity, no fish loss, Realism 1 boundary checks; events='+
-    JSON.stringify({graze:natural.eco.grazeEvents,rest:natural.eco.restEvents,shelter:natural.eco.shelterEvents}));
+    JSON.stringify({graze:natural.eco.grazeEvents,rest:natural.eco.restEvents,shelter:natural.eco.shelterEvents,school:natural.eco.schoolEvents}));
 }catch(error){
   console.error(error);process.exitCode=1;
 }finally{

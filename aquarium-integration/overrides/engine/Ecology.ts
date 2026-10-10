@@ -13,6 +13,7 @@ export interface EcoSnapshot {
   grazeEvents: number;
   restEvents: number;
   shelterEvents: number;
+  schoolEvents: number;
   consumed: number;
   elapsed: number;
 }
@@ -25,11 +26,12 @@ export class EcoSystem {
   private grazeEvents=0;
   private restEvents=0;
   private shelterEvents=0;
+  private schoolEvents=0;
   private info:{water:'freshwater'|'saltwater';gallons:number;fish:number;plants:number}={
     water:'freshwater',gallons:30,fish:0,plants:0};
   private current:EcoSnapshot={
     temperature:25,oxygen:96,cleanliness:94,leftover:0,waste:.10,
-    grazeEvents:0,restEvents:0,shelterEvents:0,consumed:0,elapsed:0
+    grazeEvents:0,restEvents:0,shelterEvents:0,schoolEvents:0,consumed:0,elapsed:0
   };
   configure(config:TankConfig):void{
     const next={
@@ -51,10 +53,11 @@ export class EcoSystem {
     this.consumed++;
     this.waste=clamp(this.waste-.002,0,1);
   }
-  event(event:'graze'|'rest'|'shelter'):void{
+  event(event:'graze'|'rest'|'shelter'|'school'):void{
     if(event==='graze')this.grazeEvents++;
     else if(event==='rest')this.restEvents++;
-    else this.shelterEvents++;
+    else if(event==='shelter')this.shelterEvents++;
+    else this.schoolEvents++;
   }
   clean():void{
     this.waste=Math.min(this.waste,.08);
@@ -81,6 +84,7 @@ export class EcoSystem {
       oxygen:Math.round(oxygen),cleanliness:Math.round(cleanliness),
       leftover,waste:+this.waste.toFixed(4),grazeEvents:this.grazeEvents,
       restEvents:this.restEvents,shelterEvents:this.shelterEvents,
+      schoolEvents:this.schoolEvents,
       consumed:this.consumed,elapsed:Math.round(this.elapsed)};
   }
   snapshot():EcoSnapshot{return {...this.current};}

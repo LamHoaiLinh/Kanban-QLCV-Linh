@@ -168,7 +168,7 @@ export class FoodSystem {
 export class FishSystem {
   group = new THREE.Group();
   food: FoodSystem;
-  onEcoEvent?:(event:'graze'|'rest'|'shelter')=>void;
+  onEcoEvent?:(event:'graze'|'rest'|'shelter'|'school')=>void;
   populations: Population[] = [];
   private feedTimer = 0;   // seconds of "the fish are hungry/excited" remaining
   private pendingDrop:{x:number;z:number}|null=null;
@@ -688,7 +688,7 @@ export class FishSystem {
       }
       if(sp.archetype==='schooler'&&p<.045&&!env.reducedMotion){
         a.mode='dart';a.modeT=.35+.35*Math.random();
-        this.onEcoEvent?.('graze');
+        this.onEcoEvent?.('school');
         return;
       }
     }

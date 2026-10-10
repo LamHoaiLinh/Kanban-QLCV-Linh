@@ -260,7 +260,7 @@ function EcologySection(){
             <div><span>Nước sạch</span><strong>{snapshot.cleanliness}/100</strong></div>
             <div><span>Thức ăn dư</span><strong>{snapshot.leftover}</strong></div>
           </div>
-          <p className="eco-note">Hoạt động tự nhiên: {snapshot.grazeEvents} lần rỉa nền · {snapshot.restEvents} lượt nghỉ · {snapshot.shelterEvents} lượt trú ẩn.</p>
+          <p className="eco-note">Hoạt động tự nhiên: {snapshot.grazeEvents} lần rỉa nền · {snapshot.restEvents} lượt nghỉ · {snapshot.shelterEvents} lượt trú ẩn · {snapshot.schoolEvents} lần đàn đổi hướng.</p>
         </>
       )}
       <div className="row-actions" style={{marginTop:8}}>
