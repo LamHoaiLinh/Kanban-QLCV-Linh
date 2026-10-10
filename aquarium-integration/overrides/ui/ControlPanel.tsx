@@ -55,14 +55,14 @@ export function ControlPanel() {
       lastMove=now;
       reset();
     };
-    for(const name of ['pointerdown','keydown','input','change','wheel','focusin','touchstart']){
+    for(const name of ['click','pointerdown','keydown','input','change','wheel','focusin','touchstart']){
       node.addEventListener(name,reset,{passive:true});
     }
     node.addEventListener('pointermove',onMove,{passive:true});
     reset();
     return ()=>{
       clearTimeout(timer);
-      for(const name of ['pointerdown','keydown','input','change','wheel','focusin','touchstart']){
+      for(const name of ['click','pointerdown','keydown','input','change','wheel','focusin','touchstart']){
         node.removeEventListener(name,reset);
       }
       node.removeEventListener('pointermove',onMove);
