@@ -195,6 +195,10 @@ export class FishSystem {
   getHabitatSnapshot(env:SimEnv){return this.habitat.snapshot(env);}
   getFinSnapshot(){return this.populations.map(p=>({id:p.sp.id,
     vertices:p.mesh.geometry.getAttribute('position').count,
+    medianStrip:p.mesh.geometry.userData.medianMembraneStrip===true,
+    medianTips:[...Array(p.mesh.geometry.getAttribute('aFinFlex').count).keys()]
+      .filter(i=>p.mesh.geometry.getAttribute('aPart').getX(i)===2 &&
+        p.mesh.geometry.getAttribute('aFinFlex').getX(i)>.95).length,
     flexible:[...Array(p.mesh.geometry.getAttribute('aFinFlex').count).keys()].filter(i=>
       p.mesh.geometry.getAttribute('aFinFlex').getX(i)>.001).length,
     mouth:[...p.agents].map(a=>a.jaw)}));}
