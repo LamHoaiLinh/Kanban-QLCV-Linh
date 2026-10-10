@@ -12,6 +12,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import type { QualityTier, TankConfig } from '../types';
 import { tankDims } from '../data/tanks';
 import { installUnderwaterFog, SharedUniforms } from './shaders';
+import { EcoSystem, type EcoMode } from './Ecology';
 import { markReady } from '../platform/native';
 import { QUALITY, detectQuality, type QualitySettings } from './quality';
 import { CameraRig } from './CameraRig';
@@ -71,6 +72,14 @@ export class Engine {
   private lastCycleT = 0;
   // FPS + draw call counters for the dev HUD.
   stats = { fps: 60, drawCalls: 0, triangles: 0, fishCount: 0 };
+  readonly ecology=new EcoSystem();
+  private ecoMode:EcoMode='natural';
+  getEcoSnapshot(){return this.ecology.snapshot();}
+  cleanEco(){this.ecology.clean();}
+  setEcoMode(mode:EcoMode){
+    this.ecoMode=mode;
+    this.simEnv.ecoMode=mode;
+  }
 
   constructor(private container: HTMLElement) {
     // Must run BEFORE any material compiles — swaps Three's fog for our
@@ -108,13 +117,15 @@ export class Engine {
     this.decor = new DecorSystem(this.scene);
     this.flora = new FloraSystem(this.scene);
     this.fish = new FishSystem(this.scene);
+    this.fish.onEcoEvent=(event)=>this.ecology.event(event);
+    this.fish.food.onEat=()=>this.ecology.eat();
 
     this.simEnv = {
       time: 0, dayFactor: 1,
       halfW: 0.5, halfD: 0.25, floorY: 0, surfaceY: 0.48,
       current: this.current,
       reducedMotion: false,
-      obstacles: [], shelters: [],
+      obstacles: [], shelters: [],ecoMode:'natural',
     };
     // QA-only regression probe. Not enabled on the published KanBan URL.
     if(new URLSearchParams(location.search).get('qa')==='1'){
@@ -124,6 +135,8 @@ export class Engine {
         flora:this.flora.getContainmentSnapshot(this.dims),
         obstacles:this.simEnv.obstacles.length,
         food:this.fish.food.bits.length,
+        eco:this.ecology.snapshot(),
+        ecoMode:this.ecoMode,
         species:this.fish.getMovementSnapshot(),
         drawCalls:this.renderer.info.render.calls,
         triangles:this.renderer.info.render.triangles,
@@ -248,6 +261,7 @@ export class Engine {
     const structureChanged = force || structureKey !== this.lastStructureKey;
     const fishChanged = force || structureChanged || fishKey !== this.lastFishKey;
     this.config = config;
+    this.ecology.configure(config);
 
     if (structureChanged) {
       this.lastStructureKey = structureKey;
@@ -323,6 +337,7 @@ export class Engine {
   feedAt(clientX:number,clientY:number,kind:FoodKind='normal'):boolean{
     const hit=this.tankPoint(clientX,clientY);
     this.fish.feed(hit.x,hit.z,this.simEnv,kind);
+    this.ecology.feed(kind);
     this.callbacks.onFed?.(kind,this.clickFoodCount);
     return true;
   }
@@ -525,6 +540,8 @@ export class Engine {
     this.dayFactor = THREE.MathUtils.damp(this.dayFactor, this.targetDayFactor(), 0.5, dt);
     this.simEnv.dayFactor = this.dayFactor;
 
+    this.ecology.advance(dt,this.ecoMode,this.dayFactor,
+      this.fish.food.bits.filter(b=>b.state==='settled').length);
     this.fish.update(dt, this.simEnv);
     this.environment.update(this.dayFactor, this.rig.camera);
     this.rig.update(dt);

@@ -75,6 +75,7 @@ export function AquariumCanvas() {
     engine.setQuality(s0.quality);
     engine.applyConfig(s0.config);
     engine.setReducedMotion(s0.reducedMotion);
+    engine.setEcoMode(s0.ecoMode);
     engine.setCameraMode(s0.cameraMode);
 
     const unsub = useStore.subscribe((state, prev) => {
@@ -82,6 +83,7 @@ export function AquariumCanvas() {
       if (state.quality !== prev.quality) engine.setQuality(state.quality);
       if (state.feedMode !== prev.feedMode) engine.setFeedMode(state.feedMode);
       if (state.reducedMotion !== prev.reducedMotion) engine.setReducedMotion(state.reducedMotion);
+      if (state.ecoMode !== prev.ecoMode) engine.setEcoMode(state.ecoMode);
       if (state.cameraMode !== prev.cameraMode && state.cameraMode !== 'follow') {
         engine.setCameraMode(state.cameraMode);
       }
