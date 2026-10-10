@@ -254,6 +254,21 @@ export class FishSystem {
       }
     }
   }
+  // Lightweight telemetry for browser QA; does not change simulation state.
+  getMovementSnapshot(){
+    return this.populations.map(p=>{
+      const agents=p.agents.filter(a=>!a.drop);
+      const n=Math.max(1,agents.length);
+      return {
+        species:p.sp.id,
+        count:agents.length,
+        meanSpeed:agents.reduce((sum,a)=>sum+a.vel.length(),0)/n,
+        turns:agents.reduce((sum,a)=>sum+Math.abs(a.bend),0)/n,
+        meshVertices:p.mesh.geometry.getAttribute('position').count,
+        finGroups:p.mesh.geometry.groups.length,
+      };
+    });
+  }
   // Test-only probe. No production counters or global simulation timers.
   getPhysicsSnapshot(env:SimEnv):{fish:number;wallViolations:number;solidOverlaps:number;maxOverlap:number}{
     let fish=0,wallViolations=0,solidOverlaps=0,maxOverlap=0;
@@ -387,10 +402,12 @@ export class FishSystem {
       THREE.MathUtils.lerp(zoneY[0], zoneY[1], Math.random()),
       (Math.random() - 0.5) * env.halfD * 1.6
     );
+    const initialVelocity=new THREE.Vector3(
+      (Math.random()-.5)*.05,0,(Math.random()-.5)*.05);
     const agent: Agent = {
       sp, index: i, key: `${sp.id}:${i}`,
       pos,
-      vel: new THREE.Vector3((Math.random() - 0.5) * 0.05, 0, (Math.random() - 0.5) * 0.05),
+      vel: initialVelocity,
       phase: Math.random() * TAU,
       bend: 0, flap: 0,
       rand: Math.random(),
@@ -401,7 +418,7 @@ export class FishSystem {
         THREE.MathUtils.lerp(zoneY[0], zoneY[1], 0.5),
         (Math.random() - 0.5) * env.halfD * 1.4
       ),
-      prevYaw: 0,
+      prevYaw: Math.atan2(-initialVelocity.z,initialVelocity.x),
       hunger: 0,
     };
     if (isCrawler(sp)) {
@@ -571,6 +588,13 @@ export class FishSystem {
       steer.x+=Math.sin(t*.85+a.rand*18)*.14;
     }else if(sp.id==='betta'||sp.id==='angelfish'){
       steer.y+=Math.sin(t*.33+a.rand*25)*.055;
+    }else if(sp.id==='ocellaris-clown'){
+      steer.x+=Math.cos(t*.8+a.rand*11)*.10;
+      steer.y+=Math.sin(t*.63+a.rand*19)*.11;
+    }else if(sp.id==='blue-tang'||sp.id==='yellow-tang'){
+      steer.z+=Math.sin(t*.58+a.rand*21)*.09;
+    }else if(sp.id==='dwarf-gourami'||sp.id==='honey-gourami'){
+      steer.y+=Math.sin(t*.39+a.rand*14)*.065;
     }else if(sp.id.includes('corydoras')&&a.mode==='forage'){
       steer.y-=.13;
       steer.x+=Math.sin(t*1.7+a.rand*13)*.24;
@@ -587,6 +611,8 @@ export class FishSystem {
     if(sp.id==='betta')targetSpeed*=.77;
     if(sp.id==='angelfish')targetSpeed*=.86;
     if(sp.id==='guppy')targetSpeed*=1.08;
+    if(sp.id==='ocellaris-clown')targetSpeed*=.88;
+    if(sp.id==='dwarf-gourami'||sp.id==='honey-gourami')targetSpeed*=.82;
     if (a.mode === 'rest') targetSpeed = cruise * 0.06;
     if(a.mode==='dart')
       targetSpeed=maxSpeed*(sp.id==='betta'?.63:sp.id==='angelfish'?.72:1);

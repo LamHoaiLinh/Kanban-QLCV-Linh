@@ -170,7 +170,12 @@ export const useStore = create<AppState>()(
 
       loadTank: (name) => {
         const saved = get().savedTanks[name];
-        if (saved) set({ config: structuredClone(saved), followFishKey: null, selectedFishKey: null });
+        if(saved){
+          const config=structuredClone(saved);
+          if(config.name==='Surprise Tank'||config.name==='Hồ cá bất ngờ')
+            config.name='Hồ cá ngẫu nhiên';
+          set({config,followFishKey:null,selectedFishKey:null});
+        }
       },
 
       deleteTank: (name) =>
