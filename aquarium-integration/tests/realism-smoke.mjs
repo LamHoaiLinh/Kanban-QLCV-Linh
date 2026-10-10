@@ -33,8 +33,23 @@ try{
     console.log('QA '+tag+' fish='+x.fish.fish+' rock-overlap='+x.fish.solidOverlaps+' vertices='+x.flora.vertices+' name='+x.name);
   }
   await audit('initial');
+  // KanBan closes the panel after 15 seconds; slow headless SwiftShader can
+  // take minutes to rebuild 30 tanks. Reopen the real UI before each action,
+  // never disable the production auto-close behavior just for a passing test.
+  async function ensureTankPanel(){
+    await page.evaluate(()=>{
+      if(!document.querySelector('.panel'))document.querySelector('.open-panel')?.click();
+    });
+    await page.waitForSelector('.panel',{timeout:15000});
+    await page.evaluate(()=>{
+      [...document.querySelectorAll('.panel .tabs button')]
+        .find(b=>b.textContent?.trim()==='Bể')?.click();
+    });
+    await page.waitForSelector('.preset-list button',{timeout:15000});
+  }
   const presets=['Cộng đồng Amazon','Hồ thủy sinh mini','Đầm san hô','Ốc đảo Betta','Suối nước trà','Đại dương xanh'];
   for(const name of presets){
+    await ensureTankPanel();
     await page.evaluate(n=>{
       const b=[...document.querySelectorAll('.preset-list button')].find(x=>x.textContent?.includes(n));
       if(!b)throw Error('Missing preset: '+n);
@@ -43,6 +58,7 @@ try{
     await audit('preset '+name);
   }
   for(let i=0;i<30;i++){
+    await ensureTankPanel();
     await page.evaluate(()=>{
       const b=[...document.querySelectorAll('.panel button')].find(x=>x.textContent?.includes('Tạo ngẫu nhiên'));
       if(!b)throw Error('Missing random button');
@@ -54,6 +70,7 @@ try{
   }
   // A fish from the smallest aquarium must retain safe clearance from glass
   // after repeated changes to large tanks and back.
+  await ensureTankPanel();
   await page.evaluate(()=>[...document.querySelectorAll('.preset-list button')].find(x=>x.textContent?.includes('Hồ thủy sinh mini'))?.click());
   await audit('return to nano');
 
