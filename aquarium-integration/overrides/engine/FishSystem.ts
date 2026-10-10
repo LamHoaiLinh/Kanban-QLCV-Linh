@@ -30,7 +30,13 @@ const TAU = Math.PI * 2;
 // body-lengths-per-second figures, but in a small on-screen tank that reads
 // far too frantic — a quarter speed is much closer to how a real tank feels.
 // Tail-beat frequency derives from actual speed, so the animation slows with it.
-const SPEED_SCALE = 0.25;
+const SPEED_SCALE = 0.30;
+function speciesPace(sp:SpeciesDef):number{
+ if(sp.id==='angelfish'||sp.id==='betta')return .78;
+ if(/pleco|oto|gourami/.test(sp.id))return .82;
+ if(/danio|tetra|rasbora|guppy|endler/.test(sp.id))return 1.40;
+ return sp.archetype==='schooler'?1.28:1.02;
+}
 
 // Surface crawlers stick to the glass/floor instead of swimming freely:
 // snails graze slowly; hillstream loaches cling and scoot in little bursts.
@@ -59,6 +65,7 @@ export interface SimEnv {
   obstacles: { pos: THREE.Vector3; radius: number; surface?:'wood'|'plant' }[]; // decor/coral keep-out spheres
   shelters: THREE.Vector3[];                            // hiding spots (decor)
   sampleSurface?:(from:THREE.Vector3,toward:THREE.Vector3)=>{point:THREE.Vector3;normal:THREE.Vector3;surface:string;area?:number}|null;
+  foodSolidHit?:(from:THREE.Vector3,to:THREE.Vector3)=>THREE.Vector3|null;
   tunnels: SwimTunnel[]; // open corridors exported from the physical wood geometry
 }
 
@@ -95,6 +102,9 @@ interface Agent {
   nextJump:number;
   hunger: number;           // >0 after feeding starts; seeks food
   feedDistance?: number; // current target range used for smooth approach
+  feedTarget?:FoodBit;feedLastDistance?:number;feedStall?:number;
+  feedAvoid?:FoodBit;feedAvoidUntil?:number;feedCooldown?:number;
+  paceBias:number;
   drop?:{stage:'fall'|'dive';velocityY:number;elapsed:number;targetY:number};
   // Critter-specific
   wall?: 'floor' | 'back' | 'left' | 'right';
@@ -113,7 +123,7 @@ interface Population {
 
 // ── KanAquarium: individual pellets and high-priority rare cookies ──
 export type FoodKind = 'normal' | 'fish-cookie' | 'bear-cookie';
-interface FoodBit {pos:THREE.Vector3;age:number;state:'float'|'sink'|'settled'|'gone';kind:FoodKind;sprite:THREE.Sprite}
+interface FoodBit {pos:THREE.Vector3;age:number;state:'float'|'sink'|'settled'|'gone';kind:FoodKind;sprite:THREE.Sprite;support?:'wood'|'floor'}
 export class FoodSystem {
   bits:FoodBit[]=[];
   onEat?:()=>void;
@@ -153,14 +163,21 @@ export class FoodSystem {
     this.group.remove(bit.sprite);
     const i=this.bits.indexOf(bit);if(i>=0)this.bits.splice(i,1);
   }
-  update(dt:number,floorY:number):void{
+  update(dt:number,floorY:number,solidHit?:(from:THREE.Vector3,to:THREE.Vector3)=>THREE.Vector3|null):void{
     for(let i=this.bits.length-1;i>=0;i--){
       const b=this.bits[i];b.age+=dt;const special=b.kind!=='normal';
       // Sinking starts immediately when the food is released.
       if(b.state==='sink'){
-        b.pos.y-=dt*(special?.075:.090);
-        b.pos.x+=Math.sin(b.age*2.2+b.pos.z*35)*dt*.003;
-        if(b.pos.y<=floorY+.01){b.pos.y=floorY+.01;b.state='settled'}
+        const previous=b.pos.clone(),next=b.pos.clone();
+        next.y-=dt*(special?.075:.090);
+        next.x+=Math.sin(b.age*2.2+b.pos.z*35)*dt*.003;
+        const impact=solidHit?.(previous,next);
+        if(impact&&impact.y>floorY+.012){
+          b.pos.copy(impact);b.pos.y+=.004;b.state='settled';b.support='wood';
+        }else{
+          b.pos.copy(next);
+          if(b.pos.y<=floorY+.01){b.pos.y=floorY+.01;b.state='settled';b.support='floor'}
+        }
       }
       if(b.age>(special?55:26))b.state='gone';
       if(b.state==='gone'){this.remove(b);continue}
@@ -170,13 +187,13 @@ export class FoodSystem {
   }
   get active():boolean{return this.bits.length>0}
   get hasCookie():boolean{return this.bits.some(b=>b.kind!=='normal'&&b.state!=='gone')}
-  nearest(p:THREE.Vector3,maxDist:number,settledOnly:boolean):FoodBit|null{
+  nearest(p:THREE.Vector3,maxDist:number,settledOnly:boolean,excluded?:FoodBit):FoodBit|null{
     let best:FoodBit|null=null,score=Infinity;
     for(const b of this.bits){
-      if(b.state==='gone'||b.age<(b.kind==='normal'?.35:.45))continue;
+      if(b===excluded||b.state==='gone'||b.age<(b.kind==='normal'?.35:.45))continue;
       const special=b.kind!=='normal';
       if(!special&&settledOnly&&b.state!=='settled')continue;
-      if(!special&&!settledOnly&&b.state==='settled')continue;
+      if(!special&&!settledOnly&&b.state==='settled'&&b.support!=='wood')continue;
       const d=b.pos.distanceToSquared(p);
       if(d>Math.pow(special?maxDist*1.45:maxDist,2))continue;
       // Cookies are preferred when reasonably close, not magically detected across the tank.
@@ -319,8 +336,13 @@ export class FishSystem {
     else if(a.pos.x>xmax){a.pos.x=xmax;a.vel.x=Math.min(0,a.vel.x)}
     if(a.pos.z<zmin){a.pos.z=zmin;a.vel.z=Math.max(0,a.vel.z)}
     else if(a.pos.z>zmax){a.pos.z=zmax;a.vel.z=Math.min(0,a.vel.z)}
-    if(a.pos.y<ymin){a.pos.y=ymin;a.vel.y=Math.max(0,a.vel.y)}
-    else if(a.pos.y>ymax){a.pos.y=ymax;a.vel.y=Math.min(0,a.vel.y)}
+    if(a.pos.y<ymin){
+      a.pos.y=ymin;a.vel.y=Math.max(0,a.vel.y);
+      a.acceleration.y=Math.max(0,a.acceleration.y);
+    }else if(a.pos.y>ymax){
+      a.pos.y=ymax;a.vel.y=Math.min(0,a.vel.y);
+      a.acceleration.y=Math.min(0,a.acceleration.y);
+    }
     // Resolve position against solid decorations after steering; avoid popping
     // by removing inward velocity only. A low iteration count bounds CPU cost.
     const radius=this.collisionRadius(a);
@@ -543,7 +565,7 @@ export class FishSystem {
           agent.stuckTime=old.stuckTime??0;
           agent.moveOrigin.copy(old.moveOrigin??old.pos);
           agent.jaw=old.jaw??0;agent.jawTime=old.jawTime??0;
-          agent.rand=old.rand;agent.scale=old.scale;agent.hunger=old.hunger;
+          agent.rand=old.rand;agent.scale=old.scale;agent.hunger=old.hunger;agent.paceBias=old.paceBias??1;
           agent.drop=old.drop?{...old.drop}:undefined;
           agent.acceleration.copy(old.acceleration);agent.travel=old.travel;agent.collisions=old.collisions;
           agent.recoveries=old.recoveries;agent.history=[...old.history];agent.nextPeck=old.nextPeck;agent.nextJump=old.nextJump;
@@ -609,7 +631,7 @@ export class FishSystem {
       stuckTime: 0,
       acceleration:new THREE.Vector3(),travel:0,collisions:0,recoveries:0,history:[],
       nextPeck:env.time+10+Math.random()*35,nextJump:env.time+120+Math.random()*180,
-      hunger: 0,
+      hunger: 0,paceBias:.86+Math.random()*.30,
     };
     if (isCrawler(sp)) {
       // Crawlers split between the glass and the floor ("grazing the glass").
@@ -634,7 +656,7 @@ export class FishSystem {
   feed(x: number, z: number, env: SimEnv, kind:FoodKind='normal',
     startY=env.surfaceY-.035): void {
     this.food.scatter(x,z,startY,kind);
-    this.feedTimer = 75;
+    this.feedTimer = 18; // short, lively feeding window; no minute-long frenzy
   }
 
   // Find a fish agent by its stable key (for follow-cam / naming).
@@ -653,7 +675,7 @@ export class FishSystem {
   update(dt: number, env: SimEnv): void {
     dt = Math.min(dt, 0.05); // clamp to avoid physics explosions on tab-return
     this.feedTimer = Math.max(0, this.feedTimer - dt);
-    this.food.update(dt, env.floorY);
+    this.food.update(dt, env.floorY,env.foodSolidHit);
     this.updateSplashes(dt);
     // Director is observational and never alters population sizes or persistence.
     const allAgents=this.populations.flatMap(p=>p.agents);
@@ -790,13 +812,27 @@ export class FishSystem {
   }
 
   // ── Core fish update ──
+  // Reject food paths passing through a solid, rather than making fish
+  // swim against a log indefinitely. Keep the cheap test to one target.
+  private foodRouteBlocked(from:THREE.Vector3,to:THREE.Vector3,env:SimEnv,clearance:number):boolean{
+    const segment=to.clone().sub(from),len2=segment.lengthSq();
+    if(len2<1e-8)return false;
+    for(const ob of env.obstacles){
+      const t=THREE.MathUtils.clamp(ob.pos.clone().sub(from).dot(segment)/len2,0,1);
+      if(t<=.07||t>=.93)continue;
+      if(ob.pos.distanceToSquared(from.clone().addScaledVector(segment,t))<
+         Math.pow(ob.radius+clearance,2))return true;
+    }
+    return false;
+  }
+
   private updateFish(a: Agent, school: Agent[], dt: number, env: SimEnv): void {
     const sp = a.sp;
     const L = a.scale;
     a.feedDistance=undefined;
     a.jawTime=Math.max(0,a.jawTime-dt);
     a.jaw=THREE.MathUtils.damp(a.jaw,a.jawTime>0?1:0,a.jawTime>0?19:11,dt);
-    const cruise = sp.swim.cruise * L * SPEED_SCALE; // body-lengths/s → m/s
+    const cruise = sp.swim.cruise * L * SPEED_SCALE * speciesPace(sp); // body-lengths/s → m/s
     const maxSpeed = cruise * sp.swim.burst;
 
     // — Activity by time of day: nocturnal species invert the rhythm —
@@ -875,10 +911,26 @@ export class FishSystem {
     this.habitat.steer(a,steer,dt,env);
 
     // 6) Feeding overrides almost everything — fish RACE for food.
-    if (this.feedTimer > 0 && this.food.active && (a.mode !== 'rest' || this.food.hasCookie)) {
-      const bottomFeeder = sp.zone === 'bottom';
-      const target = this.food.nearest(a.pos, Math.max(.17,L*6), bottomFeeder);
-      if (target) {
+    if(this.feedTimer>0&&this.food.active&&(a.feedCooldown??0)<=env.time){
+      const bottomFeeder=sp.zone==='bottom';
+      let target=this.food.nearest(a.pos,Math.max(.17,L*6),bottomFeeder,
+        (a.feedAvoidUntil??0)>env.time?a.feedAvoid:undefined);
+      if(target&&this.foodRouteBlocked(a.pos,target.pos,env,L*.20)){
+        a.feedAvoid=target;a.feedAvoidUntil=env.time+3;
+        target=this.food.nearest(a.pos,Math.max(.17,L*6),bottomFeeder,a.feedAvoid);
+      }
+      if(target){
+        if(a.feedTarget!==target){a.feedTarget=target;a.feedStall=0;a.feedLastDistance=Infinity;}
+        const distance=a.pos.distanceTo(target.pos);
+        a.feedStall=distance<(a.feedLastDistance??Infinity)-.00035
+          ?0:(a.feedStall??0)+dt;
+        a.feedLastDistance=distance;
+        if((a.feedStall??0)>3.5){
+          a.feedAvoid=target;a.feedAvoidUntil=env.time+5;a.feedTarget=undefined;
+          a.feedCooldown=env.time+.8;a.feedStall=0;a.mode='cruise';
+          this.newAnchorNear(a,env,.3);
+          return;
+        }
         this.habitat.cancelFor(a); // feeding outranks a sightseeing event
         const special=target.kind!=='normal';
         _v2.copy(target.pos).sub(a.pos);
@@ -888,6 +940,7 @@ export class FishSystem {
         a.feedDistance=d;
         if(d<L*.43+(.003)){ 
           this.food.eat(target);
+          a.feedTarget=undefined;a.feedStall=0;a.feedCooldown=env.time+.6+Math.random()*.8;
           a.jawTime=.24;
           a.mode='feed';a.modeT=.26;a.gulp=undefined;
         } else if(d>1e-6){
@@ -896,7 +949,7 @@ export class FishSystem {
           // Do not spin 180 degrees instantly for a pellet directly behind the fish.
           if(forward>-.65||d<L*1.8){
             if(d<L*1.2)a.jawTime=Math.max(a.jawTime,.085);
-            steer.addScaledVector(dir,special?3.15:2.35);
+            steer.addScaledVector(dir,special?4.1:3.4);
             a.mode='feed';a.modeT=Math.max(a.modeT,.45);
           }
         }
@@ -935,7 +988,7 @@ export class FishSystem {
     steer.y += Math.sin(t * 0.41 + a.rand * 23) * 0.1;
 
     // — Integrate: steer → velocity, with mode-dependent target speed —
-    let targetSpeed=cruise*activity;
+    let targetSpeed=cruise*activity*a.paceBias;
     // Visual tempo by species, separate from shared movement archetypes.
     if(sp.id==='betta')targetSpeed*=.77;
     if(angel)targetSpeed*=1.06;
@@ -946,9 +999,9 @@ export class FishSystem {
     if(a.mode==='dart')
       targetSpeed=maxSpeed*(sp.id==='betta'?.63:sp.id==='angelfish'?.72:1);
     if(a.mode==='feed'){
-      targetSpeed=cruise*(this.food.hasCookie?1.50:1.20);
+      targetSpeed=cruise*(this.food.hasCookie?2.7:2.35)*a.paceBias;
       if(a.feedDistance!==undefined){
-        const slowing=THREE.MathUtils.clamp(a.feedDistance/(L*2.6),.22,1);
+        const slowing=THREE.MathUtils.clamp(a.feedDistance/(L*1.8),.40,1);
         targetSpeed*=slowing;
       }
     }
@@ -1246,7 +1299,10 @@ export class FishSystem {
       if(a.peck&&a.peck.stage!=='approach')pitch=THREE.MathUtils.damp(a.prevPitch,Math.asin(-a.peck.normal.y),4,dt);
       else pitch=THREE.MathUtils.clamp(pitch,-maxPitch,
         sp.id==='angelfish'?.19:maxPitch);
-      if(sp.id==='angelfish')pitch=THREE.MathUtils.damp(a.prevPitch,pitch,2.8,dt);
+      if(sp.id==='angelfish'){
+        const desired=Math.abs(pitch)<.08?0:THREE.MathUtils.clamp(pitch,-.16,.14);
+        pitch=THREE.MathUtils.damp(a.prevPitch,desired,1.35,dt);
+      }
     }
 
     // Bank into turns: roll proportional to yaw rate × speed (RESEARCH.md §3.2).
