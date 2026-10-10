@@ -21,7 +21,7 @@ import { getFishAsset } from './FishFactory';
 import { normalizeStock } from '../data/stocking';
 import type { TankConfig } from '../types';
 import { HabitatDirector } from './HabitatDirector';
-import { behaviorFor } from './BehaviorProfiles';
+import { behaviorFor, habitatFor } from './BehaviorProfiles';
 import { CurrentField } from './CurrentField';
 import { radialSpriteTexture } from './textures';
 import { applyUnderwater } from './shaders';
@@ -107,6 +107,8 @@ interface Agent {
   // Critter-specific
   wall?: 'floor' | 'back' | 'left' | 'right';
   crawlDir?: number;
+  surfaceNormal?:THREE.Vector3;
+  surfacePose?:THREE.Quaternion;
   // Corydoras air-gulp state: rocketing 'up' to the surface or diving 'down'.
   gulp?: 'up' | 'down';
 }
@@ -715,7 +717,7 @@ export class FishSystem {
         if (this.animateJump(a,dt,env)) {}
         else if(this.animatePeck(a,dt,env)) {}
         else if (this.animateDrop(a,dt,env)) {/* New fish enters the water before joining normal swimming. */}
-        else if (isCrawler(sp)) {this.updateCrawler(a, dt, env);this.habitat.crawl(a,dt,env);}
+        else if (isCrawler(sp)) {this.updateCrawler(a, dt, env);if(!a.surfaceNormal)this.habitat.crawl(a,dt,env);}
         else this.updateFish(a, agents, dt, env);
         if(!isCrawler(sp)&&!a.drop&&a.jump?.stage!=='breach')this.constrain(a,env,dt);
         a.travel+=a.pos.distanceTo(before);
@@ -867,7 +869,7 @@ export class FishSystem {
     for (const ob of env.obstacles) {
       _v2.copy(a.pos).sub(ob.pos);
       const d = _v2.length();
-      const avoidMargin=this.habitat.inCorridor(a)?Math.min(.025,margin):margin;
+      const avoidMargin=this.habitat.inCorridor(a)?Math.min(.025,margin):margin*habitatFor(sp).confidenceRadius;
       if (d < ob.radius + avoidMargin + this.collisionRadius(a) && d > 1e-5) {
         steer.addScaledVector(_v2.divideScalar(d), ((ob.radius + avoidMargin + this.collisionRadius(a) - d) / Math.max(ob.radius,.025)) * 1.3);
       }
@@ -1178,6 +1180,11 @@ export class FishSystem {
     const lo=Math.max(y0,env.floorY+safeY);
     const hi=Math.max(lo,Math.min(y1,env.surfaceY-safeY));
     const baseline=a.pos.clone();
+    if(env.shelters.length&&Math.random()<habitatFor(a.sp).shelterPreference){
+      const nearest=env.shelters.reduce((best,s)=>s.distanceToSquared(a.pos)<best.distanceToSquared(a.pos)?s:best);
+      baseline.lerp(nearest,.4);
+    }
+    let found=false;
     for(let attempt=0;attempt<18;attempt++){
       const nx=THREE.MathUtils.clamp(baseline.x+(Math.random()-.5)*env.halfW*2*range,
         -env.halfW*.72,env.halfW*.72);
@@ -1186,8 +1193,9 @@ export class FishSystem {
       const ny=THREE.MathUtils.lerp(lo,hi,Math.random());
       a.anchor.set(nx,ny,nz);
       if(env.obstacles.every(ob=>a.anchor.distanceTo(ob.pos)>
-        ob.radius+this.collisionRadius(a)+.035))break;
+        ob.radius+this.collisionRadius(a)+.035)&&!env.solids?.contains(a.anchor,this.collisionRadius(a))){found=true;break;}
     }
+    if(!found)a.anchor.copy(a.pos);
   }
 
   private anchorToShelter(a: Agent, env: SimEnv): void {
@@ -1203,7 +1211,8 @@ export class FishSystem {
   // alignment/cohesion 0.5 each, cohesion radius > separation radius, and a
   // rear blind spot (fish can't see directly behind themselves).
   private boids(a: Agent, school: Agent[], steer: THREE.Vector3, L: number): void {
-    const sepR = L * 1.6, cohR = L * 7;
+    const tight=behaviorFor(a.sp).social==='tight';
+    const sepR = L * (tight?1.35:1.7), cohR = L * (tight?8:5);
     const sep = _v2.set(0, 0, 0);
     const ali = _v3.set(0, 0, 0);
     const coh = new THREE.Vector3();
@@ -1231,7 +1240,7 @@ export class FishSystem {
     if (nSep > 0) steer.addScaledVector(sep.normalize(), 2.0);
     if (nCoh > 0) {
       steer.addScaledVector(ali.normalize(), 0.5);
-      steer.addScaledVector(coh.normalize(), 0.5);
+      steer.addScaledVector(coh.normalize(), tight?.65:.28);
     }
   }
 
@@ -1255,6 +1264,40 @@ export class FishSystem {
     if (a.sp.archetype === 'surface') {
       steer.y += (env.surfaceY - 0.04 - a.pos.y) * 3;
     }
+  }
+
+  private crawlHardscape(a:Agent,dt:number,env:SimEnv,speed:number):boolean{
+    if(!env.solids||a.wall!=='floor')return false;
+    const radius=Math.max(.002,a.scale*.12),up=a.surfaceNormal?.clone()??new THREE.Vector3(0,1,0);
+    let direction=new THREE.Vector3(Math.cos(a.crawlDir??0),0,Math.sin(a.crawlDir??0));
+    direction.addScaledVector(up,-direction.dot(up));
+    if(direction.lengthSq()<.02)direction.set(0,1,0).addScaledVector(up,-up.y);
+    if(direction.lengthSq()<1e-8)return false;
+    direction.normalize();
+    const next=a.pos.clone().addScaledVector(direction,speed*dt);
+    const obstacle=env.solids.sweep(a.pos,next,radius);
+    if(obstacle){
+      const contact=obstacle.point.clone().addScaledVector(obstacle.normal,radius+.00002);
+      // Contact is reached continuously; never teleport to a distant patch.
+      if(contact.distanceTo(a.pos)<speed*dt+.003){
+        a.pos.copy(contact);a.surfaceNormal=obstacle.normal.clone();
+        a.vel.copy(direction).multiplyScalar(speed);
+        return true;
+      }
+    }
+    if(!a.surfaceNormal)return false;
+    const contact=env.solids.sweep(next.clone().addScaledVector(up,.006),next.clone().addScaledVector(up,-.009),radius);
+    if(contact&&contact.normal.dot(up)>.25){
+      const onSurface=contact.point.clone().addScaledVector(contact.normal,radius+.00002);
+      if(onSurface.distanceTo(a.pos)<=speed*dt+.0025){
+        a.vel.copy(onSurface).sub(a.pos).divideScalar(Math.max(dt,.001));a.pos.copy(onSurface);
+        a.surfaceNormal.copy(contact.normal);return true;
+      }
+    }
+    // At a real edge, turn back rather than crossing an empty gap/flying.
+    a.crawlDir=(a.crawlDir??0)+Math.PI*.65;a.vel.multiplyScalar(.5);
+    if(a.pos.y<=env.floorY+radius+.003){a.surfaceNormal=undefined;a.pos.y=env.floorY+radius;}
+    return true;
   }
 
   // ── Crawlers: snails & hillstream loaches on glass or substrate ──
@@ -1283,7 +1326,12 @@ export class FishSystem {
       }
       speed = a.mode === 'dart' ? 0.06 : 0.003;
     }
-    a.crawlDir! += (Math.random() - 0.5) * dt * 0.8;
+    if(shrimp&&this.feedTimer>0){
+      const food=this.food.nearest(a.pos,.18,true,b=>b.pos.y<env.floorY+.06&&!env.solids?.sweep(a.pos,b.pos,.001));
+      if(food){const aim=Math.atan2(food.pos.z-a.pos.z,food.pos.x-a.pos.x);const turn=Math.atan2(Math.sin(aim-a.crawlDir!),Math.cos(aim-a.crawlDir!));a.crawlDir!+=THREE.MathUtils.clamp(turn,-dt*1.5,dt*1.5);speed=.012;if(a.pos.distanceTo(food.pos)<a.scale*.25+food.radius)this.food.eat(food);}
+    }
+    a.crawlDir! += (Math.random() - 0.5) * dt * (shrimp?.8:.18);
+    if((shrimp||a.sp.id.includes('snail'))&&this.crawlHardscape(a,dt,env,speed))return;
     const dir = a.crawlDir!;
     if (a.wall === 'floor') {
       a.pos.y = env.floorY + (shrimp?a.scale*.14:.002);
@@ -1305,6 +1353,7 @@ export class FishSystem {
       if (a.pos.y >= env.surfaceY - 0.041 || a.pos.y <= env.floorY + 0.031) a.crawlDir! = -dir;
     }
     for(const ob of env.obstacles){
+      if(env.solids&&ob.surface==='wood')continue;
       const d=a.pos.distanceTo(ob.pos),safe=ob.radius+a.scale*.20;
       if(d<safe&&d>1e-6){
         const away=a.pos.clone().sub(ob.pos);away.y=0;
@@ -1321,7 +1370,8 @@ export class FishSystem {
     const speed = a.vel.length();
 
     let yaw: number, pitch: number, up: THREE.Vector3 | null = null;
-    if (isCrawler(sp) && a.wall && a.wall !== 'floor') {
+    if(a.surfaceNormal){yaw=a.prevYaw;pitch=a.prevPitch;up=a.surfaceNormal.clone();}
+    else if (isCrawler(sp) && a.wall && a.wall !== 'floor') {
       // On the glass: belly against the pane (local +Y along the wall normal),
       // nose pointing along the crawl direction within the pane.
       yaw = a.crawlDir!;
@@ -1374,7 +1424,15 @@ export class FishSystem {
     _q.setFromEuler(_e);
     if (up) {
       // Align object +Y to the wall normal (snail-on-glass).
-      _q.setFromUnitVectors(_v2.set(0, 1, 0), up.normalize());
+      up.normalize();
+      const forward=a.vel.clone().addScaledVector(up,-a.vel.dot(up));
+      if(forward.lengthSq()<1e-8)forward.set(1,0,0).addScaledVector(up,-up.x);
+      if(forward.lengthSq()<1e-8)forward.set(0,0,1);
+      forward.normalize();
+      _q.setFromRotationMatrix(_m.makeBasis(forward,up,new THREE.Vector3().crossVectors(forward,up).normalize()));
+      a.surfacePose??=_q.clone();a.surfacePose.rotateTowards(_q,dt*(sp.id.includes('snail')?.65:2));_q.copy(a.surfacePose);
+    }else if(a.surfacePose&&isCrawler(sp)){
+      a.surfacePose.rotateTowards(_q,dt*(sp.id.includes('snail')?.65:2));_q.copy(a.surfacePose);
     }
 
     _m.compose(a.pos, _q, _s.set(a.scale, a.scale, a.scale));

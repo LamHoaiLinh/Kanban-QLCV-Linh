@@ -26,3 +26,27 @@ const profiles:Record<string,BehaviorProfile>={
 };
 export const behaviorFor=(sp:SpeciesDef):BehaviorProfile=>profiles[sp.id]??
  (sp.invert||['bottom','cleaner','nocturnal'].includes(sp.archetype)?bottom:sp.archetype==='schooler'?school:calm);
+
+export interface HabitatTraits {
+ zone:'top'|'mid'|'bottom'|'crawler'|'surface-grazer'|'cave-seeker';
+ confidenceRadius:number; // body-length multiplier for early obstacle avoidance
+ shelterPreference:number;
+ surfaceBehavior:'swim'|'graze'|'crawl'|'cave';
+ secondaryMotion:'fins'|'body-wave'|'legs-antennae'|'slow-foot';
+ scenePreference:'open'|'planted'|'shade';
+}
+const traitCache=new Map<string,HabitatTraits>();
+export function habitatFor(sp:SpeciesDef):HabitatTraits {
+ const cached=traitCache.get(sp.id);if(cached)return cached;
+ const shrimp=sp.id.includes('shrimp'),snail=sp.id.includes('snail');
+ const grazer=sp.id==='zebra-oto'||sp.id.includes('bristlenose'),cave=sp.shape.eelLike;
+ const planted=sp.id==='cherry-barb'||grazer;
+ const traits:HabitatTraits={
+  zone:shrimp||snail?'crawler':cave?'cave-seeker':grazer?'surface-grazer':sp.zone,
+  confidenceRadius:grazer||cave?.65:sp.id==='rummynose-tetra'?1.1:1,
+  shelterPreference:cave?.85:grazer?.7:planted?.4:.08,
+  surfaceBehavior:shrimp||snail?'crawl':grazer?'graze':cave?'cave':'swim',
+  secondaryMotion:shrimp?'legs-antennae':snail?'slow-foot':cave?'body-wave':'fins',
+  scenePreference:cave?'shade':planted||shrimp?'planted':'open',
+ };traitCache.set(sp.id,traits);return traits;
+}

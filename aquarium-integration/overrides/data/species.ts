@@ -433,6 +433,52 @@ export const SPECIES: SpeciesDef[] = [
   },
 ];
 
+// Additional community fish retain the established procedural asset pipeline.
+// Existing cardinal/rummy/kuhli/oto/nerite IDs remain unchanged in saved tanks.
+const communityVariant=(source:string,patch:Partial<SpeciesDef>):SpeciesDef=>{
+  const original=SPECIES.find(s=>s.id===source)!;
+  return {...original,...patch,shape:{...original.shape,...patch.shape},palette:{...original.palette,...patch.palette},swim:{...original.swim,...patch.swim}};
+};
+SPECIES.push(
+ communityVariant('guppy',{
+  id:'endler-guppy',common:'Cá Endler',scientific:'Poecilia wingei',lengthM:.028,adultSizeIn:1.2,
+  bioload:.7,minGallons:5,minGroup:4,
+  habitat:'Tầng trên và khoảng hở giữa cây trong hồ cộng đồng.',funFact:'Trong hồ mô phỏng: bứt ngắn, đổi hướng gọn và chủ động tìm mồi.',
+  shape:shape({height:.26,tailSize:.23,tailFork:.10,finLong:false,eyeSize:.065}),
+  palette:pal({base:'#84ae9e',back:'#44756e',belly:'#dce8cf',pattern:'spots',patternColor:'#ed792d',patternColor2:'#204756',fin:'#e6ac45',iridescence:.5}),
+  swim:swim({cruise:1.6,freqBase:3.3,turnRate:3.6,amp:.15,mode:3})
+ }),
+ communityVariant('harlequin-rasbora',{
+  id:'cherry-barb',common:'Cá anh đào',scientific:'Puntius titteya',lengthM:.045,adultSizeIn:2,
+  minGroup:6,minGallons:20,bioload:1.2,
+  habitat:'Tầng giữa gần bụi cây và khoảng trống nhỏ.',funFact:'Trong hồ mô phỏng: nhóm lỏng, bơi êm, thích men mép bụi cây.',
+  shape:shape({height:.33,width:.4,noseSharp:.4,tailFork:.5}),
+  palette:pal({base:'#aa4937',back:'#763e33',belly:'#e2a084',pattern:'hstripe',patternColor:'#65352e',fin:'#b9694d',iridescence:.25}),
+  swim:swim({cruise:1.15,freqBase:2.4,turnRate:2.8,amp:.16})
+ }),
+ communityVariant('cardinal-tetra',{
+  id:'congo-tetra',common:'Cá tetra Congo',scientific:'Phenacogrammus interruptus',lengthM:.075,adultSizeIn:3,
+  minGroup:6,minGallons:55,bioload:2.5,
+  habitat:'Khoảng bơi giữa hồ lớn, phía trước cây hậu cảnh.',funFact:'Trong hồ mô phỏng: lướt theo nhóm, vòng cua rộng và vây dài mềm.',
+  shape:shape({height:.38,width:.35,noseSharp:.4,tailFork:.6,tailSize:.31,finLong:true,dorsalHeight:.52,analHeight:.4}),
+  palette:pal({base:'#b5b9aa',back:'#688980',belly:'#ded4b5',pattern:'hstripe',patternColor:'#bf915e',fin:'#bdb4cf',finOpacity:.42,iridescence:.62}),
+  swim:swim({cruise:1.2,freqBase:2,turnRate:1.9,amp:.14})
+ }),
+ communityVariant('cherry-shrimp',{
+  id:'amano-shrimp',common:'Tép Amano',scientific:'Caridina multidentata',lengthM:.037,adultSizeIn:1.8,
+  minGroup:3,minGallons:10,bioload:.5,
+  habitat:'Nền cát, chân lũa, lá rộng và các bề mặt có màng rêu.',funFact:'Trong hồ mô phỏng: chân trước nhặt mồi, bò từng đoạn ngắn rồi nghỉ.',
+  shape:shape({height:.24,width:.45,noseSharp:.7,tailFork:.08,tailSize:.15,dorsalHeight:0,analHeight:0,barbels:true}),
+  palette:pal({base:'#b4baa5',back:'#849781',belly:'#d9dcc5',pattern:'spots',patternColor:'#66735b',patternColor2:'#87937b',fin:'#c3cbb1',finOpacity:.38,iridescence:.12}),
+  swim:swim({cruise:.25,freqBase:.75,turnRate:1.4,amp:.025,mode:3})
+ }),
+ communityVariant('bristlenose-pleco',{
+  id:'albino-bristlenose',common:'Tỳ bà mũi lông vàng',scientific:'Ancistrus sp. (biến thể vàng)',
+  habitat:'Đáy hồ, lũa và bóng dưới lá lớn.',funFact:'Biến thể màu của nhóm pleco: giữ nhịp bám/rỉa chậm, không tính là loài có tập tính hoàn toàn mới.',
+  palette:pal({base:'#bcab77',back:'#a18c58',belly:'#e3d4a7',pattern:'mottle',patternColor:'#9b895c',fin:'#c6b77f',eyeColor:'#a75b4c',iridescence:.1})
+ })
+);
+
 export const speciesById = new Map(SPECIES.map((s) => [s.id, s]));
 export const speciesForWater = (water: 'freshwater' | 'saltwater') =>
   SPECIES.filter((s) => s.water === water);

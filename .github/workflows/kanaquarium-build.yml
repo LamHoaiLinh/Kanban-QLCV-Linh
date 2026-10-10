@@ -70,6 +70,24 @@ jobs:
           cp aquarium-integration/tests/memory-cycles-smoke.mjs _aquarium-build/
           cd _aquarium-build
           node memory-cycles-smoke.mjs
+      - name: Content - one hundred seeds, twelve showcases and legacy migration
+        run: |
+          cp aquarium-integration/tests/content-smoke.mjs _aquarium-build/
+          cp aquarium-integration/tests/crawler-content-smoke.mjs _aquarium-build/
+          cd _aquarium-build
+          node content-smoke.mjs
+          node crawler-content-smoke.mjs
+      - name: Preserve content review gallery
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aquarium-content-review
+          path: |
+            _aquarium-build/content-report.json
+            _aquarium-build/crawler-content-report.json
+            _aquarium-build/evidence/content/**
+          if-no-files-found: warn
+          retention-days: 30
       - name: Preserve stability telemetry
         if: always()
         uses: actions/upload-artifact@v4

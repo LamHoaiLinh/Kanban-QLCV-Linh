@@ -10,7 +10,8 @@
 //  • Hard corals are rigid — their skeleton must never deform.
 
 import * as THREE from 'three';
-import type { FloraDef } from '../types';
+import type { FloraDef, AquascapeLayout } from '../types';
+import { seededRandom } from '../data/Aquascapes';
 import { floraById } from '../data/flora';
 import { applyUnderwater } from './shaders';
 import { CurrentField } from './CurrentField';
@@ -65,6 +66,7 @@ class GeoAccum {
 }
 
 // Reusable low-poly templates.
+const stemTemplate=new THREE.CylinderGeometry(1,1,1,5,1);
 const bladeTemplate = new THREE.PlaneGeometry(1, 1, 1, 6);       // tall blade, 6 height segs for smooth bending
 const leafTemplate = (() => {
   // A pointed leaf: plane pinched at both ends by shaping X by Y.
@@ -123,6 +125,19 @@ const swayHook = /* glsl */ `
 `;
 
 interface FloraMotion { swayAmp: number; swayFreq: number; pulse: number }
+const fernLeafTemplate=leafTemplate.clone();
+{
+ const p=fernLeafTemplate.getAttribute('position');
+ for(let i=0;i<p.count;i++){const y=p.getY(i)+.5;p.setX(i,p.getX(i)*(.35+.65*Math.abs(Math.sin(y*Math.PI*7))));}
+ fernLeafTemplate.computeVertexNormals();
+}
+const thickLeafBack=leafTemplate.clone();
+{
+ const p=thickLeafBack.getAttribute('position'),n=thickLeafBack.getAttribute('normal');
+ for(let i=0;i<p.count;i++){p.setZ(i,p.getZ(i)-.0015);n.setXYZ(i,-n.getX(i),-n.getY(i),-n.getZ(i));}
+ const index=thickLeafBack.getIndex()!;for(let i=0;i<index.count;i+=3){const a=index.getX(i);index.setX(i,index.getX(i+2));index.setX(i+2,a);}
+}
+
 const MOTION: Record<string, FloraMotion> = {
   stem:      { swayAmp: 0.035, swayFreq: 0.9, pulse: 0 },
   rosette:   { swayAmp: 0.02, swayFreq: 0.8, pulse: 0 },
@@ -138,6 +153,7 @@ const MOTION: Record<string, FloraMotion> = {
 };
 
 export class FloraSystem {
+  private random:()=>number=Math.random;
   group = new THREE.Group();
   private meshes: THREE.Mesh[] = [];
   // For automated regression checks of geometry and animated movement.
@@ -165,7 +181,10 @@ export class FloraSystem {
     dims: { halfW: number; halfD: number; floorY: number; surfaceY: number },
     current: CurrentField,
     anchors: THREE.Vector3[],  // rock/wood tops where epiphytes & corals sit
+    layout?:AquascapeLayout,
+    placement?:{surface:(x:number,z:number)=>THREE.Vector3|null;blocked:(p:THREE.Vector3,r:number)=>boolean},
   ): { obstacles: { pos: THREE.Vector3; radius: number }[] } {
+    this.random=seededRandom(layout?layout.seed^0x7b45:undefined);
     for (const m of this.meshes) {
       this.group.remove(m);
       m.geometry.dispose();
@@ -178,7 +197,8 @@ export class FloraSystem {
     for (const [id, count] of Object.entries(floraCounts)) {
       const def = floraById.get(id);
       if (!def || count <= 0) continue;
-      const motion = MOTION[def.kind];
+      const baseMotion=MOTION[def.kind];
+      const motion={...baseMotion,swayAmp:baseMotion.swayAmp*(def.id==='anubias'?.25:def.id==='java-fern'?.55:1)};
       const acc = new GeoAccum();
 
       for (let i = 0; i < count; i++) {
@@ -188,22 +208,41 @@ export class FloraSystem {
         const isCoral = ['softcoral', 'xenia', 'lps', 'anemone', 'zoa', 'hardcoral'].includes(def.kind);
         const epiphyte = ['java-fern', 'anubias', 'java-moss'].includes(def.id);
         if (def.kind === 'floating') {
-          x = (Math.random() - 0.5) * dims.halfW * 1.7;
-          z = (Math.random() - 0.5) * dims.halfD * 1.5;
+          x = (this.random() - 0.5) * dims.halfW * 1.7;
+          z = (this.random() - 0.5) * dims.halfD * 1.5;
           y = dims.surfaceY;
         } else if ((isCoral || epiphyte) && anchors.length > 0) {
           const a = anchors[anchorIdx++ % anchors.length];
-          x = a.x + (Math.random() - 0.5) * 0.06;
-          z = a.z + (Math.random() - 0.5) * 0.06;
+          x = a.x + (this.random() - 0.5) * 0.06;
+          z = a.z + (this.random() - 0.5) * 0.06;
           y = a.y;
         } else if (def.kind === 'stem' || def.kind === 'rosette') {
-          x = (Math.random() - 0.5) * dims.halfW * 1.8;
-          z = -dims.halfD * (0.25 + Math.random() * 0.65); // back half
+          x = (this.random() - 0.5) * dims.halfW * 1.8;
+          z = -dims.halfD * (0.25 + this.random() * 0.65); // back half
         } else {
-          x = (Math.random() - 0.5) * dims.halfW * 1.7;
-          z = dims.halfD * (Math.random() * 1.4 - 0.55);   // mid → front
+          x = (this.random() - 0.5) * dims.halfW * 1.7;
+          z = dims.halfD * (this.random() * 1.4 - 0.55);   // mid → front
         }
 
+        if(layout){
+          if((epiphyte||isCoral)&&anchors.length){
+            const anchor=anchors[(anchorIdx-1+anchors.length)%anchors.length];
+            const contact=placement?.surface(x,z)??placement?.surface(anchor.x,anchor.z);
+            if(!contact)continue;
+            x=contact.x;y=contact.y+.001;z=contact.z;
+          }else if(def.kind!=='floating'){
+            const low=def.heightM<=.10;
+            for(let attempt=0;attempt<16;attempt++){
+              const primary=this.random()<.72?layout.focalSide:-layout.focalSide;
+              const side=layout.layoutTheme==='jungle-corners'?(.5+this.random()*.32):(.18+this.random()*.60);
+              x=primary*dims.halfW*side;
+              z=low?dims.halfD*(.18+this.random()*.5):-dims.halfD*(.38+this.random()*.4);
+              y=dims.floorY;
+              if(!placement?.blocked(new THREE.Vector3(x,y+Math.min(.04,def.heightM*.2),z),.026))break;
+            }
+            if(placement?.blocked(new THREE.Vector3(x,y+Math.min(.04,def.heightM*.2),z),.026))continue;
+          }
+        }
         // Reserve space for foliage sway near the panes.
         const pad=Math.min(.07,Math.max(.016,motion.swayAmp*1.65+.008));
         x=THREE.MathUtils.clamp(x,-dims.halfW+pad,dims.halfW-pad);
@@ -282,56 +321,72 @@ export class FloraSystem {
     // Cap height so nothing pokes out of the water — vallisneria in a shallow
     // tank bends at the surface in real life; here we just grow it shorter.
     const waterH = dims.surfaceY - dims.floorY;
-    const H = Math.min(def.heightM * (0.75 + Math.random() * 0.5), waterH * 0.88);
+    const H = Math.min(def.heightM * (0.75 + this.random() * 0.5), (dims.surfaceY-spot.y)*.86,waterH*.88);
     // Deep, slightly desaturated tones read as living tissue instead of neon.
     const colors = def.colors.map((c) => new THREE.Color(c).multiplyScalar(0.72));
-    const pick = () => colors[Math.floor(Math.random() * colors.length)];
-    const phase = Math.random();
+    const pick = () => colors[Math.floor(this.random() * colors.length)];
+    const phase = this.random();
     // Sway weight from local height (templates are unit-height centered at 0).
     const byHeight = (_x: number, y: number) => THREE.MathUtils.clamp(y + 0.5, 0, 1);
 
+    if(['ludwigia-repens','rotala-rotundifolia','hornwort'].includes(def.id)){
+      const needle=def.id==='hornwort',small=def.id==='rotala-rotundifolia';
+      for(let stem=0;stem<(needle?4:6);stem++){
+        const h=H*(.65+this.random()*.35),sx=spot.x+(this.random()-.5)*.045,sz=spot.z+(this.random()-.5)*.045;
+        _m.compose(new THREE.Vector3(sx,spot.y+h*.5,sz),new THREE.Quaternion(),new THREE.Vector3(.002,h,.002));
+        acc.add(stemTemplate,_m,pick(),byHeight,phase);
+        const levels=needle?9:small?10:7;
+        for(let level=1;level<=levels;level++)for(let leaf=0;leaf<(needle?5:2);leaf++){
+          const angle=leaf*Math.PI*(needle?.4:1)+level*.61,leafH=h*(needle?.15:small?.14:.22);
+          _m.compose(new THREE.Vector3(sx+Math.cos(angle)*leafH*.25,spot.y+h*level/(levels+1),sz+Math.sin(angle)*leafH*.25),new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.sin(angle)*.95,-angle,Math.cos(angle)*.95)),new THREE.Vector3(leafH*(needle?.12:small?.35:.55),leafH,1));
+          acc.add(leafTemplate,_m,pick(),byHeight,phase+stem*.13+level*.07);
+        }
+      }
+      return;
+    }
     switch (def.kind) {
       case 'stem': {
         // A cluster of tall grass ribbons (vallisneria).
-        const blades = 5 + Math.floor(Math.random() * 5);
+        const blades = 5 + Math.floor(this.random() * 5);
         for (let b = 0; b < blades; b++) {
-          const h = H * (0.7 + Math.random() * 0.5);
+          const h = H * (0.7 + this.random() * 0.5);
           _m.compose(
-            new THREE.Vector3(spot.x + (Math.random() - 0.5) * 0.05, spot.y + h / 2, spot.z + (Math.random() - 0.5) * 0.05),
-            new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.random() * Math.PI, (Math.random() - 0.5) * 0.15)),
-            new THREE.Vector3(0.012 + Math.random() * 0.006, h, 1)
+            new THREE.Vector3(spot.x + (this.random() - 0.5) * 0.05, spot.y + h / 2, spot.z + (this.random() - 0.5) * 0.05),
+            new THREE.Quaternion().setFromEuler(new THREE.Euler(0, this.random() * Math.PI, (this.random() - 0.5) * 0.15)),
+            new THREE.Vector3(0.012 + this.random() * 0.006, h, 1)
           );
-          acc.add(bladeTemplate, _m, _c.copy(pick()).multiplyScalar(0.8 + Math.random() * 0.4), byHeight, phase + b * 0.13);
+          acc.add(bladeTemplate, _m, _c.copy(pick()).multiplyScalar(0.8 + this.random() * 0.4), byHeight, phase + b * 0.13);
         }
         break;
       }
       case 'rosette': {
         // Radial leaves from a crown (sword, crypt, anubias, java fern).
-        const leaves = 7 + Math.floor(Math.random() * 6);
+        const leaves = (def.id==='water-sprite'?14:7) + Math.floor(this.random() * 6);
         for (let l = 0; l < leaves; l++) {
-          const ang = (l / leaves) * Math.PI * 2 + Math.random() * 0.5;
-          const lean = 0.35 + Math.random() * 0.55;       // outward arch
-          const h = H * (0.70 + Math.random() * 0.50);
+          const ang = (l / leaves) * Math.PI * 2 + this.random() * 0.5;
+          const lean = 0.35 + this.random() * 0.55;       // outward arch
+          const h = H * (0.70 + this.random() * 0.50);
           _m.compose(
             new THREE.Vector3(spot.x + Math.cos(ang) * 0.015, spot.y + h / 2 * Math.cos(lean * 0.8), spot.z + Math.sin(ang) * 0.015),
             new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.sin(ang) * lean, -ang, Math.cos(ang) * lean, 'YXZ')),
-            new THREE.Vector3(h * (def.id === 'amazon-sword' ? 0.28 : def.id === 'anubias' ? 0.50 : 0.31), h, 1)
+            new THREE.Vector3(h * (def.id === 'amazon-sword' ? 0.28 : def.id === 'anubias' ? 0.50 : def.id==='java-fern'?.18:def.id==='water-sprite'?.4:0.31), h, 1)
           );
-          acc.add(leafTemplate, _m, _c.copy(pick()).multiplyScalar(0.75 + Math.random() * 0.5), byHeight, phase + l * 0.11);
+          acc.add(def.id==='water-sprite'?fernLeafTemplate:leafTemplate, _m, _c.copy(pick()).multiplyScalar(0.75 + this.random() * 0.5), byHeight, phase + l * 0.11);
+          if(def.id==='anubias')acc.add(thickLeafBack,_m,_c,byHeight,phase+l*.11);
         }
         break;
       }
       case 'carpet': {
         // A tuft of tiny blades; many tufts of the same species = a lawn.
-        const blades = 24;
+        const blades = def.id==='dwarf-sagittaria'?12:24;
         for (let b = 0; b < blades; b++) {
-          const h = H * (0.6 + Math.random() * 0.8);
+          const h = H * (0.6 + this.random() * 0.8);
           _m.compose(
-            new THREE.Vector3(spot.x + (Math.random() - 0.5) * 0.09, spot.y + h / 2, spot.z + (Math.random() - 0.5) * 0.09),
-            new THREE.Quaternion().setFromEuler(new THREE.Euler((Math.random() - 0.5) * 0.4, Math.random() * Math.PI, (Math.random() - 0.5) * 0.4)),
+            new THREE.Vector3(spot.x + (this.random() - 0.5) * 0.09, spot.y + h / 2, spot.z + (this.random() - 0.5) * 0.09),
+            new THREE.Quaternion().setFromEuler(new THREE.Euler((this.random() - 0.5) * 0.4, this.random() * Math.PI, (this.random() - 0.5) * 0.4)),
             new THREE.Vector3(0.004, h, 1)
           );
-          acc.add(bladeTemplate, _m, _c.copy(pick()).multiplyScalar(0.8 + Math.random() * 0.5), byHeight, Math.random());
+          acc.add(bladeTemplate, _m, _c.copy(pick()).multiplyScalar(0.8 + this.random() * 0.5), byHeight, this.random());
         }
         break;
       }
@@ -339,17 +394,17 @@ export class FloraSystem {
         // A cushion of small randomly-oriented fronds.
         for (let b = 0; b < 30; b++) {
           _m.compose(
-            new THREE.Vector3(spot.x + (Math.random() - 0.5) * 0.08, spot.y + Math.random() * H, spot.z + (Math.random() - 0.5) * 0.08),
-            new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI)),
+            new THREE.Vector3(spot.x + (this.random() - 0.5) * 0.08, spot.y + this.random() * H, spot.z + (this.random() - 0.5) * 0.08),
+            new THREE.Quaternion().setFromEuler(new THREE.Euler(this.random() * Math.PI, this.random() * Math.PI, this.random() * Math.PI)),
             new THREE.Vector3(0.014, 0.02, 1)
           );
-          acc.add(leafTemplate, _m, _c.copy(pick()).multiplyScalar(0.6 + Math.random() * 0.7), () => 0.4 + Math.random() * 0.4, Math.random());
+          acc.add(leafTemplate, _m, _c.copy(pick()).multiplyScalar(0.6 + this.random() * 0.7), () => 0.4 + this.random() * 0.4, this.random());
         }
         break;
       }
       case 'floating': {
         // Surface rosette + dangling roots.
-        const leaves = 5 + Math.floor(Math.random() * 3);
+        const leaves = 5 + Math.floor(this.random() * 3);
         for (let l = 0; l < leaves; l++) {
           const ang = (l / leaves) * Math.PI * 2;
           _m.compose(
@@ -360,14 +415,14 @@ export class FloraSystem {
           acc.add(leafTemplate, _m, _c.copy(pick()), () => 0.15, phase);
         }
         for (let r = 0; r < 5; r++) {
-          const len = 0.05 + Math.random() * H;
+          const len = 0.05 + this.random() * H;
           _m.compose(
-            new THREE.Vector3(spot.x + (Math.random() - 0.5) * 0.02, spot.y - len / 2, spot.z + (Math.random() - 0.5) * 0.02),
+            new THREE.Vector3(spot.x + (this.random() - 0.5) * 0.02, spot.y - len / 2, spot.z + (this.random() - 0.5) * 0.02),
             new THREE.Quaternion(),
             new THREE.Vector3(0.0015, len, 1)
           );
           // Roots sway MORE at the bottom (inverted weight).
-          acc.add(bladeTemplate, _m, _c.set('#c8c0a0'), (_x, y) => 1 - (y + 0.5), Math.random());
+          acc.add(bladeTemplate, _m, _c.set('#c8c0a0'), (_x, y) => 1 - (y + 0.5), this.random());
         }
         break;
       }
@@ -381,42 +436,42 @@ export class FloraSystem {
           acc.add(sphereTemplate, _m, _c.copy(pick()), () => 0.75, phase + 0.3);
         } else {
           for (let b = 0; b < 8; b++) {
-            const ang = Math.random() * Math.PI * 2, r = Math.random() * H * 0.3;
+            const ang = this.random() * Math.PI * 2, r = this.random() * H * 0.3;
             _m.compose(
-              new THREE.Vector3(spot.x + Math.cos(ang) * r, spot.y + trunkH + Math.random() * H * 0.4, spot.z + Math.sin(ang) * r),
-              new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.random(), Math.random(), Math.random())),
+              new THREE.Vector3(spot.x + Math.cos(ang) * r, spot.y + trunkH + this.random() * H * 0.4, spot.z + Math.sin(ang) * r),
+              new THREE.Quaternion().setFromEuler(new THREE.Euler(this.random(), this.random(), this.random())),
               new THREE.Vector3(H * 0.28, H * 0.3, H * 0.28)
             );
-            acc.add(sphereTemplate, _m, _c.copy(pick()).multiplyScalar(0.8 + Math.random() * 0.4), () => 0.7 + Math.random() * 0.3, Math.random());
+            acc.add(sphereTemplate, _m, _c.copy(pick()).multiplyScalar(0.8 + this.random() * 0.4), () => 0.7 + this.random() * 0.3, this.random());
           }
         }
         break;
       }
       case 'xenia': {
         // Stalks tipped with feathery "hands" that pulse open/closed.
-        const stalks = 5 + Math.floor(Math.random() * 4);
+        const stalks = 5 + Math.floor(this.random() * 4);
         for (let s = 0; s < stalks; s++) {
-          const sx = spot.x + (Math.random() - 0.5) * 0.05, sz = spot.z + (Math.random() - 0.5) * 0.05;
-          const h = H * (0.6 + Math.random() * 0.5);
+          const sx = spot.x + (this.random() - 0.5) * 0.05, sz = spot.z + (this.random() - 0.5) * 0.05;
+          const h = H * (0.6 + this.random() * 0.5);
           _m.compose(new THREE.Vector3(sx, spot.y + h / 2, sz), new THREE.Quaternion(), new THREE.Vector3(0.008, h, 0.008));
           acc.add(cylTemplate, _m, _c.copy(pick()).multiplyScalar(0.8), byHeight, s * 0.17);
           // The polyp hand: a small sphere whose vertices breathe along normals.
           _m.compose(new THREE.Vector3(sx, spot.y + h + 0.008, sz), new THREE.Quaternion(), new THREE.Vector3(0.028, 0.02, 0.028));
-          acc.add(sphereTemplate, _m, _c.copy(pick()), () => 1, s * 0.17 + Math.random() * 0.1);
+          acc.add(sphereTemplate, _m, _c.copy(pick()), () => 1, s * 0.17 + this.random() * 0.1);
         }
         break;
       }
       case 'lps': {
         // Dense cluster of long flowing tentacles (hammer/torch coral).
         for (let tnt = 0; tnt < 26; tnt++) {
-          const ang = Math.random() * Math.PI * 2, r = Math.random() * H * 0.45;
-          const h = H * (0.7 + Math.random() * 0.6);
+          const ang = this.random() * Math.PI * 2, r = this.random() * H * 0.45;
+          const h = H * (0.7 + this.random() * 0.6);
           _m.compose(
             new THREE.Vector3(spot.x + Math.cos(ang) * r, spot.y + h / 2, spot.z + Math.sin(ang) * r),
-            new THREE.Quaternion().setFromEuler(new THREE.Euler((Math.random() - 0.5) * 0.7, 0, (Math.random() - 0.5) * 0.7)),
+            new THREE.Quaternion().setFromEuler(new THREE.Euler((this.random() - 0.5) * 0.7, 0, (this.random() - 0.5) * 0.7)),
             new THREE.Vector3(0.014, h, 0.014)
           );
-          acc.add(coneTemplate, _m, _c.copy(pick()).multiplyScalar(0.8 + Math.random() * 0.5), byHeight, Math.random());
+          acc.add(coneTemplate, _m, _c.copy(pick()).multiplyScalar(0.8 + this.random() * 0.5), byHeight, this.random());
         }
         break;
       }
@@ -425,26 +480,26 @@ export class FloraSystem {
         _m.compose(new THREE.Vector3(spot.x, spot.y + H * 0.12, spot.z), new THREE.Quaternion(), new THREE.Vector3(H * 0.7, H * 0.3, H * 0.7));
         acc.add(sphereTemplate, _m, _c.copy(colors[0]).multiplyScalar(0.7), () => 0.1, phase);
         for (let tnt = 0; tnt < 34; tnt++) {
-          const ang = Math.random() * Math.PI * 2, r = Math.random() * H * 0.32;
-          const h = H * (0.5 + Math.random() * 0.55);
+          const ang = this.random() * Math.PI * 2, r = this.random() * H * 0.32;
+          const h = H * (0.5 + this.random() * 0.55);
           _m.compose(
             new THREE.Vector3(spot.x + Math.cos(ang) * r, spot.y + H * 0.2 + h / 2, spot.z + Math.sin(ang) * r),
             new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.cos(ang) * 0.5, 0, -Math.sin(ang) * 0.5)),
             new THREE.Vector3(0.016, h, 0.016)
           );
-          acc.add(coneTemplate, _m, _c.copy(colors[1 % colors.length]).multiplyScalar(0.85 + Math.random() * 0.35), byHeight, Math.random());
+          acc.add(coneTemplate, _m, _c.copy(colors[1 % colors.length]).multiplyScalar(0.85 + this.random() * 0.35), byHeight, this.random());
         }
         break;
       }
       case 'zoa': {
         // A mat of little button polyps in mixed neon colors.
         for (let p = 0; p < 22; p++) {
-          const px = spot.x + (Math.random() - 0.5) * 0.09, pz = spot.z + (Math.random() - 0.5) * 0.09;
-          const h = H * (0.6 + Math.random() * 0.6);
+          const px = spot.x + (this.random() - 0.5) * 0.09, pz = spot.z + (this.random() - 0.5) * 0.09;
+          const h = H * (0.6 + this.random() * 0.6);
           _m.compose(new THREE.Vector3(px, spot.y + h / 2, pz), new THREE.Quaternion(), new THREE.Vector3(0.006, h, 0.006));
-          acc.add(cylTemplate, _m, _c.set('#7a6a58'), byHeight, Math.random());
+          acc.add(cylTemplate, _m, _c.set('#7a6a58'), byHeight, this.random());
           _m.compose(new THREE.Vector3(px, spot.y + h, pz), new THREE.Quaternion(), new THREE.Vector3(0.02, 0.005, 0.02));
-          acc.add(sphereTemplate, _m, _c.copy(pick()), () => 0.9, Math.random());
+          acc.add(sphereTemplate, _m, _c.copy(pick()), () => 0.9, this.random());
         }
         break;
       }
@@ -455,8 +510,8 @@ export class FloraSystem {
         } else if (def.id === 'montipora-plate') {
           for (let p = 0; p < 3; p++) {
             _m.compose(
-              new THREE.Vector3(spot.x + (Math.random() - 0.5) * 0.04, spot.y + H * (0.3 + p * 0.3), spot.z + (Math.random() - 0.5) * 0.04),
-              new THREE.Quaternion().setFromEuler(new THREE.Euler((Math.random() - 0.5) * 0.3, Math.random(), (Math.random() - 0.5) * 0.3)),
+              new THREE.Vector3(spot.x + (this.random() - 0.5) * 0.04, spot.y + H * (0.3 + p * 0.3), spot.z + (this.random() - 0.5) * 0.04),
+              new THREE.Quaternion().setFromEuler(new THREE.Euler((this.random() - 0.5) * 0.3, this.random(), (this.random() - 0.5) * 0.3)),
               new THREE.Vector3(H * (1.5 - p * 0.3), H * 0.08, H * (1.5 - p * 0.3))
             );
             acc.add(sphereTemplate, _m, _c.copy(pick()).multiplyScalar(0.85 + p * 0.12), () => 0, phase);
@@ -464,14 +519,14 @@ export class FloraSystem {
         } else {
           // Acropora: rigid branching — trunk + angled branch cones.
           for (let b = 0; b < 12; b++) {
-            const ang = Math.random() * Math.PI * 2, r = Math.random() * H * 0.35;
-            const h = H * (0.5 + Math.random() * 0.7);
+            const ang = this.random() * Math.PI * 2, r = this.random() * H * 0.35;
+            const h = H * (0.5 + this.random() * 0.7);
             _m.compose(
               new THREE.Vector3(spot.x + Math.cos(ang) * r, spot.y + h / 2, spot.z + Math.sin(ang) * r),
               new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.cos(ang) * 0.45, 0, -Math.sin(ang) * 0.45)),
               new THREE.Vector3(0.02, h, 0.02)
             );
-            acc.add(coneTemplate, _m, _c.copy(pick()).multiplyScalar(0.75 + Math.random() * 0.5), () => 0, Math.random());
+            acc.add(coneTemplate, _m, _c.copy(pick()).multiplyScalar(0.75 + this.random() * 0.5), () => 0, this.random());
           }
         }
         break;
