@@ -59,6 +59,17 @@ try{
       if(k===10&&!check.some(v=>v.kind==='fish-cookie'))throw Error('10th click cookie not drawn');
     }
   }
+  // Regression: all six control tabs and representative translations render in Chromium.
+  await page.click('.open-panel');
+  await page.waitForSelector('.panel');
+  const tabs=await page.$eval('.panel .tabs button',a=>a.map(x=>x.textContent?.trim()));
+  for(const name of ['Bể','Cá','Cây','Trang trí','Đã lưu','Cài đặt']){
+    if(!tabs.includes(name))throw Error('Control tab not translated: '+name+'; got '+JSON.stringify(tabs));
+  }
+  for(const [tab,expected] of [['Bể','Nền đáy'],['Cá','Tìm cá theo tên'],['Cây','Dương xỉ Java'],['Trang trí','Đá và lũa'],['Đã lưu','Lưu hồ hiện tại'],['Cài đặt','Chất lượng đồ họa']]){
+    await page.evaluate(name=>{[...document.querySelectorAll('.panel .tabs button')].find(x=>x.textContent?.trim()===name)?.click()},tab);
+    await page.waitForFunction(s=>document.querySelector('.panel .panel-body')?.textContent?.includes(s)||document.querySelector('.panel .panel-body input')?.getAttribute('placeholder')?.includes(s),{timeout:5000},expected);
+  }
   const counter=await page.evaluate(()=>document.querySelector('.kanban-aquarium-feed-count')?.textContent);
-  console.log('PASS: 10 consecutive clicks; pellets visible; 10th fish cookie; sizes 10px/25px; counter='+counter);
+  console.log('PASS: immediate sink; 10px pellets/25px cookies; 10th cookie; six Vietnamese control tabs; counter='+counter);
 }catch(e){console.error(e);process.exitCode=1}finally{await browser?.close();server.kill('SIGTERM')}
