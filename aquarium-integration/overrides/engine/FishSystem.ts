@@ -189,7 +189,7 @@ export class FishSystem {
   }
   private finSoftness(sp:SpeciesDef):number{
     return !this.softFinsOn||sp.invert||sp.shape.eelLike?0:
-      sp.shape.finLong?.034:.010;
+      sp.id==='angelfish'?.064:sp.shape.finLong?.045:.018;
   }
   resetHabitat():void{this.habitat.reset();}
   getHabitatSnapshot(env:SimEnv){return this.habitat.snapshot(env);}
