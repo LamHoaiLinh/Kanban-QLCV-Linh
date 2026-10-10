@@ -112,7 +112,7 @@ export class FoodSystem {
       this.mats.set(file,new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false,depthWrite:false,alphaTest:0.02,toneMapped:false}));
     }
   }
-  scatter(x:number,z:number,surfaceY:number,kind:FoodKind='normal'):void{
+  scatter(x:number,z:number,startY:number,kind:FoodKind='normal'):void{
     if(this.bits.length>=65)this.remove(this.bits[0]);
     const files=this.variants[kind],name=files[Math.floor(Math.random()*files.length)];
     const sprite=new THREE.Sprite(this.mats.get(name)!);
@@ -122,7 +122,9 @@ export class FoodSystem {
     // exact world positions, avoiding water shaders and fog swallowing pellets.
     sprite.visible=!new URLSearchParams(location.search).has('kanban');
     sprite.renderOrder=1500;
-    const bit:FoodBit={pos:new THREE.Vector3(x+(Math.random()-.5)*.014,surfaceY-.035,z+(Math.random()-.5)*.014),
+    // Preserve the exact screen ray: horizontal scattering would shift the pellet
+    // away from the pointer, especially with an oblique camera.
+    const bit:FoodBit={pos:new THREE.Vector3(x,startY,z),
       age:0,state:'sink',kind,sprite};
     sprite.position.copy(bit.pos);this.group.add(sprite);this.bits.push(bit);
   }
@@ -458,8 +460,9 @@ export class FishSystem {
     }
   }
 
-  feed(x: number, z: number, env: SimEnv, kind:FoodKind='normal'): void {
-    this.food.scatter(x, z, env.surfaceY,kind);
+  feed(x: number, z: number, env: SimEnv, kind:FoodKind='normal',
+    startY=env.surfaceY-.035): void {
+    this.food.scatter(x,z,startY,kind);
     this.feedTimer = 75;
   }
 
