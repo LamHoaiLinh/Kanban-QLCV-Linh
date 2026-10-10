@@ -61,6 +61,9 @@ try{
    }
    fish.feed(food.x,food.z,env,'fish-cookie',food.y);const bit=fish.food.bits.at(-1);bit.state='settled';bit.age=.5;
    let eaten=0,maxClaimants=0,lastFeed=0,abandonedAt=null,hadTarget=false;const first=actors[0],initial=first.pos.clone(),trace=[];
+   // Fault injection starts with an acquired target. Random reaction latency
+   // must not allow another fish to win before the actor can be frozen.
+   if(mode==='stalled'){first.foodTarget=bit;first.foodProgress={best:first.pos.distanceTo(bit.pos),stalled:0,elapsed:0,checkAt:env.time+.25};}
    fish.food.onEat=()=>eaten++;
    for(let i=0;i<60*20;i++){
     if(mode==='stalled')first.pos.copy(initial);

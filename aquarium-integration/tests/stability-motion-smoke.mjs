@@ -21,7 +21,7 @@ try{
    const trace=[];
    for(let frame=0;frame<600*fps;frame++){
     const dt=frame>0&&frame%(fps*31)===0?.25:1/fps;
-    env.time+=Math.min(dt,.05);fish.update(dt,env);
+    env.time+=Math.min(dt,.05);env.current.time=env.time;fish.update(dt,env);
     if(frame===fps*2)fish.feed(0,env.halfD*.6,env,'fish-cookie',env.surfaceY-.014);
     for(const a of agents)if(!Number.isFinite(a.prevPitch)||!a.pos.toArray().every(Number.isFinite)||a.pos.y>env.surfaceY-fish.verticalClearance(a,env)+.002)throw Error('Non-finite or waterline violation');
     trace.push(agents.map(a=>[a.pos.x,a.pos.y,a.pos.z,a.vel.x,a.vel.y,a.vel.z,a.prevYaw,a.prevPitch,a.collisions,a.recoveries,a.stuckTime]));

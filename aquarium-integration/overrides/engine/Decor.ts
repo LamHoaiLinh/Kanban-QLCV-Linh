@@ -188,7 +188,14 @@ export class DecorSystem {
       if(obj instanceof THREE.Mesh)obj.geometry.dispose();
     });
     this.group.clear();
-    for (const m of this.materials) m.dispose();
+    // These procedural maps are owned by this decor rebuild, never shared
+    // with fish/environment assets. Several materials can share one bark map.
+    const maps=new Set<THREE.Texture>();
+    for(const m of this.materials){
+      for(const value of Object.values(m))if(value instanceof THREE.Texture)maps.add(value);
+      m.dispose();
+    }
+    for(const map of maps)map.dispose();
     this.materials = [];
 
     const out: DecorOutput = { obstacles: [], shelters: [], tunnels: [], anchors: [], airstone: null };

@@ -21,6 +21,7 @@ import { getFishAsset } from './FishFactory';
 import { normalizeStock } from '../data/stocking';
 import type { TankConfig } from '../types';
 import { HabitatDirector } from './HabitatDirector';
+import { behaviorFor } from './BehaviorProfiles';
 import { CurrentField } from './CurrentField';
 import { radialSpriteTexture } from './textures';
 import { applyUnderwater } from './shaders';
@@ -84,6 +85,7 @@ interface Agent {
   anchor: THREE.Vector3;    // territory / station / school goal
   prevYaw: number;
   prevPitch: number;
+  pitchVelocity?:number;
   moveOrigin: THREE.Vector3;
   stuckTime: number;
   acceleration: THREE.Vector3;
@@ -193,10 +195,10 @@ export class FoodSystem {
   nearest(p:THREE.Vector3,maxDist:number,settledOnly:boolean,accept?:(b:FoodBit)=>boolean):FoodBit|null{
     let best:FoodBit|null=null,score=Infinity;
     for(const b of this.bits){
-      if(b.state==='gone'||b.age<(b.kind==='normal'?.35:.45))continue;
+      if(b.state==='gone'||b.age<(b.kind==='normal'?.12:.18))continue;
       const special=b.kind!=='normal';
       if(!special&&settledOnly&&b.state!=='settled')continue;
-      if(!special&&!settledOnly&&b.state==='settled')continue;
+      // Midwater fish may take settled food on a reachable wood ledge too.
       const d=b.pos.distanceToSquared(p);
       if(d>Math.pow(special?maxDist*1.45:maxDist,2))continue;
       // Cookies are preferred when reasonably close, not magically detected across the tank.
@@ -346,7 +348,7 @@ export class FishSystem {
     if(a.pos.y>=ymax-.00001){a.acceleration.y=Math.min(0,a.acceleration.y);}
     // A habitat/feeding event may have left an anchor outside this tall fish's
     // valid envelope. Project the GOAL before it can keep pulling into the clamp.
-    if(a.sp.id==='angelfish')a.anchor.y=THREE.MathUtils.clamp(a.anchor.y,ymin+.008,ymax-.008);
+    if(!a.gulp&&!a.jump)a.anchor.y=THREE.MathUtils.clamp(a.anchor.y,ymin+.008,ymax-.008);
     // Resolve position against solid decorations after steering; avoid popping
     // by removing inward velocity only. A low iteration count bounds CPU cost.
     const radius=this.collisionRadius(a);
@@ -661,6 +663,10 @@ export class FishSystem {
     startY=env.surfaceY-.035): void {
     this.food.scatter(x,z,startY,kind);
     this.feedTimer = 12;
+    for(const p of this.populations)for(const a of p.agents)if(!a.foodTarget){
+      const profile=behaviorFor(a.sp);
+      a.foodCooldown=env.time+.08+a.rand*.3+(profile.foodInterest==='high'?0:.1);
+    }
   }
 
   // Find a fish agent by its stable key (for follow-cam / naming).
@@ -822,7 +828,8 @@ export class FishSystem {
     a.feedDistance=undefined;
     a.jawTime=Math.max(0,a.jawTime-dt);
     a.jaw=THREE.MathUtils.damp(a.jaw,a.jawTime>0?1:0,a.jawTime>0?19:11,dt);
-    const cruise = sp.swim.cruise * L * SPEED_SCALE; // body-lengths/s → m/s
+    const profile=behaviorFor(sp);
+    const cruise = sp.swim.cruise * L * SPEED_SCALE * profile.pace;
     const maxSpeed = cruise * sp.swim.burst;
 
     // — Activity by time of day: nocturnal species invert the rhythm —
@@ -840,17 +847,19 @@ export class FishSystem {
     a.modeT -= dt;
     if (a.modeT <= 0) this.pickMode(a, env, activity);
 
+    const target=this.feedingTarget(a,env,dt);
+    if(target)this.habitat.cancelFor(a);
     const steer = _v1.set(0, 0, 0);
 
     // 1) Wall avoidance — smooth quadratic push away from glass and surface.
     const angel=sp.id==='angelfish';
     // A large angel in a small aquarium was trapped inside overlapping soft
     // wall margins (.23m for a .1m fish), fighting the hard fin-aware clamp.
-    const margin = angel?Math.max(.035,L*.90):Math.max(.065,L*2.3);
+    const margin = Math.min(Math.max(.035,L*(angel?.90:1.4)),Math.min(env.halfW,env.halfD)*.55);
     const push = (d: number) => THREE.MathUtils.clamp((margin - d) / margin, 0, 1) ** 2 * 1.6;
     steer.x += push(a.pos.x + env.halfW) - push(env.halfW - a.pos.x);
     steer.z += push(a.pos.z + env.halfD) - push(env.halfD - a.pos.z);
-    const safeY=angel?this.verticalClearance(a,env):0;
+    const safeY=this.verticalClearance(a,env);
     steer.y += push(a.pos.y-env.floorY-safeY) -
       push(env.surfaceY-safeY-a.pos.y);
 
@@ -866,7 +875,7 @@ export class FishSystem {
 
     // 3) Depth-band preference — a soft pull back into the species' layer.
     //    Suspended during an air-gulp run: the whole point is leaving the zone.
-    if (!a.gulp&&!this.habitat.inCorridor(a)) {
+    if (!target&&!a.gulp&&!this.habitat.inCorridor(a)) {
       const [y0, y1] = this.zoneBand(sp, env);
       if (a.pos.y < y0) steer.y += (y0 - a.pos.y) * 1.6;
       if (a.pos.y > y1) steer.y -= (a.pos.y - y1) * 1.6;
@@ -890,19 +899,18 @@ export class FishSystem {
     }
 
     // 4) Boids for schooling species (RESEARCH.md §3.3).
-    if (sp.archetype === 'schooler' && school.length > 1) {
+    if (!target&&sp.archetype === 'schooler' && school.length > 1) {
       this.boids(a, school, steer, L);
     }
 
     // 5) Archetype flavor.
-    this.archetypeSteer(a, steer, env, activity);
+    if(!target)this.archetypeSteer(a, steer, env, activity);
 
     // One event at most can steer a fish through a measured corridor.
-    this.habitat.steer(a,steer,dt,env);
+    if(!target)this.habitat.steer(a,steer,dt,env);
 
     // Bounded, locally visible feeding. Keep the target stable, share slots,
     // recheck movement of the pellet, and abandon instead of fighting decor.
-    const target=this.feedingTarget(a,env,dt);
     if(target){
       this.habitat.cancelFor(a);
       const offset=target.pos.clone().sub(a.pos),d=offset.length();
@@ -925,12 +933,17 @@ export class FishSystem {
     // 7) Current: drift with the flow, and face into it when it's strong
     //    (rheotaxis) — sells "there is real water in this box".
     env.current.sample(a.pos, _v2);
+    // Current fades into the fin-aware boundary; do not repeatedly drift into
+    // a hard clamp while the next frame accelerates upward again.
+    const driftRoom=_v2.y>0?env.surfaceY-safeY-a.pos.y:a.pos.y-env.floorY-safeY;
+    _v2.y*=THREE.MathUtils.clamp(driftRoom/.035,0,1);
     a.pos.addScaledVector(_v2, dt);
     const flow = _v2.length();
     if (flow > 0.03) steer.addScaledVector(_v2.normalize(), -0.25);
 
     // 8) Species movement personality without changing boids/collisions.
     const t=env.time*(env.reducedMotion?.5:1);
+    if(!target){
     if(sp.id==='guppy'){
       steer.y+=Math.sin(t*.73+a.rand*24)*.16;
       steer.x+=Math.sin(t*.85+a.rand*18)*.14;
@@ -952,6 +965,7 @@ export class FishSystem {
     steer.x += Math.sin(t * 0.7 + a.rand * 40) * 0.22;
     steer.z += Math.cos(t * 0.53 + a.rand * 71) * 0.22;
     steer.y += Math.sin(t * 0.41 + a.rand * 23) * 0.1;
+    }
 
     // — Integrate: steer → velocity, with mode-dependent target speed —
     let targetSpeed=cruise*activity;
@@ -961,13 +975,13 @@ export class FishSystem {
     if(sp.id==='guppy')targetSpeed*=1.08;
     if(sp.id==='ocellaris-clown')targetSpeed*=.88;
     if(sp.id==='dwarf-gourami'||sp.id==='honey-gourami')targetSpeed*=.82;
-    if (a.mode === 'rest') targetSpeed = cruise * (angel?.42:.06);
+    if (a.mode === 'rest') targetSpeed = cruise * profile.restSpeed;
     if(a.mode==='dart')
       targetSpeed=maxSpeed*(sp.id==='betta'?.63:sp.id==='angelfish'?.72:1);
     if(a.mode==='feed'){
-      targetSpeed=cruise*(this.food.hasCookie?1.50:1.20);
+      targetSpeed=cruise*profile.feedBoost*(target?.kind!=='normal'?1.12:1);
       if(a.feedDistance!==undefined){
-        const slowing=THREE.MathUtils.clamp(a.feedDistance/(L*2.6),.22,1);
+        const slowing=THREE.MathUtils.clamp(a.feedDistance/(L*1.15),.38,1);
         targetSpeed*=slowing;
       }
     }
@@ -976,23 +990,33 @@ export class FishSystem {
     if(env.ecoMode==='natural')targetSpeed*=Math.max(.86,Math.min(1.03,env.ecoComfort??1));
     if(env.ecoMode==='natural'&&a.mode==='rest')targetSpeed*=.75;
 
+    // Depth steering is a damped controller. Without velocity feedback,
+    // zone/anchor/wall springs overshoot in alternating vertical arcs, even
+    // away from collisions (the yellow-tang video reproduction).
+    if(!a.gulp)steer.y-=a.vel.y/Math.max(.012,cruise)*.8;
     const steerStrength = a.mode === 'dart' ? 4 : 1.8;
-    const desired=steer.clone().multiplyScalar(steerStrength*Math.max(cruise,.05)*6).clampLength(0,Math.max(.025,cruise*8));
+    const desired=steer.clone().multiplyScalar(steerStrength*Math.max(cruise,.012)*6).clampLength(0,Math.max(.025,cruise*8));
     const change=desired.sub(a.acceleration).clampLength(0,Math.max(.12,cruise*45)*dt);
     a.acceleration.add(change);
-    const heading=a.vel.clone();
+    const heading=a.vel.clone().setY(0);
     a.vel.addScaledVector(a.acceleration,dt);
-    if(heading.lengthSq()>1e-8&&a.vel.lengthSq()>1e-8){
-      const angle=heading.angleTo(a.vel),limit=sp.swim.turnRate*dt*(angel?.43:sp.id==='betta'?.67:1);
-      if(angle>limit){const q=new THREE.Quaternion().setFromUnitVectors(heading.normalize(),a.vel.clone().normalize());
-        q.identity().slerp(new THREE.Quaternion().setFromUnitVectors(heading,a.vel.clone().normalize()),limit/angle);
-        a.vel.copy(heading.applyQuaternion(q).multiplyScalar(a.vel.length()));}
+    const horizontalVelocity=a.vel.clone().setY(0);
+    if(heading.lengthSq()>1e-8&&horizontalVelocity.lengthSq()>1e-8){
+      // Limit yaw, not the vertical braking controller. Constraining the whole
+      // velocity quaternion delayed vertical damping and caused another oscillation.
+      const horizontalSpeed=horizontalVelocity.length(),vertical=a.vel.y;
+      const angle=heading.angleTo(horizontalVelocity),limit=sp.swim.turnRate*dt*(angel?.43:sp.id==='betta'?.67:1);
+      if(angle>limit){
+        const rotation=new THREE.Quaternion().setFromUnitVectors(heading.normalize(),horizontalVelocity.normalize());
+        const q=new THREE.Quaternion().slerp(rotation,limit/angle);
+        a.vel.copy(heading.applyQuaternion(q).multiplyScalar(horizontalSpeed));a.vel.y=vertical;
+      }
     }
 
     // Clamp speed toward the target (fish accelerate fast, decelerate gently).
     const speed = a.vel.length();
     if (speed > 1e-6) {
-      const newSpeed = THREE.MathUtils.damp(speed, targetSpeed, 2.2, dt);
+      const newSpeed = THREE.MathUtils.damp(speed, targetSpeed, a.mode==='feed'?4.2:2.2, dt);
       a.vel.multiplyScalar(newSpeed / speed);
     } else {
       a.vel.set(0.01, 0, 0);
@@ -1044,18 +1068,19 @@ export class FishSystem {
       if(d<progress.best-.001){progress.best=d;progress.stalled=0;}else progress.stalled+=dt;
       const check=env.time>=progress.checkAt;
       if(check)progress.checkAt=env.time+.25;
-      if(b.state==='gone'||progress.stalled>2.5||progress.elapsed>7||(check&&!this.canReachFood(a,b,env))){
+      if(b.state==='gone'||progress.stalled>2.5||progress.elapsed>11||(check&&!this.canReachFood(a,b,env))){
         this.releaseFood(a,env,b.state!=='gone');return null;
       }
       return b;
     }
-    if(env.time<(a.foodCooldown??0)||a.mode==='rest'&&!this.food.hasCookie)return null;
+    if(env.time<(a.foodCooldown??0))return null;
     // At most ~2 target searches/second/fish, independent of render FPS.
-    a.foodCooldown=env.time+.45+a.rand*.15;
-    b=this.food.nearest(a.pos,Math.max(.17,a.scale*6),a.sp.zone==='bottom',candidate=>{
+    const profile=behaviorFor(a.sp);
+    a.foodCooldown=env.time+.16+a.rand*.14;
+    b=this.food.nearest(a.pos,Math.max(.26,Math.min(env.halfW*1.5,profile.perception)),a.sp.zone==='bottom',candidate=>{
       if((a.rejectedFood?.get(candidate)??0)>env.time)return false;
       let claimants=0;for(const p of this.populations)for(const other of p.agents)if(other.foodTarget===candidate)claimants++;
-      return claimants<(candidate.kind==='normal'?1:3)&&this.canReachFood(a,candidate,env);
+      return claimants<(candidate.kind==='normal'?2:3)&&this.canReachFood(a,candidate,env);
     })??undefined;
     if(!b)return null;
     a.foodTarget=b;a.foodProgress={best:a.pos.distanceTo(b.pos),stalled:0,elapsed:0,checkAt:env.time+.25};
@@ -1098,7 +1123,7 @@ export class FishSystem {
         break;
       case 'solitary':
         // Patrol between points of a territory.
-        a.mode = r < 0.25 ? 'rest' : 'cruise';
+        a.mode = r < (sp.id.endsWith('-tang')?.08:.25) ? 'rest' : 'cruise';
         a.modeT = 3 + Math.random() * 5;
         if (a.mode === 'cruise') this.newAnchorNear(a, env, 0.6);
         break;
@@ -1149,18 +1174,18 @@ export class FishSystem {
     // full fin envelope. Try free swimming pockets rather than a position
     // behind the nearest log collider.
     const angel=a.sp.id==='angelfish';
-    const safeY=angel?this.verticalClearance(a,env)+.014:0;
+    const safeY=this.verticalClearance(a,env)+.014;
     const lo=Math.max(y0,env.floorY+safeY);
     const hi=Math.max(lo,Math.min(y1,env.surfaceY-safeY));
     const baseline=a.pos.clone();
-    for(let attempt=0;attempt<(angel?18:1);attempt++){
+    for(let attempt=0;attempt<18;attempt++){
       const nx=THREE.MathUtils.clamp(baseline.x+(Math.random()-.5)*env.halfW*2*range,
         -env.halfW*.72,env.halfW*.72);
       const nz=THREE.MathUtils.clamp(baseline.z+(Math.random()-.5)*env.halfD*2*range,
         -env.halfD*.68,env.halfD*.68);
       const ny=THREE.MathUtils.lerp(lo,hi,Math.random());
       a.anchor.set(nx,ny,nz);
-      if(!angel||env.obstacles.every(ob=>a.anchor.distanceTo(ob.pos)>
+      if(env.obstacles.every(ob=>a.anchor.distanceTo(ob.pos)>
         ob.radius+this.collisionRadius(a)+.035))break;
     }
   }
@@ -1320,7 +1345,18 @@ export class FishSystem {
       if(a.peck&&a.peck.stage!=='approach')pitch=THREE.MathUtils.damp(a.prevPitch,Math.asin(-a.peck.normal.y),4,dt);
       else pitch=THREE.MathUtils.clamp(pitch,-maxPitch,
         sp.id==='angelfish'?.19:maxPitch);
-      if(sp.id==='angelfish')pitch=THREE.MathUtils.damp(a.prevPitch,pitch,2.8,dt);
+      // Continuous body response for every species, including tangs. Jump/peck
+      // keep their own intentional pose; cruising retains nonzero pitch.
+      if(!a.jump&&!a.gulp&&!(a.peck&&a.peck.stage!=='approach')){
+        // Critically damped angular dynamics, with finite angular acceleration.
+        // A turn/braking correction cannot instantly reverse the body's pitch rate.
+        const rate=behaviorFor(sp).pitchRate;
+        const velocity=a.pitchVelocity??0;
+        const omega=sp.shape.height>=.5?2.2:4;
+        const angularAcceleration=THREE.MathUtils.clamp((pitch-a.prevPitch)*omega*omega-2*omega*velocity,-4,4);
+        a.pitchVelocity=THREE.MathUtils.clamp(velocity+angularAcceleration*dt,-rate,rate);
+        pitch=a.prevPitch+a.pitchVelocity*dt;
+      }
     }
 
     // Bank into turns: roll proportional to yaw rate × speed (RESEARCH.md §3.2).

@@ -56,6 +56,7 @@ export class Engine {
   private running = true;
   private firstFrameDone = false;
   private disposed = false;
+  private environmentTarget:THREE.WebGLRenderTarget;
   private frameTimes: number[] = [];
   private feedMode = false;
   private kanAquariumMode=new URLSearchParams(location.search).has('kanban');
@@ -113,7 +114,10 @@ export class Engine {
     // Image-based lighting from a neutral procedural "room" — gives PBR
     // materials something real to reflect without shipping an HDRI file.
     const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.06).texture;
+    const room=new RoomEnvironment();
+    this.environmentTarget=pmrem.fromScene(room,0.06);
+    this.scene.environment=this.environmentTarget.texture;
+    room.dispose();
     pmrem.dispose();
     this.scene.background = new THREE.Color('#04141f');
 
@@ -283,6 +287,24 @@ export class Engine {
         delete (window as Window & {__kanVisualFinToggle?:(on:boolean)=>void}).__kanVisualFinToggle;
         delete (window as Window & {__kanFoodTestCamera?:(mode:'orbit'|'cinematic'|'still')=>void}).__kanFoodTestCamera;
       }
+    this.composer?.passes.forEach(pass=>pass.dispose());
+    this.composer?.dispose();
+    const geometries=new Set<THREE.BufferGeometry>(),materials=new Set<THREE.Material>(),textures=new Set<THREE.Texture>();
+    this.scene.traverse(obj=>{
+      if(obj instanceof THREE.Mesh||obj instanceof THREE.Line||obj instanceof THREE.Points){
+        geometries.add(obj.geometry);
+        for(const material of Array.isArray(obj.material)?obj.material:[obj.material])materials.add(material);
+      }else if(obj instanceof THREE.Sprite)materials.add(obj.material);
+      if(obj instanceof THREE.InstancedMesh)obj.dispose();
+    });
+    for(const material of materials){
+      for(const value of Object.values(material))if(value instanceof THREE.Texture)textures.add(value);
+      material.dispose();
+    }
+    for(const geometry of geometries)geometry.dispose();
+    for(const texture of textures)texture.dispose();
+    this.environmentTarget.dispose();
+    this.scene.clear();
     this.renderer.dispose();
     this.container.removeChild(this.renderer.domElement);
   }
@@ -304,6 +326,7 @@ export class Engine {
   };
 
   private rebuildComposer(w: number, h: number): void {
+    this.composer?.passes.forEach(pass=>pass.dispose());
     this.composer?.dispose();
     if (this.quality.bloom) {
       this.composer = new EffectComposer(this.renderer);
