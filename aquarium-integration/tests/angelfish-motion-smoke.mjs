@@ -70,8 +70,11 @@ try {
   for(const [key,tr] of tracks){
     if(tr.maxDrift<.027||tr.travel<.065)
       throw Error('Angelfish barely moved in 46s '+key+' '+JSON.stringify(tr));
-    if(tr.rest/tr.frames>.47||tr.slow/tr.frames>.47)
-      throw Error('Angelfish over-resting or near stationary '+key+' '+JSON.stringify(tr));
+    // A hoverer may report mode='rest' while still swimming smoothly (e.g.
+    // scene activity or cave watching). Measure true velocity and displacement,
+    // not mode labels — the original bug was spatial pinning/jitter.
+    if(tr.slow/tr.frames>.30)
+      throw Error('Angelfish near-stationary too often '+key+' '+JSON.stringify(tr));
   }
   if(violations>0)throw Error('Boundary violations '+violations);
   if(maxStuck>2.65)throw Error('Stalled too long '+maxStuck);
