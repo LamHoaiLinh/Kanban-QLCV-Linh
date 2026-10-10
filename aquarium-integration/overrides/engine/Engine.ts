@@ -126,7 +126,7 @@ export class Engine {
       halfW: 0.5, halfD: 0.25, floorY: 0, surfaceY: 0.48,
       current: this.current,
       reducedMotion: false,
-      obstacles: [], shelters: [],ecoMode:'natural',ecoComfort:1,
+      obstacles: [], shelters: [],tunnels: [],ecoMode:'natural',ecoComfort:1,
     };
     // QA-only regression probe. Not enabled on the published KanBan URL.
     if(new URLSearchParams(location.search).get('qa')==='1'){
@@ -165,6 +165,8 @@ export class Engine {
       (window as Window & {__kanRealismProbe?:()=>unknown}).__kanRealismProbe=()=>({
         name:this.config?.name,
         fish:this.fish.getPhysicsSnapshot(this.simEnv),
+        habitat:this.fish.getHabitatSnapshot(this.simEnv),
+        fins:this.fish.getFinSnapshot(),
         flora:this.flora.getContainmentSnapshot(this.dims),
         obstacles:this.simEnv.obstacles.length,
         food:this.fish.food.bits.length,
@@ -331,6 +333,8 @@ export class Engine {
       this.foodOccluders=[...this.decor.group.children,...this.flora.group.children];
       this.foodDepthCache=new WeakMap();
       this.simEnv.shelters = decorOut.shelters;
+      this.simEnv.tunnels = decorOut.tunnels;
+      this.fish.resetHabitat();
 
       this.environment.rebuild(
         this.dims, config.water, config.substrate, config.background, config.lighting,
