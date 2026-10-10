@@ -14,8 +14,10 @@
 
 import * as THREE from 'three';
 import type { SpeciesDef } from '../types';
+import type { SwimTunnel } from './Decor';
 import { speciesById } from '../data/species';
 import { getFishAsset } from './FishFactory';
+import { HabitatDirector } from './HabitatDirector';
 import { CurrentField } from './CurrentField';
 import { radialSpriteTexture } from './textures';
 import { applyUnderwater } from './shaders';
@@ -54,6 +56,7 @@ export interface SimEnv {
   ecoComfort?:number; // gentle environmental modulation, never mortality
   obstacles: { pos: THREE.Vector3; radius: number }[]; // decor/coral keep-out spheres
   shelters: THREE.Vector3[];                            // hiding spots (decor)
+  tunnels: SwimTunnel[]; // open corridors exported from the physical wood geometry
 }
 
 type FishMode = 'cruise' | 'rest' | 'dart' | 'feed' | 'forage';
@@ -66,7 +69,9 @@ interface Agent {
   vel: THREE.Vector3;
   phase: number;            // accumulated tail-beat phase (shader reads this)
   bend: number;             // smoothed turn curvature
-  flap: number;             // pectoral flutter amount (rises when slow)
+  flap: number;
+  jaw: number;
+  jawTime: number;             // pectoral flutter amount (rises when slow)
   rand: number;
   scale: number;            // individual size variation
   mode: FishMode;
@@ -173,6 +178,26 @@ export class FishSystem {
   onEcoEvent?:(event:'graze'|'rest'|'shelter'|'school')=>void;
   populations: Population[] = [];
   private feedTimer = 0;   // seconds of "the fish are hungry/excited" remaining
+  private habitat = new HabitatDirector();
+  private softFinsOn=true;
+  setSoftFins(on:boolean):void{
+    this.softFinsOn=on;
+    for(const p of this.populations){
+      const asset=getFishAsset(p.sp);
+      asset.uniforms.uFinSoftness.value=this.finSoftness(p.sp);
+    }
+  }
+  private finSoftness(sp:SpeciesDef):number{
+    return !this.softFinsOn||sp.invert||sp.shape.eelLike?0:
+      sp.shape.finLong?.034:.010;
+  }
+  resetHabitat():void{this.habitat.reset();}
+  getHabitatSnapshot(env:SimEnv){return this.habitat.snapshot(env);}
+  getFinSnapshot(){return this.populations.map(p=>({id:p.sp.id,
+    vertices:p.mesh.geometry.getAttribute('position').count,
+    flexible:[...Array(p.mesh.geometry.getAttribute('aFinFlex').count).keys()].filter(i=>
+      p.mesh.geometry.getAttribute('aFinFlex').getX(i)>.001).length,
+    mouth:[...p.agents].map(a=>a.jaw)}));}
   private pendingDrop:{x:number;z:number}|null=null;
   private splashes:Array<{mesh:THREE.Mesh<THREE.RingGeometry,THREE.MeshBasicMaterial>;age:number}>=[];
   // Soft spherical keep-out zones approximate rocks, wood trunks and larger corals.
@@ -361,6 +386,7 @@ export class FishSystem {
       p.mesh.dispose();
     }
     this.populations = [];
+    this.habitat.reset();
 
     // Respect the quality tier's fish budget by scaling every school down
     // proportionally rather than dropping whole species.
@@ -372,12 +398,13 @@ export class FishSystem {
       if (!sp || rawCount <= 0) continue;
       const count = Math.max(1, Math.round(rawCount * scale));
       const asset = getFishAsset(sp);
+      asset.uniforms.uFinSoftness.value=this.finSoftness(sp);
       const mesh = new THREE.InstancedMesh(asset.geometry, asset.materials, count);
       mesh.frustumCulled = false; // fish roam the whole tank; skip per-instance culling
       mesh.userData.speciesId = id;
 
       // Per-instance dynamic attributes the swim shader reads.
-      const dyn = new THREE.InstancedBufferAttribute(new Float32Array(count * 3), 3);
+      const dyn = new THREE.InstancedBufferAttribute(new Float32Array(count * 4), 4);
       dyn.setUsage(THREE.DynamicDrawUsage);
       const rnd = new THREE.InstancedBufferAttribute(new Float32Array(count), 1);
       asset.geometry.setAttribute('aDyn', dyn);
@@ -391,6 +418,7 @@ export class FishSystem {
         if(old){
           agent.pos.copy(old.pos);agent.vel.copy(old.vel);agent.anchor.copy(old.anchor);
           agent.mode=old.mode;agent.modeT=old.modeT;agent.phase=old.phase;
+          agent.jaw=old.jaw??0;agent.jawTime=old.jawTime??0;
           agent.rand=old.rand;agent.scale=old.scale;agent.hunger=old.hunger;
           agent.drop=old.drop?{...old.drop}:undefined;
         }
@@ -428,7 +456,7 @@ export class FishSystem {
       pos,
       vel: initialVelocity,
       phase: Math.random() * TAU,
-      bend: 0, flap: 0,
+      bend: 0, flap: 0, jaw:0,jawTime:0,
       rand: Math.random(),
       scale: sp.lengthM * (0.82 + Math.random() * 0.36),
       mode: 'cruise', modeT: 1 + Math.random() * 4,
@@ -484,12 +512,15 @@ export class FishSystem {
     this.feedTimer = Math.max(0, this.feedTimer - dt);
     this.food.update(dt, env.floorY);
     this.updateSplashes(dt);
+    // Director is observational and never alters population sizes or persistence.
+    const allAgents=this.populations.flatMap(p=>p.agents);
+    this.habitat.update(dt,allAgents,env);
 
     for (const pop of this.populations) {
       const { sp, agents, mesh, dyn } = pop;
       for (const a of agents) {
         if (this.animateDrop(a,dt,env)) {/* New fish enters the water before joining normal swimming. */}
-        else if (isCrawler(sp)) this.updateCrawler(a, dt, env);
+        else if (isCrawler(sp)) {this.updateCrawler(a, dt, env);this.habitat.crawl(a,dt,env);}
         else this.updateFish(a, agents, dt, env);
         if(!isCrawler(sp)&&!a.drop)this.constrain(a,env);
         this.writeInstance(pop, a, dt);
@@ -504,6 +535,8 @@ export class FishSystem {
     const sp = a.sp;
     const L = a.scale;
     a.feedDistance=undefined;
+    a.jawTime=Math.max(0,a.jawTime-dt);
+    a.jaw=THREE.MathUtils.damp(a.jaw,a.jawTime>0?1:0,a.jawTime>0?19:11,dt);
     const cruise = sp.swim.cruise * L * SPEED_SCALE; // body-lengths/s → m/s
     const maxSpeed = cruise * sp.swim.burst;
 
@@ -568,11 +601,15 @@ export class FishSystem {
     // 5) Archetype flavor.
     this.archetypeSteer(a, steer, env, activity);
 
+    // One event at most can steer a fish through a measured corridor.
+    this.habitat.steer(a,steer,dt,env);
+
     // 6) Feeding overrides almost everything — fish RACE for food.
     if (this.feedTimer > 0 && this.food.active && (a.mode !== 'rest' || this.food.hasCookie)) {
       const bottomFeeder = sp.zone === 'bottom';
       const target = this.food.nearest(a.pos, Math.max(.17,L*6), bottomFeeder);
       if (target) {
+        this.habitat.cancelFor(a); // feeding outranks a sightseeing event
         const special=target.kind!=='normal';
         _v2.copy(target.pos).sub(a.pos);
         const d = _v2.length();
@@ -581,12 +618,14 @@ export class FishSystem {
         a.feedDistance=d;
         if(d<L*.43+(.003)){ 
           this.food.eat(target);
+          a.jawTime=.24;
           a.mode='feed';a.modeT=.26;a.gulp=undefined;
         } else if(d>1e-6){
           const dir=_v2.divideScalar(d);
           const forward=a.vel.lengthSq()>1e-6?dir.dot(a.vel.clone().normalize()):1;
           // Do not spin 180 degrees instantly for a pellet directly behind the fish.
           if(forward>-.65||d<L*1.8){
+            if(d<L*1.2)a.jawTime=Math.max(a.jawTime,.085);
             steer.addScaledVector(dir,special?3.15:2.35);
             a.mode='feed';a.modeT=Math.max(a.modeT,.45);
           }
@@ -921,6 +960,6 @@ export class FishSystem {
     const speedFactor = THREE.MathUtils.clamp(speed / (sp.swim.cruise * L * SPEED_SCALE + 1e-6), 0, 1);
     a.flap = THREE.MathUtils.damp(a.flap, 1 - speedFactor * 0.85, 4, dt);
 
-    pop.dyn.setXYZ(a.index, a.phase, a.bend, a.flap);
+    pop.dyn.setXYZW(a.index, a.phase, a.bend, a.flap, a.jaw);
   }
 }

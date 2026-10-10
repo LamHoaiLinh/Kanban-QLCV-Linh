@@ -1,7 +1,7 @@
 name: Build KanAquarium 3D
 on:
   push:
-    branches: [kanaquarium-3d-integration, kanaquarium-food-drop-fix, kanaquarium-visible-food-test, kanaquarium-vietnamese-food-v13, kanaquarium-auto-panel-alt-h-v14, kanaquarium-realism1-physics, kanaquarium-realism2-lifelike, kanaquarium-realism2-wall-hotfix, kanaquarium-realism3-ecosystem, kanaquarium-food-3d-click-depth, main]
+    branches: [kanaquarium-3d-integration, kanaquarium-food-drop-fix, kanaquarium-visible-food-test, kanaquarium-vietnamese-food-v13, kanaquarium-auto-panel-alt-h-v14, kanaquarium-realism1-physics, kanaquarium-realism2-lifelike, kanaquarium-realism2-wall-hotfix, kanaquarium-realism3-ecosystem, kanaquarium-food-3d-click-depth, kanaquarium-realism4-fins-habitats, main]
     paths:
       - '.github/workflows/kanaquarium-build.yml'
       - 'aquarium-integration/**'
@@ -53,6 +53,11 @@ jobs:
           cp aquarium-integration/tests/food3d-smoke.mjs _aquarium-build/food3d-smoke.mjs
           cd _aquarium-build
           node food3d-smoke.mjs
+      - name: Browser Realism 4 - flexible fins, habitats, 20 event classes, 60 fish
+        run: |
+          cp aquarium-integration/tests/realism4-habitats-smoke.mjs _aquarium-build/realism4-habitats-smoke.mjs
+          cd _aquarium-build
+          node realism4-habitats-smoke.mjs
       - name: Browser Realism 3 - ecology, modes and autonomous fish behavior
         run: |
           cp aquarium-integration/tests/realism3-smoke.mjs _aquarium-build/realism3-smoke.mjs
@@ -69,6 +74,7 @@ jobs:
           cd _aquarium-build
           node realism-smoke.mjs
       - name: Commit compiled game into site
+        if: github.ref == 'refs/heads/main'
         run: |
           rm -rf aquarium-game
           mkdir -p aquarium-game
