@@ -37,6 +37,9 @@ export function detectQuality(renderer?: { getContext(): WebGLRenderingContext |
       if (info) gpu = String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)).toLowerCase();
     }
 
+    // CPU software adapters should start conservatively, without waiting for
+    // sixty expensive frames. An explicit tier remains the user's choice.
+    if (/(swiftshader|llvmpipe|softpipe|software|basic render)/.test(gpu)) return 'low';
     if (isMobile) {
       // Modern Apple GPUs handle 'medium' fine; everything else starts low.
       return /apple/.test(gpu) ? 'medium' : 'low';
