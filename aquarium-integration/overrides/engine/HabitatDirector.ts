@@ -185,8 +185,9 @@ export class HabitatDirector {
     if(type==='wood-approach'||type==='cave-inspect'||
       type==='cave-through'||type==='wood-interior-graze'||type==='cave-rest'){
       if(!t||!eligible.length||this.occupy(t)>=t.capacity)return false;
-      const a=randomOf(eligible);
-      if(type==='wood-interior-graze'&&!forages(a))return false;
+      const candidates=type==='wood-interior-graze'?eligible.filter(forages):eligible;
+      if(!candidates.length)return false;
+      const a=randomOf(candidates);
       const path=type==='wood-approach'?[t.entrance]:
         type==='cave-inspect'?[t.entrance,t.middle,t.entrance]:
         type==='cave-through'&&t.through?[t.entrance,t.middle,t.exit]:

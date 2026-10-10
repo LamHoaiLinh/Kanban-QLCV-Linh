@@ -13,7 +13,7 @@ permissions:
 jobs:
   build-aquarium:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
@@ -45,6 +45,44 @@ jobs:
             sudo apt-get update -qq
             sudo apt-get install -y chromium-browser || sudo apt-get install -y chromium
           fi
+      - name: Stability P0 - swept hardscape food, open bores and bounded feeding
+        run: |
+          cp aquarium-integration/tests/stability-p0-smoke.mjs _aquarium-build/
+          cd _aquarium-build
+          node stability-p0-smoke.mjs
+      - name: Stability motion - waterline, 30/60 FPS and frame spikes
+        run: |
+          cp aquarium-integration/tests/stability-motion-smoke.mjs _aquarium-build/
+          cd _aquarium-build
+          node stability-motion-smoke.mjs
+      - name: Yellow tang - continuous body pose and changing current
+        run: |
+          cp aquarium-integration/tests/stability-response-smoke.mjs _aquarium-build/
+          cd _aquarium-build
+          node stability-response-smoke.mjs
+      - name: Feeding response - fast and slow species still eat
+        run: |
+          cp aquarium-integration/tests/feeding-response-smoke.mjs _aquarium-build/
+          cd _aquarium-build
+          node feeding-response-smoke.mjs
+      - name: Memory - twenty rendered tank and quality cycles
+        run: |
+          cp aquarium-integration/tests/memory-cycles-smoke.mjs _aquarium-build/
+          cd _aquarium-build
+          node memory-cycles-smoke.mjs
+      - name: Preserve stability telemetry
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stability-p0-review
+          path: |
+            _aquarium-build/stability-p0-report.json
+            _aquarium-build/stability-motion-report.json
+            _aquarium-build/stability-response-report.json
+            _aquarium-build/feeding-response-report.json
+            _aquarium-build/memory-cycles-report.json
+          if-no-files-found: warn
+          retention-days: 30
       - name: Browser smoke test - visible food and small cookies
         run: |
           cp aquarium-integration/tests/food-smoke.mjs _aquarium-build/food-smoke.mjs

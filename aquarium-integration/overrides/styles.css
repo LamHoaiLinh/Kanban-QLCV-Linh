@@ -328,3 +328,16 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .mobile-gesture{display:none}
 @media(pointer:coarse){.desktop-gesture{display:none}.mobile-gesture{display:inline}}
 @media(max-width:650px){.kan-camera-help{left:8px;transform:none;font-size:11px}.kanban-aquarium-help{top:36px}.kanban-aquarium-stock{top:88px}body:has(.kan-camera-help) .toolbar{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 18px)}}
+
+/* Touch help is a short, dismissible inline hint; all actions retain buttons. */
+.kan-help-toggle{position:fixed;z-index:21;right:52px;top:calc(env(safe-area-inset-top,0px) + 8px);width:34px;height:34px;border:1px solid #ffffff44;border-radius:50%;background:#061e28cc;color:#e8fff4;cursor:pointer}
+.kan-camera-help:not(.help-visible),.kanban-aquarium-help:not(.help-visible){display:none}
+@media(pointer:coarse){
+ .kan-camera-help{top:calc(env(safe-area-inset-top,0px) + 7px);left:12px;transform:none;max-width:calc(100vw - 118px);font-size:11px;padding:5px 8px}
+ .kanban-aquarium-help{top:calc(env(safe-area-inset-top,0px) + 35px);left:12px;transform:none;max-width:calc(100vw - 32px);padding:5px 8px;font-size:11px}
+ .kanban-aquarium-stock{top:calc(env(safe-area-inset-top,0px) + 9px);left:12px;max-width:calc(100vw - 120px);flex-wrap:wrap}
+ body:has(.kan-camera-help.help-visible) .kanban-aquarium-stock{top:calc(env(safe-area-inset-top,0px) + 65px)}
+ .kanban-aquarium-exit{top:calc(env(safe-area-inset-top,0px) + 8px);right:8px}
+ .kanban-aquarium-feed-count{font-size:10px}
+ .desktop-gesture{display:none!important}.mobile-gesture{display:inline!important}
+}

@@ -23,6 +23,8 @@ export default function App() {
   const set = useStore((s) => s.set);
   const [revealVisible, setRevealVisible] = useState(false);
   const [foodClicks,setFoodClicks]=useState(0);
+  const [helpVisible,setHelpVisible]=useState(true);
+  useEffect(()=>{const timer=setTimeout(()=>setHelpVisible(false),8000);return()=>clearTimeout(timer);},[]);
   const [renderedFish,setRenderedFish]=useState<number|null>(null);
   useEffect(()=>{const timer=setInterval(()=>setRenderedFish(getEngine()?.stats.fishCount??null),1000);return()=>clearInterval(timer);},[]);
   const fishTotal=useStore(s=>Object.values(s.config.fish).reduce((total,n)=>total+n,0));
@@ -112,8 +114,9 @@ export default function App() {
     <>
       <AquariumCanvas />
       {embedded && (<>
-        <div className="kan-camera-help"><span className="desktop-gesture">Kéo trái: xoay · Shift + kéo trái: rê · Cuộn: zoom</span><span className="mobile-gesture">1 ngón: xoay · 2 ngón: rê · Chụm/tách: zoom</span></div>
-        <div className="kanban-aquarium-help">Trái: thả thức ăn · Mỗi 10 lần: bánh cá/gấu · Phải: thêm cá · Shift + phải: bớt cá · ESC: về KanBan</div>
+        <div className={`kan-camera-help ${helpVisible?'help-visible':''}`}><span className="desktop-gesture">Kéo trái: xoay · Shift + kéo trái: rê · Cuộn: zoom</span><span className="mobile-gesture">1 ngón: xoay · 2 ngón: rê · Chụm/tách: zoom</span></div>
+        <div className={`kanban-aquarium-help ${helpVisible?'help-visible':''}`}><span className="desktop-gesture">Trái: thả thức ăn · Mỗi 10 lần: bánh cá/gấu · Phải: thêm cá · Shift + phải: bớt cá · ESC: về KanBan</span><span className="mobile-gesture">Chạm hồ: thả mồi · 10 lần: bánh · +/−: thêm/bớt cá</span></div>
+        <button className="kan-help-toggle" aria-label="Hướng dẫn thao tác" aria-expanded={helpVisible} onClick={()=>setHelpVisible(v=>!v)}>?</button>
         <div className="kanban-aquarium-stock">
           <button title="Bớt 1 con cá (Shift + chuột phải)" aria-label="Bớt một cá" onClick={removeAquariumFish}>−</button>
           <span>Cá: <strong>{fishTotal}</strong>/{fishCap}{renderedFish!==null&&renderedFish<fishTotal?` · Hiển thị: ${renderedFish}`:''}</span>
@@ -129,7 +132,7 @@ export default function App() {
             <button className="open-panel" aria-label="Mở bảng cài đặt hồ cá" onClick={() => set({ panelOpen: true })}>🛠️</button>
           )}
           <InfoCard />
-          {feedMode && <div className="feed-hint">Nhấp chuột để cho cá ăn · nhấn F để tắt</div>}
+          {feedMode && <div className="feed-hint">Chạm vào hồ để cho cá ăn · chạm nút thức ăn để tắt</div>}
         </>
       )}
       {uiHidden && (

@@ -20,6 +20,7 @@ import { CameraRig } from './CameraRig';
 import { CurrentField } from './CurrentField';
 import { EnvironmentSystem, type TankDimsWorld } from './Environment';
 import { DecorSystem } from './Decor';
+import { SolidSurfaces } from './SolidSurfaces';
 import { FloraSystem } from './Flora';
 import { FishSystem, type SimEnv, type FoodKind } from './FishSystem';
 
@@ -55,6 +56,7 @@ export class Engine {
   private running = true;
   private firstFrameDone = false;
   private disposed = false;
+  private environmentTarget:THREE.WebGLRenderTarget;
   private frameTimes: number[] = [];
   private feedMode = false;
   private kanAquariumMode=new URLSearchParams(location.search).has('kanban');
@@ -112,7 +114,10 @@ export class Engine {
     // Image-based lighting from a neutral procedural "room" — gives PBR
     // materials something real to reflect without shipping an HDRI file.
     const pmrem = new THREE.PMREMGenerator(this.renderer);
-    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.06).texture;
+    const room=new RoomEnvironment();
+    this.environmentTarget=pmrem.fromScene(room,0.06);
+    this.scene.environment=this.environmentTarget.texture;
+    room.dispose();
     pmrem.dispose();
     this.scene.background = new THREE.Color('#04141f');
 
@@ -129,7 +134,7 @@ export class Engine {
       halfW: 0.5, halfD: 0.25, floorY: 0, surfaceY: 0.48,
       current: this.current,
       reducedMotion: false,
-      obstacles: [], shelters: [],tunnels: [],ecoMode:'natural',ecoComfort:1,
+      obstacles: [], shelters: [],tunnels: [],solids:new SolidSurfaces(),ecoMode:'natural',ecoComfort:1,
     };
     // QA-only regression probe. Not enabled on the published KanBan URL.
     if(new URLSearchParams(location.search).get('qa')==='1'){
@@ -150,6 +155,9 @@ export class Engine {
           return this.ecology.snapshot();
         };
       Object.assign(window,{
+        // Explicit QA pages only; inspect actual agents/geometry without persisting fixtures.
+        __kanStabilityWorld:()=>({fish:this.fish,env:this.simEnv,decor:this.decor,
+          renderer:this.renderer,rig:this.rig}),
         __kan42Arrange:()=>this.fish.qaArrange(this.simEnv),
         __kan42Follow:(key:string|null)=>this.followFish(key),
         __kan42Day:(factor:number)=>{this.dayFactor=factor;this.simEnv.dayFactor=factor;},
@@ -255,6 +263,7 @@ export class Engine {
 
   dispose(): void {
     this.disposed = true;
+    this.simEnv.solids?.clear();
     this.renderer.setAnimationLoop(null);
     window.removeEventListener('resize', this.applySize);
     document.removeEventListener('visibilitychange', this.onVisibility);
@@ -267,6 +276,7 @@ export class Engine {
     this.foodLayer=null;
     if(new URLSearchParams(location.search).get('qa')==='1')
       {
+        delete (window as Window & {__kanStabilityWorld?:()=>unknown}).__kanStabilityWorld;
         delete (window as Window & {__kanRealismProbe?:()=>unknown}).__kanRealismProbe;
         delete (window as Window & {__kanEcoFastForward?:(seconds:number)=>unknown}).__kanEcoFastForward;
         delete (window as Window & {__kanFoodProbe?:()=>unknown}).__kanFoodProbe;
@@ -277,6 +287,24 @@ export class Engine {
         delete (window as Window & {__kanVisualFinToggle?:(on:boolean)=>void}).__kanVisualFinToggle;
         delete (window as Window & {__kanFoodTestCamera?:(mode:'orbit'|'cinematic'|'still')=>void}).__kanFoodTestCamera;
       }
+    this.composer?.passes.forEach(pass=>pass.dispose());
+    this.composer?.dispose();
+    const geometries=new Set<THREE.BufferGeometry>(),materials=new Set<THREE.Material>(),textures=new Set<THREE.Texture>();
+    this.scene.traverse(obj=>{
+      if(obj instanceof THREE.Mesh||obj instanceof THREE.Line||obj instanceof THREE.Points){
+        geometries.add(obj.geometry);
+        for(const material of Array.isArray(obj.material)?obj.material:[obj.material])materials.add(material);
+      }else if(obj instanceof THREE.Sprite)materials.add(obj.material);
+      if(obj instanceof THREE.InstancedMesh)obj.dispose();
+    });
+    for(const material of materials){
+      for(const value of Object.values(material))if(value instanceof THREE.Texture)textures.add(value);
+      material.dispose();
+    }
+    for(const geometry of geometries)geometry.dispose();
+    for(const texture of textures)texture.dispose();
+    this.environmentTarget.dispose();
+    this.scene.clear();
     this.renderer.dispose();
     this.container.removeChild(this.renderer.domElement);
   }
@@ -298,6 +326,7 @@ export class Engine {
   };
 
   private rebuildComposer(w: number, h: number): void {
+    this.composer?.passes.forEach(pass=>pass.dispose());
     this.composer?.dispose();
     if (this.quality.bloom) {
       this.composer = new EffectComposer(this.renderer);
@@ -386,6 +415,7 @@ export class Engine {
         halfW: this.dims.halfW, halfD: this.dims.halfD,
         floorY: this.dims.floorY, height: this.dims.height,
       });
+      this.simEnv.solids!.rebuild(this.decor.group);
       const floraOut = this.flora.rebuild(
         config.flora,
         { halfW: this.dims.halfW, halfD: this.dims.halfD, floorY: this.dims.floorY, surfaceY: this.dims.surfaceY },
@@ -491,7 +521,7 @@ export class Engine {
       ray.at(enter+Math.random()*(exit-enter),point);
       const blocked=this.simEnv.obstacles.some(o=>
         point.distanceToSquared(o.pos)<Math.pow(Math.max(.005,o.radius)+.006,2));
-      if(!blocked)return point;
+      if(!blocked&&!this.simEnv.solids?.contains(point,.006))return point;
     }
     return null;
   }
