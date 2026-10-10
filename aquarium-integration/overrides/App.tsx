@@ -118,7 +118,7 @@ export default function App() {
             <button className="open-panel" aria-label="Open tank builder" onClick={() => set({ panelOpen: true })}>🛠️</button>
           )}
           <InfoCard />
-          {feedMode && <div className="feed-hint">Tap the water to drop food · press F to stop</div>}
+          {feedMode && <div className="feed-hint">Nhấp chuột để cho cá ăn · nhấn F để tắt</div>}
         </>
       )}
       {uiHidden && (
@@ -126,7 +126,7 @@ export default function App() {
           className={`reveal ${revealVisible ? 'visible' : ''}`}
           onClick={() => set({ uiHidden: false })}
         >
-          Show controls (H)
+          Hiện bảng điều khiển (H)
         </button>
       )}
       {showHud && <Hud />}
