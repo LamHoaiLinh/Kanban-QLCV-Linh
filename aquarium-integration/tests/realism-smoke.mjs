@@ -89,6 +89,15 @@ try{
       throw Error('Previously populated tank became empty on resize '+JSON.stringify(nano));
     if(!nano.fish[expectedSpecies])
       throw Error('No suitable nano fallback '+JSON.stringify(nano.fish));
+    // A page reload while the 5-gallon view is active must not erase the
+    // saved pre-resize composition; reopening KanBan restores the same tank.
+    if(name==='Toàn cảnh ông tiên'){
+      await page.reload({waitUntil:'domcontentloaded'});
+      await page.waitForSelector('#canvas-host canvas',{timeout:40000});
+      const reloaded=await currentConfig();
+      if(reloaded.gallons!==5||JSON.stringify(reloaded.fish)!==JSON.stringify(nano.fish))
+        throw Error('Nano tank not persisted correctly across reload');
+    }
     await chooseSize('Nhỏ');
     await chooseSize('Rất lớn');
     const restored=await currentConfig();
