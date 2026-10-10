@@ -1,0 +1,51 @@
+name: Build KanAquarium 3D
+on:
+  push:
+    branches: [kanaquarium-3d-integration]
+    paths:
+      - '.github/workflows/kanaquarium-build.yml'
+      - 'aquarium-integration/**'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build-aquarium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/checkout@v4
+        with:
+          repository: jamisonhill/aquarium
+          ref: 2a6e16ce5df82b858183c02624d2ac5e605faec5
+          path: _aquarium-build
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: _aquarium-build/package-lock.json
+      - name: Install KanAquarium overrides
+        run: |
+          cp -r aquarium-integration/overrides/. _aquarium-build/src/
+          mkdir -p _aquarium-build/public/feed-items
+          cp aquarium-integration/feed-items/* _aquarium-build/public/feed-items/
+      - name: Build
+        run: |
+          cd _aquarium-build
+          npm ci --no-audit --no-fund
+          npm run build
+      - name: Commit compiled game into site
+        run: |
+          rm -rf aquarium-game
+          mkdir -p aquarium-game
+          cp -r _aquarium-build/dist/. aquarium-game/
+          printf 'Base project: https://github.com/jamisonhill/aquarium\nLicense: MIT (see upstream LICENSES.md)\nCustomized for KanBan.\n' > aquarium-game/LICENSE_SOURCE.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add aquarium-game
+          if ! git diff --cached --quiet; then
+            git commit -m "build: compile KanAquarium 3D for GitHub Pages"
+            git push
+          fi

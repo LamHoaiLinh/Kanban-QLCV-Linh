@@ -1983,3 +1983,15 @@ body.kalo-open{overflow:hidden!important}
 .import-section-item span{display:grid;gap:3px}.import-section-item strong{font-size:12.5px}.import-section-item small{font-size:11px;line-height:1.4;color:var(--muted)}
 .import-select-actions{display:flex;justify-content:flex-end;margin-top:10px}
 @media(max-width:700px){.guide-functional,.import-select-modal{width:100vw;max-width:none;max-height:100dvh;height:100dvh;border-radius:0}.guide-groups{max-height:none}}
+
+/* KanAquarium v1: fifth toolbar action */
+.office-launcher .aquarium-launch-btn{width:60px!important;min-width:60px!important;height:40px!important;min-height:40px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;padding:0 5px!important;background:linear-gradient(130deg,#e9fff4,#d3f0e2);border-color:#9acaaf;color:#235b44;flex:0 0 auto}
+.office-launcher .aquarium-launch-btn .office-btn-mark{font-weight:900;font-size:9px!important;white-space:nowrap}
+.office-launcher .aquarium-launch-btn:hover{background:#c5f5e0}
+:root[data-theme="dark"] .office-launcher .aquarium-launch-btn{background:#18412f;color:#cbffdb}
+.kan-aquarium-overlay{position:fixed;inset:0;z-index:22000;background:#061922}
+.kan-aquarium-overlay[hidden]{display:none}
+.kan-aquarium-frame{display:block;width:100%;height:100%;border:0;background:#061922}
+.kan-aquarium-open{overflow:hidden!important}
+@media(min-width:1250px){.desk-clock{margin-right:7px!important;min-width:310px!important;max-width:355px!important}.header-actions .office-launcher{gap:5px!important}}
+@media(max-width:700px){.office-launcher .aquarium-launch-btn{width:60px!important;min-width:60px!important;height:44px!important;min-height:44px!important}}
