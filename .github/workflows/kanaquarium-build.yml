@@ -74,6 +74,7 @@ jobs:
           cd _aquarium-build
           node realism-smoke.mjs
       - name: Commit compiled game into site
+        if: github.ref == 'refs/heads/main'
         run: |
           rm -rf aquarium-game
           mkdir -p aquarium-game
