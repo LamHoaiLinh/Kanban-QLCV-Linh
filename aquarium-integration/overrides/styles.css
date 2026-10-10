@@ -327,4 +327,4 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .kanban-aquarium-help{top:34px}.kanban-aquarium-stock{top:72px}
 .mobile-gesture{display:none}
 @media(pointer:coarse){.desktop-gesture{display:none}.mobile-gesture{display:inline}}
-@media(max-width:650px){.kan-camera-help{left:8px;transform:none;font-size:11px}.kanban-aquarium-help{top:36px}.kanban-aquarium-stock{top:88px}}
+@media(max-width:650px){.kan-camera-help{left:8px;transform:none;font-size:11px}.kanban-aquarium-help{top:36px}.kanban-aquarium-stock{top:88px}body:has(.kan-camera-help) .toolbar{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 18px)}}

@@ -97,10 +97,10 @@ try{
  await page.evaluate(()=>window.__kan42EcoMode('natural'));
  // Real event routes, not just registered enum names, observed by cinematic director.
  await page.evaluate(()=>{window.__kan42Scene({gallons:75,fish:{'neon-tetra':20,betta:1,'corydoras':6},decor:['hollow-log','split-log','log-arch'],flora:{}});window.__kanFoodTestCamera('cinematic');});
- for(const type of ['wood-approach','cave-inspect','cave-through','school-scout','school-rejoin','school-split','bottom-crumbs']){
-  const p=await page.evaluate(type=>{const launched=window.__kan42Event(type);window.__kanEcoFastForward(2);return {launched,p:window.__kan42Probe()};},type);
+ for(const type of ['wood-approach','cave-inspect','cave-through','school-scout','school-rejoin','school-split','bottom-crumbs','territory-display','brief-chase','wood-graze']){
+  const p=await page.evaluate(type=>{let launched=false;for(let i=0;i<24&&!launched;i++){window.__kan42Arrange();launched=window.__kan42Event(type);}const p=window.__kan42Probe();window.__kanEcoFastForward(2);return {launched,p};},type);
   if(p.launched&&p.p.events.some(e=>e.type===type&&e.actorIds.length))report.events.push(type);
-  await page.evaluate(()=>window.__kanEcoFastForward(35));
+  await page.evaluate(()=>window.__kanEcoFastForward(70));
  }
  assert(report.events.length>=5,'at least five real events '+JSON.stringify(report.events));
  const log=await page.evaluate(()=>window.__kan42Probe().camera.log);

@@ -765,7 +765,7 @@ export class FishSystem {
     const at=p.point.clone().addScaledVector(p.normal,a.scale*.525+.0005);
     if(p.stage==='approach'){
       const delta=at.sub(a.pos),d=delta.length(),speed=Math.min(a.sp.swim.cruise*a.scale*SPEED_SCALE,d*1.4);
-      if(d>.004){const desired=delta.normalize().multiplyScalar(speed);a.vel.lerp(desired,1-Math.exp(-3*dt));a.pos.addScaledVector(a.vel,dt);}
+      if(d>Math.max(.004,a.scale*.065)){const desired=delta.normalize().multiplyScalar(speed);a.vel.lerp(desired,1-Math.exp(-3*dt));a.pos.addScaledVector(a.vel,dt);}
       else{p.stage='inspect';p.t=0;}
     }else if(p.stage==='inspect'){
       a.vel.multiplyScalar(Math.exp(-5*dt));a.pos.lerp(at,1-Math.exp(-3*dt));
