@@ -374,6 +374,7 @@ function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
   geo.setAttribute('aFinFlex', new THREE.Float32BufferAttribute(finFlex, 1));
   geo.setIndex(indices);
   geo.computeVertexNormals();
+  geo.userData.medianMembraneStrip=sh.dorsalHeight>.02||sh.analHeight>.02;
 
   // Two material groups: body tube (0) and all fins (1).
   const finIndexStart = (() => {
