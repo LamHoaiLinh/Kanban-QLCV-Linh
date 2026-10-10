@@ -129,7 +129,7 @@ export class FoodSystem {
       const b=this.bits[i];b.age+=dt;const special=b.kind!=='normal';
       // Sinking starts immediately when the food is released.
       if(b.state==='sink'){
-        b.pos.y-=dt*(special?.040:.046);
+        b.pos.y-=dt*(special?.075:.090);
         b.pos.x+=Math.sin(b.age*2.2+b.pos.z*35)*dt*.003;
         if(b.pos.y<=floorY+.01){b.pos.y=floorY+.01;b.state='settled'}
       }

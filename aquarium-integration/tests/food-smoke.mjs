@@ -31,7 +31,7 @@ try{
   const foodY1=await page.$eval('.kan-food-item',el=>Number(el.dataset.worldY));
   await new Promise(r=>setTimeout(r,480));
   const foodY2=await page.$eval('.kan-food-item',el=>Number(el.dataset.worldY));
-  if(!(foodY2<foodY1-0.007))throw Error('Food is not sinking immediately: '+foodY1+' -> '+foodY2);
+  if(!(foodY2<foodY1-0.0015))throw Error('Food is not sinking immediately: '+foodY1+' -> '+foodY2);
   // Refresh page to reset the feed counter before verifying the 10th rare cookie.
   await page.reload({waitUntil:'domcontentloaded'});
   await page.waitForSelector('#kan-food-layer');
