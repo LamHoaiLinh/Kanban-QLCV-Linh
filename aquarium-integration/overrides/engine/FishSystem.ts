@@ -93,8 +93,8 @@ export class FoodSystem {
   private mats=new Map<string,THREE.SpriteMaterial>();
   private readonly variants:Record<FoodKind,string[]>={
     normal:['pellet-brown.svg','pellet-green.svg'],
-    'fish-cookie':['cookie-fish.svg'],
-    'bear-cookie':['cookie-bear.svg'],
+    'fish-cookie':['cookie-fish.png'],
+    'bear-cookie':['cookie-bear.png'],
   };
   constructor(parent:THREE.Object3D){
     parent.add(this.group);

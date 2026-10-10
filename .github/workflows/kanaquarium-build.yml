@@ -31,6 +31,7 @@ jobs:
           cp -r aquarium-integration/overrides/. _aquarium-build/src/
           mkdir -p _aquarium-build/public/feed-items
           cp aquarium-integration/feed-items/* _aquarium-build/public/feed-items/
+          tar -xzf aquarium-integration/food-specials.tar.gz -C _aquarium-build/public/feed-items/
       - name: Build
         run: |
           cd _aquarium-build
