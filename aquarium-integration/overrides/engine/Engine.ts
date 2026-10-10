@@ -162,6 +162,11 @@ export class Engine {
       });
       (window as Window & {__kanFoodTestCamera?:(mode:'orbit'|'cinematic'|'still')=>void}).__kanFoodTestCamera=
         (mode)=>this.setCameraMode(mode);
+      // QA-only 60-fish load, does not alter saved tanks or production store.
+      (window as Window & {__kanHabitatPopulate?:(id:string,count:number)=>void}).__kanHabitatPopulate=
+        (id:string,count:number)=>{
+          if(this.config)this.applyConfig({...this.config,fish:{[id]:Math.min(60,Math.max(0,count))}},true);
+        };
       (window as Window & {__kanRealismProbe?:()=>unknown}).__kanRealismProbe=()=>({
         name:this.config?.name,
         fish:this.fish.getPhysicsSnapshot(this.simEnv),
@@ -215,6 +220,7 @@ export class Engine {
         delete (window as Window & {__kanRealismProbe?:()=>unknown}).__kanRealismProbe;
         delete (window as Window & {__kanEcoFastForward?:(seconds:number)=>unknown}).__kanEcoFastForward;
         delete (window as Window & {__kanFoodProbe?:()=>unknown}).__kanFoodProbe;
+        delete (window as Window & {__kanHabitatPopulate?:(id:string,count:number)=>void}).__kanHabitatPopulate;
         delete (window as Window & {__kanFoodTestCamera?:(mode:'orbit'|'cinematic'|'still')=>void}).__kanFoodTestCamera;
       }
     this.renderer.dispose();
