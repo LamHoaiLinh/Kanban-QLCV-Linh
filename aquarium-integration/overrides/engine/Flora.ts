@@ -186,7 +186,7 @@ export class FloraSystem {
         // available; stems toward the back; carpets toward the front.
         let x: number, z: number, y = dims.floorY;
         const isCoral = ['softcoral', 'xenia', 'lps', 'anemone', 'zoa', 'hardcoral'].includes(def.kind);
-        const epiphyte = ['java-fern', 'anubias', 'java-moss'].includes(def.id);
+        const epiphyte = ['java-fern', 'anubias', 'java-moss', 'bucephalandra'].includes(def.id);
         if (def.kind === 'floating') {
           x = (Math.random() - 0.5) * dims.halfW * 1.7;
           z = (Math.random() - 0.5) * dims.halfD * 1.5;
@@ -296,12 +296,22 @@ export class FloraSystem {
         const blades = 5 + Math.floor(Math.random() * 5);
         for (let b = 0; b < blades; b++) {
           const h = H * (0.7 + Math.random() * 0.5);
+          const leafy = /rotala|ludwigia|bacopa|hygrophila|limnophila|hornwort/.test(def.id);
+          const stemX=spot.x+(Math.random()-.5)*.05,stemZ=spot.z+(Math.random()-.5)*.05;
           _m.compose(
-            new THREE.Vector3(spot.x + (Math.random() - 0.5) * 0.05, spot.y + h / 2, spot.z + (Math.random() - 0.5) * 0.05),
+            new THREE.Vector3(stemX, spot.y + h / 2, stemZ),
             new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.random() * Math.PI, (Math.random() - 0.5) * 0.15)),
-            new THREE.Vector3(0.012 + Math.random() * 0.006, h, 1)
+            new THREE.Vector3(leafy?.003:.012 + Math.random() * .006, h, 1)
           );
-          acc.add(bladeTemplate, _m, _c.copy(pick()).multiplyScalar(0.8 + Math.random() * 0.4), byHeight, phase + b * 0.13);
+          acc.add(bladeTemplate, _m, _c.copy(pick()).multiplyScalar(.8+Math.random()*.4), byHeight, phase+b*.13);
+          // Stem plants have paired/whorled leaves, not long Vallisneria ribbons.
+          if(leafy)for(let j=1;j<=6;j++){
+            const ang=j*2.399+b,level=j/7,spread=/hornwort|limnophila/.test(def.id)?.018:.013;
+            _m.compose(new THREE.Vector3(stemX+Math.cos(ang)*spread*.35,spot.y+h*level,stemZ+Math.sin(ang)*spread*.35),
+              new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.sin(ang)*.65,ang,Math.cos(ang)*.65)),
+              new THREE.Vector3(spread*(/bacopa|ludwigia/.test(def.id)?1.5:.7),h*.19,1));
+            acc.add(leafTemplate,_m,_c.copy(pick()),byHeight,phase+j*.19);
+          }
         }
         break;
       }
@@ -315,7 +325,7 @@ export class FloraSystem {
           _m.compose(
             new THREE.Vector3(spot.x + Math.cos(ang) * 0.015, spot.y + h / 2 * Math.cos(lean * 0.8), spot.z + Math.sin(ang) * 0.015),
             new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.sin(ang) * lean, -ang, Math.cos(ang) * lean, 'YXZ')),
-            new THREE.Vector3(h * (def.id === 'amazon-sword' ? 0.28 : def.id === 'anubias' ? 0.50 : 0.31), h, 1)
+            new THREE.Vector3(h * (def.id === 'amazon-sword' || def.id === 'red-tiger-lotus' ? 0.36 : def.id === 'anubias' || def.id === 'bucephalandra' ? 0.50 : 0.31), h, 1)
           );
           acc.add(leafTemplate, _m, _c.copy(pick()).multiplyScalar(0.75 + Math.random() * 0.5), byHeight, phase + l * 0.11);
         }

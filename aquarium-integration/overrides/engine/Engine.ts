@@ -163,6 +163,24 @@ export class Engine {
         __kan42Probe:()=>({telemetry:this.fish.getTelemetry(),camera:this.rig.snapshot(),stats:{...this.stats},
           physics:this.fish.getPhysicsSnapshot(this.simEnv),config:this.config,quality:this.quality.tier,
           events:this.fish.getLiveEvents(this.simEnv).map(e=>({...e,worldPositions:e.worldPositions.map(p=>p.toArray())}))}),
+        // QA fixture: drop onto the actual thick shell of the hollow log and
+        // run the exact FoodSystem integrator, not a stand-in collision.
+        __kan42WoodTest:()=>{
+          if(!this.config)return null;
+          this.applyConfig({...this.config,gallons:75,water:'freshwater',
+            fish:{},flora:{},decor:['hollow-log']},true);
+          this.decor.group.updateMatrixWorld(true);
+          const log=this.decor.group.children.find(obj=>obj.name==='hollow-bark-hollow-log');
+          if(!log)return null;
+          const bounds=new THREE.Box3().setFromObject(log);
+          const start=bounds.getCenter(new THREE.Vector3());
+          start.y=bounds.max.y+.035;
+          this.fish.feed(start.x,start.z,this.simEnv,'normal',start.y);
+          const pellet=this.fish.food.bits[this.fish.food.bits.length-1];
+          for(let i=0;i<35;i++)this.fish.food.update(.05,this.dims.floorY,this.simEnv.foodSolidHit);
+          return {support:pellet.support??null,state:pellet.state,
+            pelletY:pellet.pos.y,woodTop:bounds.max.y,floorY:this.dims.floorY};
+        },
         __kan42Quality:(q:QualityTier)=>this.setQuality(q),
         __kan42Step:(seconds:number)=>{for(let i=0;i<Math.ceil(seconds/.0166667);i++)this.advance(1/60);},
       });
@@ -394,6 +412,21 @@ export class Engine {
       );
       this.simEnv.obstacles = [...decorOut.obstacles.map(o=>({...o,surface:'wood' as const})), ...floraOut.obstacles.map(o=>({...o,surface:'plant' as const}))];
       this.foodOccluders=[...this.decor.group.children,...this.flora.group.children];
+      // Sweep against displayed hardscape geometry; spherical keep-outs
+      // would incorrectly block the hollow interior of a log.
+      this.simEnv.foodSolidHit=(from,to)=>{
+        const delta=to.clone().sub(from),length=delta.length();
+        if(length<1e-7)return null;
+        this.decor.group.updateMatrixWorld(true);
+        const ray=new THREE.Raycaster(from,delta.divideScalar(length),0,length+.002);
+        for(const hit of ray.intersectObjects(this.decor.group.children,true)){
+          if(!hit.face||hit.distance<.000001)continue;
+          const normal=hit.face.normal.clone()
+            .applyNormalMatrix(new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld));
+          if(normal.y>.28)return hit.point.clone();
+        }
+        return null;
+      };
       this.foodDepthCache=new WeakMap();
       this.simEnv.sampleSurface=(from,toward)=>{
         const direction=toward.clone().sub(from).normalize();

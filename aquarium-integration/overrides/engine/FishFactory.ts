@@ -53,7 +53,7 @@ const swimHook = /* glsl */ `
 
   // Head recoil: the front of the body counter-sways slightly — without this
   // the fish looks like a flag on a stick instead of a swimmer.
-  transformed.z -= uAmp * 0.22 * sin(-aDyn.x) * (1.0 - s) * (1.0 - s);
+  transformed.z -= uAmp * 0.065 * sin(-aDyn.x) * (1.0 - s) * (1.0 - s);
 
   // Bank/bend into turns: parabolic curvature along the spine.
   transformed.z += aDyn.y * s * s * 0.7;
@@ -135,7 +135,7 @@ function buildFishAsset(sp: SpeciesDef): FishAsset {
   const map = fishTextureWithEye(sp);
   const body = new THREE.MeshStandardMaterial({
     map,
-    roughness: sp.shape.eelLike ? 0.49 : sp.id==='betta' || sp.id==='guppy' ? 0.44 : 0.37,
+    roughness: sp.shape.eelLike ? 0.49 : sp.id==='betta' || sp.id==='guppy' ? 0.44 : 0.42,
     metalness: 0.34 * sp.palette.iridescence, // structural shimmer on tetras etc.
     envMapIntensity: 0.58 + sp.palette.iridescence * 0.65,
   });
@@ -171,8 +171,16 @@ function fishTextureWithEye(sp: SpeciesDef): THREE.Texture {
   const ex = W * 0.115, ey = H * (1 - 0.62), r = H * sp.shape.eyeSize * 2.4;
   ctx.fillStyle = '#d8d2c0';
   ctx.beginPath(); ctx.arc(ex, ey, r * 1.25, 0, TAU); ctx.fill();
-  ctx.fillStyle = sp.palette.eyeColor ?? '#0a0a0c';
-  ctx.beginPath(); ctx.arc(ex, ey, r * 0.85, 0, TAU); ctx.fill();
+  // A dark limbal ring and radial iris give a small but genuine spherical
+  // eye impression at close zoom, without introducing an extra mesh/draw call.
+  ctx.fillStyle='#27252a';
+  ctx.beginPath();ctx.arc(ex,ey,r*.92,0,TAU);ctx.fill();
+  const iris=ctx.createRadialGradient(ex-r*.1,ey-r*.08,r*.05,ex,ey,r*.83);
+  iris.addColorStop(0,sp.palette.eyeColor??'#101015');
+  iris.addColorStop(.65,sp.palette.eyeColor??'#101015');
+  iris.addColorStop(1,'#555352');
+  ctx.fillStyle=iris;
+  ctx.beginPath();ctx.arc(ex,ey,r*.79,0,TAU);ctx.fill();
   ctx.fillStyle = 'rgba(255,255,255,0.9)';
   ctx.beginPath(); ctx.arc(ex - r * 0.3, ey - r * 0.3, r * 0.28, 0, TAU); ctx.fill();
   // Gill cover on the skin texture; unlike separate gill meshes this adds

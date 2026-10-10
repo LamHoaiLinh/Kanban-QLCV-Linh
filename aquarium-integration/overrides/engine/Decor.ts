@@ -181,6 +181,12 @@ export class DecorSystem {
     return m;
   }
 
+  // Reuse the existing wood map for microrelief. A low bump scale creates
+  // subtle wet grain and worn bark without any extra texture allocations.
+  private woodMat(opts:THREE.MeshStandardMaterialParameters):THREE.MeshStandardMaterial {
+    return this.mat({...opts,bumpMap:opts.map,bumpScale:.003});
+  }
+
   rebuild(decorIds: string[], dims: { halfW: number; halfD: number; floorY: number; height: number }): DecorOutput {
     // Each rebuild creates new procedurally tessellated meshes. Dispose old
     // geometries first so editing wood does not leak GPU buffers over time.
@@ -199,7 +205,7 @@ export class DecorSystem {
       switch (id) {
         case 'driftwood': {
           // A main bough with two branches, arching across the left third.
-          const wood = this.mat({ map: woodTexture(), color: '#a58359', roughness: 0.92 });
+          const wood = this.woodMat({ map: woodTexture(), color: '#a58359', roughness: 0.92 });
           const curve = new THREE.CatmullRomCurve3([
             new THREE.Vector3(-halfW * 0.7, floorY, -halfD * 0.2),
             new THREE.Vector3(-halfW * 0.3, floorY + dims.height * 0.35, 0),
@@ -226,7 +232,7 @@ export class DecorSystem {
         }
         case 'spider-wood': {
           // A short trunk with several thin roots fanning up and outward.
-          const wood = this.mat({ map: woodTexture(), color: '#6a5236', roughness: 0.9 });
+          const wood = this.woodMat({ map: woodTexture(), color: '#6a5236', roughness: 0.9 });
           const cx = halfW * 0.35, cz = -halfD * 0.1;
           const base = new THREE.Vector3(cx, floorY + 0.01, cz);
           const trunkTop = base.clone().add(new THREE.Vector3(0.02 * scale, dims.height * 0.2, 0.01 * scale));
@@ -260,7 +266,7 @@ export class DecorSystem {
         }
         case 'driftwood-stump': {
           // A gnarled stump with roots splaying down into the sand.
-          const wood = this.mat({ map: woodTexture(), color: '#5f4a30', roughness: 0.92 });
+          const wood = this.woodMat({ map: woodTexture(), color: '#5f4a30', roughness: 0.92 });
           const cx = -halfW * 0.35, cz = halfD * 0.25;
           const R = 0.06 * scale + 0.02, H = 0.09 * scale + 0.03;
           const stump = new THREE.Mesh(displace(new THREE.CylinderGeometry(R * 0.85, R, H, 10, 2), 0.12, 3), wood);
@@ -287,7 +293,7 @@ export class DecorSystem {
           const barkMap=woodTexture();
           const wood=this.mat({map:barkMap,color:split?'#8b6945':'#ac8253',
             roughness:.94,side:THREE.DoubleSide});
-          const innerWood=this.mat({map:barkMap,color:split?'#423024':'#523e2d',
+          const innerWood=this.woodMat({map:barkMap,color:split?'#423024':'#523e2d',
             roughness:.98,side:THREE.DoubleSide});
           const R=(split?.072:.06)*scale+.03,len=(split?.34:.26)*scale+.08;
           const cx=halfW*(split?-.06:.1),cz=halfD*(split?-.3:.2);
@@ -344,7 +350,7 @@ export class DecorSystem {
         case 'log-arch': {
           // A hollow log bowed into an archway fish swim under and through.
           const roots=id==='root-bridge';
-          const wood = this.mat({ map: woodTexture(), color: roots?'#675039':'#6f5232', roughness: 0.9, side: THREE.DoubleSide });
+          const wood = this.woodMat({ map: woodTexture(), color: roots?'#675039':'#6f5232', roughness: 0.9, side: THREE.DoubleSide });
           const cx = -halfW * 0.2, cz = -halfD * 0.05;
           const R = 0.05 * scale + 0.022;
           const foot = 0.14 * scale + 0.05, rise = 0.1 * scale + 0.05, lean = halfD * 0.05;

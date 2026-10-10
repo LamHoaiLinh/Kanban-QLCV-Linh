@@ -55,6 +55,67 @@ export const FLORA: FloraDef[] = [
     info: 'Cây nổi có rễ dài giúp tạo bóng mát cho cá.',
   },
 
+  {
+    id: "rotala-rotundifolia", name: "Diệp tài hồng lá tròn", scientific: "Rotala rotundifolia",
+    water: 'freshwater', kind: 'stem', heightM: 0.28,
+    colors: ["#538e58","#be8177","#a95150"], careLevel: 'easy',
+    info: "Cây thân đốt hậu cảnh, lá nhỏ đung đưa như vườn Hà Lan.",
+  },
+  {
+    id: "ludwigia-repens", name: "Hồng liễu đỏ", scientific: "Ludwigia repens",
+    water: 'freshwater', kind: 'stem', heightM: 0.27,
+    colors: ["#627e3c","#ab5940","#c07349"], careLevel: 'easy',
+    info: "Lá bầu xanh đỏ tía ở các ngọn sáng.",
+  },
+  {
+    id: "hornwort", name: "Rong đuôi chó", scientific: "Ceratophyllum demersum",
+    water: 'freshwater', kind: 'stem', heightM: 0.34,
+    colors: ["#367e3b","#5eaa49","#4e8c50"], careLevel: 'easy',
+    info: "Tán lá kim xốp, trú ẩn cho cá con.",
+  },
+  {
+    id: "water-sprite", name: "Dương xỉ nước", scientific: "Ceratopteris thalictroides",
+    water: 'freshwater', kind: 'rosette', heightM: 0.25,
+    colors: ["#548d47","#86bb64","#4b8654"], careLevel: 'easy',
+    info: "Lá xẻ tơi mềm thành cụm lớn ở trung cảnh.",
+  },
+  {
+    id: "dwarf-sagittaria", name: "Hẹ nước lùn", scientific: "Sagittaria subulata",
+    water: 'freshwater', kind: 'carpet', heightM: 0.08,
+    colors: ["#5d9c38","#6db842","#398e40"], careLevel: 'easy',
+    info: "Thảm lá dạng dải ở tiền cảnh.",
+  },
+  {
+    id: "bacopa-caroliniana", name: "Bacopa lá dày", scientific: "Bacopa caroliniana",
+    water: 'freshwater', kind: 'stem', heightM: 0.2,
+    colors: ["#4f9959","#7fb86d","#5c8e5c"], careLevel: 'easy',
+    info: "Cặp lá thịt dày trên thân thẳng, hợp hậu cảnh.",
+  },
+  {
+    id: "hygrophila-polysperma", name: "Thủy cúc lá rộng", scientific: "Hygrophila polysperma",
+    water: 'freshwater', kind: 'stem', heightM: 0.28,
+    colors: ["#548f43","#75b360","#8cba6f"], careLevel: 'easy',
+    info: "Cây thân đốt tán xanh rậm nhanh.",
+  },
+  {
+    id: "red-tiger-lotus", name: "Súng hổ đỏ", scientific: "Nymphaea zenkeri",
+    water: 'freshwater', kind: 'rosette', heightM: 0.22,
+    colors: ["#813b47","#aa4b5b","#804852"], careLevel: 'easy',
+    info: "Lá to màu đỏ nâu, điểm nhấn giữa hồ.",
+  },
+  {
+    id: "bucephalandra", name: "Buce lá gợn", scientific: "Bucephalandra sp.",
+    water: 'freshwater', kind: 'rosette', heightM: 0.08,
+    colors: ["#244f50","#3a7168","#447b72"], careLevel: 'easy',
+    info: "Cây bám lũa nhỏ, lá nhăn màu xanh ngọc.",
+  },
+  {
+    id: "limnophila-sessiliflora", name: "Rong la hán xanh", scientific: "Limnophila sessiliflora",
+    water: 'freshwater', kind: 'stem', heightM: 0.3,
+    colors: ["#548c45","#6cad59","#4c965c"], careLevel: 'easy',
+    info: "Tán lá mềm hình lông chim ở hậu cảnh.",
+  },
+
   // ── Saltwater corals & anemones ──
   {
     id: 'pulsing-xenia', name: 'San hô Xenia nhịp đập', scientific: 'Xenia elongata',

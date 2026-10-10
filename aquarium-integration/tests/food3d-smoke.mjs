@@ -89,7 +89,11 @@ try{
   await new Promise(r=>setTimeout(r,250));
   const after=await page.evaluate(()=>window.__kanFoodProbe().count);
   if(after!==previous)throw Error('Background click unexpectedly fed fish');
-  console.log('PASS food3d: precise projection, submerged origin, randomized depth, obstacles, orbit/cinematic and invalid clicks; samples='+snapshots.length);
+  const wood=await page.evaluate(()=>window.__kan42WoodTest());
+  if(!wood||wood.support!=='wood'||wood.state!=='settled'||
+     wood.pelletY<=wood.floorY+.012||wood.pelletY>wood.woodTop+.045)
+    throw Error('Pellet did not settle on the real hollow-log shell: '+JSON.stringify(wood));
+  console.log('PASS food3d: exact click ray, randomized depth, real wood collision, invalid clicks; samples='+snapshots.length);
 } finally {
   if(browser)await browser.close();
   server.kill('SIGTERM');
