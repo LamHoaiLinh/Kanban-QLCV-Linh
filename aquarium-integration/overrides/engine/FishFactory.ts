@@ -120,13 +120,13 @@ function buildFishAsset(sp: SpeciesDef): FishAsset {
   const map = fishTextureWithEye(sp);
   const body = new THREE.MeshStandardMaterial({
     map,
-    roughness: sp.shape.eelLike ? 0.49 : 0.35,
+    roughness: sp.shape.eelLike ? 0.49 : sp.id==='betta' || sp.id==='guppy' ? 0.44 : 0.37,
     metalness: 0.34 * sp.palette.iridescence, // structural shimmer on tetras etc.
     envMapIntensity: 0.58 + sp.palette.iridescence * 0.65,
   });
   const fins = new THREE.MeshStandardMaterial({
     color: new THREE.Color(sp.palette.fin),
-    roughness: 0.65,
+    roughness: sp.shape.finLong?0.78:0.67,
     metalness: 0,
     transparent: true,
     opacity: sp.palette.finOpacity,
@@ -266,10 +266,10 @@ function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
     const tipX = -0.5;
     const H = sh.height * (0.55 + sh.tailFork * 0.45) * (sh.finLong ? 1.35 : 1);
     const pts: [number, number][] = [[rootX, 0]];
-    const N = sh.finLong ? 16 : 12;
+    const N = sh.finLong ? 28 : 16;
     for (let k = 0; k <= N; k++) {
       const t = k / N;                     // 0 top → 1 bottom of trailing edge
-      const y = (0.5-t)*H*(1+.018*Math.sin(t*Math.PI*8));
+      const y = (0.5-t)*H*(1+.007*Math.sin(t*Math.PI*6));
       // Fork: pull the middle of the trailing edge forward.
       const notch = Math.pow(Math.abs(0.5 - t) * 2, 1.4);
       const x = tipX+(1-notch)*sh.tailFork*sh.tailSize*.85+(sh.finLong?.007*Math.sin(t*Math.PI*12):0);
@@ -284,10 +284,10 @@ function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
     const pts: [number, number][] = [];
     const backAt = (u: number) => bodyProfile(u, sp) + bodyProfile(u, sp) * 0.12;
     pts.push([0.5 - u0 * bodyLen, backAt(u0)]);
-    const N = 6;
+    const N = sh.finLong ? 18 : 10;
     for (let k = 0; k <= N; k++) {
       const t = k / N, u = u0 + (u1 - u0) * t;
-      const raise = Math.sin(Math.PI * Math.min(1, t * 1.4)) ** (sh.finLong ? 0.6 : 1);
+      const raise = Math.pow(Math.sin(Math.PI * t),sh.finLong?0.65:1.05);
       pts.push([0.5 - u * bodyLen, backAt(u) + sh.dorsalHeight * sh.height * raise]);
     }
     pts.push([0.5 - u1 * bodyLen, backAt(u1)]);
@@ -300,10 +300,10 @@ function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
     const pts: [number, number][] = [];
     const bellyAt = (u: number) => -bodyProfile(u, sp);
     pts.push([0.5 - u0 * bodyLen, bellyAt(u0)]);
-    const N = 5;
+    const N = sh.finLong ? 12 : 8;
     for (let k = 0; k <= N; k++) {
       const t = k / N, u = u0 + (u1 - u0) * t;
-      pts.push([0.5 - u * bodyLen, bellyAt(u) - sh.analHeight * sh.height * Math.sin(Math.PI * Math.min(1, t * 1.3))]);
+      pts.push([0.5 - u * bodyLen, bellyAt(u) - sh.analHeight * sh.height * Math.pow(Math.sin(Math.PI*t),sh.finLong?.72:1)]);
     }
     addFin(pts, 2);
   }
