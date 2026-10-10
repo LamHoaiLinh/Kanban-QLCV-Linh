@@ -103,7 +103,8 @@ export function AquariumCanvas() {
     const unsub = useStore.subscribe((state, prev) => {
       if (state.config !== prev.config) {
         clearTimeout(resizeTimer);
-        if(state.config.gallons!==prev.config.gallons)resizeTimer=setTimeout(()=>engine.applyConfig(useStore.getState().config),180);
+        const sliderResize=state.config.gallons!==prev.config.gallons&&state.config.name===prev.config.name&&state.config.water===prev.config.water&&state.config.decor===prev.config.decor&&state.config.flora===prev.config.flora;
+        if(sliderResize)resizeTimer=setTimeout(()=>engine.applyConfig(useStore.getState().config),180);
         else engine.applyConfig(state.config);
       }
       if(state.smartCinema!==prev.smartCinema)engine.rig.smartCinema=state.smartCinema;

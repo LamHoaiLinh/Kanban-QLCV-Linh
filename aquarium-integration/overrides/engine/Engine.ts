@@ -72,6 +72,7 @@ export class Engine {
   private foodDepthRay=new THREE.Raycaster();
   private foodDepthRayDirection=new THREE.Vector3();
   private lastCycleT = 0;
+  private lodIn=0;
   // FPS + draw call counters for the dev HUD.
   stats = { fps: 60, drawCalls: 0, triangles: 0, fishCount: 0,frameP50Ms:16.7,frameP95Ms:16.7,geometries:0,textures:0 };
   readonly ecology=new EcoSystem();
@@ -92,6 +93,7 @@ export class Engine {
       antialias: true,
       powerPreference: 'high-performance',
     });
+    this.renderer.info.autoReset=false;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.18;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -148,6 +150,8 @@ export class Engine {
           return this.ecology.snapshot();
         };
       Object.assign(window,{
+        __kan42Burst:(count:number)=>this.fish.qaBurst(count,this.simEnv),
+        __kan42Pause:()=>this.enableExternalDrive(),
         __kan42Scene:(patch:Partial<TankConfig>)=>{if(this.config)this.applyConfig({...this.config,...patch},true);},
         __kan42Action:(key:string,action:'peck'|'dash',roll=.25)=>this.fish.qaAction(key,action,this.simEnv,roll),
         __kan42Event:(type:Parameters<FishSystem['qaHabitat']>[0])=>this.fish.qaHabitat(type,this.simEnv),
@@ -346,6 +350,7 @@ export class Engine {
   private lastFishKey = '';
   applyConfig(config: TankConfig, force = false): void {
     config=normalizeStock(config);
+    const initial=!this.config;
     const resized=!!this.config&&this.config.gallons!==config.gallons;
     const structureKey = JSON.stringify([
       config.water, Math.round(config.gallons * 10), config.substrate,
@@ -407,7 +412,7 @@ export class Engine {
         this.quality, decorOut.airstone,
       );
       SharedUniforms.uSurfaceY.value = this.dims.surfaceY;
-      this.rig.frameTank(this.dims.halfW, this.dims.height, this.dims.floorY + this.dims.height * 0.52);
+      if(initial||resized)this.rig.frameTank(this.dims.halfW, this.dims.height, this.dims.floorY + this.dims.height * 0.52);
     }
 
     if (fishChanged) {
@@ -568,6 +573,7 @@ export class Engine {
 
   screenshot(): string {
     // Render fresh, then read pixels in the same task (buffer isn't preserved).
+    this.renderer.info.reset();
     if (this.composer) this.composer.render();
     else this.renderer.render(this.scene, this.rig.camera);
     return this.renderer.domElement.toDataURL('image/png');
@@ -579,9 +585,10 @@ export class Engine {
 
   private tick = (): void => {
     if (this.disposed) return;
-    const dt = Math.min(this.clock.getDelta(), 0.1);
+    const elapsed=this.clock.getDelta();
+    const dt = Math.min(elapsed, 0.1);
     if (!this.running) return;
-    this.advance(dt);
+    this.advance(dt,elapsed);
   };
 
   /**
@@ -683,7 +690,7 @@ export class Engine {
 
   /** One simulation + render step. Called with real dt by tick(), or with a
    *  fixed dt by the capture driver (which needs stutter-free frame times). */
-  advance(dt: number): void {
+  advance(dt: number,frameElapsed=dt): void {
 
     const t = SharedUniforms.uTime.value + dt;
     SharedUniforms.uTime.value = t;
@@ -705,8 +712,10 @@ export class Engine {
     this.environment.update(this.dayFactor, this.rig.camera);
     this.rig.observe(this.fish.getLiveEvents(this.simEnv),this.simEnv.obstacles);
     this.rig.update(dt);
+    this.lodIn-=dt;if(this.lodIn<=0){this.lodIn=.5;this.fish.updateLod(this.rig.camera,this.container.clientHeight);}
     this.syncFoodLayer();
 
+    this.renderer.info.reset();
     if (this.composer) this.composer.render();
     else this.renderer.render(this.scene, this.rig.camera);
 
@@ -717,7 +726,7 @@ export class Engine {
     }
 
     // — Stats + automatic quality downgrade —
-    this.frameTimes.push(dt);
+    this.frameTimes.push(frameElapsed);
     if (this.frameTimes.length >= 60) {
       const avg = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length;
       this.stats.fps = Math.round(1 / avg);

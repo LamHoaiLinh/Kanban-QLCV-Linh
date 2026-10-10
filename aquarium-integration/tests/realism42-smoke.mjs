@@ -19,7 +19,10 @@ try{
  await page.evaluate(()=>{window.__kan42Quality('medium');window.__kan42Scene({gallons:180,fish:{'neon-tetra':100},flora:{},decor:['hollow-log','log-arch'],fishNames:{'neon-tetra:0':'Linh'}});window.__kanFoodTestCamera('cinematic');});
  let probe=await page.evaluate(()=>window.__kan42Probe());
  assert(probe.telemetry.fish.length===100,'180g must simulate 100 compatible fish');
+ await page.addStyleTag({content:'.panel,.toolbar,.kanban-aquarium-stock{display:none!important}'});
  await page.screenshot({path:'realism42-100-fish.png'});
+ await page.evaluate(()=>window.__kan42Pause());
+ console.log('START ambient stress');
  // 30 minutes of the real fixed-step physics, including the real observational camera.
  for(let minute=0;minute<30;minute++){
   const p=await page.evaluate(()=>{window.__kanEcoFastForward(60);return window.__kan42Probe();});
@@ -29,6 +32,7 @@ try{
   assert(p.telemetry.fish.every(a=>a.pos.every(Number.isFinite)&&a.vel.every(Number.isFinite)),'NaN ambient');
   assert(p.telemetry.fish.every(a=>a.stuck<2.7),'stuck fish '+JSON.stringify(p.telemetry.fish.filter(a=>a.stuck>=2.7)));
  }
+ console.log('PASS ambient stress');
  report.checks.push('100 fish / 30 simulated minutes, boundaries, solid collisions, finite poses, stuck recovery');
  for(let cycle=0;cycle<20;cycle++){
   await page.evaluate(()=>window.__kan42Scene({gallons:180,fish:{'neon-tetra':100},fishNames:{'neon-tetra:0':'Linh'}}));
@@ -40,6 +44,7 @@ try{
    if(gallons===180)assert(p.telemetry.fish.length===0,'upsizing must not regenerate removed fish');
   }
  }
+ console.log('PASS resize stress');
  report.checks.push('20 shrink/grow cycles, no NaN, named metadata retained, no automatic respawn');
  // Exercise persisted entry points and undo, including rounding budget at low quality.
  const saved=await page.evaluate(()=>window.__kan42Store('exercise'));
@@ -73,6 +78,7 @@ try{
  }
  assert(launched>=90,'insufficient eligible dash samples');assert(Math.abs(breached/launched-.5)<.06,'conditional 50%');assert(splashes===breached,'splash once');
  report.checks.push(`conditional jump ${breached}/${launched}, ${splashes} splashes, every actor returns`);
+ console.log('PASS jump statistics');
  // Peck only actual permitted species, 3–8 beats at 4–8Hz and returns to cruise.
  await page.evaluate(()=>window.__kan42Scene({gallons:20,fish:{'corydoras':6,'bristlenose-pleco':1},decor:[],flora:{}}));
  const peck=await page.evaluate(()=>{
@@ -121,6 +127,7 @@ try{
  assert(touch.after.pan&&touch.after.target.every(Number.isFinite),'two finger pan/pinch');report.checks.push('two touch pointers pan/pinch and 1/2/1 transition');
  const fin=await page.evaluate(()=>window.__kanRealismProbe().fins);
  assert(fin.every(f=>f.tapered&&f.rootThickness>0),'tapered mesh metadata');
+ await page.evaluate(()=>window.__kan42Step(.1));
  await page.screenshot({path:'realism42-camera-pan.png'});
  assert(errors.length===0,'page errors '+errors.join(';'));
  report.checks.push('no page errors or invalid shader state');

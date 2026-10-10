@@ -108,6 +108,7 @@ interface Population {
   mesh: THREE.InstancedMesh;
   agents: Agent[];
   dyn: THREE.InstancedBufferAttribute;
+  rnd: THREE.InstancedBufferAttribute;
 }
 
 // ── KanAquarium: individual pellets and high-priority rare cookies ──
@@ -196,6 +197,7 @@ export class FishSystem {
   private habitat = new HabitatDirector();
   private softFinsOn=true;
   private nextSurfaceDash=65;
+  private pendingDashes:Array<{key:string;at:number;roll:number;qa:boolean}>=[];
   private jumpStats={eligible:0,breaches:0,splashes:0};
   private patchCooldown=new Map<string,number>();
   getLiveEvents(env:SimEnv){
@@ -209,6 +211,10 @@ export class FishSystem {
     return events;
   }
   qaHabitat(type:Parameters<HabitatDirector['qaLaunch']>[0],env:SimEnv){return this.habitat.qaLaunch(type,this.populations.flatMap(p=>p.agents),env);}
+  qaBurst(count:number,env:SimEnv):number{
+    const actors=this.populations.flatMap(p=>p.agents).filter(a=>this.jumpEligible(a)&&!a.jump&&!a.drop).slice(0,Math.min(3,count));
+    actors.forEach((a,i)=>this.pendingDashes.push({key:a.key,at:env.time+i*.45,roll:.25,qa:true}));return actors.length;
+  }
   getTelemetry(){return {jump:{...this.jumpStats},fish:this.populations.flatMap(p=>p.agents.map(a=>({
     key:a.key,pos:a.pos.toArray(),vel:a.vel.toArray(),yaw:a.prevYaw,mode:a.mode,
     travel:a.travel,collisions:a.collisions,stuck:a.stuckTime,recoveries:a.recoveries,
@@ -218,6 +224,22 @@ export class FishSystem {
   qaAction(key:string,action:'peck'|'dash',env:SimEnv,roll=.25){
     const a=this.findByKey(key)?.agent;if(!a)return false;
     return action==='peck'?this.startPeck(a,env):this.startDash(a,env,roll,true);
+  }
+  updateLod(camera:THREE.PerspectiveCamera,viewportHeight:number):void{
+    for(const p of this.populations){
+      if(p.sp.invert)continue;
+      const distance=Math.min(...p.agents.map(a=>a.pos.distanceTo(camera.position)));
+      const pixels=p.sp.lengthM/Math.max(.1,distance)*viewportHeight/(2*Math.tan(THREE.MathUtils.degToRad(camera.fov/2)));
+      const wasLow=p.mesh.geometry.userData.lod==='low';
+      const low=wasLow?pixels<32:pixels<24;
+      const asset=getFishAsset(p.sp,low);
+      if(asset.geometry!==p.mesh.geometry){
+        p.mesh.geometry.dispose();
+        asset.geometry.setAttribute('aDyn',p.dyn);asset.geometry.setAttribute('aRand',p.rnd);
+        p.dyn.needsUpdate=true;p.rnd.needsUpdate=true;
+        p.mesh.geometry=asset.geometry;
+      }
+    }
   }
   setSoftFins(on:boolean):void{
     this.softFinsOn=on;
@@ -230,7 +252,7 @@ export class FishSystem {
     return !this.softFinsOn||sp.invert||sp.shape.eelLike?0:
       sp.id==='angelfish'?.085:sp.shape.finLong?.045:.018;
   }
-  resetHabitat():void{this.habitat.reset();}
+  resetHabitat():void{this.habitat.reset();this.pendingDashes=[];}
   getHabitatSnapshot(env:SimEnv){return this.habitat.snapshot(env);}
   getFinSnapshot(){return this.populations.map(p=>({id:p.sp.id,
     tapered:p.mesh.geometry.userData.taperedFins===true,rootThickness:p.mesh.geometry.userData.rootThickness,
@@ -467,7 +489,7 @@ export class FishSystem {
     const oldAgents=new Map(this.populations.flatMap(p=>p.agents.map(a=>[a.key,a] as const)));
     for (const p of this.populations) {
       this.group.remove(p.mesh);
-      p.mesh.dispose();
+      p.mesh.geometry.dispose();p.mesh.dispose();
     }
     this.populations = [];
     this.habitat.reset();
@@ -509,6 +531,10 @@ export class FishSystem {
           agent.jaw=old.jaw??0;agent.jawTime=old.jawTime??0;
           agent.rand=old.rand;agent.scale=old.scale;agent.hunger=old.hunger;
           agent.drop=old.drop?{...old.drop}:undefined;
+          agent.acceleration.copy(old.acceleration);agent.travel=old.travel;agent.collisions=old.collisions;
+          agent.recoveries=old.recoveries;agent.history=[...old.history];agent.nextPeck=old.nextPeck;agent.nextJump=old.nextJump;
+          agent.jump=old.jump?{...old.jump}:undefined;
+          agent.peck=old.peck?{...old.peck,point:old.peck.point.clone(),normal:old.peck.normal.clone()}:undefined;
         }
         if(!old&&this.pendingDrop&&!isCrawler(sp)){
           const p=this.pendingDrop;this.pendingDrop=null;
@@ -526,13 +552,13 @@ export class FishSystem {
           }
           if(old){agent.rand=old.rand;agent.scale=old.scale;agent.phase=old.phase;}
         }
-        if(!isCrawler(sp)&&!agent.drop)this.constrain(agent,env);
+        if(!isCrawler(sp)&&!agent.drop&&agent.jump?.stage!=='breach')this.constrain(agent,env);
         agent.moveOrigin.copy(agent.pos);spawned.push(agent);
         agents.push(agent);
       }
       rnd.needsUpdate = true;
 
-      const pop: Population = { sp, mesh, agents, dyn };
+      const pop: Population = { sp, mesh, agents, dyn, rnd };
       this.populations.push(pop);
       this.group.add(mesh);
     }
@@ -618,10 +644,22 @@ export class FishSystem {
     // Director is observational and never alters population sizes or persistence.
     const allAgents=this.populations.flatMap(p=>p.agents);
     this.habitat.update(dt,allAgents,env);
+    for(let i=this.pendingDashes.length-1;i>=0;i--){
+      const pending=this.pendingDashes[i];if(pending.at>env.time)continue;
+      this.pendingDashes.splice(i,1);const actor=allAgents.find(a=>a.key===pending.key);
+      if(actor&&(pending.qa||(!env.reducedMotion&&env.ecoMode!=='relax')))this.startDash(actor,env,pending.roll,pending.qa);
+    }
     if(env.time>this.nextSurfaceDash&&!env.reducedMotion&&env.ecoMode!=='relax'&&this.feedTimer<=0){
       this.nextSurfaceDash=env.time+60+Math.random()*90;
       const candidates=allAgents.filter(a=>this.jumpEligible(a)&&env.time>a.nextJump&&!a.peck&&!a.drop);
-      if(candidates.length)this.startDash(candidates[Math.floor(Math.random()*candidates.length)],env,Math.random());
+      if(candidates.length){
+        const lead=candidates[Math.floor(Math.random()*candidates.length)];
+        if(this.startDash(lead,env,Math.random())){
+          const chance=Math.random(),extra=chance<.005?2:chance<.05?1:0;
+          candidates.filter(a=>a!==lead&&a.sp.id===lead.sp.id&&a.pos.distanceTo(lead.pos)<.25).slice(0,extra)
+            .forEach((a,i)=>this.pendingDashes.push({key:a.key,at:env.time+.45+i*.55,roll:Math.random(),qa:false}));
+        }
+      }
     }
 
     for (const pop of this.populations) {

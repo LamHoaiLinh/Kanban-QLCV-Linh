@@ -110,11 +110,13 @@ export interface FishAsset {
 
 const assetCache = new Map<string, FishAsset>();
 
-export function getFishAsset(sp: SpeciesDef): FishAsset {
-  let asset = assetCache.get(sp.id);
+export function getFishAsset(sp: SpeciesDef,low=false): FishAsset {
+  const key=sp.id+(low?':low':':full');
+  let asset = assetCache.get(key);
   if (!asset) {
-    asset = buildFishAsset(sp);
-    assetCache.set(sp.id, asset);
+    if(low&&!sp.id.includes('snail')){const full=getFishAsset(sp);asset={geometry:buildFishGeometry(sp,true),materials:full.materials,uniforms:full.uniforms};}
+    else asset = buildFishAsset(sp);
+    assetCache.set(key, asset);
   }
   return asset;
 }
@@ -201,9 +203,9 @@ function bodyProfile(u: number, sp: SpeciesDef): number {
   return (sh.height / 2) * h;
 }
 
-function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
+function buildFishGeometry(sp: SpeciesDef,low=false): THREE.BufferGeometry {
   const sh = sp.shape;
-  const RINGS = 30, SIDES = 16;
+  const RINGS = low?16:30, SIDES = low?10:16;
   const positions: number[] = [];
   const uvs: number[] = [];
   const parts: number[] = [];
@@ -257,7 +259,7 @@ function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
       return v;
     };
     if(part===1||part===2){
-      const rings=sh.finLong?5:3;
+      const rings=low?2:sh.finLong?5:3;
       for(let k=1;k<outline.length-1;k++){
         const ea=outline[k],eb=outline[k+1];
         const centre=append(root[0],root[1],0);
@@ -282,7 +284,7 @@ function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
   // belly along the *whole* root, not triangulated from ONE point. The old
   // fan created a rigid, plastic-looking triangular sail, especially on angels.
   const addMedianFin = (startU:number,endU:number,sign:1|-1,rise:number) => {
-    const columns=sh.finLong?22:13,rows=sh.finLong?8:5;
+    const columns=low?9:sh.finLong?22:13,rows=low?3:sh.finLong?8:5;
     const base=positions.length/3;
     const stride=rows+1;
     for(let j=0;j<=columns;j++){
@@ -337,7 +339,7 @@ function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
     const tipX = -0.5;
     const H = sh.height * (0.55 + sh.tailFork * 0.45) * (sh.finLong ? 1.35 : 1);
     const pts: [number, number][] = [[rootX, 0]];
-    const N = sh.finLong ? 28 : 16;
+    const N = low?10:sh.finLong ? 28 : 16;
     for (let k = 0; k <= N; k++) {
       const t = k / N;                     // 0 top → 1 bottom of trailing edge
       const y = (0.5-t)*H*(1+.007*Math.sin(t*Math.PI*6));
@@ -431,6 +433,7 @@ function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
   geo.clearGroups();
   geo.addGroup(0, finIndexStart, 0);
   geo.addGroup(finIndexStart, indices.length - finIndexStart, 1);
+  geo.userData.lod=low?'low':'full';
   geo.userData.taperedFins=true;
   geo.userData.rootThickness=sh.finLong?.010:.004;
   return geo;

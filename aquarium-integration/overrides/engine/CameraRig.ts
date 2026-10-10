@@ -75,15 +75,15 @@ export class CameraRig {
     this.shotTime+=dt;this.shotPause=Math.max(0,this.shotPause-dt);this.decisionIn-=dt;
     if(this.shot){
       const live=this.observed.find(e=>e.id===this.shot!.id);
-      if(!live||this.shotTime>12){
+      if((!live&&this.shotTime>=6)||this.shotTime>12){
         this.shotLog.push({time:this.now,type:this.shot.type,reason:live?'shot complete':'actor/action ended'});
         this.shot=null;this.shotPause=12;this.tLookAt.set(0,this.midY,0);this.tRadius=this.baseRadius;
-      }else{
+      }else if(live){
         const center=new THREE.Vector3();live.worldPositions.forEach(p=>center.add(p));center.multiplyScalar(1/live.worldPositions.length);
         if(live.type==='surface-dash')center.y=Math.min(center.y,this.height*.94);
         this.tLookAt.copy(center);this.clampTarget();
         return;
-      }
+      }else{return;}
     }
     if(this.shotPause>0||this.decisionIn>0)return;this.decisionIn=1;
     const options=this.observed.filter(e=>e.eligibleCamera&&e.confidence>.7&&e.worldPositions.length>0&&
