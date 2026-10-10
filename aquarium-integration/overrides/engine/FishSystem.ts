@@ -570,6 +570,10 @@ export class FishSystem {
           agent.pos.copy(old.pos);agent.vel.copy(old.vel);agent.anchor.copy(old.anchor);
           agent.mode=old.mode;agent.modeT=old.modeT;agent.phase=old.phase;
           agent.prevYaw=old.prevYaw;agent.prevPitch=old.prevPitch??0;
+          agent.pitchVelocity=old.pitchVelocity;
+          agent.wall=old.wall;agent.crawlDir=old.crawlDir;
+          agent.surfaceNormal=old.surfaceNormal?.clone();agent.surfacePose=old.surfacePose?.clone();
+          if(agent.surfaceNormal&&!env.solids?.sweep(agent.pos.clone().addScaledVector(agent.surfaceNormal,.003),agent.pos.clone().addScaledVector(agent.surfaceNormal,-.012),Math.max(.002,agent.scale*.12)))agent.surfaceNormal=undefined;
           agent.stuckTime=old.stuckTime??0;
           agent.moveOrigin.copy(old.moveOrigin??old.pos);
           agent.jaw=old.jaw??0;agent.jawTime=old.jawTime??0;
@@ -1302,6 +1306,15 @@ export class FishSystem {
 
   // ── Crawlers: snails & hillstream loaches on glass or substrate ──
   private updateCrawler(a: Agent, dt: number, env: SimEnv): void {
+    if(a.wall==='floor'&&!a.surfaceNormal&&a.pos.y>env.floorY+Math.max(.004,a.scale*.14)+.003){
+      // A removed decoration no longer supports this animal. Settle downward
+      // continuously instead of snapping from a high branch to the substrate.
+      const next=a.pos.clone();next.y=Math.max(env.floorY+Math.max(.004,a.scale*.14),next.y-.04*dt);
+      const radius=Math.max(.002,a.scale*.12),hit=env.solids?.sweep(a.pos,next,radius);
+      if(hit){a.pos.copy(hit.point).addScaledVector(hit.normal,radius+.00002);a.surfaceNormal=hit.normal.clone();}
+      else a.pos.copy(next);
+      a.vel.set(0,-.04,0);return;
+    }
     // Snails ooze along; hillstream loaches graze in place, then scoot.
     const isLoach = a.sp.id.includes('hillstream');
     const shrimp=a.sp.id.includes('shrimp');
