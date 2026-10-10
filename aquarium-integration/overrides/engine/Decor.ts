@@ -53,7 +53,7 @@ function createHollowBark(radius:number,length:number,seed:number):THREE.BufferG
   const positions:number[]=[],uvs:number[]=[],indices:number[]=[];
   const groups:Array<{start:number;count:number;material:number}>=[];
   const outer=(t:number,a:number)=>radius*(1-.065*t)*
-    (1+.045*Math.sin(a*5+seed*3+t*5)+.026*Math.cos(a*9-seed*2+t*3));
+    (1+.075*Math.sin(a*5+seed*3+t*5)+.038*Math.cos(a*9-seed*2+t*3));
   const inner=(t:number,a:number)=>radius*.59*
     (1+.025*Math.sin(a*7+t*5+seed));
   const yAt=(t:number,a:number)=>(t-.5)*length+
@@ -199,7 +199,7 @@ export class DecorSystem {
       switch (id) {
         case 'driftwood': {
           // A main bough with two branches, arching across the left third.
-          const wood = this.mat({ map: woodTexture(), color: '#8a6844', roughness: 0.85 });
+          const wood = this.mat({ map: woodTexture(), color: '#a58359', roughness: 0.92 });
           const curve = new THREE.CatmullRomCurve3([
             new THREE.Vector3(-halfW * 0.7, floorY, -halfD * 0.2),
             new THREE.Vector3(-halfW * 0.3, floorY + dims.height * 0.35, 0),
@@ -285,7 +285,7 @@ export class DecorSystem {
         case 'hollow-log': {
           const split=id==='split-log';
           const barkMap=woodTexture();
-          const wood=this.mat({map:barkMap,color:split?'#584530':'#7a5c3a',
+          const wood=this.mat({map:barkMap,color:split?'#8b6945':'#ac8253',
             roughness:.94,side:THREE.DoubleSide});
           const innerWood=this.mat({map:barkMap,color:split?'#423024':'#523e2d',
             roughness:.98,side:THREE.DoubleSide});
@@ -296,9 +296,11 @@ export class DecorSystem {
           const bark=createHollowBark(R,len,split?3.4:2.2);
           const log=new THREE.Mesh(bark,[wood,innerWood]);
           log.name='hollow-bark-'+id;
-          log.rotation.z=Math.PI/2;
-          log.rotation.y=.2;
-          log.position.set(cx,floorY+R*1.1,cz);
+          // Aim the hollow mouth diagonally into the scene: a strictly
+          // sideways cylinder reads as a flat rectangular half-log.
+          const lookAxis=new THREE.Vector3(split?-.72:.66,0,split?.69:.75).normalize();
+          log.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),lookAxis);
+          log.position.set(cx,floorY+R*1.12,cz);
           this.group.add(log);
           // A couple of broken branch stubs poking off the bark for character.
           for (const [ox, oz, ang] of [[-0.06, 0.02, 0.6], [0.05, -0.03, -0.8]] as const) {
