@@ -153,10 +153,10 @@ export const useStore = create<AppState>()(
             substrate: substrates[Math.floor(Math.random() * substrates.length)],
             background: water === 'saltwater' ? 'reef' : (['natural', 'planted', 'deepblue'] as const)[Math.floor(Math.random() * 3)],
             lighting: water === 'saltwater' ? 'actinic' : 'daylight',
-            name: 'Surprise Tank',
+            name: 'Hồ cá bất ngờ',
           },
         }));
-        get().showToast('Here’s a surprise tank — remix it however you like.');
+        get().showToast('Đã tạo hồ cá ngẫu nhiên. Anh có thể chỉnh sửa theo ý thích.');
       },
 
       saveTank: (name) =>
