@@ -126,7 +126,7 @@ function buildFishAsset(sp: SpeciesDef): FishAsset {
     // Snails are rigid — zero amplitude keeps the shell from wobbling.
     uAmp: { value: sp.id.includes('snail') ? 0 : sp.swim.amp },
     uMode: { value: sp.swim.mode },
-    uFinSoftness: { value: sp.invert || sp.shape.eelLike ? 0 : sp.id==='angelfish' ? .064 : sp.shape.finLong ? .045 : .018 },
+    uFinSoftness: { value: sp.invert || sp.shape.eelLike ? 0 : sp.id==='angelfish' ? .085 : sp.shape.finLong ? .045 : .018 },
   };
 
   const map = fishTextureWithEye(sp);
@@ -138,10 +138,10 @@ function buildFishAsset(sp: SpeciesDef): FishAsset {
   });
   const fins = new THREE.MeshStandardMaterial({
     color: new THREE.Color(sp.palette.fin),
-    roughness: sp.shape.finLong?0.78:0.67,
+    roughness: sp.id==='angelfish'?.92:sp.shape.finLong?.78:.67,
     metalness: 0,
     transparent: true,
-    opacity: sp.palette.finOpacity,
+    opacity: sp.id==='angelfish'?sp.palette.finOpacity*.72:sp.palette.finOpacity,
     vertexColors: true, // thin ray-tinted fin membranes
     side: THREE.DoubleSide,
     depthWrite: false,
