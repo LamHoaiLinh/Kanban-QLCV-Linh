@@ -14,8 +14,10 @@
 
 import * as THREE from 'three';
 import type { SpeciesDef } from '../types';
+import type { SwimTunnel } from './Decor';
 import { speciesById } from '../data/species';
 import { getFishAsset } from './FishFactory';
+import { HabitatDirector } from './HabitatDirector';
 import { CurrentField } from './CurrentField';
 import { radialSpriteTexture } from './textures';
 import { applyUnderwater } from './shaders';
@@ -54,6 +56,7 @@ export interface SimEnv {
   ecoComfort?:number; // gentle environmental modulation, never mortality
   obstacles: { pos: THREE.Vector3; radius: number }[]; // decor/coral keep-out spheres
   shelters: THREE.Vector3[];                            // hiding spots (decor)
+  tunnels: SwimTunnel[]; // open corridors exported from the physical wood geometry
 }
 
 type FishMode = 'cruise' | 'rest' | 'dart' | 'feed' | 'forage';
@@ -175,6 +178,14 @@ export class FishSystem {
   onEcoEvent?:(event:'graze'|'rest'|'shelter'|'school')=>void;
   populations: Population[] = [];
   private feedTimer = 0;   // seconds of "the fish are hungry/excited" remaining
+  private habitat = new HabitatDirector();
+  resetHabitat():void{this.habitat.reset();}
+  getHabitatSnapshot(env:SimEnv){return this.habitat.snapshot(env);}
+  getFinSnapshot(){return this.populations.map(p=>({id:p.sp.id,
+    vertices:p.mesh.geometry.getAttribute('position').count,
+    flexible:[...Array(p.mesh.geometry.getAttribute('aFinFlex').count).keys()].filter(i=>
+      p.mesh.geometry.getAttribute('aFinFlex').getX(i)>.001).length,
+    mouth:[...p.agents].map(a=>a.jaw)}));}
   private pendingDrop:{x:number;z:number}|null=null;
   private splashes:Array<{mesh:THREE.Mesh<THREE.RingGeometry,THREE.MeshBasicMaterial>;age:number}>=[];
   // Soft spherical keep-out zones approximate rocks, wood trunks and larger corals.
@@ -363,6 +374,7 @@ export class FishSystem {
       p.mesh.dispose();
     }
     this.populations = [];
+    this.habitat.reset();
 
     // Respect the quality tier's fish budget by scaling every school down
     // proportionally rather than dropping whole species.
@@ -487,12 +499,15 @@ export class FishSystem {
     this.feedTimer = Math.max(0, this.feedTimer - dt);
     this.food.update(dt, env.floorY);
     this.updateSplashes(dt);
+    // Director is observational and never alters population sizes or persistence.
+    const allAgents=this.populations.flatMap(p=>p.agents);
+    this.habitat.update(dt,allAgents,env);
 
     for (const pop of this.populations) {
       const { sp, agents, mesh, dyn } = pop;
       for (const a of agents) {
         if (this.animateDrop(a,dt,env)) {/* New fish enters the water before joining normal swimming. */}
-        else if (isCrawler(sp)) this.updateCrawler(a, dt, env);
+        else if (isCrawler(sp)) {this.updateCrawler(a, dt, env);this.habitat.crawl(a,dt,env);}
         else this.updateFish(a, agents, dt, env);
         if(!isCrawler(sp)&&!a.drop)this.constrain(a,env);
         this.writeInstance(pop, a, dt);
@@ -573,11 +588,15 @@ export class FishSystem {
     // 5) Archetype flavor.
     this.archetypeSteer(a, steer, env, activity);
 
+    // One event at most can steer a fish through a measured corridor.
+    this.habitat.steer(a,steer,dt,env);
+
     // 6) Feeding overrides almost everything — fish RACE for food.
     if (this.feedTimer > 0 && this.food.active && (a.mode !== 'rest' || this.food.hasCookie)) {
       const bottomFeeder = sp.zone === 'bottom';
       const target = this.food.nearest(a.pos, Math.max(.17,L*6), bottomFeeder);
       if (target) {
+        this.habitat.cancelFor(a); // feeding outranks a sightseeing event
         const special=target.kind!=='normal';
         _v2.copy(target.pos).sub(a.pos);
         const d = _v2.length();
