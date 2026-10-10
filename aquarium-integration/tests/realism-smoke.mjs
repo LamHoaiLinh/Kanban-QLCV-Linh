@@ -57,6 +57,46 @@ try{
     },name);
     await audit('preset '+name);
   }
+  // Regression: volume adjustment must not turn a previously inhabited
+  // nano tank into an empty box, nor permanently delete the original stock.
+  const currentConfig=async()=>page.evaluate(()=>JSON.parse(localStorage.getItem('aquarium-v1')).state.config);
+  const chooseSize=async label=>{
+    await ensureTankPanel();
+    await page.evaluate(label=>{
+      const button=[...document.querySelectorAll('.panel .seg button')]
+        .find(b=>b.textContent?.trim()===label);
+      if(!button)throw Error('Missing tank size '+label);
+      button.click();
+    },label);
+  };
+  for(const [name,expectedSpecies] of [
+    ['Toàn cảnh ông tiên','endler-guppy'],
+    ['Trăng xanh san hô','cerith-snail']
+  ]){
+    await ensureTankPanel();
+    await page.evaluate(name=>{
+      const button=[...document.querySelectorAll('.preset-list button')]
+        .find(b=>b.textContent?.includes(name));
+      if(!button)throw Error('Missing showcase '+name);
+      button.click();
+    },name);
+    const baseline=await currentConfig();
+    if(baseline.gallons!==120)throw Error('Fixture must be 120 gallons: '+name);
+    await chooseSize('Vừa');
+    await chooseSize('Siêu nhỏ');
+    const nano=await currentConfig();
+    if(nano.gallons!==5||Object.values(nano.fish).reduce((a,b)=>a+b,0)<1)
+      throw Error('Previously populated tank became empty on resize '+JSON.stringify(nano));
+    if(!nano.fish[expectedSpecies])
+      throw Error('No suitable nano fallback '+JSON.stringify(nano.fish));
+    await chooseSize('Nhỏ');
+    await chooseSize('Rất lớn');
+    const restored=await currentConfig();
+    if(JSON.stringify(restored.fish)!==JSON.stringify(baseline.fish)||
+       JSON.stringify(restored.fishNames)!==JSON.stringify(baseline.fishNames))
+      throw Error('Original fish/names not restored after nano resize '+name);
+    console.log('PASS adaptive resize '+name+' nano='+JSON.stringify(nano.fish));
+  }
   for(let i=0;i<30;i++){
     await ensureTankPanel();
     await page.evaluate(()=>{
