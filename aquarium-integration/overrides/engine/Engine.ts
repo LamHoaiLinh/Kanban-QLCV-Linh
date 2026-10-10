@@ -167,6 +167,18 @@ export class Engine {
         (id:string,count:number)=>{
           if(this.config)this.applyConfig({...this.config,fish:{[id]:Math.min(60,Math.max(0,count))}},true);
         };
+      // Dedicated screenshot fixture, never persisted in localStorage.
+      (window as Window & {__kanVisualHotfixScene?:()=>boolean}).__kanVisualHotfixScene=()=>{
+        if(!this.config)return false;
+        this.applyConfig({...this.config,name:'Realism visual hotfix QA',
+          gallons:75,water:'freshwater',fish:{angelfish:6,betta:1,guppy:8},
+          decor:['driftwood','hollow-log','split-log','log-arch'],
+          flora:{},lighting:'daylight'},true);
+        this.setCameraMode('still');
+        return true;
+      };
+      (window as Window & {__kanVisualFinToggle?:(on:boolean)=>void}).__kanVisualFinToggle=
+        (on:boolean)=>this.setSoftFins(on);
       (window as Window & {__kanRealismProbe?:()=>unknown}).__kanRealismProbe=()=>({
         name:this.config?.name,
         fish:this.fish.getPhysicsSnapshot(this.simEnv),
