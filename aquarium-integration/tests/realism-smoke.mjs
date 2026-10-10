@@ -24,6 +24,7 @@ try{
     // Wait for a couple of real simulation frames to enforce collision bounds.
     await new Promise(r=>setTimeout(r,650));
     const x=await page.evaluate(()=>window.__kanRealismProbe());
+    if(x.fish.fish>60)throw Error(tag+': more than 60 fish '+JSON.stringify(x));
     if(x.fish.wallViolations!==0)throw Error(tag+': fish through glass '+JSON.stringify(x));
     if(x.flora.violations!==0)throw Error(tag+': flora outside glass '+JSON.stringify(x));
     if(x.fish.maxOverlap>.025)throw Error(tag+': deep penetration of solid '+JSON.stringify(x));
