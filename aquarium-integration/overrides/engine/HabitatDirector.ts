@@ -216,6 +216,26 @@ export class HabitatDirector {
     }
     return false;
   }
+  cancelFor(a:HabitAgent):void{this.routes.delete(a.key);}
+  // Crawlers keep their existing wall/floor mechanics. They only make a small
+  // natural crawl along the substrate, not an impossible flight through wood.
+  crawl(a:HabitAgent,dt:number,env:SimEnv):void{
+    const r=this.routes.get(a.key);
+    if(!r)return;
+    const p=r.waypoints[r.index];
+    if(!p){this.routes.delete(a.key);return;}
+    const dx=p.x-a.pos.x,dz=p.z-a.pos.z;
+    const d=Math.hypot(dx,dz);
+    if(d<.012){this.routes.delete(a.key);return;}
+    const step=Math.min(d,dt*.004);
+    const x=THREE.MathUtils.clamp(a.pos.x+dx/d*step,-env.halfW*.95,env.halfW*.95);
+    const z=THREE.MathUtils.clamp(a.pos.z+dz/d*step,-env.halfD*.95,env.halfD*.95);
+    if(a.sp.id.includes('snail')){
+      // Continue a deliberate film-grazing crawl along the floor; no teleport.
+      a.pos.x=x;a.pos.z=z;
+      a.mode='forage';
+    }
+  }
   // Called once per fish, after boids/obstacle steering but before integration.
   steer(a:HabitAgent,steer:THREE.Vector3,dt:number,env:SimEnv):void{
     const r=this.routes.get(a.key);
