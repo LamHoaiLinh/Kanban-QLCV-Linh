@@ -67,7 +67,7 @@ export const useStore = create<AppState>()(
       followFishKey: null,
       selectedFishKey: null,
       uiHidden: false,
-      panelOpen: new URLSearchParams(location.search).has('kanban')?false:(window.matchMedia?.('(min-width: 900px)').matches ?? true),
+      panelOpen: new URLSearchParams(location.search).has('kanban')?true:(window.matchMedia?.('(min-width: 900px)').matches ?? true),
       showHud: false,
       reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
       feedMode: false,

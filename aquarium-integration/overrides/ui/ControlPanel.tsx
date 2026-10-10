@@ -1,7 +1,7 @@
 // The build-your-tank control panel: water type, tank size, fish, plants,
 // decor, saved tanks and settings — everything updates the live scene.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore, PRESETS } from '../state/store';
 import { speciesForWater } from '../data/species';
 import { floraForWater } from '../data/flora';
@@ -29,14 +29,48 @@ softcoral:'San hô mềm',hardcoral:'San hô cứng',anemone:'Hải quỳ'
 
 
 export function ControlPanel() {
+  const panelRef=useRef<HTMLElement>(null);
   const [tab, setTab] = useState<Tab>('tank');
   const config = useStore((s) => s.config);
   const set = useStore((s) => s.set);
 
   const isSalt = config.water === 'saltwater';
 
+  // KanBan integration: auto-close after 15s without interaction INSIDE
+  // the panel. Any tab change, tap, typing, scrolling or pointer activity
+  // restarts the timer. No listeners remain after the panel is closed.
+  useEffect(()=>{
+    if(!new URLSearchParams(location.search).has('kanban'))return;
+    const node=panelRef.current;
+    if(!node)return;
+    let timer:ReturnType<typeof setTimeout>;
+    let lastMove=0;
+    const reset=()=>{
+      clearTimeout(timer);
+      timer=setTimeout(()=>useStore.getState().set({panelOpen:false}),15000);
+    };
+    const onMove=()=>{
+      const now=Date.now();
+      if(now-lastMove<750)return;
+      lastMove=now;
+      reset();
+    };
+    for(const name of ['pointerdown','keydown','input','change','wheel','focusin','touchstart']){
+      node.addEventListener(name,reset,{passive:true});
+    }
+    node.addEventListener('pointermove',onMove,{passive:true});
+    reset();
+    return ()=>{
+      clearTimeout(timer);
+      for(const name of ['pointerdown','keydown','input','change','wheel','focusin','touchstart']){
+        node.removeEventListener(name,reset);
+      }
+      node.removeEventListener('pointermove',onMove);
+    };
+  },[]);
+
   return (
-    <aside className="panel" aria-label="Bảng điều khiển hồ cá">
+    <aside ref={panelRef} className="panel" aria-label="Bảng điều khiển hồ cá">
       <div className="panel-head">
         <h1>🐠 {viTank(config.name || 'Hồ cá của tôi')}</h1>
         <button className="close" aria-label="Đóng bảng điều khiển" onClick={() => set({ panelOpen: false })}>✕</button>

@@ -20,6 +20,8 @@ try{
   await page.waitForSelector('#kan-food-layer',{timeout:40000});
   await page.waitForFunction(()=>!!document.querySelector('#canvas-host canvas'),{timeout:20000});
   await new Promise(r=>setTimeout(r,3000));
+  // The first render shows the settings without user needing to click.
+  await page.waitForSelector('.panel',{timeout:14000});
   const canvas=await page.$('#canvas-host canvas');
   if(!canvas)throw Error('WebGL canvas missing');
   let target=await canvas.boundingBox();
@@ -58,25 +60,15 @@ try{
       if(k===10&&!check.some(v=>v.kind==='fish-cookie'))throw Error('10th click cookie not drawn');
     }
   }
-  // Regression: all six control tabs and representative translations render in Chromium.
-  // A fixed aquarium overlay can obscure the top-left button in headless rendering;
-  // dispatch click directly to the control, as if activated by keyboard.
-  const opened=await page.evaluate(()=>{
-    const btn=document.querySelector('.open-panel');
-    if(!btn)return false;
-    btn.click();
-    return true;
-  });
-  if(!opened)throw Error('Tank control open button not found');
-  try{await page.waitForSelector('.panel',{timeout:8000});}
-  catch(error){
-    const debug=await page.evaluate(()=>({url:location.href,
-      openButtons:document.querySelectorAll('.open-panel').length,
-      panels:document.querySelectorAll('.panel').length,
-      bodyText:document.body.innerText.slice(0,550)
-    }));
-    throw Error('Panel failed to open: '+JSON.stringify(debug));
+  // Embedded aquarium must show its settings automatically on launch.
+  // It may have auto-closed during graphics-heavy CI feeding tests; in that
+  // case the existing reopen control should still be functional.
+  if(!(await page.$('.panel'))){
+    const btn=await page.$('.open-panel');
+    if(!btn)throw Error('Missing both panel and reopen button');
+    await page.evaluate(()=>document.querySelector('.open-panel')?.click());
   }
+  await page.waitForSelector('.panel',{timeout:10000});
   const tabs=await page.$$eval('.panel .tabs button',a=>a.map(x=>x.textContent?.trim()));
   for(const name of ['Bể','Cá','Cây','Trang trí','Đã lưu','Cài đặt']){
     if(!tabs.includes(name))throw Error('Control tab not translated: '+name+'; got '+JSON.stringify(tabs));
@@ -85,6 +77,21 @@ try{
     await page.evaluate(name=>{[...document.querySelectorAll('.panel .tabs button')].find(x=>x.textContent?.trim()===name)?.click()},tab);
     await page.waitForFunction(s=>document.querySelector('.panel .panel-body')?.textContent?.includes(s)||document.querySelector('.panel .panel-body input')?.getAttribute('placeholder')?.includes(s),{timeout:5000},expected);
   }
+  // Idle close: 15 s with no panel interaction, not 15 s since opening.
+  // Closing must preserve the fish and reopening must restart the timer.
+  await page.waitForFunction(()=>!document.querySelector('.panel'),{timeout:21000,polling:300});
+  await page.waitForSelector('.open-panel');
+  await page.evaluate(()=>document.querySelector('.open-panel')?.click());
+  await page.waitForSelector('.panel');
+  await new Promise(r=>setTimeout(r,8500));
+  await page.evaluate(()=>{
+    const tab=[...document.querySelectorAll('.panel .tabs button')].find(x=>x.textContent?.trim()==='Cá');
+    if(!tab)throw Error('Vietnamese Fish tab missing');
+    tab.click();
+  });
+  await new Promise(r=>setTimeout(r,8500));
+  if(!(await page.$('.panel')))throw Error('Panel did not reset its idle clock after interacting');
+  await page.waitForFunction(()=>!document.querySelector('.panel'),{timeout:17000,polling:400});
   const counter=await page.evaluate(()=>document.querySelector('.kanban-aquarium-feed-count')?.textContent);
-  console.log('PASS: immediate sink; 10px pellets/25px cookies; 10th cookie; six Vietnamese control tabs; counter='+counter);
+  console.log('PASS: automatic panel; 15s idle close/reopen/reset; instant sinking; sizes 10px/25px; 10th cookie; Vietnamese tabs; counter='+counter);
 }catch(e){console.error(e);process.exitCode=1}finally{await browser?.close();server.kill('SIGTERM')}
