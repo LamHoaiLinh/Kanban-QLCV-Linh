@@ -58,13 +58,25 @@ const swimHook = /* glsl */ `
   // Bank/bend into turns: parabolic curvature along the spine.
   transformed.z += aDyn.y * s * s * 0.7;
 
-  // Independent elastic fin deformation; root remains attached to the body.
-  // The progressively lagging tip is deliberately restrained (not cloth).
+  // Real membrane flexion: dorsal / anal tips visibly trail in the XY
+  // silhouette (not only in Z, which was invisible from a side camera).
+  // Fin roots are welded to the body; the quadratic span makes tips supple.
+  // Tail responds to the actual tailbeat, median fins to slower water drift.
   if (aPart > 0.5 && aPart < 2.5 && aFinFlex > 0.0) {
-    float lag = aFinFlex * (aPart < 1.5 ? 1.25 : 0.65);
-    float flex = uFinSoftness * aFinFlex * aFinFlex;
-    transformed.z += flex * sin(aDyn.x - lag + aRand * 1.7);
-    transformed.y += flex * 0.13 * cos(aDyn.x - lag);
+    float finSpan = aFinFlex * aFinFlex;
+    float finScale = uFinSoftness * finSpan * (0.72 + 0.32 * aDyn.z);
+    if (aPart < 1.5) {
+      float tailPhase = aDyn.x - 1.5 * aFinFlex + transformed.y * 4.2;
+      transformed.z += finScale * 0.65 * sin(tailPhase);
+      transformed.y += finScale * 0.23 * cos(tailPhase);
+      transformed.x += finScale * 0.32 * sin(tailPhase + 0.7);
+    } else {
+      float rippling = uTime * 2.15 + aRand * 7.1
+        - transformed.x * 5.3 - aFinFlex * 1.5;
+      transformed.z += finScale * 0.72 * sin(rippling);
+      transformed.x -= finScale * 0.74 * sin(rippling - 0.6);
+      transformed.y += finScale * 0.22 * cos(rippling);
+    }
   }
   // A brief jaw opening synchronized to real feeding, not a perpetual loop.
   if (aPart < 0.5 && uFinSoftness > 0.0) {
@@ -260,6 +272,45 @@ function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
     }
   };
 
+  // Long continuous membrane: every row is attached to the fish's back/
+  // belly along the *whole* root, not triangulated from ONE point. The old
+  // fan created a rigid, plastic-looking triangular sail, especially on angels.
+  const addMedianFin = (startU:number,endU:number,sign:1|-1,rise:number) => {
+    const columns=sh.finLong?22:13,rows=sh.finLong?8:5;
+    const base=positions.length/3;
+    const stride=rows+1;
+    for(let j=0;j<=columns;j++){
+      const t=j/columns,u=THREE.MathUtils.lerp(startU,endU,t);
+      const x=.5-u*bodyLen;
+      const rootY=sign*(bodyProfile(u,sp)*(sign>0?1.12:1));
+      const tipEnvelope=Math.pow(Math.max(0,Math.sin(Math.PI*t)),sh.finLong?.78:1.12)
+        *(.84+.16*t);
+      const tipHeight=rise*sh.height*tipEnvelope*(sp.id==='angelfish'?.79:1);
+      for(let k=0;k<=rows;k++){
+        const w=k/rows;
+        const soft=w*w*(3-2*w);
+        // Trailing edge bends aft; center is gently curved across Z so
+        // specular lighting catches the membrane instead of a flat triangle.
+        const trail=sh.finLong?.037:.013;
+        const px=x-trail*soft*(.55+.45*t);
+        const py=rootY+sign*tipHeight*w;
+        const pz=(Math.sin(Math.PI*t)*.018+Math.sin(t*15+u*3)*.003)
+          *soft*sign;
+        positions.push(px,py,pz);
+        uvs.push(.87+t*.08,.13+.74*w);
+        parts.push(2);
+        flutter.push(0);
+        finFlex.push(w);
+      }
+    }
+    for(let j=0;j<columns;j++){
+      for(let k=0;k<rows;k++){
+        const a=base+j*stride+k,b=a+stride;
+        indices.push(a,b,a+1,b,b+1,a+1);
+      }
+    }
+  };
+
   // — Caudal (tail) fin — a fan from the peduncle, forked by tailFork.
   {
     const rootX = tailBaseX + 0.02;
@@ -278,34 +329,13 @@ function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
     addFin(pts, 1);
   }
 
-  // — Dorsal fin — along the back.
-  if (sh.dorsalHeight > 0.02) {
-    const u0 = sh.finLong ? 0.28 : 0.34, u1 = sh.finLong ? 0.92 : 0.72;
-    const pts: [number, number][] = [];
-    const backAt = (u: number) => bodyProfile(u, sp) + bodyProfile(u, sp) * 0.12;
-    pts.push([0.5 - u0 * bodyLen, backAt(u0)]);
-    const N = sh.finLong ? 18 : 10;
-    for (let k = 0; k <= N; k++) {
-      const t = k / N, u = u0 + (u1 - u0) * t;
-      const raise = Math.pow(Math.sin(Math.PI * t),sh.finLong?0.65:1.05);
-      pts.push([0.5 - u * bodyLen, backAt(u) + sh.dorsalHeight * sh.height * raise]);
-    }
-    pts.push([0.5 - u1 * bodyLen, backAt(u1)]);
-    addFin(pts, 2);
+  // — Dorsal: rounded continuous translucent membrane, smooth at both ends.
+  if(sh.dorsalHeight>.02){
+    addMedianFin(sh.finLong?.28:.34,sh.finLong?.92:.72,1,sh.dorsalHeight);
   }
-
-  // — Anal fin — mirror of the dorsal, smaller.
-  if (sh.analHeight > 0.02) {
-    const u0 = 0.55, u1 = 0.85;
-    const pts: [number, number][] = [];
-    const bellyAt = (u: number) => -bodyProfile(u, sp);
-    pts.push([0.5 - u0 * bodyLen, bellyAt(u0)]);
-    const N = sh.finLong ? 12 : 8;
-    for (let k = 0; k <= N; k++) {
-      const t = k / N, u = u0 + (u1 - u0) * t;
-      pts.push([0.5 - u * bodyLen, bellyAt(u) - sh.analHeight * sh.height * Math.pow(Math.sin(Math.PI*t),sh.finLong?.72:1)]);
-    }
-    addFin(pts, 2);
+  // — Anal: independent membrane with the same fixed-root elasticity.
+  if(sh.analHeight>.02){
+    addMedianFin(.55,.85,-1,sh.analHeight);
   }
 
   // — Pectoral fins — small side sheets near the head; these scull/flutter.
