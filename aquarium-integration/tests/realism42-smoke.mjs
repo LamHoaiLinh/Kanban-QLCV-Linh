@@ -87,15 +87,16 @@ try{
  report.checks.push(`conditional jump ${breached}/${launched}, ${splashes} splashes, every actor returns`);
  console.log('PASS jump statistics');
  // Peck only actual permitted species, 3–8 beats at 4–8Hz and returns to cruise.
- await page.evaluate(()=>window.__kan42Scene({gallons:20,fish:{'corydoras':6,'bristlenose-pleco':1},decor:[],flora:{}}));
+ await page.evaluate(()=>{window.__kan42Scene({gallons:20,fish:{'corydoras':6,'bristlenose-pleco':1},decor:[],flora:{}});window.__kan42Arrange();});
  const peck=await page.evaluate(()=>{
   const fish=window.__kan42Probe().telemetry.fish;const actor=fish.find(f=>window.__kan42Action(f.key,'peck'));
   if(!actor)return null;const stages=[],jaws=[];let settings;
-  for(let i=0;i<1000;i++){window.__kanEcoFastForward(.025);const f=window.__kan42Probe().telemetry.fish.find(f=>f.key===actor.key);
+  for(let i=0;i<2000;i++){window.__kanEcoFastForward(.025);const f=window.__kan42Probe().telemetry.fish.find(f=>f.key===actor.key);
     if(f.peck){stages.push(f.peck.stage);if(f.peck.stage==='burst'){settings=f.peck;jaws.push(f.jaw);}}else if(stages.length)break;}
   return {stages:[...new Set(stages)],settings,jaws,actor:window.__kan42Probe().telemetry.fish.find(f=>f.key===actor.key)};
  });
  assert(peck?.stages.includes('burst')&&peck.stages.includes('withdraw'),'peck phases '+JSON.stringify(peck));
+ assert(peck.actor.travel>.16,'far surface approach must actually travel');
  assert(peck.settings.hz>=4&&peck.settings.hz<=8&&peck.settings.beats>=3&&peck.settings.beats<=8,'peck rate');
  assert(Math.max(...peck.jaws)>.5&&Math.min(...peck.jaws)<.2&&!peck.actor.peck,'mouth pulse and exit');
  report.checks.push('approach, inspect, 3–8 quick pecks / 4–8Hz, withdraw, cruise');

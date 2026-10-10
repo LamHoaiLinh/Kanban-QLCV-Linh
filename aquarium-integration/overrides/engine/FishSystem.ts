@@ -212,7 +212,7 @@ export class FishSystem {
   }
   qaHabitat(type:Parameters<HabitatDirector['qaLaunch']>[0],env:SimEnv){return this.habitat.qaLaunch(type,this.populations.flatMap(p=>p.agents),env);}
   qaArrange(env:SimEnv):void{
-    const near=env.tunnels[0]?.entrance??new THREE.Vector3(0,env.floorY+.04,0);
+    const near=env.tunnels[0]?.entrance??new THREE.Vector3(.02,env.floorY+.04,0);
     let i=0;for(const p of this.populations)for(const a of p.agents){
       const angle=i++*2.399963;
       a.pos.copy(near).add(new THREE.Vector3(Math.cos(angle)*.045,.03,Math.sin(angle)*.045));
@@ -762,7 +762,9 @@ export class FishSystem {
   }
   private animatePeck(a:Agent,dt:number,env:SimEnv):boolean{
     const p=a.peck;if(!p)return false;p.t+=dt;
-    if(this.feedTimer>0||p.t>(p.stage==='approach'?22:12)){a.peck=undefined;a.mode='cruise';return false;}
+    // Slow bottom fish need enough travel time for a patch up to 28cm away.
+    const approachLimit=Math.max(22,.28/Math.max(.004,a.sp.swim.cruise*a.scale*SPEED_SCALE)+6);
+    if(this.feedTimer>0||p.t>(p.stage==='approach'?approachLimit:12)){a.peck=undefined;a.mode='cruise';return false;}
     const at=p.point.clone().addScaledVector(p.normal,a.scale*.525+.0005);
     if(p.stage==='approach'){
       const delta=at.sub(a.pos),d=delta.length(),speed=Math.min(a.sp.swim.cruise*a.scale*SPEED_SCALE,d*1.4);
