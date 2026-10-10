@@ -92,7 +92,7 @@ const swimHook = /* glsl */ `
 export interface FishAsset {
   geometry: THREE.BufferGeometry;
   materials: THREE.Material[];   // [body, fins]
-  uniforms: { uWaveLen: THREE.IUniform; uAmp: THREE.IUniform; uMode: THREE.IUniform };
+  uniforms: { uWaveLen: THREE.IUniform; uAmp: THREE.IUniform; uMode: THREE.IUniform; uFinSoftness: THREE.IUniform };
 }
 
 const assetCache = new Map<string, FishAsset>();
