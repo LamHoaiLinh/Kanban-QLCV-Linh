@@ -107,8 +107,10 @@ export class HabitatDirector {
     return [to.clone()];
   }
   private nearWood(a:HabitAgent,env:SimEnv):THREE.Vector3|null{
-    if(!env.tunnels.length)return null;
-    return randomOf(env.tunnels).middle.clone();
+    const nearby=env.tunnels.filter(t=>a.pos.distanceTo(t.middle)<.34);
+    if(!nearby.length)return null;
+    nearby.sort((x,y)=>a.pos.distanceToSquared(x.middle)-a.pos.distanceToSquared(y.middle));
+    return nearby[0].middle.clone();
   }
   update(dt:number,agents:HabitAgent[],env:SimEnv):void{
     this.now+=dt;
@@ -243,8 +245,16 @@ export class HabitatDirector {
       if(!options.length)return false;
       const a=randomOf(options),wood=this.nearWood(a,env);
       if((type==='wood-graze'||type==='shrimp-root-forage')&&!wood)return false;
+      if(type==='snail-film-graze'&&
+        (a.pos.y>env.floorY+.08||a.pos.distanceTo(wood??a.pos)>.22))return false;
       const at=wood??new THREE.Vector3(a.pos.x,env.floorY+.025,a.pos.z);
-      const path=type==='snail-film-graze'?
+      const shrimpTunnel=type==='shrimp-root-forage'?
+        env.tunnels.find(t=>a.pos.distanceTo(t.entrance)<.32&&
+          a.scale*.4<t.boreRadius*.7&&
+          t.entrance.distanceTo(t.exit)>a.scale*2):null;
+      const path=shrimpTunnel?
+        [shrimpTunnel.entrance,shrimpTunnel.middle,shrimpTunnel.entrance]:
+        type==='snail-film-graze'?
         [a.pos.clone().add(new THREE.Vector3(.015,0,.01))]:
         [at.clone().add(new THREE.Vector3(.03,.01,0)),at];
       this.assign(a,type,path,14);
