@@ -1,7 +1,7 @@
 name: Build KanAquarium 3D
 on:
   push:
-    branches: [kanaquarium-3d-integration]
+    branches: [kanaquarium-3d-integration, kanaquarium-food-drop-fix, main]
     paths:
       - '.github/workflows/kanaquarium-build.yml'
       - 'aquarium-integration/**'

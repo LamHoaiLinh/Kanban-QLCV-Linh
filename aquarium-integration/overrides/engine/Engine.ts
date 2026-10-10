@@ -24,8 +24,9 @@ import { FishSystem, type SimEnv, type FoodKind } from './FishSystem';
 export interface EngineCallbacks {
   onFishPicked?: (key: string | null) => void;
   onAutoQuality?: (tier: QualityTier) => void;
-  onFed?: () => void;
-  onAddFish?: () => void;
+  onFed?: (kind:FoodKind, count:number) => void;
+  onAddFish?: (clientX?:number,clientY?:number) => void;
+  onRemoveFish?: () => void;
 }
 
 export class Engine {
@@ -250,19 +251,36 @@ export class Engine {
   }
 
   // Drop food at screen coordinates (raycast onto the water surface plane).
-  feedAt(clientX: number, clientY: number, kind:FoodKind='normal'): boolean {
-    const ndc = this.toNdc(clientX, clientY);
-    this.raycaster.setFromCamera(ndc, this.rig.camera);
-    const plane = new THREE.Plane(new THREE.Vector3(0, -1, 0), this.dims.surfaceY);
-    const hit = new THREE.Vector3();
-    if (this.raycaster.ray.intersectPlane(plane, hit)) {
-      const x = THREE.MathUtils.clamp(hit.x, -this.dims.halfW * 0.9, this.dims.halfW * 0.9);
-      const z = THREE.MathUtils.clamp(hit.z, -this.dims.halfD * 0.9, this.dims.halfD * 0.9);
-      this.fish.feed(x, z, this.simEnv,kind);
-      this.callbacks.onFed?.();
-      return true;
+  // Project against a camera-facing plane THROUGH the tank, not the water surface:
+  // surface-only rays miss whenever the click is below the visible waterline.
+  private tankPoint(clientX?:number,clientY?:number):THREE.Vector3{
+    const rect=this.renderer.domElement.getBoundingClientRect();
+    const x=clientX ?? (rect.left+rect.width*(0.25+Math.random()*0.5));
+    const y=clientY ?? (rect.top+rect.height*(0.20+Math.random()*0.3));
+    this.raycaster.setFromCamera(this.toNdc(x,y),this.rig.camera);
+    const facing=this.rig.camera.getWorldDirection(new THREE.Vector3()).normalize();
+    const plane=new THREE.Plane().setFromNormalAndCoplanarPoint(
+      facing,new THREE.Vector3(0,this.dims.surfaceY*.55,0));
+    const point=new THREE.Vector3();
+    if(!this.raycaster.ray.intersectPlane(plane,point)){
+      point.set(((x-rect.left)/Math.max(1,rect.width)*2-1)*this.dims.halfW*.8,0,0);
     }
-    return false;
+    point.x=THREE.MathUtils.clamp(point.x,-this.dims.halfW*.78,this.dims.halfW*.78);
+    point.z=THREE.MathUtils.clamp(point.z,-this.dims.halfD*.55,this.dims.halfD*.55);
+    point.y=this.dims.surfaceY;
+    return point;
+  }
+
+  queueFishDrop(clientX?:number,clientY?:number):void{
+    const p=this.tankPoint(clientX,clientY);
+    this.fish.queueDrop(p.x,p.z);
+  }
+
+  feedAt(clientX:number,clientY:number,kind:FoodKind='normal'):boolean{
+    const hit=this.tankPoint(clientX,clientY);
+    this.fish.feed(hit.x,hit.z,this.simEnv,kind);
+    this.callbacks.onFed?.(kind,this.clickFoodCount);
+    return true;
   }
 
   private toNdc(clientX: number, clientY: number): THREE.Vector2 {
@@ -274,7 +292,7 @@ export class Engine {
   }
 
   private rememberPointer=(e:PointerEvent):void=>{this.pointerDown={x:e.clientX,y:e.clientY}};
-  private onRightClick=(e:MouseEvent):void=>{e.preventDefault();if(this.kanAquariumMode)this.callbacks.onAddFish?.()};
+  private onRightClick=(e:MouseEvent):void=>{if(!this.kanAquariumMode)return;e.preventDefault();if(e.shiftKey)this.callbacks.onRemoveFish?.();else this.callbacks.onAddFish?.(e.clientX,e.clientY)};
   private onClick = (e: PointerEvent): void => {
     if(e.button!==0)return;
     if(this.kanAquariumMode){

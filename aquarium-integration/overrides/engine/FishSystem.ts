@@ -70,6 +70,7 @@ interface Agent {
   anchor: THREE.Vector3;    // territory / station / school goal
   prevYaw: number;
   hunger: number;           // >0 after feeding starts; seeks food
+  drop?:{stage:'fall'|'dive';velocityY:number;elapsed:number;targetY:number};
   // Critter-specific
   wall?: 'floor' | 'back' | 'left' | 'right';
   crawlDir?: number;
@@ -102,16 +103,17 @@ export class FoodSystem {
     for(const file of Object.values(this.variants).flat()){
       const tex=loader.load(new URL('feed-items/'+file,document.baseURI).href);
       tex.colorSpace=THREE.SRGBColorSpace;
-      this.mats.set(file,new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false,alphaTest:0.02}));
+      this.mats.set(file,new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false,depthWrite:false,alphaTest:0.02,toneMapped:false}));
     }
   }
   scatter(x:number,z:number,surfaceY:number,kind:FoodKind='normal'):void{
     if(this.bits.length>=65)this.remove(this.bits[0]);
     const files=this.variants[kind],name=files[Math.floor(Math.random()*files.length)];
     const sprite=new THREE.Sprite(this.mats.get(name)!);
-    const size=kind==='normal'?0.025:0.056;
+    const size=kind==='normal'?0.055:0.105;
     sprite.scale.set(size,size,1);
-    const bit:FoodBit={pos:new THREE.Vector3(x+(Math.random()-.5)*.014,surfaceY-.01,z+(Math.random()-.5)*.014),
+    sprite.renderOrder=1500;
+    const bit:FoodBit={pos:new THREE.Vector3(x+(Math.random()-.5)*.014,surfaceY-.035,z+(Math.random()-.5)*.014),
       age:0,state:'float',kind,sprite};
     sprite.position.copy(bit.pos);this.group.add(sprite);this.bits.push(bit);
   }
@@ -139,7 +141,7 @@ export class FoodSystem {
   nearest(p:THREE.Vector3,maxDist:number,settledOnly:boolean):FoodBit|null{
     let best:FoodBit|null=null,score=Infinity;
     for(const b of this.bits){
-      if(b.state==='gone')continue;
+      if(b.state==='gone'||b.age<(b.kind==='normal'?1.15:2.0))continue;
       const special=b.kind!=='normal';
       if(!special&&settledOnly&&b.state!=='settled')continue;
       if(!special&&!settledOnly&&b.state==='settled')continue;
@@ -158,6 +160,49 @@ export class FishSystem {
   food: FoodSystem;
   populations: Population[] = [];
   private feedTimer = 0;   // seconds of "the fish are hungry/excited" remaining
+  private pendingDrop:{x:number;z:number}|null=null;
+  private splashes:Array<{mesh:THREE.Mesh<THREE.RingGeometry,THREE.MeshBasicMaterial>;age:number}>=[];
+  queueDrop(x:number,z:number):void{this.pendingDrop={x,z};}
+  private splash(x:number,z:number,y:number):void{
+    const geometry=new THREE.RingGeometry(.018,.030,32);
+    const material=new THREE.MeshBasicMaterial({color:0x9beeff,transparent:true,opacity:.88,depthTest:false,depthWrite:false,side:THREE.DoubleSide});
+    const mesh=new THREE.Mesh(geometry,material);
+    mesh.rotation.x=-Math.PI/2;
+    mesh.position.set(x,y+.01,z);
+    mesh.renderOrder=1490;
+    this.group.add(mesh);
+    this.splashes.push({mesh,age:0});
+  }
+  private updateSplashes(dt:number):void{
+    for(let i=this.splashes.length-1;i>=0;i--){
+      const s=this.splashes[i];s.age+=dt;
+      const p=Math.min(1,s.age/1.1);
+      s.mesh.scale.setScalar(1+p*4);
+      s.mesh.material.opacity=(1-p)*.85;
+      if(p>=1){this.group.remove(s.mesh);s.mesh.geometry.dispose();s.mesh.material.dispose();this.splashes.splice(i,1);}
+    }
+  }
+  private animateDrop(a:Agent,dt:number,env:SimEnv):boolean{
+    const d=a.drop;if(!d)return false;
+    d.elapsed+=dt;
+    if(d.stage==='fall'){
+      d.velocityY-=1.7*dt;
+      a.pos.y+=d.velocityY*dt;
+      a.vel.set(.003,d.velocityY,.003);
+      if(a.pos.y<=env.surfaceY-a.scale*.32){
+        a.pos.y=env.surfaceY-a.scale*.32;
+        d.stage='dive';d.elapsed=0;
+        this.splash(a.pos.x,a.pos.z,env.surfaceY);
+      }
+    }else{
+      const p=Math.min(1,d.elapsed/.85);
+      const smooth=p*p*(3-2*p);
+      a.pos.y=THREE.MathUtils.lerp(env.surfaceY-a.scale*.32,d.targetY,smooth);
+      a.vel.set(.035,-.08,.004);
+      if(p>=1){a.drop=undefined;a.mode='dart';a.modeT=1.1;}
+    }
+    return true;
+  }
 
   constructor(parent: THREE.Object3D) {
     parent.add(this.group);
@@ -203,6 +248,14 @@ export class FishSystem {
           agent.pos.copy(old.pos);agent.vel.copy(old.vel);agent.anchor.copy(old.anchor);
           agent.mode=old.mode;agent.modeT=old.modeT;agent.phase=old.phase;
           agent.rand=old.rand;agent.scale=old.scale;agent.hunger=old.hunger;
+          agent.drop=old.drop?{...old.drop}:undefined;
+        }
+        if(!old&&this.pendingDrop&&!isCrawler(sp)){
+          const p=this.pendingDrop;this.pendingDrop=null;
+          agent.pos.set(p.x,env.surfaceY+Math.max(.13,env.surfaceY*.22),p.z);
+          agent.vel.set(0,-.03,0);
+          const band=this.zoneBand(sp,env);
+          agent.drop={stage:'fall',velocityY:-.03,elapsed:0,targetY:THREE.MathUtils.lerp(band[0],band[1],.55)};
         }
         agents.push(agent);
       }
@@ -212,6 +265,7 @@ export class FishSystem {
       this.populations.push(pop);
       this.group.add(mesh);
     }
+    this.pendingDrop=null;
     if(oldAgents.size===0)this.feedTimer=0;
   }
 
@@ -281,11 +335,13 @@ export class FishSystem {
     dt = Math.min(dt, 0.05); // clamp to avoid physics explosions on tab-return
     this.feedTimer = Math.max(0, this.feedTimer - dt);
     this.food.update(dt, env.floorY);
+    this.updateSplashes(dt);
 
     for (const pop of this.populations) {
       const { sp, agents, mesh, dyn } = pop;
       for (const a of agents) {
-        if (isCrawler(sp)) this.updateCrawler(a, dt, env);
+        if (this.animateDrop(a,dt,env)) {/* New fish enters the water before joining normal swimming. */}
+        else if (isCrawler(sp)) this.updateCrawler(a, dt, env);
         else this.updateFish(a, agents, dt, env);
         this.writeInstance(pop, a, dt);
       }

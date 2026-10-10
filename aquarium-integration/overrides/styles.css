@@ -289,3 +289,12 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .kanban-aquarium-exit{position:fixed;right:14px;top:12px;z-index:30;background:#092832cf;color:white;border:1px solid #ffffff66;border-radius:50%;width:40px;height:40px;font-size:23px;cursor:pointer}
 .kanban-aquarium-exit:hover{background:#19665e}
 @media(max-width:650px){.kanban-aquarium-help{top:5px;left:8px;transform:none;font-size:10px;max-width:calc(100vw - 62px)}.kanban-aquarium-exit{right:5px;top:5px}}
+
+/* KanAquarium v1.1: accessible fish management controls */
+.kanban-aquarium-stock{position:fixed;top:13px;left:14px;z-index:24;display:flex;align-items:center;gap:7px;background:rgba(3,26,34,.78);color:#e9fff7;border:1px solid rgba(190,255,238,.30);border-radius:16px;padding:5px 9px;box-shadow:0 4px 14px #03141935;font-size:12px;flex-wrap:wrap;max-width:340px}
+.kanban-aquarium-stock button{width:30px;height:28px;border-radius:9px;color:#e9fff7;font-size:18px;border:1px solid #8bd3c477;background:#126056a8;cursor:pointer}
+.kanban-aquarium-stock button:disabled{opacity:.4;cursor:not-allowed}
+.kanban-aquarium-stock button:hover:not(:disabled){background:#1d8774}
+.kanban-aquarium-feed-count{font-size:10px;color:#a9d8cf}
+@media(max-width:1050px){.kanban-aquarium-stock{top:51px;left:9px}.kanban-aquarium-help{font-size:10px}}
+@media(max-width:650px){.kanban-aquarium-stock{top:46px;left:5px;padding:3px 6px;max-width:96%;font-size:10px}.kanban-aquarium-stock button{width:28px;height:28px}}
