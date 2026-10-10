@@ -39,6 +39,12 @@ export default function App() {
     }
   }, [set]);
 
+  // Embedded launch: always present the setup panel on entry, while preserving
+  // the existing tank, creatures, and all durable settings.
+  useEffect(() => {
+    if(embedded) set({uiHidden:false,panelOpen:true});
+  }, [embedded,set]);
+
   // Volume/music settings → audio engine (audio starts from the toolbar tap).
   useEffect(() => { audioEngine.setVolume(audioVolume); }, [audioVolume]);
   useEffect(() => { audioEngine.setMusic(musicOn); }, [musicOn]);
@@ -115,7 +121,7 @@ export default function App() {
         <>
           <Toolbar />
           {panelOpen ? <ControlPanel /> : (
-            <button className="open-panel" aria-label="Open tank builder" onClick={() => set({ panelOpen: true })}>🛠️</button>
+            <button className="open-panel" aria-label="Mở bảng cài đặt hồ cá" onClick={() => set({ panelOpen: true })}>🛠️</button>
           )}
           <InfoCard />
           {feedMode && <div className="feed-hint">Nhấp chuột để cho cá ăn · nhấn F để tắt</div>}
