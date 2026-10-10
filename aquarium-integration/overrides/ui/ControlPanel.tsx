@@ -555,6 +555,7 @@ function SettingsTab() {
   const musicOn = useStore((s) => s.musicOn);
   const showHud = useStore((s) => s.showHud);
   const reducedMotion = useStore((s) => s.reducedMotion);
+  const softFinsOn = useStore((s)=>s.softFinsOn);
   const set = useStore((s) => s.set);
 
   return (
@@ -596,6 +597,9 @@ function SettingsTab() {
       <div className="section">
         <h2>Chuyển động và hiệu năng</h2>
         <div className="seg">
+          <button className={softFinsOn?'active':''} onClick={()=>set({softFinsOn:!softFinsOn})}>
+            {softFinsOn?'Vây mềm tự nhiên: Bật':'Vây mềm tự nhiên: Tắt (bản cũ)'}
+          </button>
           <button className={reducedMotion ? 'active' : ''} onClick={() => set({ reducedMotion: !reducedMotion })}>
             {reducedMotion ? '🐢 Bơi chậm: Bật' : 'Bơi chậm: Tắt'}
           </button>
