@@ -274,6 +274,7 @@ export class Engine {
   }
 
   setFeedMode(on: boolean): void { this.feedMode = on; }
+  setSoftFins(on:boolean):void{this.fish.setSoftFins(on);}
 
   setCameraMode(mode: 'orbit' | 'cinematic' | 'still' | 'follow'): void {
     this.rig.setMode(mode);
