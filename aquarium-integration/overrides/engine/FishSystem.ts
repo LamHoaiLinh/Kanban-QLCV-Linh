@@ -220,7 +220,7 @@ export class FishSystem {
     return Math.min((env.surfaceY-env.floorY)*.43,
       Math.max(.006,a.scale*.20,envelope));
   }
-  private constrain(a:Agent,env:SimEnv):void{
+  private constrain(a:Agent,env:SimEnv,dt:number):void{
     // Broadly elliptical fish body. The forward axis requires more clearance
     // than the side axis; do not clamp the centre directly to the glass.
     const speed=a.vel.length();
@@ -307,7 +307,7 @@ export class FishSystem {
     if(a.sp.id==='angelfish'){
       const delta=a.pos.distanceTo(a.moveOrigin);
       a.stuckTime=delta<Math.max(.00004,a.scale*.0007)?
-        a.stuckTime+.05:Math.max(0,a.stuckTime-.1);
+        a.stuckTime+dt:Math.max(0,a.stuckTime-dt*2);
       a.moveOrigin.copy(a.pos);
       if(a.stuckTime>2.5&&!a.drop){
         a.stuckTime=0;
@@ -563,7 +563,7 @@ export class FishSystem {
         if (this.animateDrop(a,dt,env)) {/* New fish enters the water before joining normal swimming. */}
         else if (isCrawler(sp)) {this.updateCrawler(a, dt, env);this.habitat.crawl(a,dt,env);}
         else this.updateFish(a, agents, dt, env);
-        if(!isCrawler(sp)&&!a.drop)this.constrain(a,env);
+        if(!isCrawler(sp)&&!a.drop)this.constrain(a,env,dt);
         this.writeInstance(pop, a, dt);
       }
       mesh.instanceMatrix.needsUpdate = true;
@@ -836,11 +836,24 @@ export class FishSystem {
 
   private newAnchorNear(a: Agent, env: SimEnv, range: number): void {
     const [y0, y1] = this.zoneBand(a.sp, env);
-    a.anchor.set(
-      THREE.MathUtils.clamp(a.anchor.x + (Math.random() - 0.5) * env.halfW * 2 * range, -env.halfW * 0.85, env.halfW * 0.85),
-      THREE.MathUtils.lerp(y0, y1, Math.random()),
-      THREE.MathUtils.clamp(a.anchor.z + (Math.random() - 0.5) * env.halfD * 2 * range, -env.halfD * 0.8, env.halfD * 0.8)
-    );
+    // Angelfish are tall: randomly sampled anchors must be reachable by the
+    // full fin envelope. Try free swimming pockets rather than a position
+    // behind the nearest log collider.
+    const angel=a.sp.id==='angelfish';
+    const safeY=angel?this.verticalClearance(a,env)+.014:0;
+    const lo=Math.max(y0,env.floorY+safeY);
+    const hi=Math.max(lo,Math.min(y1,env.surfaceY-safeY));
+    const baseline=a.pos.clone();
+    for(let attempt=0;attempt<(angel?18:1);attempt++){
+      const nx=THREE.MathUtils.clamp(baseline.x+(Math.random()-.5)*env.halfW*2*range,
+        -env.halfW*.72,env.halfW*.72);
+      const nz=THREE.MathUtils.clamp(baseline.z+(Math.random()-.5)*env.halfD*2*range,
+        -env.halfD*.68,env.halfD*.68);
+      const ny=THREE.MathUtils.lerp(lo,hi,Math.random());
+      a.anchor.set(nx,ny,nz);
+      if(!angel||env.obstacles.every(ob=>a.anchor.distanceTo(ob.pos)>
+        ob.radius+this.collisionRadius(a)+.035))break;
+    }
   }
 
   private anchorToShelter(a: Agent, env: SimEnv): void {
