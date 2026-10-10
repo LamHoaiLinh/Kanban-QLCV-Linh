@@ -225,6 +225,9 @@ export const useStore = create<AppState>()(
       partialize: (s) => ({
         config: s.config,
         savedTanks: s.savedTanks,
+        // A resize backup is durable too: reloading while viewing a nano tank
+        // must never irreversibly discard the original large-tank species.
+        resizeSnapshot: s.resizeSnapshot,
         quality: s.quality,
         audioOn: s.audioOn,
         audioVolume: s.audioVolume,
