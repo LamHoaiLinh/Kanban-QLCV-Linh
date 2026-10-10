@@ -79,12 +79,17 @@ try{
   if(after.fish.fish!==beforeFish)throw Error('Cleaning removed fish');
   if(after.fish.wallViolations!==0||after.flora.violations!==0)throw Error('Realism 1 boundary regression');
   sane(after.eco,'after clean');
-  // Autonomous events must occur without user tapping the fish. Wait using
-  // simulation time; do not force random state by patching internals.
+  // Simulate several minutes of the REAL fish mode state machine without
+  // relying on headless WebGL frame cadence. This test hook only exists in ?qa=1.
+  await page.evaluate(()=>{
+    if(typeof window.__kanEcoFastForward!=='function')
+      throw Error('QA time-advance hook is unavailable');
+    window.__kanEcoFastForward(130);
+  });
   await page.waitForFunction(()=>{
     const e=window.__kanRealismProbe?.().eco;
     return e&&(e.grazeEvents+e.restEvents+e.shelterEvents+e.schoolEvents)>0;
-  },{timeout:35000,polling:1000});
+  },{timeout:9000,polling:500});
   const natural=await snap();
   if(natural.fish.fish!==beforeFish)throw Error('Natural mode changed tank stock');
   if(natural.fish.wallViolations!==0||natural.flora.violations!==0)

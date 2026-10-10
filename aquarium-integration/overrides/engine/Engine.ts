@@ -129,6 +129,21 @@ export class Engine {
     };
     // QA-only regression probe. Not enabled on the published KanBan URL.
     if(new URLSearchParams(location.search).get('qa')==='1'){
+      // QA-only accelerated stepping runs the actual fish behavior and water
+      // model without asking a headless software GPU to render thousands of
+      // frames. Never exposed outside explicit ?qa=1 test pages.
+      (window as Window & {__kanEcoFastForward?:(seconds:number)=>unknown}).__kanEcoFastForward=
+        (seconds:number)=>{
+          const steps=Math.min(3600,Math.max(0,Math.ceil(seconds/.05)));
+          for(let i=0;i<steps;i++){
+            this.simEnv.time+=.05;
+            this.current.time=this.simEnv.time;
+            this.ecology.advance(.05,this.ecoMode,this.dayFactor,
+              this.fish.food.bits.filter(b=>b.state==='settled').length);
+            this.fish.update(.05,this.simEnv);
+          }
+          return this.ecology.snapshot();
+        };
       (window as Window & {__kanRealismProbe?:()=>unknown}).__kanRealismProbe=()=>({
         name:this.config?.name,
         fish:this.fish.getPhysicsSnapshot(this.simEnv),
@@ -176,7 +191,10 @@ export class Engine {
     this.foodLayer?.remove();
     this.foodLayer=null;
     if(new URLSearchParams(location.search).get('qa')==='1')
-      delete (window as Window & {__kanRealismProbe?:()=>unknown}).__kanRealismProbe;
+      {
+        delete (window as Window & {__kanRealismProbe?:()=>unknown}).__kanRealismProbe;
+        delete (window as Window & {__kanEcoFastForward?:(seconds:number)=>unknown}).__kanEcoFastForward;
+      }
     this.renderer.dispose();
     this.container.removeChild(this.renderer.domElement);
   }
