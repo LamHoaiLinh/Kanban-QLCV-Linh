@@ -189,12 +189,16 @@ export class FishSystem {
   }
   private finSoftness(sp:SpeciesDef):number{
     return !this.softFinsOn||sp.invert||sp.shape.eelLike?0:
-      sp.shape.finLong?.034:.010;
+      sp.id==='angelfish'?.064:sp.shape.finLong?.045:.018;
   }
   resetHabitat():void{this.habitat.reset();}
   getHabitatSnapshot(env:SimEnv){return this.habitat.snapshot(env);}
   getFinSnapshot(){return this.populations.map(p=>({id:p.sp.id,
     vertices:p.mesh.geometry.getAttribute('position').count,
+    medianStrip:p.mesh.geometry.userData.medianMembraneStrip===true,
+    medianTips:[...Array(p.mesh.geometry.getAttribute('aFinFlex').count).keys()]
+      .filter(i=>p.mesh.geometry.getAttribute('aPart').getX(i)===2 &&
+        p.mesh.geometry.getAttribute('aFinFlex').getX(i)>.95).length,
     flexible:[...Array(p.mesh.geometry.getAttribute('aFinFlex').count).keys()].filter(i=>
       p.mesh.geometry.getAttribute('aFinFlex').getX(i)>.001).length,
     mouth:[...p.agents].map(a=>a.jaw)}));}
@@ -202,6 +206,17 @@ export class FishSystem {
   private splashes:Array<{mesh:THREE.Mesh<THREE.RingGeometry,THREE.MeshBasicMaterial>;age:number}>=[];
   // Soft spherical keep-out zones approximate rocks, wood trunks and larger corals.
   private collisionRadius(a:Agent):number{return Math.max(0.007,a.scale*.30)}
+  // The physical vertical envelope must include dorsal + anal fins, not only
+  // the body centre. Tall angels formerly poked rigid triangles through the
+  // waterline because yMargin covered merely 20% of their length.
+  private verticalClearance(a:Agent,env:SimEnv):number{
+    const sh=a.sp.shape;
+    const scale=a.sp.id==='angelfish'?.54:1;
+    const fin=Math.max(sh.dorsalHeight,sh.analHeight)*sh.height*scale;
+    const envelope=a.scale*(sh.height*.5+fin)+.005;
+    return Math.min((env.surfaceY-env.floorY)*.43,
+      Math.max(.006,a.scale*.20,envelope));
+  }
   private constrain(a:Agent,env:SimEnv):void{
     // Broadly elliptical fish body. The forward axis requires more clearance
     // than the side axis; do not clamp the centre directly to the glass.
@@ -210,7 +225,7 @@ export class FishSystem {
     const dirZ=speed>1e-6?Math.abs(a.vel.z)/speed:.65;
     const xMargin=Math.min(env.halfW*.82,Math.max(.007,a.scale*(.24+.33*dirX)));
     const zMargin=Math.min(env.halfD*.82,Math.max(.007,a.scale*(.24+.33*dirZ)));
-    const yMargin=Math.min((env.surfaceY-env.floorY)*.28,Math.max(.006,a.scale*.20));
+    const yMargin=this.verticalClearance(a,env);
     const xmin=-env.halfW+xMargin,xmax=env.halfW-xMargin;
     const zmin=-env.halfD+zMargin,zmax=env.halfD-zMargin;
     const ymin=env.floorY+yMargin,ymax=env.surfaceY-yMargin;
@@ -322,7 +337,7 @@ export class FishSystem {
       const speed=a.vel.length(),dx=speed>1e-6?Math.abs(a.vel.x)/speed:.65,dz=speed>1e-6?Math.abs(a.vel.z)/speed:.65;
       const mx=Math.min(env.halfW*.82,Math.max(.007,a.scale*(.24+.33*dx)));
       const mz=Math.min(env.halfD*.82,Math.max(.007,a.scale*(.24+.33*dz)));
-      const my=Math.min((env.surfaceY-env.floorY)*.28,Math.max(.006,a.scale*.20));
+      const my=this.verticalClearance(a,env);
       if(Math.abs(a.pos.x)>env.halfW-mx+.002||Math.abs(a.pos.z)>env.halfD-mz+.002||a.pos.y<env.floorY+my-.002||a.pos.y>env.surfaceY-my+.002)wallViolations++;
       for(const ob of env.obstacles){
         const overlap=ob.radius+this.collisionRadius(a)-a.pos.distanceTo(ob.pos);

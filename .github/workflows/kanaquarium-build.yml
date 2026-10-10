@@ -1,7 +1,7 @@
 name: Build KanAquarium 3D
 on:
   push:
-    branches: [kanaquarium-3d-integration, kanaquarium-food-drop-fix, kanaquarium-visible-food-test, kanaquarium-vietnamese-food-v13, kanaquarium-auto-panel-alt-h-v14, kanaquarium-realism1-physics, kanaquarium-realism2-lifelike, kanaquarium-realism2-wall-hotfix, kanaquarium-realism3-ecosystem, kanaquarium-food-3d-click-depth, kanaquarium-realism4-fins-habitats, main]
+    branches: [kanaquarium-3d-integration, kanaquarium-food-drop-fix, kanaquarium-visible-food-test, kanaquarium-vietnamese-food-v13, kanaquarium-auto-panel-alt-h-v14, kanaquarium-realism1-physics, kanaquarium-realism2-lifelike, kanaquarium-realism2-wall-hotfix, kanaquarium-realism3-ecosystem, kanaquarium-food-3d-click-depth, kanaquarium-realism4-fins-habitats, kanaquarium-realism4-visual-hotfix-fins-logs, main]
     paths:
       - '.github/workflows/kanaquarium-build.yml'
       - 'aquarium-integration/**'
@@ -58,6 +58,21 @@ jobs:
           cp aquarium-integration/tests/realism4-habitats-smoke.mjs _aquarium-build/realism4-habitats-smoke.mjs
           cd _aquarium-build
           node realism4-habitats-smoke.mjs
+      - name: Browser visual hotfix - flexible angelfish fins and solid-round driftwood
+        run: |
+          cp aquarium-integration/tests/realism4-visual-hotfix-smoke.mjs _aquarium-build/realism4-visual-hotfix-smoke.mjs
+          cd _aquarium-build
+          node realism4-visual-hotfix-smoke.mjs
+      - name: Keep before-and-after aquarium screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: realism4-visual-hotfix-review
+          path: |
+            _aquarium-build/realism4-visual-fins-soft.png
+            _aquarium-build/realism4-visual-fins-classic.png
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Browser Realism 3 - ecology, modes and autonomous fish behavior
         run: |
           cp aquarium-integration/tests/realism3-smoke.mjs _aquarium-build/realism3-smoke.mjs
