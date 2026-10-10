@@ -206,6 +206,17 @@ export class FishSystem {
   private splashes:Array<{mesh:THREE.Mesh<THREE.RingGeometry,THREE.MeshBasicMaterial>;age:number}>=[];
   // Soft spherical keep-out zones approximate rocks, wood trunks and larger corals.
   private collisionRadius(a:Agent):number{return Math.max(0.007,a.scale*.30)}
+  // The physical vertical envelope must include dorsal + anal fins, not only
+  // the body centre. Tall angels formerly poked rigid triangles through the
+  // waterline because yMargin covered merely 20% of their length.
+  private verticalClearance(a:Agent,env:SimEnv):number{
+    const sh=a.sp.shape;
+    const scale=a.sp.id==='angelfish'?.54:1;
+    const fin=Math.max(sh.dorsalHeight,sh.analHeight)*sh.height*scale;
+    const envelope=a.scale*(sh.height*.5+fin)+.005;
+    return Math.min((env.surfaceY-env.floorY)*.43,
+      Math.max(.006,a.scale*.20,envelope));
+  }
   private constrain(a:Agent,env:SimEnv):void{
     // Broadly elliptical fish body. The forward axis requires more clearance
     // than the side axis; do not clamp the centre directly to the glass.
@@ -214,7 +225,7 @@ export class FishSystem {
     const dirZ=speed>1e-6?Math.abs(a.vel.z)/speed:.65;
     const xMargin=Math.min(env.halfW*.82,Math.max(.007,a.scale*(.24+.33*dirX)));
     const zMargin=Math.min(env.halfD*.82,Math.max(.007,a.scale*(.24+.33*dirZ)));
-    const yMargin=Math.min((env.surfaceY-env.floorY)*.28,Math.max(.006,a.scale*.20));
+    const yMargin=this.verticalClearance(a,env);
     const xmin=-env.halfW+xMargin,xmax=env.halfW-xMargin;
     const zmin=-env.halfD+zMargin,zmax=env.halfD-zMargin;
     const ymin=env.floorY+yMargin,ymax=env.surfaceY-yMargin;
