@@ -142,6 +142,7 @@ function buildFishAsset(sp: SpeciesDef): FishAsset {
     metalness: 0,
     transparent: true,
     opacity: sp.palette.finOpacity,
+    vertexColors: true, // thin ray-tinted fin membranes
     side: THREE.DoubleSide,
     depthWrite: false,
   });
@@ -207,6 +208,7 @@ function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
   const parts: number[] = [];
   const flutter: number[] = [];
   const finFlex: number[] = [];
+  const colors: number[] = [];
   const indices: number[] = [];
 
   const bodyLen = 1 - sh.tailSize;          // body occupies [tailBaseX, +0.5]
@@ -225,6 +227,7 @@ function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
       positions.push(x, cy + hh * Math.cos(th), ww * Math.sin(th));
       uvs.push(0.03 + u * 0.82, 0.5 + 0.5 * Math.cos(th));
       parts.push(0); flutter.push(0); finFlex.push(0);
+      colors.push(1,1,1);
     }
   }
   for (let i = 0; i < RINGS; i++) {
@@ -248,6 +251,8 @@ function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
       parts.push(part);
       flutter.push(flutterRoot?Math.hypot(x-flutterRoot[0],y-flutterRoot[1]):0);
       finFlex.push(part===1||part===2?t:0);
+      const pigment=part===1||part===2?1-.13*t:.98;
+      colors.push(pigment,pigment*.99,pigment*.98);
       return v;
     };
     if(part===1||part===2){
@@ -283,15 +288,15 @@ function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
       const t=j/columns,u=THREE.MathUtils.lerp(startU,endU,t);
       const x=.5-u*bodyLen;
       const rootY=sign*(bodyProfile(u,sp)*(sign>0?1.12:1));
-      const tipEnvelope=Math.pow(Math.max(0,Math.sin(Math.PI*t)),sh.finLong?.78:1.12)
+      const tipEnvelope=Math.pow(Math.max(0,Math.sin(Math.PI*t)),sh.finLong?.48:1.12)
         *(.84+.16*t);
-      const tipHeight=rise*sh.height*tipEnvelope*(sp.id==='angelfish'?.79:1);
+      const tipHeight=rise*sh.height*tipEnvelope*(sp.id==='angelfish'?.54:1);
       for(let k=0;k<=rows;k++){
         const w=k/rows;
         const soft=w*w*(3-2*w);
         // Trailing edge bends aft; center is gently curved across Z so
         // specular lighting catches the membrane instead of a flat triangle.
-        const trail=sh.finLong?.037:.013;
+        const trail=sh.finLong?.060:.013;
         const px=x-trail*soft*(.55+.45*t);
         const py=rootY+sign*tipHeight*w;
         const pz=(Math.sin(Math.PI*t)*.018+Math.sin(t*15+u*3)*.003)
@@ -301,6 +306,10 @@ function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
         parts.push(2);
         flutter.push(0);
         finFlex.push(w);
+        // Subtle fin rays and edge translucency, not a uniform plastic sheet.
+        const ray=.90+.10*(.5+.5*Math.cos(t*Math.PI*20));
+        const pigment=(1-.13*w)*ray;
+        colors.push(pigment,pigment*.995,pigment*.98);
       }
     }
     for(let j=0;j<columns;j++){
@@ -372,6 +381,7 @@ function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
   geo.setAttribute('aPart', new THREE.Float32BufferAttribute(parts, 1));
   geo.setAttribute('aFlutterD', new THREE.Float32BufferAttribute(flutter, 1));
   geo.setAttribute('aFinFlex', new THREE.Float32BufferAttribute(finFlex, 1));
+  geo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
   geo.setIndex(indices);
   geo.computeVertexNormals();
   geo.userData.medianMembraneStrip=sh.dorsalHeight>.02||sh.analHeight>.02;
