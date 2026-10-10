@@ -66,7 +66,9 @@ interface Agent {
   vel: THREE.Vector3;
   phase: number;            // accumulated tail-beat phase (shader reads this)
   bend: number;             // smoothed turn curvature
-  flap: number;             // pectoral flutter amount (rises when slow)
+  flap: number;
+  jaw: number;
+  jawTime: number;             // pectoral flutter amount (rises when slow)
   rand: number;
   scale: number;            // individual size variation
   mode: FishMode;
@@ -377,7 +379,7 @@ export class FishSystem {
       mesh.userData.speciesId = id;
 
       // Per-instance dynamic attributes the swim shader reads.
-      const dyn = new THREE.InstancedBufferAttribute(new Float32Array(count * 3), 3);
+      const dyn = new THREE.InstancedBufferAttribute(new Float32Array(count * 4), 4);
       dyn.setUsage(THREE.DynamicDrawUsage);
       const rnd = new THREE.InstancedBufferAttribute(new Float32Array(count), 1);
       asset.geometry.setAttribute('aDyn', dyn);
@@ -391,6 +393,7 @@ export class FishSystem {
         if(old){
           agent.pos.copy(old.pos);agent.vel.copy(old.vel);agent.anchor.copy(old.anchor);
           agent.mode=old.mode;agent.modeT=old.modeT;agent.phase=old.phase;
+          agent.jaw=old.jaw??0;agent.jawTime=old.jawTime??0;
           agent.rand=old.rand;agent.scale=old.scale;agent.hunger=old.hunger;
           agent.drop=old.drop?{...old.drop}:undefined;
         }
@@ -428,7 +431,7 @@ export class FishSystem {
       pos,
       vel: initialVelocity,
       phase: Math.random() * TAU,
-      bend: 0, flap: 0,
+      bend: 0, flap: 0, jaw:0,jawTime:0,
       rand: Math.random(),
       scale: sp.lengthM * (0.82 + Math.random() * 0.36),
       mode: 'cruise', modeT: 1 + Math.random() * 4,
@@ -504,6 +507,8 @@ export class FishSystem {
     const sp = a.sp;
     const L = a.scale;
     a.feedDistance=undefined;
+    a.jawTime=Math.max(0,a.jawTime-dt);
+    a.jaw=THREE.MathUtils.damp(a.jaw,a.jawTime>0?1:0,a.jawTime>0?19:11,dt);
     const cruise = sp.swim.cruise * L * SPEED_SCALE; // body-lengths/s → m/s
     const maxSpeed = cruise * sp.swim.burst;
 
@@ -581,12 +586,14 @@ export class FishSystem {
         a.feedDistance=d;
         if(d<L*.43+(.003)){ 
           this.food.eat(target);
+          a.jawTime=.24;
           a.mode='feed';a.modeT=.26;a.gulp=undefined;
         } else if(d>1e-6){
           const dir=_v2.divideScalar(d);
           const forward=a.vel.lengthSq()>1e-6?dir.dot(a.vel.clone().normalize()):1;
           // Do not spin 180 degrees instantly for a pellet directly behind the fish.
           if(forward>-.65||d<L*1.8){
+            if(d<L*1.2)a.jawTime=Math.max(a.jawTime,.085);
             steer.addScaledVector(dir,special?3.15:2.35);
             a.mode='feed';a.modeT=Math.max(a.modeT,.45);
           }
@@ -921,6 +928,6 @@ export class FishSystem {
     const speedFactor = THREE.MathUtils.clamp(speed / (sp.swim.cruise * L * SPEED_SCALE + 1e-6), 0, 1);
     a.flap = THREE.MathUtils.damp(a.flap, 1 - speedFactor * 0.85, 4, dt);
 
-    pop.dyn.setXYZ(a.index, a.phase, a.bend, a.flap);
+    pop.dyn.setXYZW(a.index, a.phase, a.bend, a.flap, a.jaw);
   }
 }
