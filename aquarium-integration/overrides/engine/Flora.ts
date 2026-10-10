@@ -68,11 +68,15 @@ class GeoAccum {
 const bladeTemplate = new THREE.PlaneGeometry(1, 1, 1, 6);       // tall blade, 6 height segs for smooth bending
 const leafTemplate = (() => {
   // A pointed leaf: plane pinched at both ends by shaping X by Y.
-  const g = new THREE.PlaneGeometry(1, 1, 2, 7);
+  const g = new THREE.PlaneGeometry(1, 1, 4, 10);
   const p = g.getAttribute('position');
   for (let i = 0; i < p.count; i++) {
     const y = p.getY(i) + 0.5; // 0..1 along leaf
-    p.setX(i, p.getX(i) * Math.sin(Math.PI * Math.min(1, y * 1.05)));
+    const across=p.getX(i);
+    const taper=Math.pow(Math.sin(Math.PI*Math.min(1,y*1.04)),.85);
+    p.setX(i,across*taper);
+    // Rib curvature and cupped edges make leaves less paper-flat.
+    p.setZ(i,across*across*.05+.014*Math.sin(y*Math.PI));
   }
   g.computeVertexNormals();
   return g;
@@ -307,11 +311,11 @@ export class FloraSystem {
         for (let l = 0; l < leaves; l++) {
           const ang = (l / leaves) * Math.PI * 2 + Math.random() * 0.5;
           const lean = 0.35 + Math.random() * 0.55;       // outward arch
-          const h = H * (0.75 + Math.random() * 0.45);
+          const h = H * (0.70 + Math.random() * 0.50);
           _m.compose(
             new THREE.Vector3(spot.x + Math.cos(ang) * 0.015, spot.y + h / 2 * Math.cos(lean * 0.8), spot.z + Math.sin(ang) * 0.015),
             new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.sin(ang) * lean, -ang, Math.cos(ang) * lean, 'YXZ')),
-            new THREE.Vector3(h * (def.id === 'amazon-sword' ? 0.3 : def.id === 'anubias' ? 0.55 : 0.35), h, 1)
+            new THREE.Vector3(h * (def.id === 'amazon-sword' ? 0.28 : def.id === 'anubias' ? 0.50 : 0.31), h, 1)
           );
           acc.add(leafTemplate, _m, _c.copy(pick()).multiplyScalar(0.75 + Math.random() * 0.5), byHeight, phase + l * 0.11);
         }

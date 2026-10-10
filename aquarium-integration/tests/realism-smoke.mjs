@@ -49,7 +49,7 @@ try{
       b.click();
     });
     const x=await page.evaluate(()=>window.__kanRealismProbe());
-    if(x.name!=='Hồ cá bất ngờ')throw Error('Random tank still English: '+x.name);
+    if(x.name!=='Hồ cá ngẫu nhiên')throw Error('Random tank still English: '+x.name);
     await audit('random '+(i+1));
   }
   // A fish from the smallest aquarium must retain safe clearance from glass

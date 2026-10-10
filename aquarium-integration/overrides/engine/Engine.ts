@@ -124,6 +124,14 @@ export class Engine {
         flora:this.flora.getContainmentSnapshot(this.dims),
         obstacles:this.simEnv.obstacles.length,
         food:this.fish.food.bits.length,
+        species:this.fish.getMovementSnapshot(),
+        drawCalls:this.renderer.info.render.calls,
+        triangles:this.renderer.info.render.triangles,
+        optics:{
+          surface:this.environment.group.children.some(o=>o instanceof THREE.Mesh
+            && o.material instanceof THREE.ShaderMaterial
+            && o.material.fragmentShader.includes('.02 + .98')),
+        },
       });
     }
 

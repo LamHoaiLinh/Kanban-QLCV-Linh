@@ -254,6 +254,21 @@ export class FishSystem {
       }
     }
   }
+  // Lightweight telemetry for browser QA; does not change simulation state.
+  getMovementSnapshot(){
+    return this.populations.map(p=>{
+      const agents=p.agents.filter(a=>!a.drop);
+      const n=Math.max(1,agents.length);
+      return {
+        species:p.sp.id,
+        count:agents.length,
+        meanSpeed:agents.reduce((sum,a)=>sum+a.vel.length(),0)/n,
+        turns:agents.reduce((sum,a)=>sum+Math.abs(a.bend),0)/n,
+        meshVertices:p.mesh.geometry.getAttribute('position').count,
+        finGroups:p.mesh.geometry.groups.length,
+      };
+    });
+  }
   // Test-only probe. No production counters or global simulation timers.
   getPhysicsSnapshot(env:SimEnv):{fish:number;wallViolations:number;solidOverlaps:number;maxOverlap:number}{
     let fish=0,wallViolations=0,solidOverlaps=0,maxOverlap=0;
@@ -387,10 +402,12 @@ export class FishSystem {
       THREE.MathUtils.lerp(zoneY[0], zoneY[1], Math.random()),
       (Math.random() - 0.5) * env.halfD * 1.6
     );
+    const initialVelocity=new THREE.Vector3(
+      (Math.random()-.5)*.05,0,(Math.random()-.5)*.05);
     const agent: Agent = {
       sp, index: i, key: `${sp.id}:${i}`,
       pos,
-      vel: new THREE.Vector3((Math.random() - 0.5) * 0.05, 0, (Math.random() - 0.5) * 0.05),
+      vel: initialVelocity,
       phase: Math.random() * TAU,
       bend: 0, flap: 0,
       rand: Math.random(),
@@ -401,7 +418,7 @@ export class FishSystem {
         THREE.MathUtils.lerp(zoneY[0], zoneY[1], 0.5),
         (Math.random() - 0.5) * env.halfD * 1.4
       ),
-      prevYaw: 0,
+      prevYaw: Math.atan2(-initialVelocity.z,initialVelocity.x),
       hunger: 0,
     };
     if (isCrawler(sp)) {
@@ -564,16 +581,41 @@ export class FishSystem {
     const flow = _v2.length();
     if (flow > 0.03) steer.addScaledVector(_v2.normalize(), -0.25);
 
-    // 8) Wander — slow per-fish noise so nobody swims in straight lines.
-    const t = env.time * (env.reducedMotion ? 0.5 : 1);
+    // 8) Species movement personality without changing boids/collisions.
+    const t=env.time*(env.reducedMotion?.5:1);
+    if(sp.id==='guppy'){
+      steer.y+=Math.sin(t*.73+a.rand*24)*.16;
+      steer.x+=Math.sin(t*.85+a.rand*18)*.14;
+    }else if(sp.id==='betta'||sp.id==='angelfish'){
+      steer.y+=Math.sin(t*.33+a.rand*25)*.055;
+    }else if(sp.id==='ocellaris-clown'){
+      steer.x+=Math.cos(t*.8+a.rand*11)*.10;
+      steer.y+=Math.sin(t*.63+a.rand*19)*.11;
+    }else if(sp.id==='blue-tang'||sp.id==='yellow-tang'){
+      steer.z+=Math.sin(t*.58+a.rand*21)*.09;
+    }else if(sp.id==='dwarf-gourami'||sp.id==='honey-gourami'){
+      steer.y+=Math.sin(t*.39+a.rand*14)*.065;
+    }else if(sp.id.includes('corydoras')&&a.mode==='forage'){
+      steer.y-=.13;
+      steer.x+=Math.sin(t*1.7+a.rand*13)*.24;
+    }else if(sp.archetype==='schooler'){
+      steer.z+=Math.sin(t*1.13+a.rand*18)*.13;
+    }
     steer.x += Math.sin(t * 0.7 + a.rand * 40) * 0.22;
     steer.z += Math.cos(t * 0.53 + a.rand * 71) * 0.22;
     steer.y += Math.sin(t * 0.41 + a.rand * 23) * 0.1;
 
     // — Integrate: steer → velocity, with mode-dependent target speed —
-    let targetSpeed = cruise * activity;
+    let targetSpeed=cruise*activity;
+    // Visual tempo by species, separate from shared movement archetypes.
+    if(sp.id==='betta')targetSpeed*=.77;
+    if(sp.id==='angelfish')targetSpeed*=.86;
+    if(sp.id==='guppy')targetSpeed*=1.08;
+    if(sp.id==='ocellaris-clown')targetSpeed*=.88;
+    if(sp.id==='dwarf-gourami'||sp.id==='honey-gourami')targetSpeed*=.82;
     if (a.mode === 'rest') targetSpeed = cruise * 0.06;
-    if (a.mode === 'dart') targetSpeed = maxSpeed;
+    if(a.mode==='dart')
+      targetSpeed=maxSpeed*(sp.id==='betta'?.63:sp.id==='angelfish'?.72:1);
     if(a.mode==='feed'){
       targetSpeed=cruise*(this.food.hasCookie?1.50:1.20);
       if(a.feedDistance!==undefined){
@@ -784,7 +826,13 @@ export class FishSystem {
       pitch = 0;
       up = _v3.set(a.wall === 'back' ? 0 : a.wall === 'left' ? 1 : -1, 0, a.wall === 'back' ? 1 : 0);
     } else {
-      yaw = Math.atan2(-a.vel.z, a.vel.x);
+      // Limit body heading rate, avoiding robotic instantaneous 180° spins.
+      const desiredYaw=Math.atan2(-a.vel.z,a.vel.x);
+      let difference=desiredYaw-a.prevYaw;
+      while(difference>Math.PI)difference-=TAU;
+      while(difference<-Math.PI)difference+=TAU;
+      const turnRate=sp.swim.turnRate*dt*(sp.id==='betta'?.67:sp.id==='angelfish'?.78:1);
+      yaw=a.prevYaw+THREE.MathUtils.clamp(difference,-turnRate,turnRate);
       pitch = Math.asin(THREE.MathUtils.clamp(speed > 1e-5 ? a.vel.y / speed : 0, -1, 1));
       // Normal swimming stays near level; an air-gulping cory points steeply.
       const maxPitch = a.gulp ? 1.25 : 0.5;

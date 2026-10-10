@@ -156,7 +156,7 @@ export const useStore = create<AppState>()(
             substrate: substrates[Math.floor(Math.random() * substrates.length)],
             background: water === 'saltwater' ? 'reef' : (['natural', 'planted', 'deepblue'] as const)[Math.floor(Math.random() * 3)],
             lighting: water === 'saltwater' ? 'actinic' : 'daylight',
-            name: 'Hồ cá bất ngờ',
+            name: 'Hồ cá ngẫu nhiên',
           },
         }));
         get().showToast('Đã tạo hồ cá ngẫu nhiên. Anh có thể chỉnh sửa theo ý thích.');
@@ -170,7 +170,12 @@ export const useStore = create<AppState>()(
 
       loadTank: (name) => {
         const saved = get().savedTanks[name];
-        if (saved) set({ config: structuredClone(saved), followFishKey: null, selectedFishKey: null });
+        if(saved){
+          const config=structuredClone(saved);
+          if(config.name==='Surprise Tank'||config.name==='Hồ cá bất ngờ')
+            config.name='Hồ cá ngẫu nhiên';
+          set({config,followFishKey:null,selectedFishKey:null});
+        }
       },
 
       deleteTank: (name) =>
@@ -203,6 +208,9 @@ export const useStore = create<AppState>()(
         const merged = { ...current, ...(persisted as Partial<AppState>) };
         // A fresh share link always wins over the previously persisted tank.
         if (sharedConfig) merged.config = sharedConfig;
+        // Keep saved tank keys intact, but migrate built-in random labels.
+        if(merged.config?.name==='Surprise Tank'||merged.config?.name==='Hồ cá bất ngờ')
+          merged.config={...merged.config,name:'Hồ cá ngẫu nhiên'};
         return merged;
       },
     }
