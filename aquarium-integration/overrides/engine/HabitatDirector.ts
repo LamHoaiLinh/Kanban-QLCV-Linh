@@ -32,9 +32,21 @@ const randomOf=<T>(a:T[]):T=>a[Math.floor(Math.random()*a.length)];
 const dist=(a:HabitAgent,b:HabitAgent)=>a.pos.distanceTo(b.pos);
 const isShrimp=(a:HabitAgent)=>a.sp.id.includes('shrimp');
 const isSnail=(a:HabitAgent)=>a.sp.id.includes('snail');
-const isSmallFish=(a:HabitAgent,t:SwimTunnel)=>!a.sp.invert&&
-  a.scale*.38<t.boreRadius*.73&&a.scale<
-    t.entrance.distanceTo(t.exit)*.55;
+const isSmallFish=(a:HabitAgent,t:SwimTunnel,env:SimEnv)=>{
+  if(a.sp.invert||a.scale*.38>=t.boreRadius*.73||
+    a.scale>=t.entrance.distanceTo(t.exit)*.55)return false;
+  const margin=Math.max(.007,a.scale*.30);
+  for(let i=0;i<=8;i++){
+    const t01=i/8;
+    const p=t01<.5?t.entrance.clone().lerp(t.middle,t01*2):
+      t.middle.clone().lerp(t.exit,(t01-.5)*2);
+    // Reject blocked corridors caused by other decorations overlapping a log.
+    for(const ob of env.obstacles){
+      if(p.distanceToSquared(ob.pos)<Math.pow(ob.radius+margin,2))return false;
+    }
+  }
+  return true;
+};
 const isTerritorial=(a:HabitAgent)=>a.sp.temperament!=='peaceful'&&
   !a.sp.invert;
 const forages=(a:HabitAgent)=>a.sp.archetype==='bottom'||
@@ -136,7 +148,7 @@ export class HabitatDirector {
     const shrimps=agents.filter(isShrimp),snails=agents.filter(isSnail);
     const lowLight=env.dayFactor<.5;
     const t=env.tunnels.length?randomOf(env.tunnels):null;
-    const eligible=t?fish.filter(a=>isSmallFish(a,t)&&
+    const eligible=t?fish.filter(a=>isSmallFish(a,t,env)&&
       this.recent.get(a.key)?.tunnel!==t.id):[];
     const near=(list:HabitAgent[],target:HabitAgent,limit=.38)=>
       list.filter(a=>a!==target&&dist(a,target)<limit);
