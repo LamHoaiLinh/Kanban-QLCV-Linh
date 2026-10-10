@@ -337,7 +337,7 @@ export class FishSystem {
       const speed=a.vel.length(),dx=speed>1e-6?Math.abs(a.vel.x)/speed:.65,dz=speed>1e-6?Math.abs(a.vel.z)/speed:.65;
       const mx=Math.min(env.halfW*.82,Math.max(.007,a.scale*(.24+.33*dx)));
       const mz=Math.min(env.halfD*.82,Math.max(.007,a.scale*(.24+.33*dz)));
-      const my=Math.min((env.surfaceY-env.floorY)*.28,Math.max(.006,a.scale*.20));
+      const my=this.verticalClearance(a,env);
       if(Math.abs(a.pos.x)>env.halfW-mx+.002||Math.abs(a.pos.z)>env.halfD-mz+.002||a.pos.y<env.floorY+my-.002||a.pos.y>env.surfaceY-my+.002)wallViolations++;
       for(const ob of env.obstacles){
         const overlap=ob.radius+this.collisionRadius(a)-a.pos.distanceTo(ob.pos);
