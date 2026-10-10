@@ -41,16 +41,20 @@ try{
     await page.waitForSelector('.decor-grid button',{timeout:10000});
   };
   await openDecor();
-  for(const name of ['Khúc gỗ rỗng','Cầu gỗ vòm','Lũa ống cổ thụ nứt','Cầu rễ lũa đan']){
+  for(const [name,id] of [
+    ['Khúc gỗ rỗng','hollow-log'],['Cầu gỗ vòm','log-arch'],
+    ['Lũa ống cổ thụ nứt','split-log'],['Cầu rễ lũa đan','root-bridge']]){
+    // Headless SwiftShader can make a settings transition exceed the normal
+    // 15-second panel idle timer; reopening is part of the real UI contract.
+    await openDecor();
     await page.evaluate(label=>{
       const b=[...document.querySelectorAll('.decor-grid button')]
         .find(b=>b.textContent?.trim()===label);
       if(!b)throw Error('Missing selectable wood: '+label);
       if(b.getAttribute('aria-pressed')!=='true')b.click();
     },name);
-    await page.waitForFunction(n=>[...document.querySelectorAll('.decor-grid button')]
-      .find(b=>b.textContent?.trim()===n)?.getAttribute('aria-pressed')==='true',
-      {timeout:7000},name);
+    await page.waitForFunction(id=>window.__kanRealismProbe().habitat.tunnels
+      .some(t=>t.id===id),{timeout:15000},id);
   }
   await page.waitForFunction(()=>window.__kanRealismProbe().habitat.tunnels.length>=4,
     {timeout:14000});
