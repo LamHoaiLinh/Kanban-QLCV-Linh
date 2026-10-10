@@ -234,6 +234,8 @@ export class Engine {
         delete (window as Window & {__kanEcoFastForward?:(seconds:number)=>unknown}).__kanEcoFastForward;
         delete (window as Window & {__kanFoodProbe?:()=>unknown}).__kanFoodProbe;
         delete (window as Window & {__kanHabitatPopulate?:(id:string,count:number)=>void}).__kanHabitatPopulate;
+        delete (window as Window & {__kanVisualHotfixScene?:()=>boolean}).__kanVisualHotfixScene;
+        delete (window as Window & {__kanVisualFinToggle?:(on:boolean)=>void}).__kanVisualFinToggle;
         delete (window as Window & {__kanFoodTestCamera?:(mode:'orbit'|'cinematic'|'still')=>void}).__kanFoodTestCamera;
       }
     this.renderer.dispose();
