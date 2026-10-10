@@ -50,7 +50,7 @@ try{
  report.checks.push('20 shrink/grow cycles, no NaN, named metadata retained, no automatic respawn');
  // Exercise persisted entry points and undo, including rounding budget at low quality.
  const saved=await page.evaluate(()=>window.__kan42Store('exercise'));
- assert(saved.savedUnchanged&&saved.restored===100&&saved.reloaded===100&&saved.trimmed===0,'store transaction '+JSON.stringify(saved));
+ assert(saved.savedUnchanged&&saved.restored===100&&saved.reloaded===100&&saved.trimmed===0&&saved.namedSurvives&&saved.namedRestored,'store transaction '+JSON.stringify(saved));
  report.checks.push('save/load/resize/undo, durable saved snapshot unchanged');
  await page.evaluate(()=>{window.__kan42Scene({gallons:180,fish:{'neon-tetra':60,'ember-tetra':40},decor:[],flora:{}});window.__kan42Quality('low');});
  probe=await page.evaluate(()=>window.__kan42Probe());assert(probe.telemetry.fish.length<=60,'integer performance cap overflow');

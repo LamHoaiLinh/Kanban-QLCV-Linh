@@ -151,6 +151,7 @@ export class Engine {
         };
       Object.assign(window,{
         __kan42Arrange:()=>this.fish.qaArrange(this.simEnv),
+        __kan42Follow:(key:string|null)=>this.followFish(key),
         __kan42Day:(factor:number)=>{this.dayFactor=factor;this.simEnv.dayFactor=factor;},
         __kan42Burst:(count:number)=>this.fish.qaBurst(count,this.simEnv),
         __kan42Resume:()=>this.renderer.setAnimationLoop(this.tick),

@@ -42,5 +42,19 @@ export function normalizeStock(config:TankConfig,performanceCap=100):TankConfig 
     if(!(e.id in fish)||fish[e.id]>=limits.get(e.id)!||total>=cap||load+e.sp!.bioload>budget)continue;
     fish[e.id]++;total++;load+=e.sp!.bioload;progress=true;
   }}
-  return {...config,fish};
+  // Compact surviving named individuals into the live index range after a trim.
+  // The resize snapshot still holds the original keys for an exact undo.
+  const fishNames={...config.fishNames};
+  for(const e of entries){
+    const retained=fish[e.id]??0;
+    if(retained>=e.n)continue;
+    const displaced=Object.entries(fishNames).filter(([key,name])=>
+      !!name&&key.startsWith(e.id+':')&&Number(key.slice(e.id.length+1))>=retained);
+    const available=Array.from({length:retained},(_,i)=>e.id+':'+i).filter(key=>!fishNames[key]);
+    for(const [oldKey,name] of displaced){
+      const newKey=available.shift();if(!newKey)break;
+      fishNames[newKey]=name;delete fishNames[oldKey];
+    }
+  }
+  return {...config,fish,fishNames};
 }

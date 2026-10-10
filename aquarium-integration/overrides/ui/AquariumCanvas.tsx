@@ -78,13 +78,16 @@ export function AquariumCanvas() {
       __kan42Store:(action:string)=>{
         const s=useStore.getState();
         if(action==='exercise'){
-          s.setConfig({gallons:180,fish:{'neon-tetra':100},fishNames:{'neon-tetra:0':'Linh'}});
+          s.setConfig({gallons:180,fish:{'neon-tetra':100},fishNames:{'neon-tetra:99':'Linh'}});
           s.saveTank('QA42');const saved=JSON.stringify(useStore.getState().savedTanks.QA42);
+          s.setConfig({gallons:40});
+          const namedSurvives=Object.entries(useStore.getState().config.fishNames).some(([k,v])=>v==='Linh'&&Number(k.split(':')[1])<(useStore.getState().config.fish['neon-tetra']??0));
           s.setConfig({gallons:5});const trimmed=Object.values(useStore.getState().config.fish).reduce((a,b)=>a+b,0);
           const savedUnchanged=saved===JSON.stringify(useStore.getState().savedTanks.QA42);
           s.undoResize();const restored=Object.values(useStore.getState().config.fish).reduce((a,b)=>a+b,0);
+          const namedRestored=useStore.getState().config.fishNames['neon-tetra:99']==='Linh';
           s.loadTank('QA42');const reloaded=Object.values(useStore.getState().config.fish).reduce((a,b)=>a+b,0);
-          s.deleteTank('QA42');return {savedUnchanged,trimmed,restored,reloaded};
+          s.deleteTank('QA42');return {savedUnchanged,trimmed,restored,reloaded,namedSurvives,namedRestored};
         }
         return {config:s.config,savedTanks:s.savedTanks};
       }
