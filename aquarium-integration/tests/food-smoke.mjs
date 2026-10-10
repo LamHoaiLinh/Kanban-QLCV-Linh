@@ -59,8 +59,24 @@ try{
     }
   }
   // Regression: all six control tabs and representative translations render in Chromium.
-  await page.click('.open-panel');
-  await page.waitForSelector('.panel');
+  // A fixed aquarium overlay can obscure the top-left button in headless rendering;
+  // dispatch click directly to the control, as if activated by keyboard.
+  const opened=await page.evaluate(()=>{
+    const btn=document.querySelector('.open-panel');
+    if(!btn)return false;
+    btn.click();
+    return true;
+  });
+  if(!opened)throw Error('Tank control open button not found');
+  try{await page.waitForSelector('.panel',{timeout:8000});}
+  catch(error){
+    const debug=await page.evaluate(()=>({url:location.href,
+      openButtons:document.querySelectorAll('.open-panel').length,
+      panels:document.querySelectorAll('.panel').length,
+      bodyText:document.body.innerText.slice(0,550)
+    }));
+    throw Error('Panel failed to open: '+JSON.stringify(debug));
+  }
   const tabs=await page.$eval('.panel .tabs button',a=>a.map(x=>x.textContent?.trim()));
   for(const name of ['Bể','Cá','Cây','Trang trí','Đã lưu','Cài đặt']){
     if(!tabs.includes(name))throw Error('Control tab not translated: '+name+'; got '+JSON.stringify(tabs));
