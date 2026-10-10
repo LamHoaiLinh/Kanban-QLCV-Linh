@@ -228,10 +228,14 @@ export class FloraSystem {
           acc.positions[p+1]=THREE.MathUtils.clamp(acc.positions[p+1],dims.floorY+.002,dims.surfaceY-.004);
           acc.positions[p+2]=THREE.MathUtils.clamp(acc.positions[p+2],-maxZ,maxZ);
         }
-        if(isCoral||def.kind==='rosette'){
-          const yMid=THREE.MathUtils.clamp(spot.y+def.heightM*.35,dims.floorY+.02,dims.surfaceY-.02);
+        // Only substantial trunks/skeletons are rigid. Soft foliage, Xenia,
+        // moss and anemones should bend rather than form impenetrable balls.
+        const rigid=def.kind==='hardcoral'||def.kind==='lps'||def.kind==='rosette';
+        if(rigid){
+          const yMid=THREE.MathUtils.clamp(spot.y+def.heightM*.20,dims.floorY+.014,dims.surfaceY-.014);
+          const solidRadius=def.kind==='hardcoral'?.24:def.kind==='lps'?.19:.13;
           obstacles.push({pos:new THREE.Vector3(spot.x,yMid,spot.z),
-            radius:Math.min(.075,Math.max(.018,def.heightM*(isCoral?.36:.24)))});
+            radius:Math.min(.054,Math.max(.010,def.heightM*solidRadius))});
         }
       }
 
