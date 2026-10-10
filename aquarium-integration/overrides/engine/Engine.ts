@@ -62,6 +62,12 @@ export class Engine {
   // of transparent water, frustum culling, camera zoom and postprocessing.
   private foodLayer:HTMLDivElement|null=null;
   private foodElements=new Map<object,HTMLDivElement>();
+  // Depth-correct projection: only opaque rock, wood and plant polygons are
+  // tested (not glass/water). Cached so raycasting does not stall 3D rendering.
+  private foodOccluders:THREE.Object3D[]=[];
+  private foodDepthCache=new WeakMap<object,{last:number,visible:boolean}>();
+  private foodDepthRay=new THREE.Raycaster();
+  private foodDepthRayDirection=new THREE.Vector3();
   private lastCycleT = 0;
   // FPS + draw call counters for the dev HUD.
   stats = { fps: 60, drawCalls: 0, triangles: 0, fishCount: 0 };
@@ -110,6 +116,16 @@ export class Engine {
       reducedMotion: false,
       obstacles: [], shelters: [],
     };
+    // QA-only regression probe. Not enabled on the published KanBan URL.
+    if(new URLSearchParams(location.search).get('qa')==='1'){
+      (window as Window & {__kanRealismProbe?:()=>unknown}).__kanRealismProbe=()=>({
+        name:this.config?.name,
+        fish:this.fish.getPhysicsSnapshot(this.simEnv),
+        flora:this.flora.getContainmentSnapshot(this.dims),
+        obstacles:this.simEnv.obstacles.length,
+        food:this.fish.food.bits.length,
+      });
+    }
 
     // Resolve 'auto' quality once the GL context exists.
     this.quality = QUALITY[detectQuality(this.renderer)];
@@ -138,6 +154,8 @@ export class Engine {
     this.foodElements.clear();
     this.foodLayer?.remove();
     this.foodLayer=null;
+    if(new URLSearchParams(location.search).get('qa')==='1')
+      delete (window as Window & {__kanRealismProbe?:()=>unknown}).__kanRealismProbe;
     this.renderer.dispose();
     this.container.removeChild(this.renderer.domElement);
   }
@@ -250,6 +268,8 @@ export class Engine {
         decorOut.anchors,
       );
       this.simEnv.obstacles = [...decorOut.obstacles, ...floraOut.obstacles];
+      this.foodOccluders=[...this.decor.group.children,...this.flora.group.children];
+      this.foodDepthCache=new WeakMap();
       this.simEnv.shelters = decorOut.shelters;
 
       this.environment.rebuild(
@@ -445,15 +465,31 @@ export class Engine {
         this.foodElements.set(bit,icon);
       }
       projected.copy(bit.pos).project(this.rig.camera);
-      // A click below the top waterline still gives an observable pellet.
-      // Keep icons within the tank viewport instead of letting them vanish
-      // above the image (an issue with near-surface projections on wide TVs).
-      const sx=THREE.MathUtils.clamp((projected.x+1)*.5,0.055,0.945);
-      const sy=THREE.MathUtils.clamp((1-projected.y)*.5,0.085,0.925);
-      const px=sx*bounds.width;
-      const py=sy*bounds.height;
-      icon.style.transform='translate3d('+px.toFixed(1)+'px,'+py.toFixed(1)+'px,0) translate(-50%,-50%)';
-      icon.style.opacity='1';
+      const sx=(projected.x+1)*.5,sy=(1-projected.y)*.5;
+      // Unlike HUD badges, food should NEVER stick to a screen edge when it
+      // moves offscreen or behind the camera.
+      let visible=projected.z>=-1&&projected.z<=1&&sx>=0&&sx<=1&&sy>=0&&sy<=1;
+      const now=performance.now();
+      let previous=this.foodDepthCache.get(bit);
+      // Depth test a handful of food pieces per frame (approx 4Hz each).
+      if(visible&&this.foodOccluders.length&&(!previous||now-previous.last>280)){
+        const eye=this.rig.camera.position;
+        this.foodDepthRayDirection.copy(bit.pos).sub(eye);
+        const range=this.foodDepthRayDirection.length();
+        if(range>.02){
+          this.foodDepthRay.set(eye,this.foodDepthRayDirection.divideScalar(range));
+          this.foodDepthRay.near=.005;
+          this.foodDepthRay.far=range-.012;
+          visible=this.foodDepthRay.intersectObjects(this.foodOccluders,true).length===0;
+        }
+        previous={last:now,visible};
+        this.foodDepthCache.set(bit,previous);
+      }else if(visible&&previous){
+        visible=previous.visible;
+      }
+      icon.style.transform='translate3d('+(sx*bounds.width).toFixed(1)+'px,'+(sy*bounds.height).toFixed(1)+'px,0) translate(-50%,-50%)';
+      icon.style.opacity=visible?'1':'0';
+      icon.dataset.occluded=visible?'false':'true';
       icon.dataset.worldY=bit.pos.y.toFixed(5);
       icon.dataset.foodState=bit.state;
     }
