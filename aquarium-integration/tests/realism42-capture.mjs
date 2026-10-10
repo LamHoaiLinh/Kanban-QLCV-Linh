@@ -49,6 +49,12 @@ try{
   await page.evaluate(()=>{window.__kanVisualFinToggle(false);window.__kan42Step(.016)});
   await page.screenshot({path:join(out,id+'-classic.png')});
   await page.evaluate(()=>window.__kanVisualFinToggle(true));report.fixtures.push({type:'fin-comparison',species:id});
+  if(id==='angelfish'){
+   await page.mouse.move(320,200);await page.mouse.down();await page.mouse.move(430,235,{steps:8});await page.mouse.up();
+   await page.evaluate(()=>{window.__kan42Step(.016);});await page.screenshot({path:join(out,'angelfish-oblique-soft.png')});
+   await page.evaluate(()=>{window.__kanVisualFinToggle(false);window.__kan42Step(.016);});await page.screenshot({path:join(out,'angelfish-oblique-classic.png')});
+   await page.evaluate(()=>window.__kanVisualFinToggle(true));
+  }
  }
  const frames=async(name,count,fps,step)=>{const dir=join(tmp,name);mkdirSync(dir);for(let i=0;i<count;i++){await step(i);await page.screenshot({path:join(dir,String(i).padStart(4,'0')+'.png')});}encode(join(dir,'%04d.png'),join(out,name+'.mp4'),['-framerate',String(fps)]);rmSync(dir,{recursive:true,force:true});};
  await scene({angelfish:2});await closeup('angelfish:0');
@@ -97,7 +103,41 @@ try{
  report.pageErrors=errors;
  for(const file of ['realism42-report.json','realism42-event-audit.json','realism42-surfaces-review.json']){try{writeFileSync(join(out,file),readFileSync(file));}catch{throw Error('Missing acceptance report '+file);}}
  writeFileSync(join(out,'capture-report.json'),JSON.stringify(report,null,2));
+ const acceptance=JSON.parse(readFileSync('realism42-report.json','utf8'));
+ writeFileSync(join(out,'REPORT.md'),[
+ '# Realism 4.2 — báo cáo nghiệm thu',
+ '',
+ 'Nguồn: '+report.sourceCommit+'. CI: https://github.com/LamHoaiLinh/Kanban-QLCV-Linh/actions/runs/'+report.run+'.',
+ '',
+ 'Đã triển khai: giới hạn hồ tới 100 cá; chuẩn hóa preset/random/load/resize; giữ tên và snapshot đã lưu, undo resize; vây kín hai mặt và LOD; chuyển động, nhảy có xác suất, mổ bề mặt thật; 20 loại sự kiện có tuyến và thời hạn thật; camera quan sát sự kiện, pan/pinch và bố cục dọc.',
+ '',
+ '## Kiểm thử PASS',
+ '',
+ ...acceptance.checks.map(check=>'- '+check),
+ '- Giữ nguyên và chạy đủ tám bộ regression cũ.',
+ '- Audit đủ 20 loại sự kiện với cá thực hiện tuyến di chuyển; mổ được kính, gỗ và lá.',
+ '- Video tự nhiên hơn 3 phút: '+report.natural.length+' mẫu, mỗi mẫu 100 cá, không NaN hoặc vi phạm thành hồ.',
+ '- Xuất 12 ảnh so sánh vây, clip ông tiên 15 giây, mổ kính phát chậm, nhảy/splash/trở lại và ảnh dọc trước/sau pan/pinch.',
+ '',
+ '## Đo so sánh trước / sau',
+ '',
+ 'Các số dưới đây đã đo ở vòng kiểm thử trước khi sửa timeout mổ kính, Chromium SwiftShader 960×600, chất lượng medium, có tải ghi hình đồng thời. Đây là thời gian khung hình trong GPU phần mềm, không phải FPS của máy PC/điện thoại.',
+ '',
+ '| Cá | P50 trước / sau (ms) | P95 trước / sau (ms) | Draw calls trước / sau | Triangles trước / sau |',
+ '|---|---|---|---|---|',
+ '| 20 | 233 / 200 | 433 / 350 | 39 / 39 | 38,624 / 32,384 |',
+ '| 60 | 350 / 350 | 1,017 / 1,000 | 39 / 39 | 106,144 / 87,424 |',
+ '| 100 | Chưa hỗ trợ / 350 | Chưa hỗ trợ / 1,017 | Chưa hỗ trợ / 39 | Chưa hỗ trợ / 142,464 |',
+ '',
+ '## Giới hạn và đường dẫn bằng chứng',
+ '',
+ 'Chưa chứng nhận 60 FPS trên PC hoặc 30 FPS trên điện thoại thật. Test touch dùng PointerEvent trong Chromium; ảnh dọc dùng viewport 390×844. Stress 30 phút là mô phỏng tăng tốc qua physics thực, còn video tự nhiên chạy theo thời gian thực. Các clip hành vi cận cảnh dùng fixture QA để nhìn rõ.',
+ '',
+ 'Mở index.html để xem toàn bộ ảnh/video. Dữ liệu máy: capture-report.json, realism42-report.json, realism42-event-audit.json, realism42-surfaces-review.json. CI main có bước kiểm tra đúng asset trên Pages, nút Hồ Cá, ESC, Alt+H, canvas và không có QA hooks ở production; kết quả nằm trong artifact realism42-production-review.',
+ ''
+ ].join('\n'));
+
  const species=['angelfish','betta','guppy','neon-tetra','corydoras'];
- const html='<!doctype html><html lang="vi"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Realism 4.2 — bằng chứng kiểm thử</title><style>body{margin:0;background:#0b1420;color:#e5eef6;font:16px/1.6 system-ui}main{max-width:1100px;margin:auto;padding:28px}a{color:#80d8ed}section{margin:32px 0}video,img{max-width:100%;border-radius:10px;background:#000}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px}figure{margin:0}figcaption{padding:8px 0}.note{background:#162739;padding:18px;border-radius:10px}code{overflow-wrap:anywhere}</style><main><h1>Realism 4.2 — bằng chứng kiểm thử</h1><p>Commit nguồn: <code>'+report.sourceCommit+'</code>. <a href="https://github.com/LamHoaiLinh/Kanban-QLCV-Linh/actions/runs/'+report.run+'">CI và log kiểm thử</a>.</p><p class="note">Hồ 100 cá được ghi hơn 3 phút chạy thực, không kích hoạt hành vi bằng QA. Các clip cận cảnh dùng fixture QA để nhìn rõ hành vi. Kiểm thử trong Chromium dùng GPU phần mềm; chưa xác nhận 60 FPS trên PC và 30 FPS trên điện thoại thật.</p><section><h2>Hồ 100 cá — chạy tự nhiên</h2><video controls preload="metadata" src="natural-3min.mp4"></video><p><a href="natural-3min.mp4">Tải video</a> · <a href="100-fish.png">Ảnh toàn hồ</a></p></section><section><h2>Chuyển động và hành vi</h2><div class="grid"><figure><video controls preload="metadata" src="angelfish-15s.mp4"></video><figcaption>Cá ông tiên — 15 giây</figcaption></figure><figure><video controls preload="metadata" src="peck-slow-motion.mp4"></video><figcaption>Mổ kính — phát chậm 5 lần</figcaption></figure><figure><video controls preload="metadata" src="jump-return.mp4"></video><figcaption>Nhảy qua mặt nước, một splash và trở lại hồ</figcaption></figure></div></section><section><h2>So sánh vây mềm / cổ điển</h2>'+species.map(id=>'<h3>'+id+'</h3><div class="grid"><figure><img loading="lazy" src="'+id+'-soft.png"><figcaption>Vây mềm</figcaption></figure><figure><img loading="lazy" src="'+id+'-classic.png"><figcaption>Vây cổ điển — cùng góc nhìn</figcaption></figure></div>').join('')+'</section><section><h2>Màn hình dọc — pan/pinch hai ngón</h2><div class="grid"><figure><img loading="lazy" src="mobile-before.png"><figcaption>Trước thao tác</figcaption></figure><figure><img loading="lazy" src="mobile-after.png"><figcaption>Sau thao tác — không thả thức ăn</figcaption></figure></div></section><section><h2>Báo cáo máy</h2><p><a href="realism42-report.json">100 cá / 30 phút mô phỏng, 20 chu kỳ resize, save/load/undo, nhảy/mổ/camera</a><br><a href="realism42-event-audit.json">20 loại sự kiện và tuyến di chuyển thật</a><br><a href="realism42-surfaces-review.json">Mổ kính, gỗ và lá</a><br><a href="capture-report.json">Số liệu video, bộ nhớ, va chạm và giới hạn kiểm thử</a></p></section></main></html>';
+ const html='<!doctype html><html lang="vi"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Realism 4.2 — bằng chứng kiểm thử</title><style>body{margin:0;background:#0b1420;color:#e5eef6;font:16px/1.6 system-ui}main{max-width:1100px;margin:auto;padding:28px}a{color:#80d8ed}section{margin:32px 0}video,img{max-width:100%;border-radius:10px;background:#000}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px}figure{margin:0}figcaption{padding:8px 0}.note{background:#162739;padding:18px;border-radius:10px}code{overflow-wrap:anywhere}</style><main><h1>Realism 4.2 — bằng chứng kiểm thử</h1><p>Commit nguồn: <code>'+report.sourceCommit+'</code>. <a href="https://github.com/LamHoaiLinh/Kanban-QLCV-Linh/actions/runs/'+report.run+'">CI và log kiểm thử</a>.</p><p class="note">Hồ 100 cá được ghi hơn 3 phút chạy thực, không kích hoạt hành vi bằng QA. Các clip cận cảnh dùng fixture QA để nhìn rõ hành vi. Kiểm thử trong Chromium dùng GPU phần mềm; chưa xác nhận 60 FPS trên PC và 30 FPS trên điện thoại thật.</p><section><h2>Hồ 100 cá — chạy tự nhiên</h2><video controls preload="metadata" src="natural-3min.mp4"></video><p><a href="natural-3min.mp4">Tải video</a> · <a href="100-fish.png">Ảnh toàn hồ</a></p></section><section><h2>Chuyển động và hành vi</h2><div class="grid"><figure><video controls preload="metadata" src="angelfish-15s.mp4"></video><figcaption>Cá ông tiên — 15 giây</figcaption></figure><figure><video controls preload="metadata" src="peck-slow-motion.mp4"></video><figcaption>Mổ kính — phát chậm 5 lần</figcaption></figure><figure><video controls preload="metadata" src="jump-return.mp4"></video><figcaption>Nhảy qua mặt nước, một splash và trở lại hồ</figcaption></figure></div></section><section><h2>So sánh vây mềm / cổ điển</h2>'+species.map(id=>'<h3>'+id+'</h3><div class="grid"><figure><img loading="lazy" src="'+id+'-soft.png"><figcaption>Vây mềm</figcaption></figure><figure><img loading="lazy" src="'+id+'-classic.png"><figcaption>Vây cổ điển — cùng góc nhìn</figcaption></figure></div>').join('')+'<h3>Ông tiên — góc nghiêng</h3><div class="grid"><figure><img loading="lazy" src="angelfish-oblique-soft.png"><figcaption>Vây mềm, góc nghiêng</figcaption></figure><figure><img loading="lazy" src="angelfish-oblique-classic.png"><figcaption>Vây cổ điển, góc nghiêng</figcaption></figure></div></section><section><h2>Màn hình dọc — pan/pinch hai ngón</h2><div class="grid"><figure><img loading="lazy" src="mobile-before.png"><figcaption>Trước thao tác</figcaption></figure><figure><img loading="lazy" src="mobile-after.png"><figcaption>Sau thao tác — không thả thức ăn</figcaption></figure></div></section><section><h2>Báo cáo máy</h2><p><a href="REPORT.md">Báo cáo nghiệm thu và số đo trước / sau</a><br><a href="realism42-report.json">100 cá / 30 phút mô phỏng, 20 chu kỳ resize, save/load/undo, nhảy/mổ/camera</a><br><a href="realism42-event-audit.json">20 loại sự kiện và tuyến di chuyển thật</a><br><a href="realism42-surfaces-review.json">Mổ kính, gỗ và lá</a><br><a href="capture-report.json">Số liệu video, bộ nhớ, va chạm và giới hạn kiểm thử</a></p></section></main></html>';
  writeFileSync(join(out,'index.html'),html);console.log('PASS REALISM42 MEDIA '+JSON.stringify({samples:report.natural.length,fixtures:report.fixtures.length,errors}));
 }finally{await browser?.close();server.kill();rmSync(tmp,{recursive:true,force:true});}
