@@ -253,6 +253,19 @@ export class FishSystem {
         if(Math.hypot(bx-ox,by-oy,bz-oz)>.035)a.vel.multiplyScalar(.4);
       }
     }
+    // IMPORTANT: obstacle resolution can change the velocity direction.
+    // The initial glass clearance was computed before this velocity change,
+    // so the body envelope may grow by a few millimeters after collision.
+    // Resolve the final pose using the FINAL velocity, including newly
+    // appearing/returning fish, to prevent rare one-frame glass clipping.
+    const finalSpeed=a.vel.length();
+    const fx=finalSpeed>1e-6?Math.abs(a.vel.x)/finalSpeed:.65;
+    const fz=finalSpeed>1e-6?Math.abs(a.vel.z)/finalSpeed:.65;
+    const mx=Math.min(env.halfW*.82,Math.max(.007,a.scale*(.24+.33*fx)));
+    const mz=Math.min(env.halfD*.82,Math.max(.007,a.scale*(.24+.33*fz)));
+    a.pos.x=THREE.MathUtils.clamp(a.pos.x,-env.halfW+mx,env.halfW-mx);
+    a.pos.z=THREE.MathUtils.clamp(a.pos.z,-env.halfD+mz,env.halfD-mz);
+    a.pos.y=THREE.MathUtils.clamp(a.pos.y,ymin,ymax);
   }
   // Lightweight telemetry for browser QA; does not change simulation state.
   getMovementSnapshot(){
