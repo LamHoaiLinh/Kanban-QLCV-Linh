@@ -4,7 +4,7 @@ const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','preview','
 try{
  for(let i=0;i<100;i++){try{if((await fetch('http://127.0.0.1:4203/')).ok)break}catch{}await new Promise(r=>setTimeout(r,100));}
  browser=await puppeteer.launch({executablePath:chrome,headless:true,args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});const page=await browser.newPage();
- await page.evaluateOnNewDocument(()=>localStorage.setItem('aquarium-v1',JSON.stringify({state:{quality:'medium',config:{name:'Event audit',water:'freshwater',gallons:75,substrate:'sand',background:'natural',lighting:'daylight',dayNight:'night',fish:{'neon-tetra':12,corydoras:6,'zebra-oto':6,'cherry-shrimp':6,'nerite-snail':4,'kuhli-loach':6,angelfish:2,betta:1},fishNames:{},flora:{},decor:['hollow-log','split-log','log-arch']}},version:0})));
+ await page.evaluateOnNewDocument(()=>{let seed=420020;Math.random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};localStorage.setItem('aquarium-v1',JSON.stringify({state:{quality:'medium',config:{name:'Event audit',water:'freshwater',gallons:75,substrate:'sand',background:'natural',lighting:'daylight',dayNight:'night',fish:{'neon-tetra':12,corydoras:6,'zebra-oto':6,'cherry-shrimp':6,'nerite-snail':4,'kuhli-loach':6,angelfish:2,betta:1},fishNames:{},flora:{},decor:['hollow-log','split-log','log-arch']}},version:0}));});
  await page.goto('http://127.0.0.1:4203/?kanban=1&qa=1',{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.__kan42Arrange);
  await page.evaluate(()=>{window.__kan42Pause();window.__kan42Day(.2);});
  const types=await page.evaluate(()=>window.__kanRealismProbe().habitat.types),audit=[];
