@@ -32,7 +32,8 @@ const TAU = Math.PI * 2;
 // Tail-beat frequency derives from actual speed, so the animation slows with it.
 const SPEED_SCALE = 0.30;
 function speciesPace(sp:SpeciesDef):number{
- if(sp.id==='angelfish'||sp.id==='betta')return .78;
+ if(sp.id==='angelfish')return .95;
+ if(sp.id==='betta')return .78;
  if(/pleco|oto|gourami/.test(sp.id))return .82;
  if(/danio|tetra|rasbora|guppy|endler/.test(sp.id))return 1.40;
  return sp.archetype==='schooler'?1.28:1.02;
@@ -839,7 +840,7 @@ export class FishSystem {
     const nocturnal = sp.archetype === 'nocturnal';
     const activity = nocturnal
       ? THREE.MathUtils.lerp(1.15, 0.25, env.dayFactor)
-      : THREE.MathUtils.lerp(0.3, 1.0, env.dayFactor);
+      : THREE.MathUtils.lerp(0.56, 1.0, env.dayFactor);
 
     if(env.ecoMode==='natural'&&env.time>a.nextPeck&&!a.sp.invert&&
       (sp.archetype==='cleaner'||sp.archetype==='bottom'||sp.id==='bristlenose-pleco')){
@@ -995,7 +996,7 @@ export class FishSystem {
     if(sp.id==='guppy')targetSpeed*=1.08;
     if(sp.id==='ocellaris-clown')targetSpeed*=.88;
     if(sp.id==='dwarf-gourami'||sp.id==='honey-gourami')targetSpeed*=.82;
-    if (a.mode === 'rest') targetSpeed = cruise * (angel?.42:.06);
+    if (a.mode === 'rest') targetSpeed = cruise * (angel?.58:.06);
     if(a.mode==='dart')
       targetSpeed=maxSpeed*(sp.id==='betta'?.63:sp.id==='angelfish'?.72:1);
     if(a.mode==='feed'){
