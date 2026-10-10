@@ -42,7 +42,7 @@ try{
     },name);
     await audit('preset '+name);
   }
-  for(let i=0;i<12;i++){
+  for(let i=0;i<30;i++){
     await page.evaluate(()=>{
       const b=[...document.querySelectorAll('.panel button')].find(x=>x.textContent?.includes('Tạo ngẫu nhiên'));
       if(!b)throw Error('Missing random button');
@@ -86,7 +86,7 @@ try{
   if(!['true','false'].includes(food.occluded))throw Error('Missing food depth occlusion: '+JSON.stringify(food));
   if(food.width!==10||food.state!=='sink')throw Error('Food regression: '+JSON.stringify(food));
   if(failures.length)throw Error('JS runtime problems: '+failures.join(' | '));
-  console.log('PASS REALISM 1.0: 6 presets, 12 random tanks, return to nano, glass/rock/foliage bounds, food depth, Vietnamese random name');
+  console.log('PASS REALISM 1.0: 6 presets, 30 random tanks, return to nano, glass/rock/foliage bounds, food depth, Vietnamese random name');
 }catch(err){
   console.error(err);
   process.exitCode=1;
