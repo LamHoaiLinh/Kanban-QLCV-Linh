@@ -108,6 +108,37 @@ function createHollowBark(radius:number,length:number,seed:number):THREE.BufferG
   return geo;
 }
 
+// TubeGeometry provides the curved outer skin but intentionally leaves both
+// terminal cross-sections EMPTY. Seen from a diagonal angle the broken branch
+// seems to have lost half its diameter. Fill both ends in the same geometry,
+// avoiding two extra draw calls per branch.
+function cappedWoodTube(
+  curve:THREE.Curve<THREE.Vector3>,segments:number,radius:number,
+  radialSegments:number,closed=false,
+):THREE.BufferGeometry{
+  const geo=new THREE.TubeGeometry(curve,segments,radius,radialSegments,closed);
+  if(closed)return geo;
+  const pos=Array.from(geo.getAttribute('position').array as Float32Array);
+  const uv=Array.from(geo.getAttribute('uv').array as Float32Array);
+  const indices=Array.from(geo.getIndex()!.array);
+  const start=pos.length/3;
+  const p0=curve.getPoint(0),p1=curve.getPoint(1);
+  pos.push(p0.x,p0.y,p0.z,p1.x,p1.y,p1.z);
+  uv.push(.5,.5,.5,.5);
+  const last=segments*(radialSegments+1);
+  for(let k=0;k<radialSegments;k++){
+    // One cap faces back down the curve, one faces forward.
+    indices.push(start,k,k+1);
+    indices.push(start+1,last+k+1,last+k);
+  }
+  geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  geo.userData.cappedWoodEnds=2;
+  return geo;
+}
+
 export class DecorSystem {
   group = new THREE.Group();
   private materials: THREE.Material[] = [];
@@ -147,7 +178,7 @@ export class DecorSystem {
             new THREE.Vector3(-halfW * 0.3, floorY + dims.height * 0.35, 0),
             new THREE.Vector3(halfW * 0.15, floorY + dims.height * 0.55, halfD * 0.25),
           ]);
-          const bough = new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 0.02 * scale + 0.008, 9), wood);
+          const bough = new THREE.Mesh(cappedWoodTube(curve, 24, 0.02 * scale + 0.008, 9), wood);
           this.group.add(bough);
           for (let b = 0; b < 4; b++) {
             const t0 = 0.17 + b * 0.20;
@@ -158,7 +189,7 @@ export class DecorSystem {
               p0.clone().add(new THREE.Vector3(sign*halfW*.075,dims.height*(.08+.015*b),-sign*halfD*.07)),
               p0.clone().add(new THREE.Vector3(sign*halfW*(.14+.03*b),dims.height*(.13+.01*b),sign*halfD*.20)),
             ]);
-            this.group.add(new THREE.Mesh(new THREE.TubeGeometry(branch, 8, 0.012 * scale + 0.004, 6), wood));
+            this.group.add(new THREE.Mesh(cappedWoodTube(branch, 8, 0.012 * scale + 0.004, 6), wood));
           }
           const mid = curve.getPoint(0.5);
           out.obstacles.push({ pos: mid, radius: 0.1 * scale });
@@ -173,7 +204,7 @@ export class DecorSystem {
           const base = new THREE.Vector3(cx, floorY + 0.01, cz);
           const trunkTop = base.clone().add(new THREE.Vector3(0.02 * scale, dims.height * 0.2, 0.01 * scale));
           this.group.add(new THREE.Mesh(
-            new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
+            cappedWoodTube(new THREE.CatmullRomCurve3([
               base, base.clone().add(new THREE.Vector3(0, dims.height * 0.09, 0)), trunkTop,
             ]), 8, 0.014 * scale + 0.005, 6), wood));
           const spokes = 8;
@@ -187,13 +218,13 @@ export class DecorSystem {
               (trunkTop.x + tip.x) / 2 + Math.cos(ang) * 0.02, (trunkTop.y + tip.y) / 2,
               (trunkTop.z + tip.z) / 2 + Math.sin(ang) * 0.02);
             this.group.add(new THREE.Mesh(
-              new THREE.TubeGeometry(new THREE.CatmullRomCurve3([trunkTop, mid, tip]), 8, 0.007 * scale + 0.002, 5), wood));
+              cappedWoodTube(new THREE.CatmullRomCurve3([trunkTop, mid, tip]), 8, 0.007 * scale + 0.002, 5), wood));
             out.anchors.push(tip);
             if(i%2===0){
               const fork=new THREE.CatmullRomCurve3([
                 mid,mid.clone().add(new THREE.Vector3(.02, h*.08,-.014)),
                 tip.clone().add(new THREE.Vector3(-.025, h*.14,.012))]);
-              this.group.add(new THREE.Mesh(new THREE.TubeGeometry(fork,8,.003*scale+.0015,5),wood));
+              this.group.add(new THREE.Mesh(cappedWoodTube(fork,8,.003*scale+.0015,5),wood));
             }
           }
           out.obstacles.push({ pos: trunkTop.clone(), radius: 0.07 * scale });
@@ -216,7 +247,7 @@ export class DecorSystem {
             const end = new THREE.Vector3(cx + Math.cos(ang) * reach, floorY + 0.008, cz + Math.sin(ang) * reach);
             const mid = new THREE.Vector3((start.x + end.x) / 2, floorY + H * 0.15, (start.z + end.z) / 2);
             this.group.add(new THREE.Mesh(
-              new THREE.TubeGeometry(new THREE.CatmullRomCurve3([start, mid, end]), 8, 0.01 * scale + 0.003, 5), wood));
+              cappedWoodTube(new THREE.CatmullRomCurve3([start, mid, end]), 8, 0.01 * scale + 0.003, 5), wood));
           }
           out.obstacles.push({ pos: stump.position.clone(), radius: R * 1.3 });
           out.shelters.push(new THREE.Vector3(cx, floorY + 0.02, cz + R + 0.03)); // hollow beneath the roots
@@ -294,7 +325,7 @@ export class DecorSystem {
             new THREE.Vector3(cx + foot * 0.4, floorY + rise, cz - lean),
             new THREE.Vector3(cx + foot, floorY + R * 0.9, cz),
           ]);
-          this.group.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 24, roots?R*.8:R, 12, false), wood));
+          this.group.add(new THREE.Mesh(cappedWoodTube(curve, 24, roots?R*.8:R, 12, false), wood));
           if(roots){
             // Smaller intertwined roots give the familiar arch a less regular silhouette.
             for(let i=0;i<3;i++){
@@ -302,7 +333,7 @@ export class DecorSystem {
                 curve.getPoint(.12+i*.12),
                 curve.getPoint(.35+i*.10).add(new THREE.Vector3(0,.012,-.015+i*.012)),
                 curve.getPoint(.72+i*.06)]);
-              this.group.add(new THREE.Mesh(new THREE.TubeGeometry(b,12,R*.16,6,false),wood));
+              this.group.add(new THREE.Mesh(cappedWoodTube(b,12,R*.16,6,false),wood));
             }
           }
           out.obstacles.push({ pos: curve.getPoint(0.06), radius: R * 1.1 }); // footings only,
