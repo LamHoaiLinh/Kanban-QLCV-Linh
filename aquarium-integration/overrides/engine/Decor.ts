@@ -77,14 +77,16 @@ export class DecorSystem {
             new THREE.Vector3(-halfW * 0.3, floorY + dims.height * 0.35, 0),
             new THREE.Vector3(halfW * 0.15, floorY + dims.height * 0.55, halfD * 0.25),
           ]);
-          const bough = new THREE.Mesh(new THREE.TubeGeometry(curve, 16, 0.02 * scale + 0.008, 7), wood);
+          const bough = new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 0.02 * scale + 0.008, 9), wood);
           this.group.add(bough);
-          for (let b = 0; b < 2; b++) {
-            const t0 = 0.35 + b * 0.3;
+          for (let b = 0; b < 4; b++) {
+            const t0 = 0.17 + b * 0.20;
             const p0 = curve.getPoint(t0);
+            const sign=b%2===0?-1:1;
             const branch = new THREE.CatmullRomCurve3([
               p0,
-              p0.clone().add(new THREE.Vector3((b ? 1 : -1) * halfW * 0.2, dims.height * 0.18, (b ? -1 : 1) * halfD * 0.25)),
+              p0.clone().add(new THREE.Vector3(sign*halfW*.075,dims.height*(.08+.015*b),-sign*halfD*.07)),
+              p0.clone().add(new THREE.Vector3(sign*halfW*(.14+.03*b),dims.height*(.13+.01*b),sign*halfD*.20)),
             ]);
             this.group.add(new THREE.Mesh(new THREE.TubeGeometry(branch, 8, 0.012 * scale + 0.004, 6), wood));
           }
@@ -104,7 +106,7 @@ export class DecorSystem {
             new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
               base, base.clone().add(new THREE.Vector3(0, dims.height * 0.09, 0)), trunkTop,
             ]), 8, 0.014 * scale + 0.005, 6), wood));
-          const spokes = 6;
+          const spokes = 8;
           for (let i = 0; i < spokes; i++) {
             // Fan the branches around the trunk, each reaching to a different height.
             const ang = (i / spokes) * Math.PI * 2 + 0.5;
@@ -117,6 +119,12 @@ export class DecorSystem {
             this.group.add(new THREE.Mesh(
               new THREE.TubeGeometry(new THREE.CatmullRomCurve3([trunkTop, mid, tip]), 8, 0.007 * scale + 0.002, 5), wood));
             out.anchors.push(tip);
+            if(i%2===0){
+              const fork=new THREE.CatmullRomCurve3([
+                mid,mid.clone().add(new THREE.Vector3(.02, h*.08,-.014)),
+                tip.clone().add(new THREE.Vector3(-.025, h*.14,.012))]);
+              this.group.add(new THREE.Mesh(new THREE.TubeGeometry(fork,8,.003*scale+.0015,5),wood));
+            }
           }
           out.obstacles.push({ pos: trunkTop.clone(), radius: 0.07 * scale });
           out.shelters.push(base.clone().add(new THREE.Vector3(0, 0.02, 0.03)));
@@ -130,7 +138,7 @@ export class DecorSystem {
           const stump = new THREE.Mesh(displace(new THREE.CylinderGeometry(R * 0.85, R, H, 10, 2), 0.12, 3), wood);
           stump.position.set(cx, floorY + H / 2, cz);
           this.group.add(stump);
-          const roots = 5;
+          const roots = 7;
           for (let i = 0; i < roots; i++) {
             const ang = (i / roots) * Math.PI * 2 + 0.3;
             const reach = R + 0.08 * scale + 0.03;
@@ -152,7 +160,9 @@ export class DecorSystem {
           const wood = this.mat({ map: woodTexture(), color: split?'#584530':'#7a5c3a', roughness: 0.96, side: THREE.DoubleSide });
           const R = (split?.072:.06) * scale + 0.03, len = (split?.34:.26) * scale + 0.08;
           const cx = halfW * (split?-.06:.1), cz = halfD * (split?-.3:.2);
-          const log = new THREE.Mesh(new THREE.CylinderGeometry(R, R * 1.05, len, 14, 1, true), wood);
+          const bark=displace(new THREE.CylinderGeometry(R,R*1.05,len,20,5,true),
+            split?.075:.045,split?3.4:2.2);
+          const log = new THREE.Mesh(bark, wood);
           log.rotation.z = Math.PI / 2; // lay the length along X
           log.rotation.y = 0.2;         // slight angle so it doesn't read as a pipe
           log.position.set(cx, floorY + R * 0.85, cz);
