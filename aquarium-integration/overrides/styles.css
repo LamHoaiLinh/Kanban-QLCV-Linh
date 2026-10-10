@@ -298,3 +298,13 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .kanban-aquarium-feed-count{font-size:10px;color:#a9d8cf}
 @media(max-width:1050px){.kanban-aquarium-stock{top:51px;left:9px}.kanban-aquarium-help{font-size:10px}}
 @media(max-width:650px){.kanban-aquarium-stock{top:46px;left:5px;padding:3px 6px;max-width:96%;font-size:10px}.kanban-aquarium-stock button{width:28px;height:28px}}
+
+/* KanAquarium 1.2 - food projected into a crisp DOM layer; sizes deliberately
+   smaller than the mouth of medium-sized fish, never full fish-body size. */
+.kan-food-layer{position:absolute;inset:0;width:100%;height:100%;overflow:hidden;pointer-events:none;z-index:8;contain:layout style}
+.kan-food-item{position:absolute;left:0;top:0;pointer-events:none;display:grid;place-items:center;will-change:transform;box-sizing:border-box}
+.kan-food-pellet{width:5px;height:5px;border-radius:50%;background:#e6ae59;border:1px solid #fff1c1;box-shadow:0 0 2px 1px #fff2bb99,0 0 5px #ffc26b88}
+.kan-food-pellet:nth-child(3n){background:#97d77d;border-color:#e8ffd9;box-shadow:0 0 3px #aaff9999}
+.kan-food-cookie{width:10px;height:10px;filter:drop-shadow(0 0 2px #ffe6b5)}
+.kan-food-cookie img{display:block;width:100%;height:100%;object-fit:contain}
+@media(max-width:700px){.kan-food-pellet{width:5px;height:5px}.kan-food-cookie{width:9px;height:9px}}
