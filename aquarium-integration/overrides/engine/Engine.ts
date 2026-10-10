@@ -158,7 +158,7 @@ export class Engine {
         __kan42Pause:()=>this.enableExternalDrive(),
         __kan42EcoMode:(mode:EcoMode)=>this.setEcoMode(mode),
         __kan42Scene:(patch:Partial<TankConfig>)=>{if(this.config)this.applyConfig({...this.config,...patch});},
-        __kan42Action:(key:string,action:'peck'|'dash',roll=.25)=>this.fish.qaAction(key,action,this.simEnv,roll),
+        __kan42Action:(key:string,action:'peck'|'dash',roll=.25,surface?:string)=>this.fish.qaAction(key,action,this.simEnv,roll,surface),
         __kan42Event:(type:Parameters<FishSystem['qaHabitat']>[0])=>this.fish.qaHabitat(type,this.simEnv),
         __kan42Probe:()=>({telemetry:this.fish.getTelemetry(),camera:this.rig.snapshot(),stats:{...this.stats},
           physics:this.fish.getPhysicsSnapshot(this.simEnv),config:this.config,quality:this.quality.tier,
@@ -405,7 +405,12 @@ export class Engine {
         const normal=hit.face.normal.clone().applyNormalMatrix(new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld));
         if(normal.dot(direction)>0)normal.negate();
         const inFlora=this.flora.group.children.some(o=>o===hit.object||o.children.includes(hit.object));
-        return {point:hit.point.clone(),normal,surface:inFlora?'plant':'wood'};
+        const mesh=hit.object as THREE.Mesh,vertices=mesh.geometry.getAttribute('position');
+        const a=new THREE.Vector3().fromBufferAttribute(vertices,hit.face.a).applyMatrix4(mesh.matrixWorld);
+        const b=new THREE.Vector3().fromBufferAttribute(vertices,hit.face.b).applyMatrix4(mesh.matrixWorld);
+        const c=new THREE.Vector3().fromBufferAttribute(vertices,hit.face.c).applyMatrix4(mesh.matrixWorld);
+        const area=b.sub(a).cross(c.sub(a)).length()*.5;
+        return {point:hit.point.clone(),normal,surface:inFlora?'plant':'wood',area};
       };
       this.simEnv.shelters = decorOut.shelters;
       this.simEnv.tunnels = decorOut.tunnels;

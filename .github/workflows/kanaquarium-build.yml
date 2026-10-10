@@ -110,6 +110,11 @@ jobs:
           cp aquarium-integration/tests/realism42-events-smoke.mjs _aquarium-build/realism42-events-smoke.mjs
           cd _aquarium-build
           node realism42-events-smoke.mjs
+      - name: Realism 4.2 - real glass, wood and leaf peck surfaces
+        run: |
+          cp aquarium-integration/tests/realism42-surfaces-smoke.mjs _aquarium-build/realism42-surfaces-smoke.mjs
+          cd _aquarium-build
+          node realism42-surfaces-smoke.mjs
       - name: Realism 4.2 - 100 fish, resizing, peck, breach and camera gestures
         run: |
           cp aquarium-integration/tests/realism42-smoke.mjs _aquarium-build/realism42-smoke.mjs
@@ -124,6 +129,7 @@ jobs:
             _aquarium-build/realism42-*.png
             _aquarium-build/realism42-report.json
             _aquarium-build/realism42-event-audit.json
+            _aquarium-build/realism42-surfaces-review.json
           if-no-files-found: ignore
           retention-days: 30
       - name: Commit compiled game into site

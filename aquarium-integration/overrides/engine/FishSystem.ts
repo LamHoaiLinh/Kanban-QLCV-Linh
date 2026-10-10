@@ -58,7 +58,7 @@ export interface SimEnv {
   ecoComfort?:number; // gentle environmental modulation, never mortality
   obstacles: { pos: THREE.Vector3; radius: number; surface?:'wood'|'plant' }[]; // decor/coral keep-out spheres
   shelters: THREE.Vector3[];                            // hiding spots (decor)
-  sampleSurface?:(from:THREE.Vector3,toward:THREE.Vector3)=>{point:THREE.Vector3;normal:THREE.Vector3;surface:string}|null;
+  sampleSurface?:(from:THREE.Vector3,toward:THREE.Vector3)=>{point:THREE.Vector3;normal:THREE.Vector3;surface:string;area?:number}|null;
   tunnels: SwimTunnel[]; // open corridors exported from the physical wood geometry
 }
 
@@ -231,9 +231,9 @@ export class FishSystem {
     history:a.history,peck:a.peck?{stage:a.peck.stage,t:a.peck.t,hz:a.peck.hz,beats:a.peck.beats,surface:a.peck.surface}:null,
     jump:a.jump?{...a.jump}:null,jaw:a.jaw
   })))};}
-  qaAction(key:string,action:'peck'|'dash',env:SimEnv,roll=.25){
+  qaAction(key:string,action:'peck'|'dash',env:SimEnv,roll=.25,surface?:string){
     const a=this.findByKey(key)?.agent;if(!a)return false;
-    return action==='peck'?this.startPeck(a,env):this.startDash(a,env,roll,true);
+    return action==='peck'?this.startPeck(a,env,surface):this.startDash(a,env,roll,true);
   }
   updateLod(camera:THREE.PerspectiveCamera,viewportHeight:number):void{
     for(const p of this.populations){
@@ -736,17 +736,18 @@ export class FishSystem {
     }
     if(j.t>7){a.jump=undefined;a.mode='cruise';}return true;
   }
-  private startPeck(a:Agent,env:SimEnv):boolean{
+  private startPeck(a:Agent,env:SimEnv,preferredSurface?:string):boolean{
     if(a.peck||a.jump||isCrawler(a.sp)||a.sp.invert||(!['bottom','cleaner'].includes(a.sp.archetype)&&a.sp.id!=='bristlenose-pleco'))return false;
     const patches:Array<{point:THREE.Vector3;normal:THREE.Vector3;surface:string}>=[];
     for(const ob of env.obstacles){
       if(ob.radius<a.scale*.30||a.pos.distanceTo(ob.pos)>.35)continue;
       const real=env.sampleSurface?.(a.pos,ob.pos);
-      if(real&&real.normal.lengthSq()>.5)patches.push(real);
+      if(real&&real.normal.lengthSq()>.5&&(real.surface!=='plant'||(real.area??0)>=a.scale*a.scale*.005))patches.push(real);
     }
     for(const side of [-1,1])patches.push({point:new THREE.Vector3(side*env.halfW,a.pos.y,a.pos.z),normal:new THREE.Vector3(-side,0,0),surface:'glass'});
     patches.sort((x,y)=>a.pos.distanceToSquared(x.point)-a.pos.distanceToSquared(y.point));
     for(const p of patches){
+      if(preferredSurface&&p.surface!==preferredSurface)continue;
       if(a.pos.distanceTo(p.point)>.28)continue;
       const at=p.point.clone().addScaledVector(p.normal,a.scale*.55+.004);
       const key=p.surface+':'+p.point.toArray().map(v=>Math.round(v/.06)).join(':');
