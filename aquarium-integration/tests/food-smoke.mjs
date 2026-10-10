@@ -77,7 +77,7 @@ try{
     }));
     throw Error('Panel failed to open: '+JSON.stringify(debug));
   }
-  const tabs=await page.$eval('.panel .tabs button',a=>a.map(x=>x.textContent?.trim()));
+  const tabs=await page.$$eval('.panel .tabs button',a=>a.map(x=>x.textContent?.trim()));
   for(const name of ['Bể','Cá','Cây','Trang trí','Đã lưu','Cài đặt']){
     if(!tabs.includes(name))throw Error('Control tab not translated: '+name+'; got '+JSON.stringify(tabs));
   }
