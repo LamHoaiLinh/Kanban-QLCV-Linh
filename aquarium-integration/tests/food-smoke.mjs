@@ -25,6 +25,19 @@ try{
   let target=await canvas.boundingBox();
   if(!target)throw Error('Canvas has no box');
   // Coordinates purposely in lower-middle glass: formerly disappeared.
+  // Verify that food is born in 'sink' rather than waiting 1-2 seconds in 'float'.
+  await page.mouse.click(target.x+target.width*.43,target.y+target.height*.60);
+  await page.waitForSelector('.kan-food-item');
+  await page.waitForFunction(()=>document.querySelector('.kan-food-item')?.dataset.foodState==='sink',{timeout:6000});
+  const firstState=await page.$eval('.kan-food-item',el=>el.dataset.foodState);
+  if(firstState!=='sink')throw Error('Food did not enter falling state immediately: '+firstState);
+  // Refresh page to reset the feed counter before verifying the 10th rare cookie.
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.waitForSelector('#kan-food-layer');
+  await page.waitForFunction(()=>!!document.querySelector('#canvas-host canvas'));
+  await new Promise(r=>setTimeout(r,1300));
+  target=await (await page.$('#canvas-host canvas')).boundingBox();
+  if(!target)throw Error('Canvas disappeared after reload');
   for(let k=1;k<=10;k++){
     await page.mouse.click(target.x+target.width*(.33+(k%3)*.08),target.y+target.height*.60);
     const needed=k;
@@ -38,13 +51,40 @@ try{
       });
       if(check.length<k)throw Error('Food indicators absent despite feeding; '+JSON.stringify(check));
       for(const item of check){
-        if(item.w<3||item.w>12)throw Error('Food size invalid '+JSON.stringify(item));
+        if((item.kind==='normal'&&item.w!==10)||(item.kind!=='normal'&&item.w!==25))throw Error('Food size invalid '+JSON.stringify(item));
         if(item.visible!=='visible'||item.opacity==='0')throw Error('Food is hidden: '+JSON.stringify(item));
         if(item.left<0||item.left>1280||item.top<0||item.top>800)throw Error('Food outside viewport '+JSON.stringify(item));
       }
       if(k===10&&!check.some(v=>v.kind==='fish-cookie'))throw Error('10th click cookie not drawn');
     }
   }
+  // Regression: all six control tabs and representative translations render in Chromium.
+  // A fixed aquarium overlay can obscure the top-left button in headless rendering;
+  // dispatch click directly to the control, as if activated by keyboard.
+  const opened=await page.evaluate(()=>{
+    const btn=document.querySelector('.open-panel');
+    if(!btn)return false;
+    btn.click();
+    return true;
+  });
+  if(!opened)throw Error('Tank control open button not found');
+  try{await page.waitForSelector('.panel',{timeout:8000});}
+  catch(error){
+    const debug=await page.evaluate(()=>({url:location.href,
+      openButtons:document.querySelectorAll('.open-panel').length,
+      panels:document.querySelectorAll('.panel').length,
+      bodyText:document.body.innerText.slice(0,550)
+    }));
+    throw Error('Panel failed to open: '+JSON.stringify(debug));
+  }
+  const tabs=await page.$$eval('.panel .tabs button',a=>a.map(x=>x.textContent?.trim()));
+  for(const name of ['Bể','Cá','Cây','Trang trí','Đã lưu','Cài đặt']){
+    if(!tabs.includes(name))throw Error('Control tab not translated: '+name+'; got '+JSON.stringify(tabs));
+  }
+  for(const [tab,expected] of [['Bể','Nền đáy'],['Cá','Tìm cá theo tên'],['Cây','Dương xỉ Java'],['Trang trí','Đá và lũa'],['Đã lưu','Lưu hồ hiện tại'],['Cài đặt','Chất lượng đồ họa']]){
+    await page.evaluate(name=>{[...document.querySelectorAll('.panel .tabs button')].find(x=>x.textContent?.trim()===name)?.click()},tab);
+    await page.waitForFunction(s=>document.querySelector('.panel .panel-body')?.textContent?.includes(s)||document.querySelector('.panel .panel-body input')?.getAttribute('placeholder')?.includes(s),{timeout:5000},expected);
+  }
   const counter=await page.evaluate(()=>document.querySelector('.kanban-aquarium-feed-count')?.textContent);
-  console.log('PASS: 10 consecutive clicks; pellets visible; 10th fish cookie; sizes 5px/10px; counter='+counter);
+  console.log('PASS: immediate sink; 10px pellets/25px cookies; 10th cookie; six Vietnamese control tabs; counter='+counter);
 }catch(e){console.error(e);process.exitCode=1}finally{await browser?.close();server.kill('SIGTERM')}

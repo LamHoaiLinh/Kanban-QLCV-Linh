@@ -454,6 +454,8 @@ export class Engine {
       const py=sy*bounds.height;
       icon.style.transform='translate3d('+px.toFixed(1)+'px,'+py.toFixed(1)+'px,0) translate(-50%,-50%)';
       icon.style.opacity='1';
+      icon.dataset.worldY=bit.pos.y.toFixed(5);
+      icon.dataset.foodState=bit.state;
     }
     for(const [bit,element] of this.foodElements){
       if(active.has(bit))continue;
