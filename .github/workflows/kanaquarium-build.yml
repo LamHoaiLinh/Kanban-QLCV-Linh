@@ -120,6 +120,15 @@ jobs:
           cp aquarium-integration/tests/realism42-smoke.mjs _aquarium-build/realism42-smoke.mjs
           cd _aquarium-build
           node realism42-smoke.mjs
+      - name: Record Realism 4.2 review videos and screenshots
+        run: |
+          if ! command -v ffmpeg; then
+            sudo apt-get update -qq
+            sudo apt-get install -y ffmpeg
+          fi
+          cp aquarium-integration/tests/realism42-capture.mjs _aquarium-build/realism42-capture.mjs
+          cd _aquarium-build
+          node realism42-capture.mjs
       - name: Preserve Realism 4.2 evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -127,6 +136,7 @@ jobs:
           name: realism42-review
           path: |
             _aquarium-build/realism42-*.png
+            _aquarium-build/review42/**
             _aquarium-build/realism42-report.json
             _aquarium-build/realism42-event-audit.json
             _aquarium-build/realism42-surfaces-review.json
@@ -141,7 +151,9 @@ jobs:
           printf 'Base project: https://github.com/jamisonhill/aquarium\nLicense: MIT (see upstream LICENSES.md)\nCustomized for KanBan.\n' > aquarium-game/LICENSE_SOURCE.txt
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add aquarium-game
+          mkdir -p aquarium-review
+          cp -r _aquarium-build/review42/. aquarium-review/
+          git add aquarium-game aquarium-review
           if ! git diff --cached --quiet; then
             git commit -m "build: compile KanAquarium 3D for GitHub Pages"
             git push
