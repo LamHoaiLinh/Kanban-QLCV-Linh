@@ -1,7 +1,7 @@
 name: Build KanAquarium 3D
 on:
   push:
-    branches: [kanaquarium-3d-integration, kanaquarium-food-drop-fix, kanaquarium-visible-food-test, kanaquarium-vietnamese-food-v13, kanaquarium-auto-panel-alt-h-v14, kanaquarium-realism1-physics, kanaquarium-realism2-lifelike, kanaquarium-realism2-wall-hotfix, kanaquarium-realism3-ecosystem, kanaquarium-food-3d-click-depth, main]
+    branches: [kanaquarium-3d-integration, kanaquarium-food-drop-fix, kanaquarium-visible-food-test, kanaquarium-vietnamese-food-v13, kanaquarium-auto-panel-alt-h-v14, kanaquarium-realism1-physics, kanaquarium-realism2-lifelike, kanaquarium-realism2-wall-hotfix, kanaquarium-realism3-ecosystem, kanaquarium-food-3d-click-depth, kanaquarium-realism4-fins-habitats, main]
     paths:
       - '.github/workflows/kanaquarium-build.yml'
       - 'aquarium-integration/**'
