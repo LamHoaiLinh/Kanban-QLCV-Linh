@@ -171,6 +171,7 @@ export class Engine {
         name:this.config?.name,
         fish:this.fish.getPhysicsSnapshot(this.simEnv),
         habitat:this.fish.getHabitatSnapshot(this.simEnv),
+        hardscape:this.decor.getVisualGeometrySnapshot(),
         fins:this.fish.getFinSnapshot(),
         flora:this.flora.getContainmentSnapshot(this.dims),
         obstacles:this.simEnv.obstacles.length,
