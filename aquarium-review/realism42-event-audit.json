@@ -1,0 +1,162 @@
+[
+  {
+    "type": "wood-approach",
+    "started": true,
+    "actors": 1,
+    "finite": true,
+    "peakTravel": 0.41653587628905886,
+    "ended": true
+  },
+  {
+    "type": "cave-inspect",
+    "started": true,
+    "actors": 1,
+    "finite": true,
+    "peakTravel": 0.3748998332285239,
+    "ended": true
+  },
+  {
+    "type": "cave-through",
+    "started": true,
+    "actors": 1,
+    "finite": true,
+    "peakTravel": 0.4587941530845076,
+    "ended": true
+  },
+  {
+    "type": "wood-interior-graze",
+    "started": true,
+    "actors": 1,
+    "finite": true,
+    "peakTravel": 0.255849424922892,
+    "ended": true
+  },
+  {
+    "type": "cave-rest",
+    "started": true,
+    "actors": 1,
+    "finite": true,
+    "peakTravel": 0.33983266498682946,
+    "ended": true
+  },
+  {
+    "type": "second-visitor",
+    "started": true,
+    "actors": 2,
+    "finite": true,
+    "peakTravel": 0.4326284152976255,
+    "ended": true
+  },
+  {
+    "type": "cave-jostle",
+    "started": true,
+    "actors": 2,
+    "finite": true,
+    "peakTravel": 0.3634650502408941,
+    "ended": true
+  },
+  {
+    "type": "territory-display",
+    "started": true,
+    "actors": 1,
+    "finite": true,
+    "peakTravel": 0.2929792955937605,
+    "ended": true
+  },
+  {
+    "type": "brief-chase",
+    "started": true,
+    "actors": 2,
+    "finite": true,
+    "peakTravel": 0.23239388139860878,
+    "ended": true
+  },
+  {
+    "type": "nip-and-dodge",
+    "started": true,
+    "actors": 2,
+    "finite": true,
+    "peakTravel": 0.42004332932338134,
+    "ended": true
+  },
+  {
+    "type": "school-scout",
+    "started": true,
+    "actors": 1,
+    "finite": true,
+    "peakTravel": 0.10054817027804176,
+    "ended": true
+  },
+  {
+    "type": "school-rejoin",
+    "started": true,
+    "actors": 1,
+    "finite": true,
+    "peakTravel": 0.23762426966642666,
+    "ended": true
+  },
+  {
+    "type": "school-startle",
+    "started": true,
+    "actors": 4,
+    "finite": true,
+    "peakTravel": 0.3089917353815877,
+    "ended": true
+  },
+  {
+    "type": "school-split",
+    "started": true,
+    "actors": 4,
+    "finite": true,
+    "peakTravel": 0.2643673011720339,
+    "ended": true
+  },
+  {
+    "type": "yield-to-large",
+    "started": true,
+    "actors": 1,
+    "finite": true,
+    "peakTravel": 0.3411816129818662,
+    "ended": true
+  },
+  {
+    "type": "wood-graze",
+    "started": true,
+    "actors": 1,
+    "finite": true,
+    "peakTravel": 0.5053449142878824,
+    "ended": true
+  },
+  {
+    "type": "shrimp-root-forage",
+    "started": true,
+    "actors": 1,
+    "finite": true,
+    "peakTravel": 0.10771831872511207,
+    "ended": true
+  },
+  {
+    "type": "snail-film-graze",
+    "started": true,
+    "actors": 1,
+    "finite": true,
+    "peakTravel": 0.0339304255153212,
+    "ended": true
+  },
+  {
+    "type": "bottom-crumbs",
+    "started": true,
+    "actors": 1,
+    "finite": true,
+    "peakTravel": 0.10286370201072922,
+    "ended": true
+  },
+  {
+    "type": "shade-retreat",
+    "started": true,
+    "actors": 1,
+    "finite": true,
+    "peakTravel": 0.33569232004953514,
+    "ended": true
+  }
+]

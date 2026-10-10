@@ -1,0 +1,59 @@
+[
+  {
+    "surface": "glass",
+    "actor": "corydoras:2",
+    "states": [
+      "approach",
+      "inspect",
+      "burst",
+      "withdraw"
+    ],
+    "burst": {
+      "stage": "burst",
+      "t": 0,
+      "hz": 4.4677435252815485,
+      "beats": 8,
+      "surface": "glass"
+    },
+    "overlap": 0,
+    "walls": 0
+  },
+  {
+    "surface": "wood",
+    "actor": "corydoras:0",
+    "states": [
+      "approach",
+      "inspect",
+      "burst",
+      "withdraw"
+    ],
+    "burst": {
+      "stage": "burst",
+      "t": 0,
+      "hz": 4.114220721647143,
+      "beats": 3,
+      "surface": "wood"
+    },
+    "overlap": 0,
+    "walls": 0
+  },
+  {
+    "surface": "plant",
+    "actor": "corydoras:1",
+    "states": [
+      "approach",
+      "inspect",
+      "burst",
+      "withdraw"
+    ],
+    "burst": {
+      "stage": "burst",
+      "t": 0,
+      "hz": 6.492190839722753,
+      "beats": 7,
+      "surface": "plant"
+    },
+    "overlap": 0,
+    "walls": 0
+  }
+]

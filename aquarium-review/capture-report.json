@@ -1,0 +1,301 @@
+{
+  "sourceCommit": "505cdfaf2eb09401b4921e2b121cc0600be97b62",
+  "run": "38051981811",
+  "natural": [
+    {
+      "elapsedSeconds": 30.675,
+      "count": 100,
+      "physics": {
+        "fish": 98,
+        "wallViolations": 0,
+        "solidOverlaps": 0,
+        "maxOverlap": 0
+      },
+      "stats": {
+        "fps": 60,
+        "drawCalls": 63,
+        "triangles": 158744,
+        "fishCount": 100,
+        "frameP50Ms": 16.7,
+        "frameP95Ms": 16.7,
+        "geometries": 42,
+        "textures": 15
+      },
+      "camera": {
+        "mode": "cinematic",
+        "shot": null,
+        "target": [
+          0,
+          0.29551406367739136,
+          0
+        ],
+        "radius": 2.3054222490587533,
+        "manualTravel": 0,
+        "pan": false,
+        "log": []
+      }
+    },
+    {
+      "elapsedSeconds": 60.686,
+      "count": 100,
+      "physics": {
+        "fish": 98,
+        "wallViolations": 0,
+        "solidOverlaps": 0,
+        "maxOverlap": 0
+      },
+      "stats": {
+        "fps": 2,
+        "drawCalls": 63,
+        "triangles": 158744,
+        "fishCount": 100,
+        "frameP50Ms": 557.0999999999767,
+        "frameP95Ms": 1135.5,
+        "geometries": 42,
+        "textures": 15
+      },
+      "camera": {
+        "mode": "cinematic",
+        "shot": null,
+        "target": [
+          0,
+          0.29551406367739136,
+          0
+        ],
+        "radius": 2.3050124194902017,
+        "manualTravel": 0,
+        "pan": false,
+        "log": []
+      }
+    },
+    {
+      "elapsedSeconds": 90.695,
+      "count": 100,
+      "physics": {
+        "fish": 98,
+        "wallViolations": 0,
+        "solidOverlaps": 0,
+        "maxOverlap": 0
+      },
+      "stats": {
+        "fps": 2,
+        "drawCalls": 63,
+        "triangles": 158744,
+        "fishCount": 100,
+        "frameP50Ms": 571.3999999999069,
+        "frameP95Ms": 1124.5,
+        "geometries": 42,
+        "textures": 15
+      },
+      "camera": {
+        "mode": "cinematic",
+        "shot": "school-scout",
+        "target": [
+          -0.1398050113754432,
+          0.37887849013860614,
+          -0.03733714789008192
+        ],
+        "radius": 1.6342812061676106,
+        "manualTravel": 0,
+        "pan": false,
+        "log": [
+          {
+            "time": 14.076799999999897,
+            "type": "school-scout",
+            "reason": "live actors, novelty and clear line of sight"
+          }
+        ]
+      }
+    },
+    {
+      "elapsedSeconds": 120.711,
+      "count": 100,
+      "physics": {
+        "fish": 98,
+        "wallViolations": 0,
+        "solidOverlaps": 0,
+        "maxOverlap": 0
+      },
+      "stats": {
+        "fps": 1,
+        "drawCalls": 63,
+        "triangles": 158744,
+        "fishCount": 100,
+        "frameP50Ms": 584.2000000000698,
+        "frameP95Ms": 1712.5999999998603,
+        "geometries": 42,
+        "textures": 15
+      },
+      "camera": {
+        "mode": "cinematic",
+        "shot": "school-scout",
+        "target": [
+          -0.08045775483132839,
+          0.3708910285855825,
+          0.03658136741263418
+        ],
+        "radius": 1.395141493493211,
+        "manualTravel": 0,
+        "pan": false,
+        "log": [
+          {
+            "time": 14.076799999999897,
+            "type": "school-scout",
+            "reason": "live actors, novelty and clear line of sight"
+          }
+        ]
+      }
+    },
+    {
+      "elapsedSeconds": 150.718,
+      "count": 100,
+      "physics": {
+        "fish": 98,
+        "wallViolations": 0,
+        "solidOverlaps": 0,
+        "maxOverlap": 0
+      },
+      "stats": {
+        "fps": 1,
+        "drawCalls": 63,
+        "triangles": 158744,
+        "fishCount": 100,
+        "frameP50Ms": 584.2000000000698,
+        "frameP95Ms": 1712.5999999998603,
+        "geometries": 42,
+        "textures": 15
+      },
+      "camera": {
+        "mode": "cinematic",
+        "shot": "school-scout",
+        "target": [
+          0.03541220681384795,
+          0.361902279348674,
+          0.03612524519011705
+        ],
+        "radius": 1.3837933506211963,
+        "manualTravel": 0,
+        "pan": false,
+        "log": [
+          {
+            "time": 14.076799999999897,
+            "type": "school-scout",
+            "reason": "live actors, novelty and clear line of sight"
+          }
+        ]
+      }
+    },
+    {
+      "elapsedSeconds": 180.731,
+      "count": 100,
+      "physics": {
+        "fish": 98,
+        "wallViolations": 0,
+        "solidOverlaps": 0,
+        "maxOverlap": 0
+      },
+      "stats": {
+        "fps": 1,
+        "drawCalls": 63,
+        "triangles": 158744,
+        "fishCount": 100,
+        "frameP50Ms": 967.2999999998137,
+        "frameP95Ms": 1941,
+        "geometries": 42,
+        "textures": 15
+      },
+      "camera": {
+        "mode": "cinematic",
+        "shot": "school-scout",
+        "target": [
+          0.11881311090459695,
+          0.3354731616745636,
+          0.0029534265236873156
+        ],
+        "radius": 1.3830379195751203,
+        "manualTravel": 0,
+        "pan": false,
+        "log": [
+          {
+            "time": 14.076799999999897,
+            "type": "school-scout",
+            "reason": "live actors, novelty and clear line of sight"
+          }
+        ]
+      }
+    }
+  ],
+  "fixtures": [
+    {
+      "type": "fin-comparison",
+      "species": "angelfish"
+    },
+    {
+      "type": "fin-comparison",
+      "species": "betta"
+    },
+    {
+      "type": "fin-comparison",
+      "species": "guppy"
+    },
+    {
+      "type": "fin-comparison",
+      "species": "neon-tetra"
+    },
+    {
+      "type": "fin-comparison",
+      "species": "corydoras"
+    },
+    {
+      "type": "angelfish-motion",
+      "seconds": 15
+    },
+    {
+      "type": "peck",
+      "key": "corydoras:0",
+      "settings": {
+        "stage": "burst",
+        "t": 0,
+        "hz": 7.189555624499917,
+        "beats": 3,
+        "surface": "glass"
+      },
+      "phases": [
+        "burst",
+        "withdraw",
+        "cruise"
+      ],
+      "playback": "5x slow motion"
+    },
+    {
+      "type": "jump-return",
+      "above": true,
+      "splashes": 1,
+      "returned": true
+    },
+    {
+      "type": "mobile-touch",
+      "camera": {
+        "mode": "orbit",
+        "shot": null,
+        "target": [
+          -0.09743828399627145,
+          0.28806731292318977,
+          -0.0066563581075466055
+        ],
+        "radius": 1.9427908061311734,
+        "manualTravel": 109.50844619618641,
+        "pan": true,
+        "log": []
+      },
+      "foodBefore": 0,
+      "foodAfter": 0
+    }
+  ],
+  "limitations": [
+    "Software-rendered Chromium; desktop 60 FPS and physical-phone 30 FPS are not certified.",
+    "Natural video has no forced actions; close-up clips use explicit QA fixtures."
+  ],
+  "naturalWallSeconds": 781.191,
+  "pageErrors": []
+}

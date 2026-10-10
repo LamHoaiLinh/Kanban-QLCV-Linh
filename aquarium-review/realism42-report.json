@@ -1,0 +1,27 @@
+{
+  "checks": [
+    "100 fish / 30 simulated minutes, boundaries, solid collisions, finite poses, stuck recovery",
+    "20 shrink/grow cycles, no NaN, named metadata retained, no automatic respawn",
+    "save/load/resize/undo, durable saved snapshot unchanged",
+    "low quality render cap never edits durable stock",
+    "conditional jump 50/100, 50 splashes, every actor returns",
+    "approach, inspect, 3–8 quick pecks / 4–8Hz, withdraw, cruise",
+    "at least five real actor routes selected by event camera",
+    "Shift pan/click suppresses feed, twenty drags stay bounded, manual takeover",
+    "two touch pointers pan/pinch and 1/2/1 transition",
+    "no page errors or invalid shader state"
+  ],
+  "performance": [],
+  "events": [
+    "wood-approach",
+    "cave-inspect",
+    "cave-through",
+    "school-scout",
+    "school-rejoin",
+    "school-split",
+    "bottom-crumbs",
+    "territory-display",
+    "brief-chase",
+    "wood-graze"
+  ]
+}
