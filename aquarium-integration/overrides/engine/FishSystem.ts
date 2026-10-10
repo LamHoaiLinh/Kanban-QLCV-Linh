@@ -205,6 +205,17 @@ export class FishSystem {
     flexible:[...Array(p.mesh.geometry.getAttribute('aFinFlex').count).keys()].filter(i=>
       p.mesh.geometry.getAttribute('aFinFlex').getX(i)>.001).length,
     mouth:[...p.agents].map(a=>a.jaw)}));}
+  getAngelfishMotionSnapshot(env:SimEnv){
+    return this.populations.filter(p=>p.sp.id==='angelfish').flatMap(p=>
+      p.agents.filter(a=>!a.drop).map(a=>({
+        key:a.key,
+        pos:a.pos.toArray(),vel:a.vel.toArray(),speed:a.vel.length(),
+        mode:a.mode,yaw:a.prevYaw,pitch:a.prevPitch,
+        stuckTime:a.stuckTime,finClearance:this.verticalClearance(a,env),
+        anchor:a.anchor.toArray()
+      }))
+    );
+  }
   private pendingDrop:{x:number;z:number}|null=null;
   private splashes:Array<{mesh:THREE.Mesh<THREE.RingGeometry,THREE.MeshBasicMaterial>;age:number}>=[];
   // Soft spherical keep-out zones approximate rocks, wood trunks and larger corals.
