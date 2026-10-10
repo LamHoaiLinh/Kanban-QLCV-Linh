@@ -179,6 +179,18 @@ export class FishSystem {
   populations: Population[] = [];
   private feedTimer = 0;   // seconds of "the fish are hungry/excited" remaining
   private habitat = new HabitatDirector();
+  private softFinsOn=true;
+  setSoftFins(on:boolean):void{
+    this.softFinsOn=on;
+    for(const p of this.populations){
+      const asset=getFishAsset(p.sp);
+      asset.uniforms.uFinSoftness.value=this.finSoftness(p.sp);
+    }
+  }
+  private finSoftness(sp:SpeciesDef):number{
+    return !this.softFinsOn||sp.invert||sp.shape.eelLike?0:
+      sp.shape.finLong?.034:.010;
+  }
   resetHabitat():void{this.habitat.reset();}
   getHabitatSnapshot(env:SimEnv){return this.habitat.snapshot(env);}
   getFinSnapshot(){return this.populations.map(p=>({id:p.sp.id,
@@ -386,6 +398,7 @@ export class FishSystem {
       if (!sp || rawCount <= 0) continue;
       const count = Math.max(1, Math.round(rawCount * scale));
       const asset = getFishAsset(sp);
+      asset.uniforms.uFinSoftness.value=this.finSoftness(sp);
       const mesh = new THREE.InstancedMesh(asset.geometry, asset.materials, count);
       mesh.frustumCulled = false; // fish roam the whole tank; skip per-instance culling
       mesh.userData.speciesId = id;
