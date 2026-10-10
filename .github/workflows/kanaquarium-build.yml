@@ -1,7 +1,7 @@
 name: Build KanAquarium 3D
 on:
   push:
-    branches: [kanaquarium-3d-integration, kanaquarium-food-drop-fix, kanaquarium-visible-food-test, kanaquarium-vietnamese-food-v13, kanaquarium-auto-panel-alt-h-v14, main]
+    branches: [kanaquarium-3d-integration, kanaquarium-food-drop-fix, kanaquarium-visible-food-test, kanaquarium-vietnamese-food-v13, kanaquarium-auto-panel-alt-h-v14, kanaquarium-realism1-physics, main]
     paths:
       - '.github/workflows/kanaquarium-build.yml'
       - 'aquarium-integration/**'
@@ -48,6 +48,11 @@ jobs:
           cp aquarium-integration/tests/food-smoke.mjs _aquarium-build/food-smoke.mjs
           cd _aquarium-build
           node food-smoke.mjs
+      - name: Browser realism regression - tank bounds, plants, food depth
+        run: |
+          cp aquarium-integration/tests/realism-smoke.mjs _aquarium-build/realism-smoke.mjs
+          cd _aquarium-build
+          node realism-smoke.mjs
       - name: Commit compiled game into site
         run: |
           rm -rf aquarium-game

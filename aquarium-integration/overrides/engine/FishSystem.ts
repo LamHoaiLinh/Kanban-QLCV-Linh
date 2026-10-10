@@ -1,3 +1,5 @@
+// ── KanAquarium Realism 1: physics collisions on existing fish agents only.
+// No new persistence schema: fish IDs, quantities and tank configurations remain stable.
 // The living heart of the aquarium: per-fish agents simulated on the CPU
 // (positions, velocities, behavior states) driving GPU-instanced meshes.
 //
@@ -70,6 +72,7 @@ interface Agent {
   anchor: THREE.Vector3;    // territory / station / school goal
   prevYaw: number;
   hunger: number;           // >0 after feeding starts; seeks food
+  feedDistance?: number; // current target range used for smooth approach
   drop?:{stage:'fall'|'dive';velocityY:number;elapsed:number;targetY:number};
   // Critter-specific
   wall?: 'floor' | 'back' | 'left' | 'right';
@@ -144,13 +147,14 @@ export class FoodSystem {
   nearest(p:THREE.Vector3,maxDist:number,settledOnly:boolean):FoodBit|null{
     let best:FoodBit|null=null,score=Infinity;
     for(const b of this.bits){
-      if(b.state==='gone'||b.age<(b.kind==='normal'?1.15:2.0))continue;
+      if(b.state==='gone'||b.age<(b.kind==='normal'?.35:.45))continue;
       const special=b.kind!=='normal';
       if(!special&&settledOnly&&b.state!=='settled')continue;
       if(!special&&!settledOnly&&b.state==='settled')continue;
       const d=b.pos.distanceToSquared(p);
-      if(d>Math.pow(special?maxDist*2.5:maxDist,2))continue;
-      const s=d-(special?100:0);
+      if(d>Math.pow(special?maxDist*1.45:maxDist,2))continue;
+      // Cookies are preferred when reasonably close, not magically detected across the tank.
+      const s=d/(special?1.7:1);
       if(s<score){score=s;best=b}
     }
     return best;
@@ -165,6 +169,109 @@ export class FishSystem {
   private feedTimer = 0;   // seconds of "the fish are hungry/excited" remaining
   private pendingDrop:{x:number;z:number}|null=null;
   private splashes:Array<{mesh:THREE.Mesh<THREE.RingGeometry,THREE.MeshBasicMaterial>;age:number}>=[];
+  // Soft spherical keep-out zones approximate rocks, wood trunks and larger corals.
+  private collisionRadius(a:Agent):number{return Math.max(0.007,a.scale*.30)}
+  private constrain(a:Agent,env:SimEnv):void{
+    // Broadly elliptical fish body. The forward axis requires more clearance
+    // than the side axis; do not clamp the centre directly to the glass.
+    const speed=a.vel.length();
+    const dirX=speed>1e-6?Math.abs(a.vel.x)/speed:.65;
+    const dirZ=speed>1e-6?Math.abs(a.vel.z)/speed:.65;
+    const xMargin=Math.min(env.halfW*.82,Math.max(.007,a.scale*(.24+.33*dirX)));
+    const zMargin=Math.min(env.halfD*.82,Math.max(.007,a.scale*(.24+.33*dirZ)));
+    const yMargin=Math.min((env.surfaceY-env.floorY)*.28,Math.max(.006,a.scale*.20));
+    const xmin=-env.halfW+xMargin,xmax=env.halfW-xMargin;
+    const zmin=-env.halfD+zMargin,zmax=env.halfD-zMargin;
+    const ymin=env.floorY+yMargin,ymax=env.surfaceY-yMargin;
+    if(a.pos.x<xmin){a.pos.x=xmin;a.vel.x=Math.max(0,a.vel.x)}
+    else if(a.pos.x>xmax){a.pos.x=xmax;a.vel.x=Math.min(0,a.vel.x)}
+    if(a.pos.z<zmin){a.pos.z=zmin;a.vel.z=Math.max(0,a.vel.z)}
+    else if(a.pos.z>zmax){a.pos.z=zmax;a.vel.z=Math.min(0,a.vel.z)}
+    if(a.pos.y<ymin){a.pos.y=ymin;a.vel.y=Math.max(0,a.vel.y)}
+    else if(a.pos.y>ymax){a.pos.y=ymax;a.vel.y=Math.min(0,a.vel.y)}
+    // Resolve position against solid decorations after steering; avoid popping
+    // by removing inward velocity only. A low iteration count bounds CPU cost.
+    const radius=this.collisionRadius(a);
+    for(let pass=0;pass<6;pass++){
+      let moved=false;
+      for(const ob of env.obstacles){
+        const safe=Math.max(0.005,ob.radius)+radius;
+        const dx=a.pos.x-ob.pos.x,dy=a.pos.y-ob.pos.y,dz=a.pos.z-ob.pos.z;
+        const d2=dx*dx+dy*dy+dz*dz;
+        if(d2>=safe*safe)continue;
+        const d=Math.sqrt(d2);
+        const nx=d>1e-6?dx/d:1,ny=d>1e-6?dy/d:0,nz=d>1e-6?dz/d:0;
+        // Only push to a reachable location inside the water volume.
+        a.pos.x=THREE.MathUtils.clamp(ob.pos.x+nx*(safe+.001),xmin,xmax);
+        a.pos.y=THREE.MathUtils.clamp(ob.pos.y+ny*(safe+.001),ymin,ymax);
+        a.pos.z=THREE.MathUtils.clamp(ob.pos.z+nz*(safe+.001),zmin,zmax);
+        const inward=a.vel.x*nx+a.vel.y*ny+a.vel.z*nz;
+        if(inward<0){a.vel.x-=inward*nx;a.vel.y-=inward*ny;a.vel.z-=inward*nz}
+        moved=true;
+      }
+      if(!moved)break;
+    }
+    // When several stones/coral skeletons overlap, sequential projection can
+    // push a fish out of one collider and into the next. Search a small set of
+    // reachable positions around the fish instead of letting it clip deeply.
+    const deepestAt=(x:number,y:number,z:number):number=>{
+      let max=0;
+      for(const ob of env.obstacles){
+        const dx=x-ob.pos.x,dy=y-ob.pos.y,dz=z-ob.pos.z;
+        const d=Math.sqrt(dx*dx+dy*dy+dz*dz);
+        max=Math.max(max,ob.radius+radius-d);
+      }
+      return Math.max(0,max);
+    };
+    const initialPenetration=deepestAt(a.pos.x,a.pos.y,a.pos.z);
+    if(initialPenetration>.006){
+      const ox=a.pos.x,oy=a.pos.y,oz=a.pos.z;
+      let bx=ox,by=oy,bz=oz,bestScore=initialPenetration*80;
+      let found=false;
+      const radii=[.018,.04,.075,.12,.19,.27];
+      for(const searchR of radii){
+        for(let k=0;k<16;k++){
+          const theta=k*(Math.PI/8)+a.rand*Math.PI*.5;
+          const px=THREE.MathUtils.clamp(ox+Math.cos(theta)*searchR,xmin,xmax);
+          const pz=THREE.MathUtils.clamp(oz+Math.sin(theta)*searchR,zmin,zmax);
+          for(const dy of [0,-.035,.035,-.08,.08]){
+            const py=THREE.MathUtils.clamp(oy+dy,ymin,ymax);
+            const deep=deepestAt(px,py,pz);
+            const displacement=Math.hypot(px-ox,py-oy,pz-oz);
+            const score=deep*80+displacement*.5;
+            if(score<bestScore){
+              bestScore=score;bx=px;by=py;bz=pz;
+              if(deep<.002){found=true;break}
+            }
+          }
+          if(found)break;
+        }
+        if(found)break;
+      }
+      if(bestScore<initialPenetration*80){
+        a.pos.set(bx,by,bz);
+        if(Math.hypot(bx-ox,by-oy,bz-oz)>.035)a.vel.multiplyScalar(.4);
+      }
+    }
+  }
+  // Test-only probe. No production counters or global simulation timers.
+  getPhysicsSnapshot(env:SimEnv):{fish:number;wallViolations:number;solidOverlaps:number;maxOverlap:number}{
+    let fish=0,wallViolations=0,solidOverlaps=0,maxOverlap=0;
+    for(const p of this.populations)for(const a of p.agents){
+      if(isCrawler(a.sp)||a.drop)continue;
+      fish++;
+      const speed=a.vel.length(),dx=speed>1e-6?Math.abs(a.vel.x)/speed:.65,dz=speed>1e-6?Math.abs(a.vel.z)/speed:.65;
+      const mx=Math.min(env.halfW*.82,Math.max(.007,a.scale*(.24+.33*dx)));
+      const mz=Math.min(env.halfD*.82,Math.max(.007,a.scale*(.24+.33*dz)));
+      const my=Math.min((env.surfaceY-env.floorY)*.28,Math.max(.006,a.scale*.20));
+      if(Math.abs(a.pos.x)>env.halfW-mx+.002||Math.abs(a.pos.z)>env.halfD-mz+.002||a.pos.y<env.floorY+my-.002||a.pos.y>env.surfaceY-my+.002)wallViolations++;
+      for(const ob of env.obstacles){
+        const overlap=ob.radius+this.collisionRadius(a)-a.pos.distanceTo(ob.pos);
+        if(overlap>.004){solidOverlaps++;maxOverlap=Math.max(maxOverlap,overlap)}
+      }
+    }
+    return {fish,wallViolations,solidOverlaps,maxOverlap};
+  }
   queueDrop(x:number,z:number):void{this.pendingDrop={x,z};}
   private splash(x:number,z:number,y:number):void{
     const geometry=new THREE.RingGeometry(.018,.030,32);
@@ -260,6 +367,7 @@ export class FishSystem {
           const band=this.zoneBand(sp,env);
           agent.drop={stage:'fall',velocityY:-.03,elapsed:0,targetY:THREE.MathUtils.lerp(band[0],band[1],.55)};
         }
+        if(!isCrawler(sp)&&!agent.drop)this.constrain(agent,env);
         agents.push(agent);
       }
       rnd.needsUpdate = true;
@@ -346,6 +454,7 @@ export class FishSystem {
         if (this.animateDrop(a,dt,env)) {/* New fish enters the water before joining normal swimming. */}
         else if (isCrawler(sp)) this.updateCrawler(a, dt, env);
         else this.updateFish(a, agents, dt, env);
+        if(!isCrawler(sp)&&!a.drop)this.constrain(a,env);
         this.writeInstance(pop, a, dt);
       }
       mesh.instanceMatrix.needsUpdate = true;
@@ -357,6 +466,7 @@ export class FishSystem {
   private updateFish(a: Agent, school: Agent[], dt: number, env: SimEnv): void {
     const sp = a.sp;
     const L = a.scale;
+    a.feedDistance=undefined;
     const cruise = sp.swim.cruise * L * SPEED_SCALE; // body-lengths/s → m/s
     const maxSpeed = cruise * sp.swim.burst;
 
@@ -373,7 +483,7 @@ export class FishSystem {
     const steer = _v1.set(0, 0, 0);
 
     // 1) Wall avoidance — smooth quadratic push away from glass and surface.
-    const margin = Math.max(0.06, L * 2);
+    const margin = Math.max(0.065, L * 2.3);
     const push = (d: number) => THREE.MathUtils.clamp((margin - d) / margin, 0, 1) ** 2 * 1.6;
     steer.x += push(a.pos.x + env.halfW) - push(env.halfW - a.pos.x);
     steer.z += push(a.pos.z + env.halfD) - push(env.halfD - a.pos.z);
@@ -383,8 +493,8 @@ export class FishSystem {
     for (const ob of env.obstacles) {
       _v2.copy(a.pos).sub(ob.pos);
       const d = _v2.length();
-      if (d < ob.radius + margin && d > 1e-5) {
-        steer.addScaledVector(_v2.divideScalar(d), ((ob.radius + margin - d) / ob.radius) * 1.2);
+      if (d < ob.radius + margin + this.collisionRadius(a) && d > 1e-5) {
+        steer.addScaledVector(_v2.divideScalar(d), ((ob.radius + margin + this.collisionRadius(a) - d) / Math.max(ob.radius,.025)) * 1.3);
       }
     }
 
@@ -424,17 +534,25 @@ export class FishSystem {
     // 6) Feeding overrides almost everything — fish RACE for food.
     if (this.feedTimer > 0 && this.food.active && (a.mode !== 'rest' || this.food.hasCookie)) {
       const bottomFeeder = sp.zone === 'bottom';
-      const target = this.food.nearest(a.pos, 1.2, bottomFeeder);
+      const target = this.food.nearest(a.pos, Math.max(.17,L*6), bottomFeeder);
       if (target) {
         const special=target.kind!=='normal';
-        if(special){a.mode='feed';a.modeT=Math.max(a.modeT,1.5)}
         _v2.copy(target.pos).sub(a.pos);
         const d = _v2.length();
-        if (d < L * (special?1.0:0.55)) {
-          this.food.eat(target);          // gulp!
-          a.modeT = 0.3; a.mode = 'feed'; a.gulp = undefined;
-        } else {
-          steer.addScaledVector(_v2.divideScalar(d),special?6.4:2.2); // frantic cookie race
+        // Food is detected locally, approached with a gradual slowdown and
+        // only swallowed when it reaches the fish's mouth region.
+        a.feedDistance=d;
+        if(d<L*.43+(.003)){ 
+          this.food.eat(target);
+          a.mode='feed';a.modeT=.26;a.gulp=undefined;
+        } else if(d>1e-6){
+          const dir=_v2.divideScalar(d);
+          const forward=a.vel.lengthSq()>1e-6?dir.dot(a.vel.clone().normalize()):1;
+          // Do not spin 180 degrees instantly for a pellet directly behind the fish.
+          if(forward>-.65||d<L*1.8){
+            steer.addScaledVector(dir,special?3.15:2.35);
+            a.mode='feed';a.modeT=Math.max(a.modeT,.45);
+          }
         }
       }
     }
@@ -456,7 +574,13 @@ export class FishSystem {
     let targetSpeed = cruise * activity;
     if (a.mode === 'rest') targetSpeed = cruise * 0.06;
     if (a.mode === 'dart') targetSpeed = maxSpeed;
-    if (a.mode === 'feed') targetSpeed = this.food.hasCookie?maxSpeed*1.2:cruise*1.8;
+    if(a.mode==='feed'){
+      targetSpeed=cruise*(this.food.hasCookie?1.50:1.20);
+      if(a.feedDistance!==undefined){
+        const slowing=THREE.MathUtils.clamp(a.feedDistance/(L*2.6),.22,1);
+        targetSpeed*=slowing;
+      }
+    }
     if (a.mode === 'forage') targetSpeed = cruise * 0.4;
 
     const steerStrength = a.mode === 'dart' ? 4 : 1.8;
@@ -476,10 +600,8 @@ export class FishSystem {
 
     a.pos.addScaledVector(a.vel, dt);
 
-    // Hard containment (should rarely trigger thanks to avoidance).
-    a.pos.x = THREE.MathUtils.clamp(a.pos.x, -env.halfW, env.halfW);
-    a.pos.z = THREE.MathUtils.clamp(a.pos.z, -env.halfD, env.halfD);
-    a.pos.y = THREE.MathUtils.clamp(a.pos.y, env.floorY + L * 0.4, env.surfaceY - L * 0.35);
+    // Body-aware containment and solid collision are resolved after this step
+    // in update(), keeping the direction field and physical boundary separate.
   }
 
   private pickMode(a: Agent, env: SimEnv, activity: number): void {

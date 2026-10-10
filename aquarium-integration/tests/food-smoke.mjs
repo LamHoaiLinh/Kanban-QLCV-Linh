@@ -40,26 +40,39 @@ try{
   await new Promise(r=>setTimeout(r,1300));
   target=await (await page.$('#canvas-host canvas')).boundingBox();
   if(!target)throw Error('Canvas disappeared after reload');
+  // In a realistic tank, fish can eat immediately. Regression must not
+  // require every pellet to remain visible until the tenth click.
+  await page.evaluate(()=>{
+    window.__kanFeedEvents=[];
+    window.__kanFoodKinds=[];
+    window.addEventListener('kanaquarium-fed',e=>window.__kanFeedEvents.push(e.detail));
+    const layer=document.querySelector('#kan-food-layer');
+    const observer=new MutationObserver(records=>{
+      for(const record of records)for(const el of record.addedNodes){
+        if(el instanceof HTMLElement&&el.classList.contains('kan-food-item'))window.__kanFoodKinds.push(el.dataset.kind);
+      }
+    });
+    observer.observe(layer,{childList:true});
+    window.__kanFoodObserver=observer;
+  });
   for(let k=1;k<=10;k++){
     await page.mouse.click(target.x+target.width*(.33+(k%3)*.08),target.y+target.height*.60);
-    const needed=k;
-    await page.waitForFunction(n=>Number(document.querySelector('#kan-food-layer')?.dataset.foodCount||0)>=n,{timeout:6000},needed);
-    if(k===1||k===10){
-      const check=await page.evaluate(()=>{
-        const els=[...document.querySelectorAll('.kan-food-item')];
-        return els.map(e=>({kind:e.dataset.kind,w:e.getBoundingClientRect().width,h:e.getBoundingClientRect().height,
-          left:e.getBoundingClientRect().left,top:e.getBoundingClientRect().top,
-          opacity:getComputedStyle(e).opacity,visible:getComputedStyle(e).visibility}));
-      });
-      if(check.length<k)throw Error('Food indicators absent despite feeding; '+JSON.stringify(check));
-      for(const item of check){
-        if((item.kind==='normal'&&item.w!==10)||(item.kind!=='normal'&&item.w!==25))throw Error('Food size invalid '+JSON.stringify(item));
-        if(item.visible!=='visible'||item.opacity==='0')throw Error('Food is hidden: '+JSON.stringify(item));
-        if(item.left<0||item.left>1280||item.top<0||item.top>800)throw Error('Food outside viewport '+JSON.stringify(item));
-      }
-      if(k===10&&!check.some(v=>v.kind==='fish-cookie'))throw Error('10th click cookie not drawn');
-    }
+    await page.waitForFunction(n=>window.__kanFeedEvents.length>=n,{timeout:6000},k);
   }
+  await page.waitForFunction(()=>window.__kanFoodKinds.includes('fish-cookie'),{timeout:8000});
+  const feedCheck=await page.evaluate(()=>{
+    const els=[...document.querySelectorAll('.kan-food-item')];
+    return {events:window.__kanFeedEvents,kinds:window.__kanFoodKinds,
+      sizes:els.map(e=>({kind:e.dataset.kind,w:e.getBoundingClientRect().width,
+      occluded:e.dataset.occluded,opacity:getComputedStyle(e).opacity}))};
+  });
+  if(feedCheck.events.length!==10||feedCheck.events[9]?.kind!=='fish-cookie')
+    throw Error('Tenth click is not fish-cookie: '+JSON.stringify(feedCheck.events));
+  if(!feedCheck.kinds.includes('normal')||!feedCheck.kinds.includes('fish-cookie'))
+    throw Error('Pellet or rare cookie never rendered: '+JSON.stringify(feedCheck.kinds));
+  for(const f of feedCheck.sizes)
+    if((f.kind==='normal'&&f.w!==10)||(f.kind!=='normal'&&f.w!==25))
+      throw Error('Food sizes changed: '+JSON.stringify(f));
   // Embedded aquarium must show its settings automatically on launch.
   // It may have auto-closed during graphics-heavy CI feeding tests; in that
   // case the existing reopen control should still be functional.

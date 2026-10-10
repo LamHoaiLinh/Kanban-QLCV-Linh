@@ -15,7 +15,7 @@ import type { SpeciesDef, FloraDef } from '../types';
 type Tab = 'tank' | 'fish' | 'flora' | 'decor' | 'saved' | 'settings';
 const OLD_NAMES:Record<string,string>={
 'Amazon Community':'Cộng đồng Amazon','Nano Planted':'Hồ thủy sinh mini','Reef Lagoon':'Đầm san hô','Betta Oasis':'Ốc đảo Betta',
-'Blackwater Stream':'Suối nước trà','Tang Highway':'Đại dương xanh','My Aquarium':'Hồ cá của tôi','My Tank':'Hồ của tôi'
+'Blackwater Stream':'Suối nước trà','Tang Highway':'Đại dương xanh','My Aquarium':'Hồ cá của tôi','My Tank':'Hồ của tôi','Surprise Tank':'Hồ cá bất ngờ'
 };
 const viTank=(s:string)=>OLD_NAMES[s]||s;
 const li=(n:number)=>Math.round(n*3.785);
