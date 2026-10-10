@@ -2,7 +2,7 @@
 // screensaver/kiosk handling, toast notifications.
 
 import { useEffect, useRef, useState } from 'react';
-import { AquariumCanvas } from './ui/AquariumCanvas';
+import { AquariumCanvas, addAquariumFish, removeAquariumFish } from './ui/AquariumCanvas';
 import { ControlPanel } from './ui/ControlPanel';
 import { Toolbar } from './ui/Toolbar';
 import { InfoCard } from './ui/InfoCard';
@@ -21,6 +21,14 @@ export default function App() {
   const musicOn = useStore((s) => s.musicOn);
   const set = useStore((s) => s.set);
   const [revealVisible, setRevealVisible] = useState(false);
+  const [foodClicks,setFoodClicks]=useState(0);
+  const fishTotal=useStore(s=>Object.values(s.config.fish).reduce((total,n)=>total+n,0));
+  const embedded=new URLSearchParams(location.search).has('kanban');
+  useEffect(()=>{
+    const onFeed=(e:Event)=>setFoodClicks((e as CustomEvent<{count:number}>).detail.count);
+    window.addEventListener('kanaquarium-fed',onFeed);
+    return ()=>window.removeEventListener('kanaquarium-fed',onFeed);
+  },[]);
   const revealTimer = useRef<ReturnType<typeof setTimeout>>();
 
   // Kiosk mode: ?kiosk=1 starts full-screen-quiet with a cinematic camera —
@@ -93,8 +101,14 @@ export default function App() {
   return (
     <>
       <AquariumCanvas />
-      {new URLSearchParams(location.search).has('kanban') && (<>
-        <div className="kanban-aquarium-help">Trái: thả thức ăn · 10 lần có bánh cá/gấu · Phải: thêm cá · ESC: về KanBan</div>
+      {embedded && (<>
+        <div className="kanban-aquarium-help">Trái: thả thức ăn · Mỗi 10 lần: bánh cá/gấu · Phải: thêm cá · Shift + phải: bớt cá · ESC: về KanBan</div>
+        <div className="kanban-aquarium-stock">
+          <button title="Bớt 1 con cá (Shift + chuột phải)" aria-label="Bớt một cá" onClick={removeAquariumFish}>−</button>
+          <span>Cá: <strong>{fishTotal}</strong>/60</span>
+          <button title="Thêm cá, có hiệu ứng rơi" aria-label="Thêm một cá" disabled={fishTotal>=60} onClick={()=>addAquariumFish()}>+</button>
+          <span className="kanban-aquarium-feed-count">Đã thả: {foodClicks} · Còn {10-foodClicks%10} lượt đến bánh</span>
+        </div>
         <button className="kanban-aquarium-exit" title="Về KanBan (ESC)" onClick={()=>window.parent.postMessage({type:'aquarium-game-close'},location.origin)}>✕</button>
       </>)}
       {!uiHidden && (

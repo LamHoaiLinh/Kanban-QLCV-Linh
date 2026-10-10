@@ -7,6 +7,31 @@ import { Engine } from '../engine/Engine';
 import { setEngine, getEngine } from '../engine/engineRef';
 import { useStore } from '../state/store';
 
+// Keep all stock changes in one place so buttons and mouse shortcuts behave identically.
+let mostRecentAdded:string|null=null;
+export function addAquariumFish(clientX?:number,clientY?:number):void{
+  const s=useStore.getState();
+  const total=Object.values(s.config.fish).reduce((sum,n)=>sum+n,0);
+  if(total>=60){s.showToast('Đã đủ 60 sinh vật, hãy bớt cá trước');return;}
+  const choices=Object.entries(s.config.fish).filter(([id,n])=>n>0&&!id.includes('snail')&&!id.includes('shrimp'));
+  const id=choices.length?choices[Math.floor(Math.random()*choices.length)][0]
+    :(s.config.water==='freshwater'?'guppy':'green-chromis');
+  getEngine()?.queueFishDrop(clientX,clientY);
+  s.setFishCount(id,(s.config.fish[id]||0)+1);
+  mostRecentAdded=id;
+  s.showToast('Cá mới đang rơi vào hồ');
+}
+export function removeAquariumFish():void{
+  const s=useStore.getState();
+  const fish=Object.entries(s.config.fish)
+    .filter(([id,n])=>n>0&&!id.includes('snail')&&!id.includes('shrimp'));
+  if(!fish.length){s.showToast('Không còn cá để bớt');return;}
+  const id=mostRecentAdded&&s.config.fish[mostRecentAdded]>0?mostRecentAdded:
+    fish.sort((a,b)=>b[1]-a[1])[0][0];
+  s.setFishCount(id,(s.config.fish[id]||0)-1);
+  s.showToast('Đã đưa bớt 1 con cá ra khỏi hồ');
+}
+
 export function AquariumCanvas() {
   const hostRef = useRef<HTMLDivElement>(null);
 
@@ -38,15 +63,9 @@ export function AquariumCanvas() {
         engine.followFish(null);
       }
     };
-    engine.callbacks.onAddFish=()=>{
-      const s=useStore.getState();
-      const total=Object.values(s.config.fish).reduce((sum,n)=>sum+n,0);
-      if(total>=60){s.showToast('Hồ đạt giới hạn 60 sinh vật');return}
-      const active=Object.entries(s.config.fish).filter(([id,n])=>n>0&&!id.includes('snail')&&!id.includes('shrimp'));
-      const id=active.length?active[Math.floor(Math.random()*active.length)][0]:(s.config.water==='freshwater'?'guppy':'green-chromis');
-      s.setFishCount(id,(s.config.fish[id]||0)+1);
-      s.showToast('Đã thêm một con cá');
-    };
+    engine.callbacks.onAddFish=addAquariumFish;
+    engine.callbacks.onRemoveFish=removeAquariumFish;
+    engine.callbacks.onFed=(kind,count)=>window.dispatchEvent(new CustomEvent('kanaquarium-fed',{detail:{kind,count}}));
     engine.callbacks.onAutoQuality = (tier) => {
       useStore.getState().showToast(`Lowered quality to “${tier}” to keep things smooth. You can pin a tier in Settings.`);
     };
