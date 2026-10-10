@@ -53,7 +53,7 @@ const swimHook = /* glsl */ `
 
   // Head recoil: the front of the body counter-sways slightly — without this
   // the fish looks like a flag on a stick instead of a swimmer.
-  transformed.z -= uAmp * 0.22 * sin(-aDyn.x) * (1.0 - s) * (1.0 - s);
+  transformed.z -= uAmp * 0.065 * sin(-aDyn.x) * (1.0 - s) * (1.0 - s);
 
   // Bank/bend into turns: parabolic curvature along the spine.
   transformed.z += aDyn.y * s * s * 0.7;
