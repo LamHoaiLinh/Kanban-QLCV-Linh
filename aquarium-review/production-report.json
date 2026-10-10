@@ -1,0 +1,25 @@
+{
+  "status": "PASS",
+  "sourceCommit": "505cdfaf2eb09401b4921e2b121cc0600be97b62",
+  "expectedAsset": "./assets/index-BxKfHugf.js",
+  "rootHTTP": 200,
+  "state": {
+    "url": "https://lamhoailinh.github.io/Kanban-QLCV-Linh/aquarium-game/index.html?kanban=1",
+    "qa": "undefined",
+    "title": "Aquarium — a living virtual tank",
+    "note": "−\nCá: 29/56\n+\nĐã thả: 0 · Còn 10 lượt đến bánh",
+    "canvas": [
+      960,
+      600
+    ]
+  },
+  "checks": [
+    "Exact deployed asset HTTP 200",
+    "Root Hồ Cá launcher opens canvas",
+    "Production QA hooks absent",
+    "Escape closes overlay",
+    "Alt+H reopens overlay",
+    "No page errors"
+  ],
+  "errors": []
+}
