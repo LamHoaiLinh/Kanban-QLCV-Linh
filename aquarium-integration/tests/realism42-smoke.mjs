@@ -38,6 +38,11 @@ try{
  report.checks.push('100 fish / 30 simulated minutes, boundaries, solid collisions, finite poses, stuck recovery');
  for(let cycle=0;cycle<20;cycle++){
   await page.evaluate(()=>window.__kan42Scene({gallons:180,fish:{'neon-tetra':100},fishNames:{'neon-tetra:0':'Linh'}}));
+  await page.evaluate(()=>window.__kanFoodTestCamera('cinematic'));
+  await page.mouse.move(600,450);await page.mouse.down();await page.mouse.move(660,430,{steps:3});await page.mouse.up();
+  const feeds=await page.evaluate(()=>window.__kanFoodProbe().count);
+  await page.mouse.click(600,450);
+  assert((await page.evaluate(()=>window.__kanFoodProbe().count))===feeds+1,'feeding between resize cycles');
   for(const gallons of [120,75,40,20,5,180]){
    const p=await page.evaluate(g=>{window.__kan42Scene({gallons:g});window.__kanEcoFastForward(.5);return window.__kan42Probe();},gallons);
    assert(p.telemetry.fish.length<=100,'absolute cap');assert(p.physics.wallViolations===0,'resize containment');
