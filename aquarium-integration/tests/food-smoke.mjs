@@ -1,0 +1,50 @@
+import puppeteer from 'puppeteer-core';
+import {spawn,execFileSync} from 'node:child_process';
+const chrome=['/usr/bin/google-chrome','/usr/bin/google-chrome-stable','/usr/bin/chromium','/opt/google/chrome/chrome'].find(path=>{try{execFileSync('test',['-x',path]);return true}catch{return false}});
+if(!chrome)throw Error('Chromium/Chrome executable not installed on CI agent');
+const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','preview','--host','127.0.0.1','--port','4175','--strictPort'],{stdio:'pipe'});
+server.stderr.on('data',x=>process.stderr.write(x));
+let browser=null;
+try{
+  for(let i=0;i<80;i++){
+    try{const r=await fetch('http://127.0.0.1:4175/?kanban=1');if(r.ok)break;}catch{}
+    await new Promise(r=>setTimeout(r,250));
+    if(i===79)throw Error('Vite preview startup timeout');
+  }
+  browser=await puppeteer.launch({headless:true,executablePath:chrome,
+    args:['--no-sandbox','--disable-setuid-sandbox','--enable-webgl','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+  const page=await browser.newPage();
+  page.on('pageerror',e=>process.stderr.write('PAGE ERROR '+e.message+'\n'));
+  await page.setViewport({width:1280,height:800,deviceScaleFactor:1});
+  await page.goto('http://127.0.0.1:4175/?kanban=1',{waitUntil:'domcontentloaded',timeout:30000});
+  await page.waitForSelector('#kan-food-layer',{timeout:40000});
+  await page.waitForFunction(()=>!!document.querySelector('#canvas-host canvas'),{timeout:20000});
+  await new Promise(r=>setTimeout(r,3000));
+  const canvas=await page.$('#canvas-host canvas');
+  if(!canvas)throw Error('WebGL canvas missing');
+  let target=await canvas.boundingBox();
+  if(!target)throw Error('Canvas has no box');
+  // Coordinates purposely in lower-middle glass: formerly disappeared.
+  for(let k=1;k<=10;k++){
+    await page.mouse.click(target.x+target.width*(.33+(k%3)*.08),target.y+target.height*.60);
+    const needed=k;
+    await page.waitForFunction(n=>Number(document.querySelector('#kan-food-layer')?.dataset.foodCount||0)>=n,{timeout:6000},needed);
+    if(k===1||k===10){
+      const check=await page.evaluate(()=>{
+        const els=[...document.querySelectorAll('.kan-food-item')];
+        return els.map(e=>({kind:e.dataset.kind,w:e.getBoundingClientRect().width,h:e.getBoundingClientRect().height,
+          left:e.getBoundingClientRect().left,top:e.getBoundingClientRect().top,
+          opacity:getComputedStyle(e).opacity,visible:getComputedStyle(e).visibility}));
+      });
+      if(check.length<k)throw Error('Food indicators absent despite feeding; '+JSON.stringify(check));
+      for(const item of check){
+        if(item.w<3||item.w>12)throw Error('Food size invalid '+JSON.stringify(item));
+        if(item.visible!=='visible'||item.opacity==='0')throw Error('Food is hidden: '+JSON.stringify(item));
+        if(item.left<0||item.left>1280||item.top<0||item.top>800)throw Error('Food outside viewport '+JSON.stringify(item));
+      }
+      if(k===10&&!check.some(v=>v.kind==='fish-cookie'))throw Error('10th click cookie not drawn');
+    }
+  }
+  const counter=await page.evaluate(()=>document.querySelector('.kanban-aquarium-feed-count')?.textContent);
+  console.log('PASS: 10 consecutive clicks; pellets visible; 10th fish cookie; sizes 5px/10px; counter='+counter);
+}catch(e){console.error(e);process.exitCode=1}finally{await browser?.close();server.kill('SIGTERM')}

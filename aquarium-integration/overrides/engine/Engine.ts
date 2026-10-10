@@ -58,6 +58,10 @@ export class Engine {
   private kanAquariumMode=new URLSearchParams(location.search).has('kanban');
   private clickFoodCount=0;
   private pointerDown={x:0,y:0};
+  // DOM overlay tied to 3D food positions: guaranteed legibility independent
+  // of transparent water, frustum culling, camera zoom and postprocessing.
+  private foodLayer:HTMLDivElement|null=null;
+  private foodElements=new Map<object,HTMLDivElement>();
   private lastCycleT = 0;
   // FPS + draw call counters for the dev HUD.
   stats = { fps: 60, drawCalls: 0, triangles: 0, fishCount: 0 };
@@ -76,6 +80,15 @@ export class Engine {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(this.renderer.domElement);
     this.renderer.domElement.style.cssText = 'width:100%;height:100%;display:block;touch-action:none;';
+    if(this.kanAquariumMode){
+      const layer=document.createElement('div');
+      layer.id='kan-food-layer';
+      layer.className='kan-food-layer';
+      layer.setAttribute('aria-label','Thức ăn cá đang rơi trong hồ');
+      layer.setAttribute('data-food-count','0');
+      container.appendChild(layer);
+      this.foodLayer=layer;
+    }
 
     // Image-based lighting from a neutral procedural "room" — gives PBR
     // materials something real to reflect without shipping an HDRI file.
@@ -122,6 +135,9 @@ export class Engine {
     this.renderer.domElement.removeEventListener('pointerdown',this.rememberPointer);
     this.renderer.domElement.removeEventListener('contextmenu',this.onRightClick);
     this.rig.dispose();
+    this.foodElements.clear();
+    this.foodLayer?.remove();
+    this.foodLayer=null;
     this.renderer.dispose();
     this.container.removeChild(this.renderer.domElement);
   }
@@ -402,6 +418,51 @@ export class Engine {
     this.rig.lockFrontView(halfW, halfH, halfD, midY, coverDepth, overfill);
   }
 
+  // Overlay is not an independent animation: each DOM icon follows a FoodBit
+  // in the simulation and vanishes as soon as that bit is eaten or expires.
+  private syncFoodLayer():void{
+    const layer=this.foodLayer;
+    if(!layer)return;
+    const bounds=this.renderer.domElement.getBoundingClientRect();
+    const active=new Set<object>();
+    const projected=new THREE.Vector3();
+    for(const bit of this.fish.food.bits){
+      active.add(bit);
+      let icon=this.foodElements.get(bit);
+      if(!icon){
+        icon=document.createElement('div');
+        icon.className=bit.kind==='normal'?'kan-food-item kan-food-pellet':'kan-food-item kan-food-cookie';
+        icon.dataset.kind=bit.kind;
+        icon.setAttribute('aria-hidden','true');
+        if(bit.kind!=='normal'){
+          const image=document.createElement('img');
+          image.alt='';
+          image.src=new URL('feed-items/'+(bit.kind==='fish-cookie'?'cookie-fish.png':'cookie-bear.png'),document.baseURI).href;
+          image.draggable=false;
+          icon.appendChild(image);
+        }
+        layer.appendChild(icon);
+        this.foodElements.set(bit,icon);
+      }
+      projected.copy(bit.pos).project(this.rig.camera);
+      // A click below the top waterline still gives an observable pellet.
+      // Keep icons within the tank viewport instead of letting them vanish
+      // above the image (an issue with near-surface projections on wide TVs).
+      const sx=THREE.MathUtils.clamp((projected.x+1)*.5,0.055,0.945);
+      const sy=THREE.MathUtils.clamp((1-projected.y)*.5,0.085,0.925);
+      const px=sx*bounds.width;
+      const py=sy*bounds.height;
+      icon.style.transform='translate3d('+px.toFixed(1)+'px,'+py.toFixed(1)+'px,0) translate(-50%,-50%)';
+      icon.style.opacity='1';
+    }
+    for(const [bit,element] of this.foodElements){
+      if(active.has(bit))continue;
+      element.remove();
+      this.foodElements.delete(bit);
+    }
+    layer.dataset.foodCount=String(active.size);
+  }
+
   /** One simulation + render step. Called with real dt by tick(), or with a
    *  fixed dt by the capture driver (which needs stutter-free frame times). */
   advance(dt: number): void {
@@ -419,6 +480,7 @@ export class Engine {
     this.fish.update(dt, this.simEnv);
     this.environment.update(this.dayFactor, this.rig.camera);
     this.rig.update(dt);
+    this.syncFoodLayer();
 
     if (this.composer) this.composer.render();
     else this.renderer.render(this.scene, this.rig.camera);

@@ -110,8 +110,11 @@ export class FoodSystem {
     if(this.bits.length>=65)this.remove(this.bits[0]);
     const files=this.variants[kind],name=files[Math.floor(Math.random()*files.length)];
     const sprite=new THREE.Sprite(this.mats.get(name)!);
-    const size=kind==='normal'?0.055:0.105;
+    const size=kind==='normal'?0.006:0.013;
     sprite.scale.set(size,size,1);
+    // In KanBan we render crisp, 5px/10px HUD sprites projected from these
+    // exact world positions, avoiding water shaders and fog swallowing pellets.
+    sprite.visible=!new URLSearchParams(location.search).has('kanban');
     sprite.renderOrder=1500;
     const bit:FoodBit={pos:new THREE.Vector3(x+(Math.random()-.5)*.014,surfaceY-.035,z+(Math.random()-.5)*.014),
       age:0,state:'float',kind,sprite};
@@ -130,7 +133,7 @@ export class FoodSystem {
         b.pos.x+=Math.sin(b.age*2.2+b.pos.z*35)*dt*.003;
         if(b.pos.y<=floorY+.01){b.pos.y=floorY+.01;b.state='settled'}
       }
-      if(b.age>(special?65:42))b.state='gone';
+      if(b.age>(special?55:26))b.state='gone';
       if(b.state==='gone'){this.remove(b);continue}
       b.sprite.position.copy(b.pos);
       b.sprite.material.rotation=Math.sin(b.age*.6+b.pos.x*5)*.08;
