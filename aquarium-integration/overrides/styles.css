@@ -315,3 +315,10 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .panel .seg button{white-space:normal;font-size:12.5px;min-width:64px}
 .panel .section>h2{letter-spacing:.035em;font-size:11.5px}
 .panel .species-row .meta{overflow-wrap:anywhere}
+
+/* Realism 3: observational ecology panel — legible without extra GPU work. */
+.eco-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:9px}
+.eco-metrics>div{display:flex;flex-direction:column;gap:4px;padding:9px 10px;border:1px solid rgba(115,162,178,.22);border-radius:8px;background:rgba(15,48,60,.48)}
+.eco-metrics span{color:var(--text-dim);font-size:11px}
+.eco-metrics strong{font-size:14px;font-variant-numeric:tabular-nums;color:var(--text)}
+.eco-note{font-size:11.5px;line-height:1.55;color:var(--text-dim);margin:8px 2px 0}
