@@ -53,6 +53,11 @@ jobs:
           cp aquarium-integration/tests/food3d-smoke.mjs _aquarium-build/food3d-smoke.mjs
           cd _aquarium-build
           node food3d-smoke.mjs
+      - name: Browser Realism 4 - flexible fins, habitats, 20 event classes, 60 fish
+        run: |
+          cp aquarium-integration/tests/realism4-habitats-smoke.mjs _aquarium-build/realism4-habitats-smoke.mjs
+          cd _aquarium-build
+          node realism4-habitats-smoke.mjs
       - name: Browser Realism 3 - ecology, modes and autonomous fish behavior
         run: |
           cp aquarium-integration/tests/realism3-smoke.mjs _aquarium-build/realism3-smoke.mjs
