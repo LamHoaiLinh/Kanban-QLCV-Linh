@@ -3,6 +3,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore, PRESETS } from '../state/store';
+import { getEngine } from '../engine/engineRef';
+import type { EcoSnapshot } from '../engine/Ecology';
 import { speciesForWater } from '../data/species';
 import { floraForWater } from '../data/flora';
 import { decorForWater } from '../data/decor';
@@ -202,6 +204,8 @@ function TankTab() {
         </p>
       </div>
 
+      <EcologySection />
+
       <div className="section">
         <h2>Các mẫu bể</h2>
         <div className="preset-list">
@@ -220,6 +224,52 @@ function TankTab() {
         </div>
       </div>
     </>
+  );
+}
+
+// ───────── Realism 3.0: observational ecology, never required chores ─────────
+function EcologySection(){
+  const ecoMode=useStore(s=>s.ecoMode);
+  const set=useStore(s=>s.set);
+  const [snapshot,setSnapshot]=useState<EcoSnapshot|null>(null);
+  const update=()=>setSnapshot(getEngine()?.getEcoSnapshot()??null);
+  useEffect(()=>{
+    update();
+    const timer=window.setInterval(update,2000);
+    return ()=>window.clearInterval(timer);
+  },[]);
+  return (
+    <div className="section" aria-label="Hệ sinh thái mô phỏng">
+      <h2>Hệ sinh thái mô phỏng</h2>
+      <div className="seg" role="group" aria-label="Chế độ hồ cá">
+        <button className={ecoMode==='natural'?'active':''}
+          aria-pressed={ecoMode==='natural'}
+          onClick={()=>set({ecoMode:'natural'})}>Ngắm cá tự nhiên</button>
+        <button className={ecoMode==='relax'?'active':''}
+          aria-pressed={ecoMode==='relax'}
+          onClick={()=>set({ecoMode:'relax'})}>Thư giãn tương tác</button>
+      </div>
+      <p className="eco-note">{ecoMode==='natural'
+        ?'Cá tự tìm chỗ nghỉ, trú ẩn và rỉa nền. Nước biến đổi nhẹ theo thức ăn, cây và số cá.'
+        :'Giữ chuyển động quen thuộc, giảm các hoạt động tự phát. Hồ không cần chăm sóc.'}</p>
+      {snapshot&&(
+        <>
+          <div className="eco-metrics" aria-label="Chỉ số mô phỏng">
+            <div><span>Nhiệt độ</span><strong>{snapshot.temperature.toFixed(1)}°C</strong></div>
+            <div><span>Oxy (chỉ số)</span><strong>{snapshot.oxygen}/100</strong></div>
+            <div><span>Nước sạch</span><strong>{snapshot.cleanliness}/100</strong></div>
+            <div><span>Thức ăn dư</span><strong>{snapshot.leftover}</strong></div>
+          </div>
+          <p className="eco-note">Hoạt động tự nhiên: {snapshot.grazeEvents} lần rỉa nền · {snapshot.restEvents} lượt nghỉ · {snapshot.shelterEvents} lượt trú ẩn · {snapshot.schoolEvents} lần đàn đổi hướng.</p>
+        </>
+      )}
+      <div className="row-actions" style={{marginTop:8}}>
+        <button className="btn" onClick={()=>{
+          getEngine()?.cleanEco();update();
+        }}>Làm sạch nước mô phỏng</button>
+      </div>
+      <p className="eco-note">Các chỉ số chỉ để minh họa, không phải phép đo nước thực tế. Không có cá chết hoặc mất hồ khi không mở ứng dụng.</p>
+    </div>
   );
 }
 

@@ -50,6 +50,8 @@ export interface SimEnv {
   surfaceY: number;
   current: CurrentField;
   reducedMotion: boolean;
+  ecoMode?:'natural'|'relax';
+  ecoComfort?:number; // gentle environmental modulation, never mortality
   obstacles: { pos: THREE.Vector3; radius: number }[]; // decor/coral keep-out spheres
   shelters: THREE.Vector3[];                            // hiding spots (decor)
 }
@@ -93,6 +95,7 @@ export type FoodKind = 'normal' | 'fish-cookie' | 'bear-cookie';
 interface FoodBit {pos:THREE.Vector3;age:number;state:'float'|'sink'|'settled'|'gone';kind:FoodKind;sprite:THREE.Sprite}
 export class FoodSystem {
   bits:FoodBit[]=[];
+  onEat?:()=>void;
   private group=new THREE.Group();
   private mats=new Map<string,THREE.SpriteMaterial>();
   private readonly variants:Record<FoodKind,string[]>={
@@ -159,12 +162,13 @@ export class FoodSystem {
     }
     return best;
   }
-  eat(b:FoodBit):void{b.state='gone';this.remove(b)}
+  eat(b:FoodBit):void{b.state='gone';this.remove(b);this.onEat?.()}
 }
 // ── The fish system proper ──
 export class FishSystem {
   group = new THREE.Group();
   food: FoodSystem;
+  onEcoEvent?:(event:'graze'|'rest'|'shelter'|'school')=>void;
   populations: Population[] = [];
   private feedTimer = 0;   // seconds of "the fish are hungry/excited" remaining
   private pendingDrop:{x:number;z:number}|null=null;
@@ -637,6 +641,9 @@ export class FishSystem {
       }
     }
     if (a.mode === 'forage') targetSpeed = cruise * 0.4;
+    // A mild, comfortable ecology subtly changes activity, never stops swimming.
+    if(env.ecoMode==='natural')targetSpeed*=Math.max(.86,Math.min(1.03,env.ecoComfort??1));
+    if(env.ecoMode==='natural'&&a.mode==='rest')targetSpeed*=.75;
 
     const steerStrength = a.mode === 'dart' ? 4 : 1.8;
     a.vel.addScaledVector(steer, dt * steerStrength * Math.max(cruise, 0.05) * 6);
@@ -662,6 +669,29 @@ export class FishSystem {
   private pickMode(a: Agent, env: SimEnv, activity: number): void {
     const sp = a.sp;
     const r = Math.random();
+    // Gentle emergent behavior, one short activity at a time. No fish death,
+    // breeding or forced maintenance in either mode.
+    if(env.ecoMode==='natural'){
+      const p=Math.random();
+      if((sp.archetype==='bottom'||sp.archetype==='cleaner')&&p<.20){
+        a.mode='forage';a.modeT=3+Math.random()*5;
+        this.newAnchorNear(a,env,.20);
+        this.onEcoEvent?.('graze');
+        return;
+      }
+      if((sp.archetype==='solitary'||sp.archetype==='ambusher'
+          ||sp.archetype==='hoverer')&&p<.16){
+        a.mode='rest';a.modeT=4+Math.random()*7;
+        this.anchorToShelter(a,env);
+        this.onEcoEvent?.(env.shelters.length?'shelter':'rest');
+        return;
+      }
+      if(sp.archetype==='schooler'&&p<.045&&!env.reducedMotion){
+        a.mode='dart';a.modeT=.35+.35*Math.random();
+        this.onEcoEvent?.('school');
+        return;
+      }
+    }
     switch (sp.archetype) {
       case 'schooler':
         // Mostly cruise; rare group-startling darts.
@@ -791,6 +821,16 @@ export class FishSystem {
     // Snails ooze along; hillstream loaches graze in place, then scoot.
     const isLoach = a.sp.id.includes('hillstream');
     let speed = 0.004;
+    if(env.ecoMode==='natural'&&!isLoach){
+      // Snails intermittently graze on glass instead of gliding nonstop.
+      a.modeT-=dt;
+      if(a.modeT<=0){
+        a.mode=a.mode==='forage'?'rest':'forage';
+        a.modeT=a.mode==='rest'?1.5+Math.random()*3:4+Math.random()*7;
+        if(a.mode==='forage')this.onEcoEvent?.('graze');
+      }
+      if(a.mode==='rest')speed=.00035;
+    }
     if (isLoach) {
       a.modeT -= dt;
       if (a.modeT <= 0) {

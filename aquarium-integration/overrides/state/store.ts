@@ -11,6 +11,7 @@ import { speciesForWater } from '../data/species';
 import { floraForWater } from '../data/flora';
 import { decorForWater } from '../data/decor';
 import { tankDims } from '../data/tanks';
+import type { EcoMode } from '../engine/Ecology';
 
 export interface AppState {
   config: TankConfig;
@@ -21,6 +22,7 @@ export interface AppState {
   audioOn: boolean;
   audioVolume: number;
   musicOn: boolean;
+  ecoMode: EcoMode; // persisted, never affects saved tank schema
 
   // Session UI state (not persisted)
   cameraMode: CameraMode;
@@ -63,6 +65,7 @@ export const useStore = create<AppState>()(
       audioOn: false, // muted by default — browsers block autoplay anyway
       audioVolume: 0.6,
       musicOn: false,
+      ecoMode: 'natural',
       cameraMode: 'orbit',
       followFishKey: null,
       selectedFishKey: null,
@@ -203,9 +206,12 @@ export const useStore = create<AppState>()(
         audioOn: s.audioOn,
         audioVolume: s.audioVolume,
         musicOn: s.musicOn,
+        ecoMode: s.ecoMode,
       }),
       merge: (persisted, current) => {
         const merged = { ...current, ...(persisted as Partial<AppState>) };
+        if(merged.ecoMode!=='natural'&&merged.ecoMode!=='relax')
+          merged.ecoMode='natural';
         // A fresh share link always wins over the previously persisted tank.
         if (sharedConfig) merged.config = sharedConfig;
         // Keep saved tank keys intact, but migrate built-in random labels.
