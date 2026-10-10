@@ -1,6 +1,6 @@
 # Realism 4.2 — báo cáo nghiệm thu
 
-Nguồn: 505cdfaf2eb09401b4921e2b121cc0600be97b62. CI: https://github.com/LamHoaiLinh/Kanban-QLCV-Linh/actions/runs/38051981811.
+Nguồn: 91c56c880773ad47c47ce7dad62d278da277df05. CI: https://github.com/LamHoaiLinh/Kanban-QLCV-Linh/actions/runs/38072668360.
 
 Đã triển khai: giới hạn hồ tới 100 cá; chuẩn hóa preset/random/load/resize; giữ tên và snapshot đã lưu, undo resize; vây kín hai mặt và LOD; chuyển động, nhảy có xác suất, mổ bề mặt thật; 20 loại sự kiện có tuyến và thời hạn thật; camera quan sát sự kiện, pan/pinch và bố cục dọc.
 
@@ -36,11 +36,3 @@ Các số dưới đây đã đo ở vòng kiểm thử trước khi sửa timeo
 Chưa chứng nhận 60 FPS trên PC hoặc 30 FPS trên điện thoại thật. Test touch dùng PointerEvent trong Chromium; ảnh dọc dùng viewport 390×844. Stress 30 phút là mô phỏng tăng tốc qua physics thực, còn video tự nhiên chạy theo thời gian thực. Các clip hành vi cận cảnh dùng fixture QA để nhìn rõ.
 
 Mở index.html để xem toàn bộ ảnh/video. Dữ liệu máy: capture-report.json, realism42-report.json, realism42-event-audit.json, realism42-surfaces-review.json. CI main có bước kiểm tra đúng asset trên Pages, nút Hồ Cá, ESC, Alt+H, canvas và không có QA hooks ở production; kết quả nằm trong artifact realism42-production-review.
-
-## Kiểm tra bản production — PASS
-
-CI main: https://github.com/LamHoaiLinh/Kanban-QLCV-Linh/actions/runs/38051981811.
-
-Asset được phục vụ: ./assets/index-BxKfHugf.js. Root HTTP 200. Nút Hồ Cá mở canvas; ESC đóng; Alt+H mở lại; không có QA hooks trên production hoặc lỗi JavaScript. Dữ liệu kiểm tra: production-report.json. Ảnh chụp production nằm trong artifact realism42-production-review của CI main.
-
-Trang chạy: https://lamhoailinh.github.io/Kanban-QLCV-Linh/. Ảnh/video: https://lamhoailinh.github.io/Kanban-QLCV-Linh/aquarium-review/.

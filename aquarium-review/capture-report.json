@@ -1,9 +1,9 @@
 {
-  "sourceCommit": "505cdfaf2eb09401b4921e2b121cc0600be97b62",
-  "run": "38051981811",
+  "sourceCommit": "91c56c880773ad47c47ce7dad62d278da277df05",
+  "run": "38072668360",
   "natural": [
     {
-      "elapsedSeconds": 30.675,
+      "elapsedSeconds": 30.732,
       "count": 100,
       "physics": {
         "fish": 98,
@@ -29,14 +29,14 @@
           0.29551406367739136,
           0
         ],
-        "radius": 2.3054222490587533,
+        "radius": 2.305523820008176,
         "manualTravel": 0,
         "pan": false,
         "log": []
       }
     },
     {
-      "elapsedSeconds": 60.686,
+      "elapsedSeconds": 60.746,
       "count": 100,
       "physics": {
         "fish": 98,
@@ -49,8 +49,8 @@
         "drawCalls": 63,
         "triangles": 158744,
         "fishCount": 100,
-        "frameP50Ms": 557.0999999999767,
-        "frameP95Ms": 1135.5,
+        "frameP50Ms": 576,
+        "frameP95Ms": 1169.4000000000233,
         "geometries": 42,
         "textures": 15
       },
@@ -62,14 +62,14 @@
           0.29551406367739136,
           0
         ],
-        "radius": 2.3050124194902017,
+        "radius": 2.3050141558559614,
         "manualTravel": 0,
         "pan": false,
         "log": []
       }
     },
     {
-      "elapsedSeconds": 90.695,
+      "elapsedSeconds": 90.758,
       "count": 100,
       "physics": {
         "fish": 98,
@@ -82,33 +82,105 @@
         "drawCalls": 63,
         "triangles": 158744,
         "fishCount": 100,
-        "frameP50Ms": 571.3999999999069,
-        "frameP95Ms": 1124.5,
+        "frameP50Ms": 584.0999999999767,
+        "frameP95Ms": 1165,
         "geometries": 42,
         "textures": 15
       },
       "camera": {
         "mode": "cinematic",
-        "shot": "school-scout",
+        "shot": null,
         "target": [
-          -0.1398050113754432,
-          0.37887849013860614,
-          -0.03733714789008192
+          0,
+          0.29551406367739136,
+          0
         ],
-        "radius": 1.6342812061676106,
+        "radius": 2.3050097283900493,
+        "manualTravel": 0,
+        "pan": false,
+        "log": []
+      }
+    },
+    {
+      "elapsedSeconds": 120.765,
+      "count": 100,
+      "physics": {
+        "fish": 98,
+        "wallViolations": 0,
+        "solidOverlaps": 0,
+        "maxOverlap": 0
+      },
+      "stats": {
+        "fps": 2,
+        "drawCalls": 63,
+        "triangles": 167816,
+        "fishCount": 100,
+        "frameP50Ms": 593.9000000000233,
+        "frameP95Ms": 1152.0999999999767,
+        "geometries": 42,
+        "textures": 15
+      },
+      "camera": {
+        "mode": "cinematic",
+        "shot": "cave-through",
+        "target": [
+          0.07035128009846119,
+          0.2671796702532907,
+          -0.17730843820643483
+        ],
+        "radius": 1.4232533813842039,
         "manualTravel": 0,
         "pan": false,
         "log": [
           {
-            "time": 14.076799999999897,
-            "type": "school-scout",
+            "time": 14.806099999999825,
+            "type": "cave-through",
             "reason": "live actors, novelty and clear line of sight"
           }
         ]
       }
     },
     {
-      "elapsedSeconds": 120.711,
+      "elapsedSeconds": 150.79,
+      "count": 100,
+      "physics": {
+        "fish": 98,
+        "wallViolations": 0,
+        "solidOverlaps": 0,
+        "maxOverlap": 0
+      },
+      "stats": {
+        "fps": 2,
+        "drawCalls": 62,
+        "triangles": 167804,
+        "fishCount": 100,
+        "frameP50Ms": 593.9000000000233,
+        "frameP95Ms": 1152.0999999999767,
+        "geometries": 42,
+        "textures": 15
+      },
+      "camera": {
+        "mode": "cinematic",
+        "shot": "cave-through",
+        "target": [
+          0.15766623272954225,
+          0.2165911286251196,
+          -0.17730843820643483
+        ],
+        "radius": 1.3871889049015436,
+        "manualTravel": 0,
+        "pan": false,
+        "log": [
+          {
+            "time": 14.806099999999825,
+            "type": "cave-through",
+            "reason": "live actors, novelty and clear line of sight"
+          }
+        ]
+      }
+    },
+    {
+      "elapsedSeconds": 180.805,
       "count": 100,
       "physics": {
         "fish": 98,
@@ -118,107 +190,29 @@
       },
       "stats": {
         "fps": 1,
-        "drawCalls": 63,
-        "triangles": 158744,
+        "drawCalls": 62,
+        "triangles": 172132,
         "fishCount": 100,
-        "frameP50Ms": 584.2000000000698,
-        "frameP95Ms": 1712.5999999998603,
+        "frameP50Ms": 1152.4000000001397,
+        "frameP95Ms": 2411.3000000000466,
         "geometries": 42,
         "textures": 15
       },
       "camera": {
         "mode": "cinematic",
-        "shot": "school-scout",
+        "shot": "cave-through",
         "target": [
-          -0.08045775483132839,
-          0.3708910285855825,
-          0.03658136741263418
+          0.17458538850438365,
+          0.16942806317503772,
+          -0.17730843820643483
         ],
-        "radius": 1.395141493493211,
+        "radius": 1.383408080463179,
         "manualTravel": 0,
         "pan": false,
         "log": [
           {
-            "time": 14.076799999999897,
-            "type": "school-scout",
-            "reason": "live actors, novelty and clear line of sight"
-          }
-        ]
-      }
-    },
-    {
-      "elapsedSeconds": 150.718,
-      "count": 100,
-      "physics": {
-        "fish": 98,
-        "wallViolations": 0,
-        "solidOverlaps": 0,
-        "maxOverlap": 0
-      },
-      "stats": {
-        "fps": 1,
-        "drawCalls": 63,
-        "triangles": 158744,
-        "fishCount": 100,
-        "frameP50Ms": 584.2000000000698,
-        "frameP95Ms": 1712.5999999998603,
-        "geometries": 42,
-        "textures": 15
-      },
-      "camera": {
-        "mode": "cinematic",
-        "shot": "school-scout",
-        "target": [
-          0.03541220681384795,
-          0.361902279348674,
-          0.03612524519011705
-        ],
-        "radius": 1.3837933506211963,
-        "manualTravel": 0,
-        "pan": false,
-        "log": [
-          {
-            "time": 14.076799999999897,
-            "type": "school-scout",
-            "reason": "live actors, novelty and clear line of sight"
-          }
-        ]
-      }
-    },
-    {
-      "elapsedSeconds": 180.731,
-      "count": 100,
-      "physics": {
-        "fish": 98,
-        "wallViolations": 0,
-        "solidOverlaps": 0,
-        "maxOverlap": 0
-      },
-      "stats": {
-        "fps": 1,
-        "drawCalls": 63,
-        "triangles": 158744,
-        "fishCount": 100,
-        "frameP50Ms": 967.2999999998137,
-        "frameP95Ms": 1941,
-        "geometries": 42,
-        "textures": 15
-      },
-      "camera": {
-        "mode": "cinematic",
-        "shot": "school-scout",
-        "target": [
-          0.11881311090459695,
-          0.3354731616745636,
-          0.0029534265236873156
-        ],
-        "radius": 1.3830379195751203,
-        "manualTravel": 0,
-        "pan": false,
-        "log": [
-          {
-            "time": 14.076799999999897,
-            "type": "school-scout",
+            "time": 14.806099999999825,
+            "type": "cave-through",
             "reason": "live actors, novelty and clear line of sight"
           }
         ]
@@ -256,8 +250,8 @@
       "settings": {
         "stage": "burst",
         "t": 0,
-        "hz": 7.189555624499917,
-        "beats": 3,
+        "hz": 5.6359309535473585,
+        "beats": 4,
         "surface": "glass"
       },
       "phases": [
@@ -283,7 +277,7 @@
           0.28806731292318977,
           -0.0066563581075466055
         ],
-        "radius": 1.9427908061311734,
+        "radius": 1.9427972702752494,
         "manualTravel": 109.50844619618641,
         "pan": true,
         "log": []
@@ -296,6 +290,6 @@
     "Software-rendered Chromium; desktop 60 FPS and physical-phone 30 FPS are not certified.",
     "Natural video has no forced actions; close-up clips use explicit QA fixtures."
   ],
-  "naturalWallSeconds": 781.191,
+  "naturalWallSeconds": 870.279,
   "pageErrors": []
 }
