@@ -58,6 +58,7 @@ export class Engine {
   private feedMode = false;
   private kanAquariumMode=new URLSearchParams(location.search).has('kanban');
   private clickFoodCount=0;
+  private lastFoodSpawn:THREE.Vector3|null=null;
   private pointerDown={x:0,y:0};
   // DOM overlay tied to 3D food positions: guaranteed legibility independent
   // of transparent water, frustum culling, camera zoom and postprocessing.
@@ -144,6 +145,23 @@ export class Engine {
           }
           return this.ecology.snapshot();
         };
+      // Test-only evidence of the exact spawn point, even after a fish eats it.
+      (window as Window & {__kanFoodProbe?:()=>unknown}).__kanFoodProbe=()=>({
+        count:this.clickFoodCount,
+        dims:{halfW:this.dims.halfW,halfD:this.dims.halfD,
+          floorY:this.dims.floorY,surfaceY:this.dims.surfaceY},
+        lastSpawn:this.lastFoodSpawn?.toArray()??null,
+        lastScreen:this.lastFoodSpawn?(()=>{
+          const point=this.lastFoodSpawn.clone().project(this.rig.camera);
+          return [point.x,point.y,point.z];
+        })():null,
+        obstacles:this.simEnv.obstacles.map(o=>[o.pos.x,o.pos.y,o.pos.z,o.radius]),
+        food:this.fish.food.bits.map(bit=>({
+          pos:bit.pos.toArray(),kind:bit.kind,state:bit.state,age:bit.age,
+        })),
+      });
+      (window as Window & {__kanFoodTestCamera?:(mode:'orbit'|'cinematic'|'still')=>void}).__kanFoodTestCamera=
+        (mode)=>this.setCameraMode(mode);
       (window as Window & {__kanRealismProbe?:()=>unknown}).__kanRealismProbe=()=>({
         name:this.config?.name,
         fish:this.fish.getPhysicsSnapshot(this.simEnv),
@@ -194,6 +212,8 @@ export class Engine {
       {
         delete (window as Window & {__kanRealismProbe?:()=>unknown}).__kanRealismProbe;
         delete (window as Window & {__kanEcoFastForward?:(seconds:number)=>unknown}).__kanEcoFastForward;
+        delete (window as Window & {__kanFoodProbe?:()=>unknown}).__kanFoodProbe;
+        delete (window as Window & {__kanFoodTestCamera?:(mode:'orbit'|'cinematic'|'still')=>void}).__kanFoodTestCamera;
       }
     this.renderer.dispose();
     this.container.removeChild(this.renderer.domElement);
@@ -347,16 +367,63 @@ export class Engine {
     return point;
   }
 
+
+  // Pick a random physical depth along the exact screen-space click ray.
+  // The click's projected pixel is invariant along this ray in perspective,
+  // unlike forcing every pellet to start at the water surface.
+  private foodPoint(clientX:number,clientY:number):THREE.Vector3|null{
+    const rect=this.renderer.domElement.getBoundingClientRect();
+    if(!Number.isFinite(clientX)||!Number.isFinite(clientY)||
+      clientX<rect.left||clientX>rect.right||clientY<rect.top||clientY>rect.bottom)return null;
+    this.raycaster.setFromCamera(this.toNdc(clientX,clientY),this.rig.camera);
+    const ray=this.raycaster.ray;
+    const pad=Math.min(.012,this.dims.halfW*.08,this.dims.halfD*.08,
+      (this.dims.surfaceY-this.dims.floorY)*.08);
+    const min=new THREE.Vector3(-this.dims.halfW+pad,this.dims.floorY+pad,-this.dims.halfD+pad);
+    const max=new THREE.Vector3(this.dims.halfW-pad,this.dims.surfaceY-pad,this.dims.halfD-pad);
+    // Slab intersection gives both entry and exit distances, including
+    // oblique viewpoints and cameras that are temporarily inside the tank.
+    let enter=0,exit=Infinity;
+    for(const axis of ['x','y','z'] as const){
+      const origin=ray.origin[axis],direction=ray.direction[axis];
+      if(Math.abs(direction)<1e-9){
+        if(origin<min[axis]||origin>max[axis])return null;
+        continue;
+      }
+      const a=(min[axis]-origin)/direction,b=(max[axis]-origin)/direction;
+      enter=Math.max(enter,Math.min(a,b));
+      exit=Math.min(exit,Math.max(a,b));
+      if(exit<=enter)return null;
+    }
+    if(!Number.isFinite(exit)||exit-enter<.0005)return null;
+    // Stay a small distance away from the glass, floor and waterline.
+    const inset=Math.min((exit-enter)*.06,.01);
+    enter+=inset;exit-=inset;
+    if(exit<=enter)return null;
+    // Keep solid hardscape/coral clear. Never shift x/y after choosing depth:
+    // moving off the ray would make the pellet jump away from the cursor.
+    const point=new THREE.Vector3();
+    for(let attempt=0;attempt<28;attempt++){
+      ray.at(enter+Math.random()*(exit-enter),point);
+      const blocked=this.simEnv.obstacles.some(o=>
+        point.distanceToSquared(o.pos)<Math.pow(Math.max(.005,o.radius)+.006,2));
+      if(!blocked)return point;
+    }
+    return null;
+  }
+
   queueFishDrop(clientX?:number,clientY?:number):void{
     const p=this.tankPoint(clientX,clientY);
     this.fish.queueDrop(p.x,p.z);
   }
 
-  feedAt(clientX:number,clientY:number,kind:FoodKind='normal'):boolean{
-    const hit=this.tankPoint(clientX,clientY);
-    this.fish.feed(hit.x,hit.z,this.simEnv,kind);
+  feedAt(clientX:number,clientY:number,kind:FoodKind='normal',count=this.clickFoodCount):boolean{
+    const hit=this.foodPoint(clientX,clientY);
+    if(!hit)return false;
+    this.fish.feed(hit.x,hit.z,this.simEnv,kind,hit.y);
+    this.lastFoodSpawn=hit.clone();
     this.ecology.feed(kind);
-    this.callbacks.onFed?.(kind,this.clickFoodCount);
+    this.callbacks.onFed?.(kind,count);
     return true;
   }
 
@@ -374,9 +441,9 @@ export class Engine {
     if(e.button!==0)return;
     if(this.kanAquariumMode){
       if(Math.hypot(e.clientX-this.pointerDown.x,e.clientY-this.pointerDown.y)>9)return;
-      this.clickFoodCount++;
-      const kind:FoodKind=this.clickFoodCount%10===0?(this.clickFoodCount/10)%2===1?'fish-cookie':'bear-cookie':'normal';
-      this.feedAt(e.clientX,e.clientY,kind);
+      const next=this.clickFoodCount+1;
+      const kind:FoodKind=next%10===0?(next/10)%2===1?'fish-cookie':'bear-cookie':'normal';
+      if(this.feedAt(e.clientX,e.clientY,kind,next))this.clickFoodCount=next;
       return;
     }
     // Ignore if this was a drag, not a tap.
