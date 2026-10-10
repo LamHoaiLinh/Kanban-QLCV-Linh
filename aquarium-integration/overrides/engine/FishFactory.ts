@@ -83,6 +83,7 @@ const swimHook = /* glsl */ `
     float lip = 1.0 - smoothstep(0.01, 0.14, s);
     float lowerJaw = 1.0 - smoothstep(-0.01, 0.015, transformed.y);
     transformed.y -= lip * lowerJaw * aDyn.w * 0.042;
+    transformed.x += lip * aDyn.w * 0.025;
     transformed.x -= lip * lowerJaw * aDyn.w * 0.007;
   }
 
@@ -385,6 +386,32 @@ function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
         [x0-.090,-hh*.76-.047],[x0-.055,-hh*.76-.005]],2,z,side*.12);
     }
   }
+  // Closed tapered fin sheets in the existing material group: no extra draw calls.
+  // Thickness is 0.4–1% body length at roots, fading to a thin rim.
+  const originalVertices=positions.length/3,originalIndices=indices.length;
+  const back=new Map<number,number>();
+  for(let v=finStart;v<originalVertices;v++){
+    const w=parts[v]===3?Math.min(1,flutter[v]/.18):finFlex[v];
+    const thickness=(sh.finLong?.010:.004)*Math.pow(1-w,1.8)+.00035;
+    const z=positions[v*3+2];positions[v*3+2]=z+thickness*.5;
+    const b=positions.length/3;back.set(v,b);
+    positions.push(positions[v*3],positions[v*3+1],z-thickness*.5);
+    uvs.push(uvs[v*2],uvs[v*2+1]);parts.push(parts[v]);flutter.push(flutter[v]);finFlex.push(finFlex[v]);
+    colors.push(colors[v*3],colors[v*3+1],colors[v*3+2]);
+  }
+  const boundary=new Map<string,{a:number;b:number;n:number}>();
+  const pointKey=(v:number)=>[positions[v*3],positions[v*3+1],positions[v*3+2]].map(x=>x.toFixed(5)).join(',');
+  for(let k=RINGS*SIDES*6;k<originalIndices;k+=3){
+    const a=indices[k],b=indices[k+1],c=indices[k+2];
+    indices.push(back.get(c)!,back.get(b)!,back.get(a)!);
+    for(const [u,v] of [[a,b],[b,c],[c,a]]){
+      const x=pointKey(u),y=pointKey(v),key=x<y?x+'|'+y:y+'|'+x;
+      const edge=boundary.get(key);if(edge)edge.n++;else boundary.set(key,{a:u,b:v,n:1});
+    }
+  }
+  for(const {a,b,n} of boundary.values())if(n===1){
+    const aa=back.get(a)!,bb=back.get(b)!;indices.push(a,aa,b,b,aa,bb);
+  }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
@@ -404,7 +431,8 @@ function buildFishGeometry(sp: SpeciesDef): THREE.BufferGeometry {
   geo.clearGroups();
   geo.addGroup(0, finIndexStart, 0);
   geo.addGroup(finIndexStart, indices.length - finIndexStart, 1);
-  void finStart;
+  geo.userData.taperedFins=true;
+  geo.userData.rootThickness=sh.finLong?.010:.004;
   return geo;
 }
 

@@ -60,6 +60,19 @@ export class HabitatDirector {
   private nextIn=5;
   private recent=new Map<string,{type:HabitatEvent;tunnel:string|null;until:number}>();
   private now=0;
+  liveEvents(env:SimEnv){
+    const groups=new Map<string,Route[]>();
+    for(const r of this.routes.values())groups.set(r.kind,[...(groups.get(r.kind)??[]),r]);
+    return [...groups].map(([type,rs])=>({id:type+':'+rs[0].fish.key,type,
+      actorIds:rs.map(r=>r.fish.key),worldPositions:rs.map(r=>r.fish.pos.clone()),startAt:env.time-(26-this.activeTime),
+      predictedDuration:Math.max(...rs.map(r=>r.ttl)),confidence:1,visualInterest:type.includes('cave')?.8:.65,
+      routeOrBounds:rs.flatMap(r=>r.waypoints.map(vec)),eligibleCamera:true}));
+  }
+  qaLaunch(type:HabitatEvent,agents:HabitAgent[],env:SimEnv):boolean{
+    if(!HABITAT_EVENTS.includes(type))return false;this.reset();
+    if(!this.launch(type,agents,env))return false;
+    this.active=type;this.activeTime=26;this.counts[type]++;return true;
+  }
   reset():void{
     this.routes.clear();this.active=null;this.activeTime=0;this.nextIn=7;
     this.recent.clear();
@@ -143,6 +156,7 @@ export class HabitatDirector {
     }
   }
   private launch(type:HabitatEvent,agents:HabitAgent[],env:SimEnv):boolean{
+    agents=agents.filter(a=>this.recent.get(a.key)?.type!==type);
     const fish=agents.filter(a=>!a.sp.invert);
     const schoolers=fish.filter(a=>a.sp.archetype==='schooler');
     const territorials=fish.filter(isTerritorial);
@@ -314,7 +328,7 @@ export class HabitatDirector {
       if(r.stalled>6){this.routes.delete(a.key);return;}
       steer.addScaledVector(delta.divideScalar(Math.max(d,1e-6)),3.2);
       a.anchor.copy(next);
-      a.mode=r.kind==='shade-retreat'?'rest':
+      a.mode=r.kind==='brief-chase'||r.kind==='nip-and-dodge'||r.kind==='school-startle'?'dart':r.kind==='shade-retreat'?'rest':
         r.kind.includes('graze')||r.kind.includes('forage')?'forage':'cruise';
       a.modeT=Math.max(a.modeT,.3);
     }

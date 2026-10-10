@@ -1,0 +1,46 @@
+// Design stock and performance stock are deliberately separate; saved tanks are never edited here.
+import type { TankConfig } from '../types';
+import { speciesById } from './species';
+import { tankDims } from './tanks';
+export const ABSOLUTE_FISH_CAP = 100;
+export function sizeFishCap(gallons:number):number {
+  const knots=[[5,8],[20,28],[40,48],[75,68],[120,88],[180,100]];
+  const g=Math.max(5,Math.min(180,gallons));
+  for(let i=1;i<knots.length;i++)if(g<=knots[i][0]){
+    const [x0,y0]=knots[i-1],[x1,y1]=knots[i];
+    return Math.floor(y0+(y1-y0)*(g-x0)/(x1-x0));
+  }
+  return 100;
+}
+export function effectiveFishCap(config:TankConfig,performanceCap=100):number {
+  const entries=Object.entries(config.fish).filter(([,n])=>n>0);
+  let count=0,cost=0;
+  for(const [id,n] of entries){const sp=speciesById.get(id);if(sp){count+=n;cost+=n*sp.bioload;}}
+  const bio=count?Math.floor(tankDims(config.gallons).capacity/Math.max(.1,cost/count)):100;
+  return Math.max(0,Math.min(100,sizeFishCap(config.gallons),bio,performanceCap));
+}
+// Retain named fish first, then complete social groups, then allocate spare capacity fairly.
+// Original keys and names remain in the snapshot, including names outside a trimmed live view.
+export function normalizeStock(config:TankConfig,performanceCap=100):TankConfig {
+  const cap=Math.min(sizeFishCap(config.gallons),performanceCap,100);
+  const budget=tankDims(config.gallons).capacity;
+  const entries=Object.entries(config.fish).map(([id,n])=>({id,n:Math.max(0,Math.floor(Number.isFinite(n)?n:0)),sp:speciesById.get(id)}))
+    .filter(e=>e.sp&&e.n>0&&e.sp.water===config.water&&e.sp.minGallons<=config.gallons);
+  entries.sort((a,b)=>{
+    const named=(id:string)=>Object.entries(config.fishNames??{}).some(([k,v])=>k.startsWith(id+':')&&!!v);
+    return Number(named(b.id))-Number(named(a.id));
+  });
+  const fish:Record<string,number>={};let total=0,load=0;
+  const limits=new Map(entries.map(e=>[e.id,Math.min(e.n,e.sp!.maxPerTank??100)]));
+  for(const e of entries){
+    const minimum=Math.min(e.n,Math.max(1,e.sp!.minGroup));
+    if(minimum>limits.get(e.id)!||total+minimum>cap||load+minimum*e.sp!.bioload>budget)continue;
+    fish[e.id]=minimum;total+=minimum;load+=minimum*e.sp!.bioload;
+  }
+  let progress=true;
+  while(progress&&total<cap){progress=false;for(const e of entries){
+    if(!(e.id in fish)||fish[e.id]>=limits.get(e.id)!||total>=cap||load+e.sp!.bioload>budget)continue;
+    fish[e.id]++;total++;load+=e.sp!.bioload;progress=true;
+  }}
+  return {...config,fish};
+}
