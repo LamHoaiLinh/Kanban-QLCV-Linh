@@ -147,7 +147,7 @@ export class FoodSystem {
   nearest(p:THREE.Vector3,maxDist:number,settledOnly:boolean):FoodBit|null{
     let best:FoodBit|null=null,score=Infinity;
     for(const b of this.bits){
-      if(b.state==='gone')continue;
+      if(b.state==='gone'||b.age<(b.kind==='normal'?.35:.45))continue;
       const special=b.kind!=='normal';
       if(!special&&settledOnly&&b.state!=='settled')continue;
       if(!special&&!settledOnly&&b.state==='settled')continue;
