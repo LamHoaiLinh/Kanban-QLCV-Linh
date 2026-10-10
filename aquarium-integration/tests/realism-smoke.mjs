@@ -66,10 +66,12 @@ try{
     const observer=new MutationObserver(records=>{
       for(const record of records)for(const el of record.addedNodes){
         if(el instanceof HTMLElement&&el.matches('.kan-food-item')){
-          requestAnimationFrame(()=>window.__qaFoods.push({
+          // MutationObserver fires after the food's dataset is updated, even
+          // on software-rendered Chromium with throttled requestAnimationFrame.
+          window.__qaFoods.push({
             kind:el.dataset.kind,state:el.dataset.foodState,occluded:el.dataset.occluded,
             width:el.getBoundingClientRect().width
-          }));
+          });
         }
       }
     });
