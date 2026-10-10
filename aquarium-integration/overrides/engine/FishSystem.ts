@@ -564,16 +564,32 @@ export class FishSystem {
     const flow = _v2.length();
     if (flow > 0.03) steer.addScaledVector(_v2.normalize(), -0.25);
 
-    // 8) Wander — slow per-fish noise so nobody swims in straight lines.
-    const t = env.time * (env.reducedMotion ? 0.5 : 1);
+    // 8) Species movement personality without changing boids/collisions.
+    const t=env.time*(env.reducedMotion?.5:1);
+    if(sp.id==='guppy'){
+      steer.y+=Math.sin(t*.73+a.rand*24)*.16;
+      steer.x+=Math.sin(t*.85+a.rand*18)*.14;
+    }else if(sp.id==='betta'||sp.id==='angelfish'){
+      steer.y+=Math.sin(t*.33+a.rand*25)*.055;
+    }else if(sp.id.includes('corydoras')&&a.mode==='forage'){
+      steer.y-=.13;
+      steer.x+=Math.sin(t*1.7+a.rand*13)*.24;
+    }else if(sp.archetype==='schooler'){
+      steer.z+=Math.sin(t*1.13+a.rand*18)*.13;
+    }
     steer.x += Math.sin(t * 0.7 + a.rand * 40) * 0.22;
     steer.z += Math.cos(t * 0.53 + a.rand * 71) * 0.22;
     steer.y += Math.sin(t * 0.41 + a.rand * 23) * 0.1;
 
     // — Integrate: steer → velocity, with mode-dependent target speed —
-    let targetSpeed = cruise * activity;
+    let targetSpeed=cruise*activity;
+    // Visual tempo by species, separate from shared movement archetypes.
+    if(sp.id==='betta')targetSpeed*=.77;
+    if(sp.id==='angelfish')targetSpeed*=.86;
+    if(sp.id==='guppy')targetSpeed*=1.08;
     if (a.mode === 'rest') targetSpeed = cruise * 0.06;
-    if (a.mode === 'dart') targetSpeed = maxSpeed;
+    if(a.mode==='dart')
+      targetSpeed=maxSpeed*(sp.id==='betta'?.63:sp.id==='angelfish'?.72:1);
     if(a.mode==='feed'){
       targetSpeed=cruise*(this.food.hasCookie?1.50:1.20);
       if(a.feedDistance!==undefined){
@@ -784,7 +800,13 @@ export class FishSystem {
       pitch = 0;
       up = _v3.set(a.wall === 'back' ? 0 : a.wall === 'left' ? 1 : -1, 0, a.wall === 'back' ? 1 : 0);
     } else {
-      yaw = Math.atan2(-a.vel.z, a.vel.x);
+      // Limit body heading rate, avoiding robotic instantaneous 180° spins.
+      const desiredYaw=Math.atan2(-a.vel.z,a.vel.x);
+      let difference=desiredYaw-a.prevYaw;
+      while(difference>Math.PI)difference-=TAU;
+      while(difference<-Math.PI)difference+=TAU;
+      const turnRate=sp.swim.turnRate*dt*(sp.id==='betta'?.67:sp.id==='angelfish'?.78:1);
+      yaw=a.prevYaw+THREE.MathUtils.clamp(difference,-turnRate,turnRate);
       pitch = Math.asin(THREE.MathUtils.clamp(speed > 1e-5 ? a.vel.y / speed : 0, -1, 1));
       // Normal swimming stays near level; an air-gulping cory points steeply.
       const maxPitch = a.gulp ? 1.25 : 0.5;
