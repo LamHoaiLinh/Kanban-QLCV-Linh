@@ -14,10 +14,11 @@ const rows=[];for(let index=0;index<112;index++){
  const row=await p.evaluate(index=>{
   const catalog=window.__kanContentQA();const config=index<100?window.__kanContentSeed(index+1):catalog.presets[index-100];
   if(index<100&&JSON.stringify(config)!==JSON.stringify(window.__kanContentSeed(index+1)))throw Error('Seed not deterministic');
+  if(!Object.keys(config.fish).some(id=>!catalog.species.find(sp=>sp.id===id)?.invert))throw Error('No swimming life after size filtering');
   if(config.decor.filter(d=>d.includes('log')||d.includes('driftwood')).length>1)throw Error('Overpacked logs');
   window.__kan42Scene(config);window.__kan42Day(1);window.__kanEcoFastForward(2);window.__kanFoodTestCamera('still');window.__kan42Step(.016);
   const{env,fish,flora,decor,renderer}=window.__kanStabilityWorld();let invalid=0;let fingerprint=2166136261;const mix=v=>{fingerprint=Math.imul(fingerprint^(Math.round(v*1e6)|0),16777619)>>>0;};
-  for(const mesh of flora.group.children){const pos=mesh.geometry.attributes.position;for(let i=0;i<pos.count;i++){const x=pos.getX(i),y=pos.getY(i),z=pos.getZ(i);if(!Number.isFinite(x+y+z)||Math.abs(x)>env.halfW+.0001||Math.abs(z)>env.halfD+.0001||y>env.surfaceY+.0001)invalid++;mix(x);mix(y);mix(z);}}
+  for(const mesh of flora.group.children){const pos=mesh.geometry.attributes.position;for(let i=0;i<pos.count;i++){const x=pos.getX(i),y=pos.getY(i),z=pos.getZ(i);if(!Number.isFinite(x+y+z)||Math.abs(x)>env.halfW+.0001||Math.abs(z)>env.halfD+.0001||y>env.surfaceY+.0001||y<env.floorY-.0001)invalid++;mix(x);mix(y);mix(z);}}
   const physics=fish.getPhysicsSnapshot(env),count=fish.populations.reduce((s,p)=>s+p.agents.length,0);
   if(invalid||physics.wallViolations)throw Error('Layout bounds '+JSON.stringify({index,invalid,physics}));
   return {index,name:config.name,seed:config.layout.seed,theme:config.layout.layoutTheme,gallons:config.gallons,fish:count,floraFingerprint:fingerprint,physics,render:{...renderer.info.render},memory:{...renderer.info.memory},config};

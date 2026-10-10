@@ -28,7 +28,9 @@ export function makeAquascape(seed:number,gallons:number,theme:Theme):TankConfig
   const sp=speciesById.get(id)!;if(sp.minGallons>gallons)continue;
   fish[id]=Math.min(sp.maxPerTank??100,Math.max(sp.minGroup,Math.round(n*factor*(.85+random()*.3))));
  }
- if(!Object.keys(fish).length)fish['endler-guppy']=4;
+ // Tiny rock tanks otherwise retain only one snail after minGallons filtering.
+ // Keep an appropriate small swimming group alongside the slow bottom life.
+ if(!Object.keys(fish).some(id=>!speciesById.get(id)!.invert))fish['endler-guppy']=4;
  for(const[id,n]of Object.entries(spec.flora))flora[id]=Math.max(1,Math.round(n*factor*(.8+random()*.3)));
  return normalizeStock({name:'Hồ cá ngẫu nhiên',water:'freshwater',gallons,substrate:theme==='nano'?'blacksand':'sand',background:theme==='angelfish'?'deepblue':'natural',lighting:'daylight',dayNight:'cycle',fish,flora,fishNames:{},decor:gallons<=20?['river-rocks']:spec.decor.slice(),layout:{generatorVersion:1,seed:seed>>>0,layoutTheme:theme,plantDensity:spec.density,openWaterRatio:spec.open,hardscapeType:theme==='rock'?'stone':theme==='nano'?'nano-rock':'wood',stockingProfile:theme,focalSide:random()<.5?-1:1,description:spec.description,tags:spec.tags.slice(),signatureShot:theme==='bottom-life'?'bottom':theme==='open-school'?'front':'diagonal'}});
 }
