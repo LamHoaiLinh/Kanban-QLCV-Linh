@@ -125,7 +125,7 @@ export class Engine {
       halfW: 0.5, halfD: 0.25, floorY: 0, surfaceY: 0.48,
       current: this.current,
       reducedMotion: false,
-      obstacles: [], shelters: [],ecoMode:'natural',
+      obstacles: [], shelters: [],ecoMode:'natural',ecoComfort:1,
     };
     // QA-only regression probe. Not enabled on the published KanBan URL.
     if(new URLSearchParams(location.search).get('qa')==='1'){
@@ -542,6 +542,10 @@ export class Engine {
 
     this.ecology.advance(dt,this.ecoMode,this.dayFactor,
       this.fish.food.bits.filter(b=>b.state==='settled').length);
+    const eco=this.ecology.snapshot();
+    this.simEnv.ecoComfort=this.ecoMode==='natural'
+      ?Math.max(.86,Math.min(1.03,((eco.oxygen+eco.cleanliness)/200)*1.04))
+      :1;
     this.fish.update(dt, this.simEnv);
     this.environment.update(this.dayFactor, this.rig.camera);
     this.rig.update(dt);

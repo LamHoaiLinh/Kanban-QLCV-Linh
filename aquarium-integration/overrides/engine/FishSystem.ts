@@ -51,6 +51,7 @@ export interface SimEnv {
   current: CurrentField;
   reducedMotion: boolean;
   ecoMode?:'natural'|'relax';
+  ecoComfort?:number; // gentle environmental modulation, never mortality
   obstacles: { pos: THREE.Vector3; radius: number }[]; // decor/coral keep-out spheres
   shelters: THREE.Vector3[];                            // hiding spots (decor)
 }
@@ -640,6 +641,8 @@ export class FishSystem {
       }
     }
     if (a.mode === 'forage') targetSpeed = cruise * 0.4;
+    // A mild, comfortable ecology subtly changes activity, never stops swimming.
+    if(env.ecoMode==='natural')targetSpeed*=Math.max(.86,Math.min(1.03,env.ecoComfort??1));
     if(env.ecoMode==='natural'&&a.mode==='rest')targetSpeed*=.75;
 
     const steerStrength = a.mode === 'dart' ? 4 : 1.8;
@@ -818,6 +821,16 @@ export class FishSystem {
     // Snails ooze along; hillstream loaches graze in place, then scoot.
     const isLoach = a.sp.id.includes('hillstream');
     let speed = 0.004;
+    if(env.ecoMode==='natural'&&!isLoach){
+      // Snails intermittently graze on glass instead of gliding nonstop.
+      a.modeT-=dt;
+      if(a.modeT<=0){
+        a.mode=a.mode==='forage'?'rest':'forage';
+        a.modeT=a.mode==='rest'?1.5+Math.random()*3:4+Math.random()*7;
+        if(a.mode==='forage')this.onEcoEvent?.('graze');
+      }
+      if(a.mode==='rest')speed=.00035;
+    }
     if (isLoach) {
       a.modeT -= dt;
       if (a.modeT <= 0) {
