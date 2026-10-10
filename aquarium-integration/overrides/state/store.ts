@@ -11,7 +11,7 @@ import { speciesForWater } from '../data/species';
 import { floraForWater } from '../data/flora';
 import { decorForWater } from '../data/decor';
 import { tankDims } from '../data/tanks';
-import { normalizeStock, sizeFishCap } from '../data/stocking';
+import { normalizeStock, resizeStock } from '../data/stocking';
 import type { EcoMode } from '../engine/Ecology';
 
 export interface AppState {
@@ -59,7 +59,6 @@ export interface AppState {
 // A share link (#t=...) overrides the persisted current tank on first load.
 const sharedConfig = typeof window !== 'undefined' ? decodeShareHash() : null;
 
-let lastShrinkAt=0;
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
 export const useStore = create<AppState>()(
@@ -81,21 +80,42 @@ export const useStore = create<AppState>()(
       reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
       smartCinema: true,
       resizeSnapshot: null,
-      undoResize: () => { const old=get().resizeSnapshot;if(old)set({config:old,resizeSnapshot:null}); },
+      undoResize: () => { const old=get().resizeSnapshot;if(old)set({config:old,resizeSnapshot:null,followFishKey:null,selectedFishKey:null}); },
       softFinsOn: true,
       feedMode: false,
       toast: null,
 
       setConfig: (patch) => {
-        const before=get().config;
-        const next=normalizeStock({...before,...patch});
-        const trimmed=Object.values(before.fish).reduce((a,b)=>a+b,0)-Object.values(next.fish).reduce((a,b)=>a+b,0);
-        const shrinking=patch.gallons!==undefined&&patch.gallons<before.gallons;
-        const now=Date.now();
-        const snapshot=shrinking&&now-lastShrinkAt<700&&get().resizeSnapshot?get().resizeSnapshot:structuredClone(before);
-        set({config:next,...(shrinking?{resizeSnapshot:snapshot}:{})});
-        if(shrinking)lastShrinkAt=now;
-        if(trimmed>0)get().showToast(`Đã giảm ${trimmed} sinh vật theo sức chứa. Có thể khôi phục bể trước trong bảng Dung tích.`);
+        const before=get().config, original=get().resizeSnapshot;
+        const volumeChange=patch.gallons!==undefined&&patch.gallons!==before.gallons;
+        const explicitStock=patch.fish!==undefined||patch.water!==undefined;
+        // Always derive the temporary display stock from the ORIGINAL aquarium,
+        // never from the previously trimmed step of a dragged slider.
+        const source=volumeChange&&!explicitStock&&original&&original.water===before.water
+          ?original:before;
+        const fitted=volumeChange&&!explicitStock
+          ?resizeStock(source,patch.gallons!)
+          :normalizeStock({...before,...patch});
+        const next=volumeChange&&!explicitStock
+          ?{...before,...patch,fish:fitted.fish,fishNames:fitted.fishNames}
+          :fitted;
+        const shrinking=volumeChange&&patch.gallons!<before.gallons;
+        const returning=!!original&&volumeChange&&patch.gallons!>=original.gallons;
+        const snapshot=explicitStock||returning?null
+          :shrinking?(original??structuredClone(before)):original;
+        set({
+          config:next,resizeSnapshot:snapshot,
+          ...(volumeChange?{followFishKey:null,selectedFishKey:null}:{})
+        });
+        if(volumeChange){
+          const previousCount=Object.values(before.fish).reduce((a,b)=>a+b,0);
+          const nextCount=Object.values(next.fish).reduce((a,b)=>a+b,0);
+          const substituted=Object.keys(next.fish).some(id=>!source.fish[id]);
+          if(shrinking&&previousCount>0&&substituted)
+            get().showToast(`Hồ ${Math.round(patch.gallons!*3.785)} lít: đã chọn sinh vật nhỏ phù hợp. Phóng lớn sẽ khôi phục đàn cá cũ.`);
+          else if(shrinking&&previousCount>nextCount)
+            get().showToast(`Đã cân đối từ ${previousCount} xuống ${nextCount} sinh vật theo sức chứa. Phóng lớn sẽ khôi phục đàn cũ.`);
+        }
       },
 
       // Switching water type swaps the whole library, so stock must be cleared —
@@ -104,6 +124,7 @@ export const useStore = create<AppState>()(
         set((s) => {
           if (s.config.water === water) return s;
           return {
+            resizeSnapshot:null,
             config: {
               ...s.config, water, fish: {}, flora: {}, fishNames: {},
               decor: s.config.decor.filter((d) => decorForWater(water).some((x) => x.id === d)),
@@ -118,7 +139,7 @@ export const useStore = create<AppState>()(
         set((s) => {
           const fish = { ...s.config.fish };
           if (count <= 0) delete fish[id]; else fish[id] = Math.min(count, 100);
-          return { config: normalizeStock({ ...s.config, fish }) };
+          return { config: normalizeStock({ ...s.config, fish }),resizeSnapshot:null };
         }),
 
       setFloraCount: (id, count) =>
@@ -143,7 +164,7 @@ export const useStore = create<AppState>()(
           config: { ...s.config, fishNames: { ...s.config.fishNames, [key]: name } },
         })),
 
-      applyPreset: (preset) => set({ config: normalizeStock(structuredClone(preset)), followFishKey: null, selectedFishKey: null }),
+      applyPreset: (preset) => set({ config: normalizeStock(structuredClone(preset)), resizeSnapshot:null,followFishKey: null, selectedFishKey: null }),
 
       // Curated theme first, then gentle variation. Unlike fully independent
       // random objects, these compositions keep foreground room for swimming.
@@ -163,7 +184,7 @@ export const useStore = create<AppState>()(
         for(const [id,amount] of Object.entries(config.flora))
           config.flora[id]=Math.max(1,amount+Math.floor(Math.random()*3)-1);
         config.name='Hồ cá ngẫu nhiên';
-        set({config:normalizeStock(config),followFishKey:null,selectedFishKey:null});
+        set({config:normalizeStock(config),resizeSnapshot:null,followFishKey:null,selectedFishKey:null});
         get().showToast('Đã tạo hồ cá ngẫu nhiên theo bố cục '+template.name+'.');
       },
 
@@ -179,7 +200,7 @@ export const useStore = create<AppState>()(
           const config=structuredClone(saved);
           if(config.name==='Surprise Tank'||config.name==='Hồ cá bất ngờ')
             config.name='Hồ cá ngẫu nhiên';
-          set({config:normalizeStock(config),followFishKey:null,selectedFishKey:null});
+          set({config:normalizeStock(config),resizeSnapshot:null,followFishKey:null,selectedFishKey:null});
         }
       },
 
@@ -204,6 +225,9 @@ export const useStore = create<AppState>()(
       partialize: (s) => ({
         config: s.config,
         savedTanks: s.savedTanks,
+        // A resize backup is durable too: reloading while viewing a nano tank
+        // must never irreversibly discard the original large-tank species.
+        resizeSnapshot: s.resizeSnapshot,
         quality: s.quality,
         audioOn: s.audioOn,
         audioVolume: s.audioVolume,

@@ -397,6 +397,19 @@ export const SPECIES: SpeciesDef[] = [
     swim: swim({"cruise":0.92,"turnRate":2.4,"amp":0.12}),
   },
 
+  {
+    id: 'cerith-snail', common: 'Ốc Cerith mini', scientific: 'Cerithium sp.',
+    water: 'saltwater', adultSizeIn: 0.8, lengthM: 0.018,
+    temperament: 'peaceful', careLevel: 'easy', zone: 'bottom', archetype: 'cleaner',
+    minGroup: 1, maxPerTank: 4, bioload: 0.15, minGallons: 5, reefSafe: true, invert: true,
+    habitat: 'Ốc nhỏ hoạt động trên cát và đá biển, thích hợp với hồ nano có tảo tự nhiên.',
+    funFact: 'Bò chậm, sục cát và gặm các lớp tảo trên bề mặt.',
+    colorTags: ['brown', 'gold'],
+    shape: shape({ height: 0.62, width: 0.68, noseSharp: 0, tailFork: 0, tailSize: 0.01, dorsalHeight: 0, analHeight: 0 }),
+    palette: pal({ base: '#967a50', belly: '#d0b99b', back: '#604b32', pattern: 'hstripe', patternColor: '#493829', patternParams: [4], iridescence: 0.05, finOpacity: 0 }),
+    swim: swim({ cruise: 0.015, burst: 0.12, freqBase: 0, mode: 3, turnRate: 0.4 }),
+  },
+
   // ───────────────────────── SALTWATER ─────────────────────────
   {
     id: 'ocellaris-clown', common: 'Cá hề Nemo', scientific: 'Amphiprion ocellaris',

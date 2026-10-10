@@ -58,3 +58,45 @@ export function normalizeStock(config:TankConfig,performanceCap=100):TankConfig 
   }
   return {...config,fish,fishNames};
 }
+
+
+// Preserve the *intent* of a tank while resizing: use the original (pre-shrink)
+// population as the source so 180 -> 40 -> 5 -> 180 cannot progressively
+// erase species. Respect minimum tank sizes and minimum schooling groups.
+// When all original species are too large, substitute a suitable nano animal
+// instead of leaving a previously inhabited tank empty.
+export function resizeStock(source:TankConfig,gallons:number):TankConfig {
+  const target={...source,gallons};
+  const originalCount=Object.values(source.fish).reduce((sum,n)=>sum+Math.max(0,n||0),0);
+  if(!originalCount)return normalizeStock(target); // an intentionally empty tank stays empty
+
+  const numberRatio=Math.min(1,sizeFishCap(gallons)/Math.max(1,sizeFishCap(source.gallons)));
+  const bioRatio=Math.min(1,tankDims(gallons).capacity/Math.max(1,tankDims(source.gallons).capacity));
+  const ratio=Math.min(numberRatio,bioRatio);
+  const proposed:Record<string,number>={};
+  for(const [id,rawCount] of Object.entries(source.fish)){
+    const sp=speciesById.get(id),count=Math.max(0,Math.floor(rawCount));
+    if(!sp||!count||sp.water!==source.water||sp.minGallons>gallons)continue;
+    // Social groups should survive intact if they fit; individual animals may
+    // scale down to one. Never manufacture additional members beyond original.
+    const targetCount=Math.max(Math.min(count,sp.minGroup),Math.round(count*ratio));
+    proposed[id]=Math.min(count,targetCount);
+  }
+  const fitting=normalizeStock({...target,fish:proposed});
+  if(Object.keys(fitting.fish).length)return fitting;
+
+  const priority=source.water==='freshwater'
+    ? ['endler-guppy','cherry-shrimp','ember-tetra','guppy','betta','nerite-snail']
+    : ['cerith-snail','turbo-snail'];
+  const cap=sizeFishCap(gallons),budget=tankDims(gallons).capacity;
+  for(const id of priority){
+    const sp=speciesById.get(id);
+    if(!sp||sp.water!==source.water||sp.minGallons>gallons)continue;
+    const amount=Math.min(sp.maxPerTank??100,Math.max(1,sp.minGroup),cap);
+    if(amount<sp.minGroup||amount*sp.bioload>budget)continue;
+    const replacement=normalizeStock({...target,fish:{[id]:amount},fishNames:{}});
+    if(Object.keys(replacement.fish).length)return replacement;
+  }
+  // Do not invent physically impossible stock when no suitable nano species exists.
+  return fitting;
+}
