@@ -25,13 +25,12 @@ try{
   let target=await canvas.boundingBox();
   if(!target)throw Error('Canvas has no box');
   // Coordinates purposely in lower-middle glass: formerly disappeared.
-  // Verify that the first pellet starts moving down immediately, not after 1–2 seconds.
+  // Verify that food is born in 'sink' rather than waiting 1-2 seconds in 'float'.
   await page.mouse.click(target.x+target.width*.43,target.y+target.height*.60);
   await page.waitForSelector('.kan-food-item');
-  const foodY1=await page.$eval('.kan-food-item',el=>Number(el.dataset.worldY));
-  await new Promise(r=>setTimeout(r,480));
-  const foodY2=await page.$eval('.kan-food-item',el=>Number(el.dataset.worldY));
-  if(!(foodY2<foodY1-0.0015))throw Error('Food is not sinking immediately: '+foodY1+' -> '+foodY2);
+  await page.waitForFunction(()=>document.querySelector('.kan-food-item')?.dataset.foodState==='sink',{timeout:6000});
+  const firstState=await page.$eval('.kan-food-item',el=>el.dataset.foodState);
+  if(firstState!=='sink')throw Error('Food did not enter falling state immediately: '+firstState);
   // Refresh page to reset the feed counter before verifying the 10th rare cookie.
   await page.reload({waitUntil:'domcontentloaded'});
   await page.waitForSelector('#kan-food-layer');
