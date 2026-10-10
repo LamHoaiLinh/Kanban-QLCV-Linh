@@ -135,6 +135,7 @@ function buildFishAsset(sp: SpeciesDef): FishAsset {
   const map = fishTextureWithEye(sp);
   const body = new THREE.MeshStandardMaterial({
     map,
+    vertexColors:true,
     roughness: sp.shape.eelLike ? 0.49 : sp.id==='betta' || sp.id==='guppy' ? 0.44 : 0.37,
     metalness: 0.34 * sp.palette.iridescence, // structural shimmer on tetras etc.
     envMapIntensity: 0.58 + sp.palette.iridescence * 0.65,
@@ -168,10 +169,19 @@ function fishTextureWithEye(sp: SpeciesDef): THREE.Texture {
   const canvas = tex.image as HTMLCanvasElement;
   const ctx = canvas.getContext('2d')!;
   const W = canvas.width, H = canvas.height;
+  if(sp.id.includes('snail')){
+    // A shell pattern, not a fish eye painted on the shell. The soft foot
+    // samples a quiet belly texel and has its own vertex tint below.
+    ctx.strokeStyle='rgba(39,29,18,.22)';ctx.lineWidth=1.5;ctx.beginPath();
+    for(let i=0;i<160;i++){const t=i/159*Math.PI*5,r=i/159*H*.36;const x=W*.5+Math.cos(t)*r,y=H*.5+Math.sin(t)*r;if(!i)ctx.moveTo(x,y);else ctx.lineTo(x,y);}ctx.stroke();
+    tex.needsUpdate=true;return tex;
+  }
   const ex = W * 0.115, ey = H * (1 - 0.62), r = H * sp.shape.eyeSize * 2.4;
   ctx.fillStyle = '#d8d2c0';
   ctx.beginPath(); ctx.arc(ex, ey, r * 1.25, 0, TAU); ctx.fill();
-  ctx.fillStyle = sp.palette.eyeColor ?? '#0a0a0c';
+  const eye=ctx.createRadialGradient(ex-r*.25,ey-r*.25,r*.05,ex,ey,r);
+  eye.addColorStop(0,sp.palette.eyeColor??'#394752');eye.addColorStop(.55,sp.palette.eyeColor??'#12171e');eye.addColorStop(1,'#030609');
+  ctx.fillStyle = eye;
   ctx.beginPath(); ctx.arc(ex, ey, r * 0.85, 0, TAU); ctx.fill();
   ctx.fillStyle = 'rgba(255,255,255,0.9)';
   ctx.beginPath(); ctx.arc(ex - r * 0.3, ey - r * 0.3, r * 0.28, 0, TAU); ctx.fill();
@@ -221,7 +231,7 @@ function buildFishGeometry(sp: SpeciesDef,low=false): THREE.BufferGeometry {
   for (let i = 0; i <= RINGS; i++) {
     const u = i / RINGS;                     // 0 nose → 1 tail base
     const x = 0.5 - u * bodyLen;
-    const hh = Math.max(0.004, bodyProfile(u, sp));
+    const hh = Math.max(0.004, bodyProfile(u, sp))*(sp.id.includes('shrimp')?.94+.06*Math.cos(u*Math.PI*14):1);
     const ww = hh * sh.width * (1.0-.07*Math.cos(u*Math.PI*2));
     // Fish backs arch more than bellies drop — shift the section center up a touch.
     const cy = hh * 0.12 * Math.sin(u * Math.PI);
@@ -461,14 +471,15 @@ function buildSnailGeometry(sp: SpeciesDef): THREE.BufferGeometry {
 
   // Merge the two by hand (avoids importing BufferGeometryUtils for one case).
   const geos = [shell, foot];
-  const positions: number[] = [], uvs: number[] = [], parts: number[] = [], flutter: number[] = [], finFlex: number[] = [], indices: number[] = [];
+  const positions: number[] = [], uvs: number[] = [], parts: number[] = [], flutter: number[] = [], finFlex: number[] = [], indices: number[] = [],colors:number[]=[];
   let offset = 0;
   for (const g of geos) {
     const pos = g.getAttribute('position'), uv = g.getAttribute('uv');
     const idx = g.getIndex()!;
     for (let i = 0; i < pos.count; i++) {
       positions.push(pos.getX(i), pos.getY(i), pos.getZ(i));
-      uvs.push(uv.getX(i), uv.getY(i));
+      uvs.push(g===foot?.92:uv.getX(i),g===foot?.02:uv.getY(i));
+      colors.push(...(g===foot?[.55,.57,.5]:[1,1,1]));
       parts.push(0); flutter.push(0); finFlex.push(0);
     }
     for (let i = 0; i < idx.count; i++) indices.push(idx.getX(i) + offset);
@@ -480,6 +491,7 @@ function buildSnailGeometry(sp: SpeciesDef): THREE.BufferGeometry {
   geo.setAttribute('aPart', new THREE.Float32BufferAttribute(parts, 1));
   geo.setAttribute('aFlutterD', new THREE.Float32BufferAttribute(flutter, 1));
   geo.setAttribute('aFinFlex', new THREE.Float32BufferAttribute(finFlex, 1));
+  geo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));
   geo.setIndex(indices);
   geo.computeVertexNormals();
   geo.clearGroups();

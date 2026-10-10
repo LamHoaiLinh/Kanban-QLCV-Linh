@@ -112,6 +112,14 @@ export const FLORA: FloraDef[] = [
   },
 ];
 
+FLORA.push(
+ {id:'ludwigia-repens',name:'Diệp tài hồng',scientific:'Ludwigia repens',water:'freshwater',kind:'stem',heightM:.27,colors:['#6a7544','#915745','#7c6849'],careLevel:'easy',info:'Cắm nền; lá đối hơi tròn, điểm nhấn đỏ nâu ở trung/hậu cảnh.'},
+ {id:'rotala-rotundifolia',name:'Vảy ốc',scientific:'Rotala rotundifolia',water:'freshwater',kind:'stem',heightM:.32,colors:['#68824e','#a27a5b','#8b9560'],careLevel:'moderate',info:'Cắm nền; thân mảnh, lá nhỏ xếp tầng, tạo bụi hậu cảnh mềm.'},
+ {id:'hornwort',name:'Rong đuôi chó',scientific:'Ceratophyllum demersum',water:'freshwater',kind:'stem',heightM:.28,colors:['#426a37','#5c8644','#355d30'],careLevel:'easy',info:'Cụm thân treo gần nền; lá kim xòe vòng, không có thân rễ giả.'},
+ {id:'water-sprite',name:'Thủy cúc dương xỉ',scientific:'Ceratopteris thalictroides',water:'freshwater',kind:'rosette',heightM:.25,colors:['#538340','#6b9a4e','#416f34'],careLevel:'easy',info:'Cắm nền; lá phân thùy tơi nhẹ cho trung/hậu cảnh.'},
+ {id:'dwarf-sagittaria',name:'Cỏ thìa lùn',scientific:'Sagittaria subulata',water:'freshwater',kind:'carpet',heightM:.075,colors:['#629244','#77a153','#4f833c'],careLevel:'easy',info:'Cắm nền; cụm lá ribbon ngắn tiền cảnh, chừa đường cát cho cá đáy.'}
+);
+
 export const floraById = new Map(FLORA.map((f) => [f.id, f]));
 export const floraForWater = (water: 'freshwater' | 'saltwater') =>
   FLORA.filter((f) => f.water === water);

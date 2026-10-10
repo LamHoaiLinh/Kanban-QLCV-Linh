@@ -6,12 +6,10 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { CameraMode, DayNightMode, QualityTier, TankConfig } from '../types';
 import { DEFAULT_TANK, PRESETS } from '../data/presets';
+import { randomAquascape, migrateAquariumState } from '../data/Aquascapes';
 import { decodeShareHash } from './share';
-import { speciesForWater } from '../data/species';
-import { floraForWater } from '../data/flora';
 import { decorForWater } from '../data/decor';
-import { tankDims } from '../data/tanks';
-import { normalizeStock, sizeFishCap } from '../data/stocking';
+import { normalizeStock } from '../data/stocking';
 import type { EcoMode } from '../engine/Ecology';
 
 export interface AppState {
@@ -147,42 +145,8 @@ export const useStore = create<AppState>()(
 
       // "Surprise me": build a random but sensible tank within capacity.
       randomize: () => {
-        const water = Math.random() < 0.55 ? 'freshwater' as const : 'saltwater' as const;
-        const gallons = [10, 20, 29, 40, 55, 75, 120][Math.floor(Math.random() * 7)];
-        const cap = tankDims(gallons).capacity;
-        const pool = speciesForWater(water).filter((sp) => sp.minGallons <= gallons);
-        const fish: Record<string, number> = {};
-        let load = 0;
-        let totalFish=0;
-        // Fill ~80% of capacity: schools first, then characters, then cleanup crew.
-        const shuffled = [...pool].sort(() => Math.random() - 0.5);
-        for (const sp of shuffled) {
-          if (load >= cap * 0.8) break;
-          const groupSize = sp.minGroup > 1 ? sp.minGroup + Math.floor(Math.random() * 5) : (sp.maxPerTank ?? 1);
-          const cost = sp.bioload * groupSize;
-          if(totalFish+groupSize>sizeFishCap(gallons))continue;
-          if (load + cost <= cap * 0.85 && !(sp.mouthIn && Object.keys(fish).length > 0)) {
-            fish[sp.id] = groupSize;
-            load += cost;
-            totalFish+=groupSize;
-          }
-        }
-        const floraPool = floraForWater(water).sort(() => Math.random() - 0.5).slice(0, 4 + Math.floor(Math.random() * 3));
-        const flora: Record<string, number> = {};
-        for (const f of floraPool) flora[f.id] = 1 + Math.floor(Math.random() * 4);
-        const decor = decorForWater(water).filter((d) => !d.playful || Math.random() < 0.2)
-          .filter(() => Math.random() < 0.6).map((d) => d.id);
-        const substrates = water === 'saltwater' ? (['sand', 'crushedcoral'] as const) : (['sand', 'gravel', 'blacksand'] as const);
-        set((s) => ({
-          config: {
-            ...s.config, water, gallons, fish, flora, decor, fishNames: {},
-            substrate: substrates[Math.floor(Math.random() * substrates.length)],
-            background: water === 'saltwater' ? 'reef' : (['natural', 'planted', 'deepblue'] as const)[Math.floor(Math.random() * 3)],
-            lighting: water === 'saltwater' ? 'actinic' : 'daylight',
-            name: 'Hồ cá ngẫu nhiên',
-          },
-        }));
-        get().showToast('Đã tạo hồ cá ngẫu nhiên. Anh có thể chỉnh sửa theo ý thích.');
+        const seed=Math.floor(Math.random()*4294967296);
+        set({config:randomAquascape(seed),followFishKey:null,selectedFishKey:null});
       },
 
       saveTank: (name) =>
@@ -218,6 +182,8 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'aquarium-v1',
+      version:1,
+      migrate:(persisted)=>migrateAquariumState(persisted) as AppState,
       // Only persist durable things — session UI state stays fresh each visit.
       partialize: (s) => ({
         config: s.config,

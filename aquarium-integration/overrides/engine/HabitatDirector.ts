@@ -302,6 +302,7 @@ export class HabitatDirector {
     const x=THREE.MathUtils.clamp(a.pos.x+dx/d*step,-env.halfW*.95,env.halfW*.95);
     const z=THREE.MathUtils.clamp(a.pos.z+dz/d*step,-env.halfD*.95,env.halfD*.95);
     if(a.sp.id.includes('snail')||a.sp.id.includes('shrimp')){
+      if(env.solids?.sweep(a.pos,new THREE.Vector3(x,a.pos.y,z),Math.max(.002,a.scale*.12)))return;
       // Continue a deliberate film-grazing crawl along the floor; no teleport.
       a.pos.x=x;a.pos.z=z;
       a.mode='forage';

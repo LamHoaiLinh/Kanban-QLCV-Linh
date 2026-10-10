@@ -7,6 +7,8 @@
 import * as THREE from 'three';
 import { applyUnderwater } from './shaders';
 import { rockTexture, woodTexture } from './textures';
+import type { AquascapeLayout } from '../types';
+import { seededRandom } from '../data/Aquascapes';
 
 // Machine-readable water corridors; unlike a spherical decor collider these
 // store actual entrances, widths, and direction. Generated from the SAME
@@ -116,10 +118,14 @@ function cappedWoodTube(
   curve:THREE.Curve<THREE.Vector3>,segments:number,radius:number,
   radialSegments:number,closed=false,
 ):THREE.BufferGeometry{
+  radialSegments=Math.max(10,radialSegments);
   const geo=new THREE.TubeGeometry(curve,segments,radius,radialSegments,closed);
   if(closed)return geo;
   const pos=Array.from(geo.getAttribute('position').array as Float32Array);
   const uv=Array.from(geo.getAttribute('uv').array as Float32Array);
+  // Three TubeGeometry uses U along the curve; bark uses V along the trunk,
+  // as do the hollow logs and cylinders. Share the same longitudinal grain.
+  for(let i=0;i<uv.length;i+=2){const along=uv[i];uv[i]=uv[i+1];uv[i+1]=along;}
   const indices=Array.from(geo.getIndex()!.array);
   const start=pos.length/3;
   const p0=curve.getPoint(0),p1=curve.getPoint(1);
@@ -176,12 +182,17 @@ export class DecorSystem {
 
   private mat(opts: THREE.MeshStandardMaterialParameters): THREE.MeshStandardMaterial {
     const m = new THREE.MeshStandardMaterial(opts);
+    if(opts.map?.userData.woodGrain){
+      m.bumpMap=opts.map;m.bumpScale=.0014;m.roughness=Math.min(.94,Math.max(.82,opts.roughness??.9));
+    }
     applyUnderwater(m, { caustics: true, causticStrength: 1 });
     this.materials.push(m);
     return m;
   }
 
-  rebuild(decorIds: string[], dims: { halfW: number; halfD: number; floorY: number; height: number }): DecorOutput {
+  rebuild(decorIds: string[], dims: { halfW: number; halfD: number; floorY: number; height: number },layout?:AquascapeLayout): DecorOutput {
+    const random=seededRandom(layout?.seed);
+    this.group.scale.x=1;
     // Each rebuild creates new procedurally tessellated meshes. Dispose old
     // geometries first so editing wood does not leak GPU buffers over time.
     this.group.traverse(obj=>{
@@ -206,7 +217,7 @@ export class DecorSystem {
       switch (id) {
         case 'driftwood': {
           // A main bough with two branches, arching across the left third.
-          const wood = this.mat({ map: woodTexture(), color: '#a58359', roughness: 0.92 });
+          const wood = this.mat({ map: woodTexture(random), color: '#a58359', roughness: 0.92 });
           const curve = new THREE.CatmullRomCurve3([
             new THREE.Vector3(-halfW * 0.7, floorY, -halfD * 0.2),
             new THREE.Vector3(-halfW * 0.3, floorY + dims.height * 0.35, 0),
@@ -233,7 +244,7 @@ export class DecorSystem {
         }
         case 'spider-wood': {
           // A short trunk with several thin roots fanning up and outward.
-          const wood = this.mat({ map: woodTexture(), color: '#6a5236', roughness: 0.9 });
+          const wood = this.mat({ map: woodTexture(random), color: '#6a5236', roughness: 0.9 });
           const cx = halfW * 0.35, cz = -halfD * 0.1;
           const base = new THREE.Vector3(cx, floorY + 0.01, cz);
           const trunkTop = base.clone().add(new THREE.Vector3(0.02 * scale, dims.height * 0.2, 0.01 * scale));
@@ -267,7 +278,7 @@ export class DecorSystem {
         }
         case 'driftwood-stump': {
           // A gnarled stump with roots splaying down into the sand.
-          const wood = this.mat({ map: woodTexture(), color: '#5f4a30', roughness: 0.92 });
+          const wood = this.mat({ map: woodTexture(random), color: '#5f4a30', roughness: 0.92 });
           const cx = -halfW * 0.35, cz = halfD * 0.25;
           const R = 0.06 * scale + 0.02, H = 0.09 * scale + 0.03;
           const stump = new THREE.Mesh(displace(new THREE.CylinderGeometry(R * 0.85, R, H, 10, 2), 0.12, 3), wood);
@@ -291,7 +302,7 @@ export class DecorSystem {
         case 'split-log':
         case 'hollow-log': {
           const split=id==='split-log';
-          const barkMap=woodTexture();
+          const barkMap=woodTexture(random);
           const wood=this.mat({map:barkMap,color:split?'#8b6945':'#ac8253',
             roughness:.94,side:THREE.DoubleSide});
           const innerWood=this.mat({map:barkMap,color:split?'#423024':'#523e2d',
@@ -357,7 +368,7 @@ export class DecorSystem {
         case 'log-arch': {
           // A hollow log bowed into an archway fish swim under and through.
           const roots=id==='root-bridge';
-          const wood = this.mat({ map: woodTexture(), color: roots?'#675039':'#6f5232', roughness: 0.9, side: THREE.DoubleSide });
+          const wood = this.mat({ map: woodTexture(random), color: roots?'#675039':'#6f5232', roughness: 0.9, side: THREE.DoubleSide });
           const cx = -halfW * 0.2, cz = -halfD * 0.05;
           const R = 0.05 * scale + 0.022;
           const foot = 0.14 * scale + 0.05, rise = 0.1 * scale + 0.05, lean = halfD * 0.05;
@@ -393,13 +404,13 @@ export class DecorSystem {
           break;
         }
         case 'river-rocks': {
-          const rock = this.mat({ map: rockTexture('#5e5852'), roughness: 0.9 });
+          const rock = this.mat({ map: rockTexture('#5e5852',random), roughness: 0.9 });
           for (let i = 0; i < 5; i++) {
-            const r = (0.03 + Math.random() * 0.05) * scale + 0.015;
+            const r = (0.03 + random() * 0.05) * scale + 0.015;
             const g = displace(new THREE.SphereGeometry(r, 10, 8), 0.25, i + 2);
             const m = new THREE.Mesh(g, rock);
-            m.position.set(halfW * (0.15 + Math.random() * 0.5), floorY + r * 0.55, halfD * (Math.random() * 0.8 - 0.5));
-            m.rotation.set(Math.random(), Math.random() * Math.PI, Math.random());
+            m.position.set(halfW * (0.15 + random() * 0.5), floorY + r * 0.55, halfD * (random() * 0.8 - 0.5));
+            m.rotation.set(random(), random() * Math.PI, random());
             this.group.add(m);
             out.obstacles.push({ pos: m.position.clone(), radius: r * 1.1 });
             out.anchors.push(m.position.clone().add(new THREE.Vector3(0, r * 0.8, 0)));
@@ -407,14 +418,14 @@ export class DecorSystem {
           break;
         }
         case 'slate-stack': {
-          const slate = this.mat({ map: rockTexture('#565a60'), roughness: 0.8 });
+          const slate = this.mat({ map: rockTexture('#565a60',random), roughness: 0.8 });
           const cx = -halfW * 0.45, cz = halfD * 0.15;
           let y = floorY;
           for (let i = 0; i < 3; i++) {
             const w = (0.16 - i * 0.03) * scale + 0.04, d = (0.12 - i * 0.02) * scale + 0.03, h = 0.014 * scale + 0.006;
             const m = new THREE.Mesh(displace(new THREE.BoxGeometry(w, h, d, 4, 1, 4), 0.08, i + 5), slate);
-            m.position.set(cx + (Math.random() - 0.5) * 0.03, y + h / 2 + (i > 0 ? 0.02 : 0), cz + (Math.random() - 0.5) * 0.03);
-            m.rotation.y = Math.random() * 0.6;
+            m.position.set(cx + (random() - 0.5) * 0.03, y + h / 2 + (i > 0 ? 0.02 : 0), cz + (random() - 0.5) * 0.03);
+            m.rotation.y = random() * 0.6;
             this.group.add(m);
             y = m.position.y + h / 2;
           }
@@ -425,23 +436,23 @@ export class DecorSystem {
         }
         case 'reef-rock': {
           // A porous rock wall across the back — the reef's skeleton.
-          const rockMat = this.mat({ map: rockTexture('#6a625a'), roughness: 0.95 });
+          const rockMat = this.mat({ map: rockTexture('#6a625a',random), roughness: 0.95 });
           for (let i = 0; i < 7; i++) {
-            const r = (0.06 + Math.random() * 0.09) * scale + 0.02;
+            const r = (0.06 + random() * 0.09) * scale + 0.02;
             const g = displace(new THREE.SphereGeometry(r, 12, 9), 0.45, i * 1.7 + 1);
             const m = new THREE.Mesh(g, rockMat);
             const x = -halfW * 0.8 + (i / 6) * halfW * 1.6;
-            m.position.set(x + (Math.random() - 0.5) * 0.06, floorY + r * (0.4 + Math.random() * 0.5), -halfD * (0.35 + Math.random() * 0.3));
-            m.rotation.set(Math.random(), Math.random() * Math.PI, Math.random());
+            m.position.set(x + (random() - 0.5) * 0.06, floorY + r * (0.4 + random() * 0.5), -halfD * (0.35 + random() * 0.3));
+            m.rotation.set(random(), random() * Math.PI, random());
             this.group.add(m);
             out.obstacles.push({ pos: m.position.clone(), radius: r });
             out.shelters.push(m.position.clone().add(new THREE.Vector3(0.03, r * 0.3, r * 0.9)));
-            out.anchors.push(m.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * r, r * 0.85, (Math.random() - 0.5) * r * 0.5)));
+            out.anchors.push(m.position.clone().add(new THREE.Vector3((random() - 0.5) * r, r * 0.85, (random() - 0.5) * r * 0.5)));
           }
           break;
         }
         case 'sunken-ship': {
-          const hullMat = this.mat({ map: woodTexture(), color: '#7a6a52', roughness: 0.9 });
+          const hullMat = this.mat({ map: woodTexture(random), color: '#7a6a52', roughness: 0.9 });
           const ship = new THREE.Group();
           // Hull: a stretched, pointed box; listing to one side in the sand.
           const hull = new THREE.Mesh(new THREE.CapsuleGeometry(0.045 * scale + 0.02, 0.22 * scale + 0.06, 4, 8), hullMat);
@@ -465,7 +476,7 @@ export class DecorSystem {
           break;
         }
         case 'castle': {
-          const stone = this.mat({ map: rockTexture('#8a8288'), roughness: 0.85 });
+          const stone = this.mat({ map: rockTexture('#8a8288',random), roughness: 0.85 });
           const castle = new THREE.Group();
           const keep = new THREE.Mesh(new THREE.CylinderGeometry(0.05 * scale + 0.015, 0.06 * scale + 0.02, 0.16 * scale + 0.05, 8), stone);
           keep.position.y = 0.08 * scale + 0.025;
@@ -489,7 +500,7 @@ export class DecorSystem {
           break;
         }
         case 'airstone': {
-          const stoneMat = this.mat({ map: rockTexture('#b8b4ac'), roughness: 1 });
+          const stoneMat = this.mat({ map: rockTexture('#b8b4ac',random), roughness: 1 });
           const stone = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.02, 0.02, 10), stoneMat);
           stone.position.set(halfW * 0.72, floorY + 0.01, -halfD * 0.55);
           this.group.add(stone);
@@ -498,6 +509,12 @@ export class DecorSystem {
         }
       }
     }
+    if(layout?.focalSide===1){
+      this.group.scale.x=-1;
+      const points=new Set<THREE.Vector3>([...out.obstacles.map(o=>o.pos),...out.shelters,...out.anchors,...out.tunnels.flatMap(t=>[t.entrance,t.middle,t.exit]),...(out.airstone?[out.airstone]:[])]);
+      for(const point of points)point.x*=-1;
+    }
+    this.group.updateMatrixWorld(true);
     return out;
   }
 }

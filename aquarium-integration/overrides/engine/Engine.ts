@@ -12,6 +12,9 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import type { QualityTier, TankConfig } from '../types';
 import { effectiveFishCap, normalizeStock } from '../data/stocking';
 import { tankDims } from '../data/tanks';
+import { SHOWCASES,randomAquascape } from '../data/Aquascapes';
+import { SPECIES } from '../data/species';
+import { FLORA } from '../data/flora';
 import { installUnderwaterFog, SharedUniforms } from './shaders';
 import { EcoSystem, type EcoMode } from './Ecology';
 import { markReady } from '../platform/native';
@@ -156,8 +159,10 @@ export class Engine {
         };
       Object.assign(window,{
         // Explicit QA pages only; inspect actual agents/geometry without persisting fixtures.
-        __kanStabilityWorld:()=>({fish:this.fish,env:this.simEnv,decor:this.decor,
+        __kanStabilityWorld:()=>({fish:this.fish,env:this.simEnv,decor:this.decor,flora:this.flora,
           renderer:this.renderer,rig:this.rig}),
+        __kanContentQA:()=>({presets:SHOWCASES,species:SPECIES,flora:FLORA}),
+        __kanContentSeed:(seed:number)=>randomAquascape(seed),
         __kan42Arrange:()=>this.fish.qaArrange(this.simEnv),
         __kan42Follow:(key:string|null)=>this.followFish(key),
         __kan42Day:(factor:number)=>{this.dayFactor=factor;this.simEnv.dayFactor=factor;},
@@ -277,6 +282,8 @@ export class Engine {
     if(new URLSearchParams(location.search).get('qa')==='1')
       {
         delete (window as Window & {__kanStabilityWorld?:()=>unknown}).__kanStabilityWorld;
+        delete (window as Window & {__kanContentQA?:()=>unknown}).__kanContentQA;
+        delete (window as Window & {__kanContentSeed?:unknown}).__kanContentSeed;
         delete (window as Window & {__kanRealismProbe?:()=>unknown}).__kanRealismProbe;
         delete (window as Window & {__kanEcoFastForward?:(seconds:number)=>unknown}).__kanEcoFastForward;
         delete (window as Window & {__kanFoodProbe?:()=>unknown}).__kanFoodProbe;
@@ -385,9 +392,10 @@ export class Engine {
     config=normalizeStock(config);
     const initial=!this.config;
     const resized=!!this.config&&this.config.gallons!==config.gallons;
+    const newLayout=config.layout?.seed!==this.config?.layout?.seed;
     const structureKey = JSON.stringify([
       config.water, Math.round(config.gallons * 10), config.substrate,
-      config.background, config.lighting, config.decor, config.flora, this.quality.tier,
+      config.background, config.lighting, config.decor, config.flora, config.layout, this.quality.tier,
     ]);
     const fishKey = JSON.stringify(config.fish) + this.quality.tier;
     const structureChanged = force || structureKey !== this.lastStructureKey;
@@ -414,13 +422,17 @@ export class Engine {
       const decorOut = this.decor.rebuild(config.decor, {
         halfW: this.dims.halfW, halfD: this.dims.halfD,
         floorY: this.dims.floorY, height: this.dims.height,
-      });
+      },config.layout);
       this.simEnv.solids!.rebuild(this.decor.group);
       const floraOut = this.flora.rebuild(
         config.flora,
         { halfW: this.dims.halfW, halfD: this.dims.halfD, floorY: this.dims.floorY, surfaceY: this.dims.surfaceY },
         this.current,
-        decorOut.anchors,
+        decorOut.anchors,config.layout,
+        {surface:(x,z)=>{
+          const from=new THREE.Vector3(x,this.dims.surfaceY,z),to=new THREE.Vector3(x,this.dims.floorY,z);
+          return this.simEnv.solids!.sweep(from,to,.001)?.point??null;
+        },blocked:(p,r)=>this.simEnv.solids!.contains(p,r)},
       );
       this.simEnv.obstacles = [...decorOut.obstacles.map(o=>({...o,surface:'wood' as const})), ...floraOut.obstacles.map(o=>({...o,surface:'plant' as const}))];
       this.foodOccluders=[...this.decor.group.children,...this.flora.group.children];
@@ -451,7 +463,7 @@ export class Engine {
         this.quality, decorOut.airstone,
       );
       SharedUniforms.uSurfaceY.value = this.dims.surfaceY;
-      if(initial||resized)this.rig.frameTank(this.dims.halfW, this.dims.height, this.dims.floorY + this.dims.height * 0.52);
+      if(initial||resized||newLayout)this.rig.frameTank(this.dims.halfW, this.dims.height, this.dims.floorY + this.dims.height * 0.52,config.layout?.signatureShot,config.layout?.focalSide);
     }
 
     if (fishChanged) {

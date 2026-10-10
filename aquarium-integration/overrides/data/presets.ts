@@ -1,6 +1,7 @@
 // Starter tank presets — one click to a beautiful, correctly-stocked tank.
 
 import type { TankConfig } from '../types';
+import { SHOWCASES } from './Aquascapes';
 
 const base = {
   dayNight: 'cycle' as const,
@@ -57,5 +58,7 @@ export const PRESETS: TankConfig[] = [
     decor: ['reef-rock', 'airstone'],
   },
 ];
+
+PRESETS.push(...SHOWCASES);
 
 export const DEFAULT_TANK: TankConfig = PRESETS[0];

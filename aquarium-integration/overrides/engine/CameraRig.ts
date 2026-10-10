@@ -147,7 +147,7 @@ export class CameraRig {
   }
 
   // Frame a (new) tank: pull back proportionally to its width.
-  frameTank(halfW: number, height: number, midY: number): void {
+  frameTank(halfW: number, height: number, midY: number, signature?:'front'|'diagonal'|'bottom', focalSide=1): void {
     if(this.shot)this.shotLog.push({time:this.now,type:this.shot.type,reason:'tank reframed'});
     this.halfW=halfW;this.height=height;this.midY=midY;this.shot=null;
     this.tLookAt.set(0, midY, 0);
@@ -157,8 +157,8 @@ export class CameraRig {
     this.radius = this.tRadius * 1.05;
     this.minR = Math.max(0.18, halfW * 0.5);
     this.maxR = halfW * 6 + 1;
-    this.tTheta = this.theta = 0;
-    this.tPhi = this.phi = Math.PI / 2.14;
+    this.tTheta = this.theta = signature==='diagonal' ? focalSide*.18 : 0;
+    this.tPhi = this.phi = signature==='bottom' ? Math.PI/2.3 : Math.PI / 2.14;
   }
 
   setMode(mode: CameraMode): void {

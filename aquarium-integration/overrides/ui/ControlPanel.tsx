@@ -216,6 +216,7 @@ function TankTab() {
               <div className="p-desc">
                 {p.water === 'saltwater' ? 'Nước mặn' : 'Nước ngọt'} · {li(p.gallons)} lít ·{' '}
                 {Object.values(p.fish).reduce((a, b) => a + b, 0)} sinh vật
+                {p.layout&&<><br/>{p.layout.tags.join(' · ')}<br/>{p.layout.description}</>}
               </div>
             </button>
           ))}
