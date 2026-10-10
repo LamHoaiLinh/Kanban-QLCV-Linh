@@ -231,7 +231,7 @@ export class FishSystem {
     return Math.min((env.surfaceY-env.floorY)*.43,
       Math.max(.006,a.scale*.20,envelope));
   }
-  private constrain(a:Agent,env:SimEnv,dt:number):void{
+  private constrain(a:Agent,env:SimEnv,dt=0):void{
     // Broadly elliptical fish body. The forward axis requires more clearance
     // than the side axis; do not clamp the centre directly to the glass.
     const speed=a.vel.length();
