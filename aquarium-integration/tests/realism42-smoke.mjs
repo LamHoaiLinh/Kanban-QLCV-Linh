@@ -13,10 +13,12 @@ try{
  const page=await browser.newPage(),errors=[];
  page.on('pageerror',e=>errors.push(e.message));
  await page.setViewport({width:1280,height:800,deviceScaleFactor:1});
- await page.evaluateOnNewDocument(()=>{let state=420031;Math.random=()=>{state=(Math.imul(1664525,state)+1013904223)>>>0;return state/4294967296;};});
+ await page.evaluateOnNewDocument(()=>{
+  localStorage.setItem('aquarium-v1',JSON.stringify({state:{quality:'medium',config:{name:'QA42',water:'freshwater',gallons:40,substrate:'sand',background:'natural',lighting:'daylight',dayNight:'day',fish:{},fishNames:{},flora:{},decor:[]}},version:0}));
+  let state=420031;Math.random=()=>{state=(Math.imul(1664525,state)+1013904223)>>>0;return state/4294967296;};});
  await page.goto('http://127.0.0.1:4198/?kanban=1&qa=1',{waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.__kan42Probe&&window.__kan42Store);
- await page.evaluate(()=>{window.__kan42Quality('medium');window.__kan42Scene({gallons:180,fish:{'neon-tetra':100},flora:{},decor:['hollow-log','log-arch'],fishNames:{'neon-tetra:0':'Linh'}});window.__kanFoodTestCamera('cinematic');});
+ await page.evaluate(()=>{window.__kan42Pause();window.__kan42Quality('medium');window.__kan42Scene({gallons:180,fish:{'neon-tetra':100},flora:{},decor:['hollow-log','log-arch'],fishNames:{'neon-tetra:0':'Linh'}});window.__kanFoodTestCamera('cinematic');window.__kan42Step(.02);});
  let probe=await page.evaluate(()=>window.__kan42Probe());
  assert(probe.telemetry.fish.length===100,'180g must simulate 100 compatible fish');
  await page.addStyleTag({content:'.panel,.toolbar,.kanban-aquarium-stock{display:none!important}'});
@@ -54,9 +56,9 @@ try{
  probe=await page.evaluate(()=>window.__kan42Probe());assert(probe.telemetry.fish.length<=60,'integer performance cap overflow');
  report.checks.push('low quality render cap never edits durable stock');
  // Statistical conditional breach and true crossing/return, splash exactly once.
- await page.evaluate(()=>window.__kan42Quality('medium'));
+ await page.evaluate(()=>{window.__kan42Quality('medium');window.__kan42EcoMode('relax');});
  let launched=0,breached=0,splashes=0;
- for(let i=0;i<100;i++){
+ for(let i=0;i<400&&launched<100;i++){
   const result=await page.evaluate(i=>{
     window.__kan42Scene({gallons:40,fish:{guppy:6},flora:{},decor:[]});
     const before=window.__kan42Probe().telemetry.jump;
@@ -71,12 +73,12 @@ try{
       if(p.physics.wallViolations)violation=true;
     }
     const p=window.__kan42Probe();return {jump:p.telemetry.jump,before,above,apex,violation,active:p.telemetry.fish.find(f=>f.key===a.key).jump};
-  },i);
-  if(!result)continue;launched++;breached+=result.jump.breaches-result.before.breaches;splashes+=result.jump.splashes-result.before.splashes;
+  },launched);
+  if(!result){await page.evaluate(()=>window.__kanEcoFastForward(5));continue;}launched++;breached+=result.jump.breaches-result.before.breaches;splashes+=result.jump.splashes-result.before.splashes;
   assert(!result.violation&&!result.active,'jump returned / containment '+JSON.stringify(result));
-  if(i<50)assert(result.above&&result.apex>.012&&result.apex<.09,'visible bounded breach '+JSON.stringify(result));
+  if(launched<=50)assert(result.above&&result.apex>.012&&result.apex<.09,'visible bounded breach '+JSON.stringify(result));
  }
- assert(launched>=90,'insufficient eligible dash samples');assert(Math.abs(breached/launched-.5)<.06,'conditional 50%');assert(splashes===breached,'splash once');
+ assert(launched===100,'insufficient eligible dash samples '+JSON.stringify({launched,breached,splashes}));assert(Math.abs(breached/launched-.5)<.06,'conditional 50%');assert(splashes===breached,'splash once');
  report.checks.push(`conditional jump ${breached}/${launched}, ${splashes} splashes, every actor returns`);
  console.log('PASS jump statistics');
  // Peck only actual permitted species, 3–8 beats at 4–8Hz and returns to cruise.
@@ -84,7 +86,7 @@ try{
  const peck=await page.evaluate(()=>{
   const fish=window.__kan42Probe().telemetry.fish;const actor=fish.find(f=>window.__kan42Action(f.key,'peck'));
   if(!actor)return null;const stages=[],jaws=[];let settings;
-  for(let i=0;i<600;i++){window.__kanEcoFastForward(.025);const f=window.__kan42Probe().telemetry.fish.find(f=>f.key===actor.key);
+  for(let i=0;i<1000;i++){window.__kanEcoFastForward(.025);const f=window.__kan42Probe().telemetry.fish.find(f=>f.key===actor.key);
     if(f.peck){stages.push(f.peck.stage);if(f.peck.stage==='burst'){settings=f.peck;jaws.push(f.jaw);}}else if(stages.length)break;}
   return {stages:[...new Set(stages)],settings,jaws,actor:window.__kan42Probe().telemetry.fish.find(f=>f.key===actor.key)};
  });
@@ -92,6 +94,7 @@ try{
  assert(peck.settings.hz>=4&&peck.settings.hz<=8&&peck.settings.beats>=3&&peck.settings.beats<=8,'peck rate');
  assert(Math.max(...peck.jaws)>.5&&Math.min(...peck.jaws)<.2&&!peck.actor.peck,'mouth pulse and exit');
  report.checks.push('approach, inspect, 3–8 quick pecks / 4–8Hz, withdraw, cruise');
+ await page.evaluate(()=>window.__kan42EcoMode('natural'));
  // Real event routes, not just registered enum names, observed by cinematic director.
  await page.evaluate(()=>{window.__kan42Scene({gallons:75,fish:{'neon-tetra':20,betta:1,'corydoras':6},decor:['hollow-log','split-log','log-arch'],flora:{}});window.__kanFoodTestCamera('cinematic');});
  for(const type of ['wood-approach','cave-inspect','cave-through','school-scout','school-rejoin','school-split','bottom-crumbs']){

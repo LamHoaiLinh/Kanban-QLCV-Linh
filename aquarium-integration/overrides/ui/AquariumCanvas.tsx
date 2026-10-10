@@ -70,7 +70,7 @@ export function AquariumCanvas() {
     engine.callbacks.onRemoveFish=removeAquariumFish;
     engine.callbacks.onFed=(kind,count)=>window.dispatchEvent(new CustomEvent('kanaquarium-fed',{detail:{kind,count}}));
     engine.callbacks.onAutoQuality = (tier) => {
-      useStore.getState().showToast(`Lowered quality to “${tier}” to keep things smooth. You can pin a tier in Settings.`);
+      useStore.getState().showToast(`Đã giảm chất lượng xuống ${tier} để giữ chuyển động mượt. Dữ liệu hồ đã lưu vẫn được giữ nguyên.`);
     };
 
     // Initial sync + granular subscriptions (store → engine).

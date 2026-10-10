@@ -43,8 +43,14 @@ export class CameraRig {
   }
   snapshot(){return {mode:this.mode,shot:this.shot?.type??null,target:this.tLookAt.toArray(),
     radius:this.radius,manualTravel:this.lastPointerTravel,pan:this.lastGestureWasPan,log:[...this.shotLog]};}
+  updateAspect(aspect:number):void{
+    const previous=this.baseRadius;this.camera.aspect=aspect;this.camera.updateProjectionMatrix();
+    const fit=Math.max(.5,this.halfW*2.6,this.halfW/(Math.tan(THREE.MathUtils.degToRad(this.camera.fov/2))*Math.max(.25,aspect))*1.10);
+    this.baseRadius=fit;this.tRadius=THREE.MathUtils.clamp(this.tRadius*fit/Math.max(.1,previous),this.minR,this.maxR);this.clampTarget();
+  }
   resetView():void{this.manual();this.frameTank(this.halfW,this.height,this.midY);}
   private manual():void{
+    if(this.shot)this.shotLog.push({time:this.now,type:this.shot.type,reason:'manual input'});
     this.shot=null;this.shotPause=20;this.followTarget=null;this.mode='orbit';this.idleTime=0;
     this.onManual?.();
   }
@@ -142,10 +148,11 @@ export class CameraRig {
 
   // Frame a (new) tank: pull back proportionally to its width.
   frameTank(halfW: number, height: number, midY: number): void {
+    if(this.shot)this.shotLog.push({time:this.now,type:this.shot.type,reason:'tank reframed'});
     this.halfW=halfW;this.height=height;this.midY=midY;this.shot=null;
     this.tLookAt.set(0, midY, 0);
     this.lookAt.copy(this.tLookAt);
-    this.tRadius = Math.max(0.5, halfW * 2.6);
+    this.tRadius = Math.max(0.5, halfW * 2.6,halfW/(Math.tan(THREE.MathUtils.degToRad(this.camera.fov/2))*Math.max(.25,this.camera.aspect))*1.10);
     this.baseRadius=this.tRadius;
     this.radius = this.tRadius * 1.05;
     this.minR = Math.max(0.18, halfW * 0.5);

@@ -19,6 +19,7 @@ export interface HabitAgent {
 }
 interface Route {
   fish:HabitAgent;
+  startedAt:number;
   waypoints:THREE.Vector3[];
   index:number;
   ttl:number;
@@ -60,18 +61,18 @@ export class HabitatDirector {
   private nextIn=5;
   private recent=new Map<string,{type:HabitatEvent;tunnel:string|null;until:number}>();
   private now=0;
-  liveEvents(env:SimEnv){
+  liveEvents(_env:SimEnv){
     const groups=new Map<string,Route[]>();
     for(const r of this.routes.values())groups.set(r.kind,[...(groups.get(r.kind)??[]),r]);
     return [...groups].map(([type,rs])=>({id:type+':'+rs[0].fish.key,type,
-      actorIds:rs.map(r=>r.fish.key),worldPositions:rs.map(r=>r.fish.pos.clone()),startAt:env.time-(26-this.activeTime),
+      actorIds:rs.map(r=>r.fish.key),worldPositions:rs.map(r=>r.fish.pos.clone()),startAt:rs[0].startedAt,
       predictedDuration:Math.max(...rs.map(r=>r.ttl)),confidence:1,visualInterest:type.includes('cave')?.8:.65,
       routeOrBounds:rs.flatMap(r=>r.waypoints.map(vec)),eligibleCamera:true}));
   }
   qaLaunch(type:HabitatEvent,agents:HabitAgent[],env:SimEnv):boolean{
     if(!HABITAT_EVENTS.includes(type))return false;this.reset();
     if(!this.launch(type,agents,env))return false;
-    this.active=type;this.activeTime=26;this.counts[type]++;return true;
+    this.active=type;this.activeTime=Math.max(26,...[...this.routes.values()].map(r=>r.ttl));this.counts[type]++;return true;
   }
   reset():void{
     this.routes.clear();this.active=null;this.activeTime=0;this.nextIn=7;
@@ -88,9 +89,16 @@ export class HabitatDirector {
     return [...this.routes.values()].filter(r=>r.waypoints.some(p=>
       p.distanceToSquared(t.middle)<Math.pow(t.boreRadius*1.6,2))).length;
   }
+  inCorridor(a:HabitAgent):boolean{
+    const kind=this.routes.get(a.key)?.kind;
+    return !!kind&&(kind.startsWith('cave-')||kind==='wood-interior-graze');
+  }
   private assign(a:HabitAgent,type:HabitatEvent,waypoints:THREE.Vector3[],ttl=15){
     const cleaned=waypoints.map(vec);
-    this.routes.set(a.key,{fish:a,waypoints:cleaned,index:0,ttl,
+    let distance=0,previous=a.pos;
+    for(const point of cleaned){distance+=previous.distanceTo(point);previous=point;}
+    ttl=Math.min(60,Math.max(ttl,distance/Math.max(.003,a.sp.swim.cruise*a.scale*.25)*1.25+3));
+    this.routes.set(a.key,{fish:a,startedAt:this.now,waypoints:cleaned,index:0,ttl,
       kind:type,lastDist:Infinity,stalled:0,hold:0});
     a.mode='cruise';a.modeT=ttl;
   }
@@ -126,7 +134,7 @@ export class HabitatDirector {
     return nearby[0].middle.clone();
   }
   update(dt:number,agents:HabitAgent[],env:SimEnv):void{
-    this.now+=dt;
+    this.now=env.time;
     // A spotlight can contain two or a small school, but never two unrelated scenes.
     for(const [key,r] of this.routes){
       r.ttl-=dt;
@@ -150,7 +158,7 @@ export class HabitatDirector {
       if(this.launch(type,agents,env)){
         this.active=type;
         this.counts[type]++;
-        this.activeTime=26;
+        this.activeTime=Math.max(26,...[...this.routes.values()].map(r=>r.ttl));
         break;
       }
     }
@@ -164,7 +172,7 @@ export class HabitatDirector {
     const shrimps=agents.filter(isShrimp),snails=agents.filter(isSnail);
     const lowLight=env.dayFactor<.5;
     const t=env.tunnels.length?randomOf(env.tunnels):null;
-    const eligible=t?fish.filter(a=>isSmallFish(a,t,env)&&
+    const eligible=t?fish.filter(a=>a.pos.distanceTo(t.entrance)<.30&&isSmallFish(a,t,env)&&
       this.recent.get(a.key)?.tunnel!==t.id):[];
     const near=(list:HabitAgent[],target:HabitAgent,limit=.38)=>
       list.filter(a=>a!==target&&dist(a,target)<limit);
@@ -292,7 +300,7 @@ export class HabitatDirector {
     const step=Math.min(d,dt*.004);
     const x=THREE.MathUtils.clamp(a.pos.x+dx/d*step,-env.halfW*.95,env.halfW*.95);
     const z=THREE.MathUtils.clamp(a.pos.z+dz/d*step,-env.halfD*.95,env.halfD*.95);
-    if(a.sp.id.includes('snail')){
+    if(a.sp.id.includes('snail')||a.sp.id.includes('shrimp')){
       // Continue a deliberate film-grazing crawl along the floor; no teleport.
       a.pos.x=x;a.pos.z=z;
       a.mode='forage';

@@ -23,6 +23,8 @@ export default function App() {
   const set = useStore((s) => s.set);
   const [revealVisible, setRevealVisible] = useState(false);
   const [foodClicks,setFoodClicks]=useState(0);
+  const [renderedFish,setRenderedFish]=useState<number|null>(null);
+  useEffect(()=>{const timer=setInterval(()=>setRenderedFish(getEngine()?.stats.fishCount??null),1000);return()=>clearInterval(timer);},[]);
   const fishTotal=useStore(s=>Object.values(s.config.fish).reduce((total,n)=>total+n,0));
   const fishCap=useStore(s=>effectiveFishCap(s.config));
   const embedded=new URLSearchParams(location.search).has('kanban');
@@ -114,7 +116,7 @@ export default function App() {
         <div className="kanban-aquarium-help">Trái: thả thức ăn · Mỗi 10 lần: bánh cá/gấu · Phải: thêm cá · Shift + phải: bớt cá · ESC: về KanBan</div>
         <div className="kanban-aquarium-stock">
           <button title="Bớt 1 con cá (Shift + chuột phải)" aria-label="Bớt một cá" onClick={removeAquariumFish}>−</button>
-          <span>Cá: <strong>{fishTotal}</strong>/{fishCap}</span>
+          <span>Cá: <strong>{fishTotal}</strong>/{fishCap}{renderedFish!==null&&renderedFish<fishTotal?` · Hiển thị: ${renderedFish}`:''}</span>
           <button title="Thêm cá, có hiệu ứng rơi" aria-label="Thêm một cá" disabled={fishTotal>=fishCap} onClick={()=>addAquariumFish()}>+</button>
           <span className="kanban-aquarium-feed-count">Đã thả: {foodClicks} · Còn {10-foodClicks%10} lượt đến bánh</span>
         </div>

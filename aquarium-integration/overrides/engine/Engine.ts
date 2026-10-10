@@ -150,9 +150,13 @@ export class Engine {
           return this.ecology.snapshot();
         };
       Object.assign(window,{
+        __kan42Arrange:()=>this.fish.qaArrange(this.simEnv),
+        __kan42Day:(factor:number)=>{this.dayFactor=factor;this.simEnv.dayFactor=factor;},
         __kan42Burst:(count:number)=>this.fish.qaBurst(count,this.simEnv),
+        __kan42Resume:()=>this.renderer.setAnimationLoop(this.tick),
         __kan42Pause:()=>this.enableExternalDrive(),
-        __kan42Scene:(patch:Partial<TankConfig>)=>{if(this.config)this.applyConfig({...this.config,...patch},true);},
+        __kan42EcoMode:(mode:EcoMode)=>this.setEcoMode(mode),
+        __kan42Scene:(patch:Partial<TankConfig>)=>{if(this.config)this.applyConfig({...this.config,...patch});},
         __kan42Action:(key:string,action:'peck'|'dash',roll=.25)=>this.fish.qaAction(key,action,this.simEnv,roll),
         __kan42Event:(type:Parameters<FishSystem['qaHabitat']>[0])=>this.fish.qaHabitat(type,this.simEnv),
         __kan42Probe:()=>({telemetry:this.fish.getTelemetry(),camera:this.rig.snapshot(),stats:{...this.stats},
@@ -288,8 +292,7 @@ export class Engine {
     const dpr = Math.min(window.devicePixelRatio || 1, this.quality.pixelRatioCap);
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h);
-    this.rig.camera.aspect = w / h;
-    this.rig.camera.updateProjectionMatrix();
+    this.rig.updateAspect(w/h);
     this.rebuildComposer(w, h);
   };
 

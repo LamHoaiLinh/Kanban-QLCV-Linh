@@ -205,7 +205,7 @@ function bodyProfile(u: number, sp: SpeciesDef): number {
 
 function buildFishGeometry(sp: SpeciesDef,low=false): THREE.BufferGeometry {
   const sh = sp.shape;
-  const RINGS = low?16:30, SIDES = low?10:16;
+  const RINGS = low?18:30, SIDES = low?12:16;
   const positions: number[] = [];
   const uvs: number[] = [];
   const parts: number[] = [];
@@ -386,6 +386,17 @@ function buildFishGeometry(sp: SpeciesDef,low=false): THREE.BufferGeometry {
       const z=side*hh*sh.width*.63;
       addFin([[x0,-hh*.76],[x0-.025,-hh*.76-.023],
         [x0-.090,-hh*.76-.047],[x0-.055,-hh*.76-.005]],2,z,side*.12);
+    }
+  }
+  if(sp.id.includes('shrimp')){
+    // Five pairs of small walking/feeding appendages and two long antennae,
+    // batched with the existing mesh. aPart=3 sculls locally while the crawler rests.
+    for(const side of [-1,1]){
+      for(let leg=0;leg<5;leg++){
+        const x=.28-leg*.085,y=-sh.height*.35,z=side*sh.width*.16;
+        addFin([[x,y],[x-.045,y-.09],[x-.025,y-.085],[x+.01,y]],3,z,side*.55,[x,y]);
+      }
+      addFin([[.39,.015],[.71,.09*side],[.69,.09*side+.008],[.38,.025]],3,side*.05,side*.17,[.39,.015]);
     }
   }
   // Closed tapered fin sheets in the existing material group: no extra draw calls.

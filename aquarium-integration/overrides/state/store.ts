@@ -227,9 +227,11 @@ export const useStore = create<AppState>()(
         audioVolume: s.audioVolume,
         musicOn: s.musicOn,
         ecoMode: s.ecoMode,
+        smartCinema:s.smartCinema,
       }),
       merge: (persisted, current) => {
         const merged = { ...current, ...(persisted as Partial<AppState>) };
+        if(typeof merged.smartCinema!=='boolean')merged.smartCinema=true;
         if(merged.ecoMode!=='natural'&&merged.ecoMode!=='relax')
           merged.ecoMode='natural';
         // A fresh share link always wins over the previously persisted tank.

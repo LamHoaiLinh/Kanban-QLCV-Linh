@@ -35,7 +35,7 @@ const SPEED_SCALE = 0.25;
 // Surface crawlers stick to the glass/floor instead of swimming freely:
 // snails graze slowly; hillstream loaches cling and scoot in little bursts.
 function isCrawler(sp: SpeciesDef): boolean {
-  return sp.id.includes('snail') || sp.id.includes('hillstream');
+  return sp.id.includes('snail') || sp.id.includes('hillstream') || sp.id.includes('shrimp');
 }
 const _v1 = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -211,6 +211,16 @@ export class FishSystem {
     return events;
   }
   qaHabitat(type:Parameters<HabitatDirector['qaLaunch']>[0],env:SimEnv){return this.habitat.qaLaunch(type,this.populations.flatMap(p=>p.agents),env);}
+  qaArrange(env:SimEnv):void{
+    const near=env.tunnels[0]?.entrance??new THREE.Vector3(0,env.floorY+.04,0);
+    let i=0;for(const p of this.populations)for(const a of p.agents){
+      const angle=i++*2.399963;
+      a.pos.copy(near).add(new THREE.Vector3(Math.cos(angle)*.045,.03,Math.sin(angle)*.045));
+      if(isCrawler(a.sp)){a.wall='floor';a.pos.y=env.floorY+a.scale*.14;}
+      else this.constrain(a,env);
+      a.moveOrigin.copy(a.pos);a.stuckTime=0;a.peck=undefined;a.jump=undefined;a.drop=undefined;
+    }
+  }
   qaBurst(count:number,env:SimEnv):number{
     const actors=this.populations.flatMap(p=>p.agents).filter(a=>this.jumpEligible(a)&&!a.jump&&!a.drop).slice(0,Math.min(3,count));
     actors.forEach((a,i)=>this.pendingDashes.push({key:a.key,at:env.time+i*.45,roll:.25,qa:true}));return actors.length;
@@ -286,7 +296,8 @@ export class FishSystem {
     const sh=a.sp.shape;
     const scale=a.sp.id==='angelfish'?.54:1;
     const fin=Math.max(sh.dorsalHeight,sh.analHeight)*sh.height*scale;
-    const envelope=a.scale*(sh.height*.5+fin)+.005;
+    let envelope=a.scale*(sh.height*.5+fin)+.005;
+    if(a.peck&&a.peck.stage!=='approach')envelope=Math.max(envelope,a.scale*.55*Math.abs(a.peck.normal.y)+.003);
     return Math.min((env.surfaceY-env.floorY)*.43,
       Math.max(.006,a.scale*.20,envelope));
   }
@@ -296,8 +307,10 @@ export class FishSystem {
     const speed=a.vel.length();
     const dirX=speed>1e-6?Math.abs(a.vel.x)/speed:.65;
     const dirZ=speed>1e-6?Math.abs(a.vel.z)/speed:.65;
-    const xMargin=Math.min(env.halfW*.82,Math.max(.007,a.scale*(.24+.33*dirX)));
-    const zMargin=Math.min(env.halfD*.82,Math.max(.007,a.scale*(.24+.33*dirZ)));
+    const contact=a.peck&&a.peck.stage!=='approach';
+    const contactGap=a.scale*.525+.0005;
+    const xMargin=contact&&Math.abs(a.peck!.normal.x)>.8?contactGap:Math.min(env.halfW*.82,Math.max(.007,a.scale*(.24+.33*dirX)));
+    const zMargin=contact&&Math.abs(a.peck!.normal.z)>.8?contactGap:Math.min(env.halfD*.82,Math.max(.007,a.scale*(.24+.33*dirZ)));
     const yMargin=this.verticalClearance(a,env);
     const xmin=-env.halfW+xMargin,xmax=env.halfW-xMargin;
     const zmin=-env.halfD+zMargin,zmax=env.halfD-zMargin;
@@ -397,8 +410,8 @@ export class FishSystem {
     const finalSpeed=a.vel.length();
     const fx=finalSpeed>1e-6?Math.abs(a.vel.x)/finalSpeed:.65;
     const fz=finalSpeed>1e-6?Math.abs(a.vel.z)/finalSpeed:.65;
-    const mx=Math.min(env.halfW*.82,Math.max(.007,a.scale*(.24+.33*fx)));
-    const mz=Math.min(env.halfD*.82,Math.max(.007,a.scale*(.24+.33*fz)));
+    const mx=contact&&Math.abs(a.peck!.normal.x)>.8?contactGap:Math.min(env.halfW*.82,Math.max(.007,a.scale*(.24+.33*fx)));
+    const mz=contact&&Math.abs(a.peck!.normal.z)>.8?contactGap:Math.min(env.halfD*.82,Math.max(.007,a.scale*(.24+.33*fz)));
     a.pos.x=THREE.MathUtils.clamp(a.pos.x,-env.halfW+mx,env.halfW-mx);
     a.pos.z=THREE.MathUtils.clamp(a.pos.z,-env.halfD+mz,env.halfD-mz);
     a.pos.y=THREE.MathUtils.clamp(a.pos.y,ymin,ymax);
@@ -425,8 +438,9 @@ export class FishSystem {
       if(isCrawler(a.sp)||a.drop||a.jump?.stage==='breach')continue;
       fish++;
       const speed=a.vel.length(),dx=speed>1e-6?Math.abs(a.vel.x)/speed:.65,dz=speed>1e-6?Math.abs(a.vel.z)/speed:.65;
-      const mx=Math.min(env.halfW*.82,Math.max(.007,a.scale*(.24+.33*dx)));
-      const mz=Math.min(env.halfD*.82,Math.max(.007,a.scale*(.24+.33*dz)));
+      const contact=a.peck&&a.peck.stage!=='approach',gap=a.scale*.525+.0005;
+      const mx=contact&&Math.abs(a.peck!.normal.x)>.8?gap:Math.min(env.halfW*.82,Math.max(.007,a.scale*(.24+.33*dx)));
+      const mz=contact&&Math.abs(a.peck!.normal.z)>.8?gap:Math.min(env.halfD*.82,Math.max(.007,a.scale*(.24+.33*dz)));
       const my=this.verticalClearance(a,env);
       if(Math.abs(a.pos.x)>env.halfW-mx+.002||Math.abs(a.pos.z)>env.halfD-mz+.002||a.pos.y<env.floorY+my-.002||a.pos.y>env.surfaceY-my+.002)wallViolations++;
       for(const ob of env.obstacles){
@@ -600,7 +614,7 @@ export class FishSystem {
     if (isCrawler(sp)) {
       // Crawlers split between the glass and the floor ("grazing the glass").
       const walls = ['floor', 'back', 'left', 'right'] as const;
-      agent.wall = walls[i % walls.length];
+      agent.wall = sp.id.includes('shrimp')?'floor':walls[i % walls.length];
       agent.crawlDir = Math.random() * TAU;
     }
     return agent;
@@ -723,7 +737,7 @@ export class FishSystem {
     if(j.t>7){a.jump=undefined;a.mode='cruise';}return true;
   }
   private startPeck(a:Agent,env:SimEnv):boolean{
-    if(a.peck||a.jump||isCrawler(a.sp)||a.sp.invert||!['bottom','cleaner'].includes(a.sp.archetype))return false;
+    if(a.peck||a.jump||isCrawler(a.sp)||a.sp.invert||(!['bottom','cleaner'].includes(a.sp.archetype)&&a.sp.id!=='bristlenose-pleco'))return false;
     const patches:Array<{point:THREE.Vector3;normal:THREE.Vector3;surface:string}>=[];
     for(const ob of env.obstacles){
       if(ob.radius<a.scale*.30||a.pos.distanceTo(ob.pos)>.35)continue;
@@ -733,6 +747,7 @@ export class FishSystem {
     for(const side of [-1,1])patches.push({point:new THREE.Vector3(side*env.halfW,a.pos.y,a.pos.z),normal:new THREE.Vector3(-side,0,0),surface:'glass'});
     patches.sort((x,y)=>a.pos.distanceToSquared(x.point)-a.pos.distanceToSquared(y.point));
     for(const p of patches){
+      if(a.pos.distanceTo(p.point)>.28)continue;
       const at=p.point.clone().addScaledVector(p.normal,a.scale*.55+.004);
       const key=p.surface+':'+p.point.toArray().map(v=>Math.round(v/.06)).join(':');
       if((this.patchCooldown.get(key)??0)>env.time||at.y<env.floorY+this.verticalClearance(a,env)||at.y>env.surfaceY-this.verticalClearance(a,env))continue;
@@ -746,8 +761,8 @@ export class FishSystem {
   }
   private animatePeck(a:Agent,dt:number,env:SimEnv):boolean{
     const p=a.peck;if(!p)return false;p.t+=dt;
-    if(this.feedTimer>0||p.t>12){a.peck=undefined;a.mode='cruise';return false;}
-    const at=p.point.clone().addScaledVector(p.normal,a.scale*.59+.005);
+    if(this.feedTimer>0||p.t>(p.stage==='approach'?22:12)){a.peck=undefined;a.mode='cruise';return false;}
+    const at=p.point.clone().addScaledVector(p.normal,a.scale*.525+.0005);
     if(p.stage==='approach'){
       const delta=at.sub(a.pos),d=delta.length(),speed=Math.min(a.sp.swim.cruise*a.scale*SPEED_SCALE,d*1.4);
       if(d>.004){const desired=delta.normalize().multiplyScalar(speed);a.vel.lerp(desired,1-Math.exp(-3*dt));a.pos.addScaledVector(a.vel,dt);}
@@ -788,7 +803,7 @@ export class FishSystem {
       : THREE.MathUtils.lerp(0.3, 1.0, env.dayFactor);
 
     if(env.ecoMode==='natural'&&env.time>a.nextPeck&&!a.sp.invert&&
-      (sp.archetype==='cleaner'||sp.archetype==='bottom')){
+      (sp.archetype==='cleaner'||sp.archetype==='bottom'||sp.id==='bristlenose-pleco')){
       a.nextPeck=env.time+30+Math.random()*60;
       if(this.feedTimer<=0&&this.startPeck(a,env))return;
     }
@@ -814,14 +829,15 @@ export class FishSystem {
     for (const ob of env.obstacles) {
       _v2.copy(a.pos).sub(ob.pos);
       const d = _v2.length();
-      if (d < ob.radius + margin + this.collisionRadius(a) && d > 1e-5) {
-        steer.addScaledVector(_v2.divideScalar(d), ((ob.radius + margin + this.collisionRadius(a) - d) / Math.max(ob.radius,.025)) * 1.3);
+      const avoidMargin=this.habitat.inCorridor(a)?Math.min(.025,margin):margin;
+      if (d < ob.radius + avoidMargin + this.collisionRadius(a) && d > 1e-5) {
+        steer.addScaledVector(_v2.divideScalar(d), ((ob.radius + avoidMargin + this.collisionRadius(a) - d) / Math.max(ob.radius,.025)) * 1.3);
       }
     }
 
     // 3) Depth-band preference — a soft pull back into the species' layer.
     //    Suspended during an air-gulp run: the whole point is leaving the zone.
-    if (!a.gulp) {
+    if (!a.gulp&&!this.habitat.inCorridor(a)) {
       const [y0, y1] = this.zoneBand(sp, env);
       if (a.pos.y < y0) steer.y += (y0 - a.pos.y) * 1.6;
       if (a.pos.y > y1) steer.y -= (a.pos.y - y1) * 1.6;
@@ -1143,7 +1159,8 @@ export class FishSystem {
   private updateCrawler(a: Agent, dt: number, env: SimEnv): void {
     // Snails ooze along; hillstream loaches graze in place, then scoot.
     const isLoach = a.sp.id.includes('hillstream');
-    let speed = 0.004;
+    const shrimp=a.sp.id.includes('shrimp');
+    let speed = shrimp?.008:.004;
     if(env.ecoMode==='natural'&&!isLoach){
       // Snails intermittently graze on glass instead of gliding nonstop.
       a.modeT-=dt;
@@ -1167,7 +1184,7 @@ export class FishSystem {
     a.crawlDir! += (Math.random() - 0.5) * dt * 0.8;
     const dir = a.crawlDir!;
     if (a.wall === 'floor') {
-      a.pos.y = env.floorY + 0.002;
+      a.pos.y = env.floorY + (shrimp?a.scale*.14:.002);
       a.pos.x += Math.cos(dir) * speed * dt;
       a.pos.z += Math.sin(dir) * speed * dt;
       a.pos.x = THREE.MathUtils.clamp(a.pos.x, -env.halfW * 0.95, env.halfW * 0.95);
@@ -1184,6 +1201,13 @@ export class FishSystem {
       a.pos.z = THREE.MathUtils.clamp(a.pos.z, -env.halfD * 0.95, env.halfD * 0.95);
       // Bounce the crawl direction at the edges so they keep moving.
       if (a.pos.y >= env.surfaceY - 0.041 || a.pos.y <= env.floorY + 0.031) a.crawlDir! = -dir;
+    }
+    for(const ob of env.obstacles){
+      const d=a.pos.distanceTo(ob.pos),safe=ob.radius+a.scale*.20;
+      if(d<safe&&d>1e-6){
+        const away=a.pos.clone().sub(ob.pos);away.y=0;
+        if(away.lengthSq()>1e-8){away.normalize();a.pos.addScaledVector(away,Math.min(.005,(safe-d)));a.crawlDir=Math.atan2(away.z,away.x);}
+      }
     }
     // Velocity is only used for orientation + tail-beat pacing here.
     a.vel.set(Math.cos(dir), 0, Math.sin(dir)).multiplyScalar(Math.max(speed, 0.001));
@@ -1216,7 +1240,8 @@ export class FishSystem {
       pitch = Math.asin(THREE.MathUtils.clamp(speed > 1e-5 ? a.vel.y / speed : 0, -1, 1));
       // Normal swimming stays near level; an air-gulping cory points steeply.
       const maxPitch = a.gulp||a.jump ? 1.45 : 0.5;
-      pitch=THREE.MathUtils.clamp(pitch,-maxPitch,
+      if(a.peck&&a.peck.stage!=='approach')pitch=THREE.MathUtils.damp(a.prevPitch,Math.asin(-a.peck.normal.y),4,dt);
+      else pitch=THREE.MathUtils.clamp(pitch,-maxPitch,
         sp.id==='angelfish'?.19:maxPitch);
       if(sp.id==='angelfish')pitch=THREE.MathUtils.damp(a.prevPitch,pitch,2.8,dt);
     }
