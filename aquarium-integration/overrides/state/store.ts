@@ -145,44 +145,26 @@ export const useStore = create<AppState>()(
 
       applyPreset: (preset) => set({ config: normalizeStock(structuredClone(preset)), followFishKey: null, selectedFishKey: null }),
 
-      // "Surprise me": build a random but sensible tank within capacity.
+      // Curated theme first, then gentle variation. Unlike fully independent
+      // random objects, these compositions keep foreground room for swimming.
       randomize: () => {
-        const water = Math.random() < 0.55 ? 'freshwater' as const : 'saltwater' as const;
-        const gallons = [10, 20, 29, 40, 55, 75, 120][Math.floor(Math.random() * 7)];
-        const cap = tankDims(gallons).capacity;
-        const pool = speciesForWater(water).filter((sp) => sp.minGallons <= gallons);
-        const fish: Record<string, number> = {};
-        let load = 0;
-        let totalFish=0;
-        // Fill ~80% of capacity: schools first, then characters, then cleanup crew.
-        const shuffled = [...pool].sort(() => Math.random() - 0.5);
-        for (const sp of shuffled) {
-          if (load >= cap * 0.8) break;
-          const groupSize = sp.minGroup > 1 ? sp.minGroup + Math.floor(Math.random() * 5) : (sp.maxPerTank ?? 1);
-          const cost = sp.bioload * groupSize;
-          if(totalFish+groupSize>sizeFishCap(gallons))continue;
-          if (load + cost <= cap * 0.85 && !(sp.mouthIn && Object.keys(fish).length > 0)) {
-            fish[sp.id] = groupSize;
-            load += cost;
-            totalFish+=groupSize;
-          }
+        const water=Math.random()<.7?'freshwater' as const:'saltwater' as const;
+        const choices=PRESETS.filter(p=>p.water===water);
+        const template=choices[Math.floor(Math.random()*choices.length)];
+        const config=structuredClone(template);
+        const species=speciesForWater(water);
+        const fish:Record<string,number>={};
+        for(const [id,amount] of Object.entries(config.fish)){
+          const sp=species.find(s=>s.id===id);
+          if(!sp)continue;
+          fish[id]=Math.max(sp.minGroup,amount+Math.floor(Math.random()*5)-2);
         }
-        const floraPool = floraForWater(water).sort(() => Math.random() - 0.5).slice(0, 4 + Math.floor(Math.random() * 3));
-        const flora: Record<string, number> = {};
-        for (const f of floraPool) flora[f.id] = 1 + Math.floor(Math.random() * 4);
-        const decor = decorForWater(water).filter((d) => !d.playful || Math.random() < 0.2)
-          .filter(() => Math.random() < 0.6).map((d) => d.id);
-        const substrates = water === 'saltwater' ? (['sand', 'crushedcoral'] as const) : (['sand', 'gravel', 'blacksand'] as const);
-        set((s) => ({
-          config: {
-            ...s.config, water, gallons, fish, flora, decor, fishNames: {},
-            substrate: substrates[Math.floor(Math.random() * substrates.length)],
-            background: water === 'saltwater' ? 'reef' : (['natural', 'planted', 'deepblue'] as const)[Math.floor(Math.random() * 3)],
-            lighting: water === 'saltwater' ? 'actinic' : 'daylight',
-            name: 'Hồ cá ngẫu nhiên',
-          },
-        }));
-        get().showToast('Đã tạo hồ cá ngẫu nhiên. Anh có thể chỉnh sửa theo ý thích.');
+        config.fish=fish;
+        for(const [id,amount] of Object.entries(config.flora))
+          config.flora[id]=Math.max(1,amount+Math.floor(Math.random()*3)-1);
+        config.name='Hồ cá ngẫu nhiên';
+        set({config:normalizeStock(config),followFishKey:null,selectedFishKey:null});
+        get().showToast('Đã tạo hồ cá ngẫu nhiên theo bố cục '+template.name+'.');
       },
 
       saveTank: (name) =>
