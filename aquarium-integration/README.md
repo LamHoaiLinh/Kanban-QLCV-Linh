@@ -1,0 +1,1 @@
+KanAquarium uses the MIT-licensed upstream 3D aquarium by jamisonhill/aquarium (pinned commit). The fish-shaped cookie and bear-shaped cookie PNG sprites are resized and palette-optimized from the user's supplied RAR. The normal feed SVG art is an original approximation for speed. GitHub Actions builds aquarium-game/ automatically; do not edit compiled files directly.
