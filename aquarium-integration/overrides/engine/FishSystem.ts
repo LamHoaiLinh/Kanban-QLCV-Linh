@@ -179,7 +179,7 @@ export class FoodSystem {
           if(b.pos.y<=floorY+.01){b.pos.y=floorY+.01;b.state='settled';b.support='floor'}
         }
       }
-      if(b.age>(special?55:26))b.state='gone';
+      if(b.age>(special?40:26))b.state='gone';
       if(b.state==='gone'){this.remove(b);continue}
       b.sprite.position.copy(b.pos);
       b.sprite.material.rotation=Math.sin(b.age*.6+b.pos.x*5)*.08;
@@ -193,7 +193,7 @@ export class FoodSystem {
       if(b===excluded||b.state==='gone'||b.age<(b.kind==='normal'?.35:.45))continue;
       const special=b.kind!=='normal';
       if(!special&&settledOnly&&b.state!=='settled')continue;
-      if(!special&&!settledOnly&&b.state==='settled'&&b.support!=='wood')continue;
+      if(!special&&!settledOnly&&b.state==='settled'&&b.support!=='wood'&&b.pos.distanceToSquared(p)>Math.pow(maxDist*.55,2))continue;
       const d=b.pos.distanceToSquared(p);
       if(d>Math.pow(special?maxDist*1.45:maxDist,2))continue;
       // Cookies are preferred when reasonably close, not magically detected across the tank.
@@ -656,7 +656,7 @@ export class FishSystem {
   feed(x: number, z: number, env: SimEnv, kind:FoodKind='normal',
     startY=env.surfaceY-.035): void {
     this.food.scatter(x,z,startY,kind);
-    this.feedTimer = 18; // short, lively feeding window; no minute-long frenzy
+    this.feedTimer = kind==='normal'?22:34; // finite excitement, longer for special cakes
   }
 
   // Find a fish agent by its stable key (for follow-cam / naming).
@@ -913,11 +913,11 @@ export class FishSystem {
     // 6) Feeding overrides almost everything — fish RACE for food.
     if(this.feedTimer>0&&this.food.active&&(a.feedCooldown??0)<=env.time){
       const bottomFeeder=sp.zone==='bottom';
-      let target=this.food.nearest(a.pos,Math.max(.17,L*6),bottomFeeder,
+      let target=this.food.nearest(a.pos,Math.max(.25,L*8),bottomFeeder,
         (a.feedAvoidUntil??0)>env.time?a.feedAvoid:undefined);
       if(target&&this.foodRouteBlocked(a.pos,target.pos,env,L*.20)){
         a.feedAvoid=target;a.feedAvoidUntil=env.time+3;
-        target=this.food.nearest(a.pos,Math.max(.17,L*6),bottomFeeder,a.feedAvoid);
+        target=this.food.nearest(a.pos,Math.max(.25,L*8),bottomFeeder,a.feedAvoid);
       }
       if(target){
         if(a.feedTarget!==target){a.feedTarget=target;a.feedStall=0;a.feedLastDistance=Infinity;}
