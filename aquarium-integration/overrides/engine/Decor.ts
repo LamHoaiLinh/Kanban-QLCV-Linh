@@ -147,6 +147,33 @@ export class DecorSystem {
     parent.add(this.group);
   }
 
+  // Lightweight structural inspection for QA: verifies rendered geometry, not
+  // merely the existence of logical fish tunnels and shelter metadata.
+  getVisualGeometrySnapshot(){
+    const all:THREE.Mesh[]=[];
+    this.group.traverse(obj=>{if(obj instanceof THREE.Mesh)all.push(obj)});
+    const logs=all.filter(m=>m.name.startsWith('hollow-bark-')).map(m=>{
+      const geo=m.geometry;
+      const shape=geo.userData.hollowBark as {radial:number;longitudinal:number;
+        innerFraction:number;fullCircle:boolean;cutFaces:number;outerWall:boolean;
+        innerWall:boolean}|undefined;
+      const p=geo.getAttribute('position');
+      const sectors=new Set<number>();
+      if(shape)for(let j=0;j<shape.radial;j++){
+        const theta=Math.atan2(p.getZ(j),p.getX(j));
+        sectors.add(Math.floor(((theta+Math.PI*2)%(Math.PI*2))/(Math.PI/2))%4);
+      }
+      return {
+        name:m.name,vertices:p.count,triangles:(geo.getIndex()?.count??0)/3,
+        sectors:sectors.size,groups:geo.groups.length,
+        fullCircle:!!shape?.fullCircle,innerWall:!!shape?.innerWall,
+        outerWall:!!shape?.outerWall,cutFaces:shape?.cutFaces??0,
+        wallFraction:shape?1-shape.innerFraction:0,
+      };
+    });
+    return {logs,cappedBranches:all.filter(m=>m.geometry.userData.cappedWoodEnds===2).length};
+  }
+
   private mat(opts: THREE.MeshStandardMaterialParameters): THREE.MeshStandardMaterial {
     const m = new THREE.MeshStandardMaterial(opts);
     applyUnderwater(m, { caustics: true, causticStrength: 1 });
