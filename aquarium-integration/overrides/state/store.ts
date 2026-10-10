@@ -32,6 +32,7 @@ export interface AppState {
   panelOpen: boolean;
   showHud: boolean;                  // dev perf HUD
   reducedMotion: boolean;
+  softFinsOn: boolean; // true = natural fin shader, false = original rigid fins
   feedMode: boolean;                 // next tap on the water drops food
   toast: string | null;
 
@@ -73,6 +74,7 @@ export const useStore = create<AppState>()(
       panelOpen: new URLSearchParams(location.search).has('kanban')?true:(window.matchMedia?.('(min-width: 900px)').matches ?? true),
       showHud: false,
       reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
+      softFinsOn: true,
       feedMode: false,
       toast: null,
 
