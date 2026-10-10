@@ -25,6 +25,7 @@ interface Route {
   kind:HabitatEvent;
   lastDist:number;
   stalled:number;
+  hold:number;
 }
 const vec=(p:THREE.Vector3)=>p.clone();
 const randomOf=<T>(a:T[]):T=>a[Math.floor(Math.random()*a.length)];
@@ -65,8 +66,33 @@ export class HabitatDirector {
   private assign(a:HabitAgent,type:HabitatEvent,waypoints:THREE.Vector3[],ttl=15){
     const cleaned=waypoints.map(vec);
     this.routes.set(a.key,{fish:a,waypoints:cleaned,index:0,ttl,
-      kind:type,lastDist:Infinity,stalled:0});
+      kind:type,lastDist:Infinity,stalled:0,hold:0});
     a.mode='cruise';a.modeT=ttl;
+  }
+  // One deterministic, bounded detour around the first solid that crosses the
+  // route; steering and final collision containment handle all other props.
+  private safePath(from:THREE.Vector3,to:THREE.Vector3,env:SimEnv):THREE.Vector3[]{
+    const line=to.clone().sub(from);
+    const lenSq=line.lengthSq();
+    if(lenSq<1e-6)return [to.clone()];
+    for(const ob of env.obstacles){
+      const t=THREE.MathUtils.clamp(ob.pos.clone().sub(from).dot(line)/lenSq,0,1);
+      if(t<.04||t>.96)continue;
+      const near=from.clone().addScaledVector(line,t);
+      const clearance=ob.radius+.04;
+      if(near.distanceToSquared(ob.pos)>clearance*clearance)continue;
+      const across=new THREE.Vector3(-line.z,0,line.x).normalize();
+      if(across.lengthSq()<.1)across.set(1,0,0);
+      const left=ob.pos.clone().addScaledVector(across,clearance);
+      const right=ob.pos.clone().addScaledVector(across,-clearance);
+      const score=(v:THREE.Vector3)=>from.distanceTo(v)+v.distanceTo(to);
+      const detour=score(left)<score(right)?left:right;
+      detour.x=THREE.MathUtils.clamp(detour.x,-env.halfW*.82,env.halfW*.82);
+      detour.y=THREE.MathUtils.clamp(to.y,env.floorY+.025,env.surfaceY-.025);
+      detour.z=THREE.MathUtils.clamp(detour.z,-env.halfD*.82,env.halfD*.82);
+      return [detour,to.clone()];
+    }
+    return [to.clone()];
   }
   private nearWood(a:HabitAgent,env:SimEnv):THREE.Vector3|null{
     if(!env.tunnels.length)return null;
@@ -154,13 +180,13 @@ export class HabitatDirector {
         THREE.MathUtils.clamp(p.y,env.floorY+.03,env.surfaceY-.03),
         THREE.MathUtils.clamp(p.z,-env.halfD*.75,env.halfD*.75));
       if(type==='territory-display'){
-        this.assign(attacker,type,[safe(attacker.pos.clone().lerp(target.pos,.45)),attacker.pos],9);
+        this.assign(attacker,type,this.safePath(attacker.pos,safe(attacker.pos.clone().lerp(target.pos,.45)),env),9);
       }else{
         const escape=safe(target.pos.clone().addScaledVector(away,.11));
-        this.assign(target,type,[escape],8);
+        this.assign(target,type,this.safePath(target.pos,escape,env),8);
         // Pursuer follows the same open-water corridor, never a straight
         // through-the-wood teleport; the collision system still applies.
-        this.assign(attacker,type,[safe(attacker.pos.clone().lerp(escape,.6))],7);
+        this.assign(attacker,type,this.safePath(attacker.pos,safe(attacker.pos.clone().lerp(escape,.6)),env),7);
       }
       memory(attacker,null);memory(target,null);return true;
     }
@@ -242,9 +268,20 @@ export class HabitatDirector {
     if(!r)return;
     const next=r.waypoints[r.index];
     if(!next){this.routes.delete(a.key);return;}
+    if(r.hold>0){
+      r.hold-=dt;
+      a.mode=r.kind==='cave-rest'?'rest':'forage';
+      a.modeT=Math.max(a.modeT,.25);
+      return;
+    }
     const delta=next.clone().sub(a.pos);
     const d=delta.length();
     if(d<Math.max(.018,a.scale*.45)){
+      if(r.index===1 && r.waypoints.length>=3 && (
+        r.kind==='cave-rest'||r.kind==='cave-inspect'||
+        r.kind==='wood-interior-graze')){
+        r.hold=r.kind==='cave-rest'?5:r.kind==='cave-inspect'?1.5:3;
+      }
       r.index++;
       if(r.index>=r.waypoints.length){this.routes.delete(a.key);return;}
     }else{
