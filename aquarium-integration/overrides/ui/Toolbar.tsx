@@ -56,7 +56,8 @@ export function Toolbar() {
         onClick={() => setConfig({ dayNight: isNight ? 'day' : 'night' })}
       >{isNight ? '☀️' : '🌙'}</button>
       <button
-        data-tip="Camera điện ảnh (C)"
+        data-tip="Camera chuyên nghiệp tự động (C)"
+        aria-label={cameraMode === 'cinematic' ? 'Chuyển về Free Camera' : 'Bật Camera chuyên nghiệp'}
         className={cameraMode === 'cinematic' ? 'active' : ''}
         aria-pressed={cameraMode === 'cinematic'}
         onClick={() => set({ cameraMode: cameraMode === 'cinematic' ? 'orbit' : 'cinematic' })}

@@ -17,6 +17,7 @@ export default function App() {
   const panelOpen = useStore((s) => s.panelOpen);
   const showHud = useStore((s) => s.showHud);
   const feedMode = useStore((s) => s.feedMode);
+  const cameraMode = useStore((s) => s.cameraMode);
   const toast = useStore((s) => s.toast);
   const audioVolume = useStore((s) => s.audioVolume);
   const musicOn = useStore((s) => s.musicOn);
@@ -46,7 +47,7 @@ export default function App() {
   // Embedded launch: always present the setup panel on entry, while preserving
   // the existing tank, creatures, and all durable settings.
   useEffect(() => {
-    if(embedded) set({uiHidden:false,panelOpen:true});
+    if(embedded) set({uiHidden:false,panelOpen:true,cameraMode:'orbit',followFishKey:null,selectedFishKey:null});
   }, [embedded,set]);
 
   // Volume/music settings → audio engine (audio starts from the toolbar tap).
@@ -112,6 +113,14 @@ export default function App() {
     <>
       <AquariumCanvas />
       {embedded && (<>
+        <button
+          type="button"
+          className={`kanban-camera-toggle ${cameraMode === 'cinematic' ? 'active' : ''}`}
+          aria-label={cameraMode === 'cinematic' ? 'Chuyển về Free Camera' : 'Bật Camera chuyên nghiệp'}
+          aria-pressed={cameraMode === 'cinematic'}
+          title={cameraMode === 'cinematic' ? 'Dừng camera tự động, xoay bằng chuột' : 'Camera chuyên nghiệp: tự chọn góc quay'}
+          onClick={() => set({ cameraMode: cameraMode === 'cinematic' ? 'orbit' : 'cinematic', followFishKey: null, selectedFishKey: null })}
+        >{cameraMode === 'cinematic' ? '✋ Free Camera' : '🎥 Camera chuyên nghiệp'}</button>
         <div className="kan-camera-help"><span className="desktop-gesture">Kéo trái: xoay · Shift + kéo trái: rê · Cuộn: zoom</span><span className="mobile-gesture">1 ngón: xoay · 2 ngón: rê · Chụm/tách: zoom</span></div>
         <div className="kanban-aquarium-help">Trái: thả thức ăn · Mỗi 10 lần: bánh cá/gấu · Phải: thêm cá · Shift + phải: bớt cá · ESC: về KanBan</div>
         <div className="kanban-aquarium-stock">

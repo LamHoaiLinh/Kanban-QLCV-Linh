@@ -1,5 +1,5 @@
 // Camera rig: a damped orbital camera with four modes.
-//  orbit     — user drags to look, scrolls/pinches to zoom; gentle idle drift
+//  orbit     — user-controlled Free Camera, completely stationary when idle
 //  cinematic — slow autonomous glide between framings (screensaver-friendly)
 //  still     — locked "just watch" framing
 //  follow    — smoothly tracks one fish (tap-a-fish)
@@ -36,13 +36,13 @@ export class CameraRig {
   private decisionIn=0;
   readonly shotLog:Array<{time:number;type:string;reason:string}>=[];
   private pointers=new Map<number,{x:number;y:number}>();
-  private gestures=0;
   private baseRadius=1.4;
   observe(events:ObservedEvent[],obstacles:Array<{pos:THREE.Vector3;radius:number}>):void{
     this.observed=events;this.occluders=obstacles;
   }
   snapshot(){return {mode:this.mode,shot:this.shot?.type??null,target:this.tLookAt.toArray(),
-    radius:this.radius,manualTravel:this.lastPointerTravel,pan:this.lastGestureWasPan,log:[...this.shotLog]};}
+    radius:this.radius,azimuth:this.theta,desiredAzimuth:this.tTheta,elevation:this.phi,
+    manualTravel:this.lastPointerTravel,pan:this.lastGestureWasPan,log:[...this.shotLog]};}
   updateAspect(aspect:number):void{
     const previous=this.baseRadius;this.camera.aspect=aspect;this.camera.updateProjectionMatrix();
     const fit=Math.max(.5,this.halfW*2.6,this.halfW/(Math.tan(THREE.MathUtils.degToRad(this.camera.fov/2))*Math.max(.25,aspect))*1.10);
@@ -51,7 +51,7 @@ export class CameraRig {
   resetView():void{this.manual();this.frameTank(this.halfW,this.height,this.midY);}
   private manual():void{
     if(this.shot)this.shotLog.push({time:this.now,type:this.shot.type,reason:'manual input'});
-    this.shot=null;this.shotPause=20;this.followTarget=null;this.mode='orbit';this.idleTime=0;
+    this.shot=null;this.shotPause=20;this.followTarget=null;this.mode='orbit';
     this.onManual?.();
   }
   private clampTarget():void{
@@ -115,8 +115,6 @@ export class CameraRig {
   private lookAt = new THREE.Vector3();
   private tLookAt = new THREE.Vector3();
 
-  private dragging = false;
-  private idleTime = 0;
   private minR = 0.4;
   private maxR = 4;
   private cineT = 0;
@@ -170,7 +168,7 @@ export class CameraRig {
     if (e.button !== 0) return;
     if(this.pointers.size===0){this.lastPointerTravel=0;this.lastGestureWasPan=e.shiftKey;}
     this.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});this.dom.setPointerCapture(e.pointerId);
-    this.gestures=this.pointers.size;this.dragging=true;this.manual();
+    this.manual();
     if(this.pointers.size>1)this.lastGestureWasPan=true;
   };
   private onMove = (e: PointerEvent): void => {
@@ -178,7 +176,7 @@ export class CameraRig {
     const before=[...this.pointers.values()];
     this.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const after=[...this.pointers.values()];
     const dx=e.clientX-old.x,dy=e.clientY-old.y;
-    this.lastPointerTravel+=Math.hypot(dx,dy);this.idleTime=0;
+    this.lastPointerTravel+=Math.hypot(dx,dy);
     if(after.length===2){
       const c=(p:Array<{x:number;y:number}>)=>({x:(p[0].x+p[1].x)/2,y:(p[0].y+p[1].y)/2});
       const a=c(before),b=c(after);this.pan(b.x-a.x,b.y-a.y);
@@ -188,15 +186,16 @@ export class CameraRig {
       this.clampTarget();this.lastGestureWasPan=true;
     }else if(e.shiftKey){this.lastGestureWasPan=true;this.pan(dx,dy);}
     else{
-      this.tTheta=THREE.MathUtils.clamp(this.tTheta-dx*.005,-1.15,1.15);
+      // Free Camera: respond to the full horizontal drag without a narrow azimuth limit.
+      this.tTheta -= dx * .008;
       this.tPhi=THREE.MathUtils.clamp(this.tPhi-dy*.004,.9,2.0);
     }
   };
   private onUp = (e:PointerEvent): void => {
-    this.pointers.delete(e.pointerId);this.gestures=this.pointers.size;this.dragging=this.gestures>0;
+    this.pointers.delete(e.pointerId);
     if(this.dom.hasPointerCapture(e.pointerId))this.dom.releasePointerCapture(e.pointerId);
   };
-  private onBlur=():void=>{this.pointers.clear();this.dragging=false;this.gestures=0;this.lastPointerTravel=999;};
+  private onBlur=():void=>{this.pointers.clear();this.lastPointerTravel=999;};
   private onWheel = (e: WheelEvent): void => {
     e.preventDefault();this.manual();
     this.tRadius=THREE.MathUtils.clamp(this.tRadius*Math.exp(Math.sign(e.deltaY)*.09),this.minR,this.maxR);
@@ -205,7 +204,7 @@ export class CameraRig {
 
   update(dt: number): void {
     const damp = (a: number, b: number, l: number) => THREE.MathUtils.damp(a, b, l, dt);
-    this.idleTime += dt;this.now+=dt;
+    this.now+=dt;
     const calm = this.reducedMotion ? 0.3 : 1;
 
     if(this.mode==='cinematic'&&this.smartCinema&&!this.reducedMotion){
@@ -217,9 +216,7 @@ export class CameraRig {
       this.tPhi = Math.PI / 2.15 + Math.sin(this.cineT * 0.7) * 0.1;
       this.tRadius = THREE.MathUtils.clamp(this.tRadius, this.minR, this.maxR);
       this.tRadius=THREE.MathUtils.clamp(this.baseRadius*(1+.025*Math.sin(this.cineT*.43)),this.minR,this.maxR);
-    } else if (this.mode === 'orbit' && this.idleTime > 14 && !this.dragging) {
-      // After 14s untouched, a barely-perceptible drift keeps the scene alive.
-      this.tTheta=THREE.MathUtils.clamp(this.tTheta+dt*.006*calm,-1.15,1.15);
+
     }
 
     if (this.mode === 'follow' && this.followTarget) {
@@ -233,7 +230,11 @@ export class CameraRig {
     }
 
     const cinematic=this.mode==='cinematic';
-    const thetaTarget=this.theta+THREE.MathUtils.clamp(this.tTheta-this.theta,-dt*.18,dt*.18);
+    // The cinematic director glides slowly; dragging in Free Camera must NOT
+    // inherit its 0.18 rad/s speed cap (which made horizontal mouse drags stall).
+    const thetaTarget=cinematic
+      ?this.theta+THREE.MathUtils.clamp(this.tTheta-this.theta,-dt*.18,dt*.18)
+      :this.tTheta;
     this.theta = damp(this.theta,thetaTarget,cinematic?1.2:9);
     this.phi = damp(this.phi, this.tPhi, cinematic?1.2:3);
     this.radius = damp(this.radius, this.tRadius, cinematic?1.0:3);
