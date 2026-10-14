@@ -34,6 +34,9 @@ const SPEED_SCALE = 0.30;
 function speciesPace(sp:SpeciesDef):number{
  if(sp.id==='angelfish')return .95;
  if(sp.id==='betta')return .78;
+ if(sp.id==='fancy-goldfish')return .73;
+ if(sp.id==='discus')return .80;
+ if(sp.id==='molly')return 1.15;
  if(/pleco|oto|gourami/.test(sp.id))return .82;
  if(/danio|tetra|rasbora|guppy|endler/.test(sp.id))return 1.40;
  return sp.archetype==='schooler'?1.28:1.02;
@@ -969,6 +972,18 @@ export class FishSystem {
     if(sp.id==='guppy'){
       steer.y+=Math.sin(t*.73+a.rand*24)*.16;
       steer.x+=Math.sin(t*.85+a.rand*18)*.14;
+    }else if(sp.id==='fancy-goldfish'){
+      // Rounded body: calm exploration and short foraging dips.
+      steer.y+=Math.sin(t*.30+a.rand*24)*.075;
+      steer.x+=Math.sin(t*.39+a.rand*16)*.065;
+    }else if(sp.id==='discus'){
+      // A shy discus stays in midwater with gentle corrections.
+      steer.y+=Math.sin(t*.22+a.rand*19)*.035;
+      steer.z+=Math.sin(t*.26+a.rand*12)*.035;
+    }else if(sp.id==='molly'){
+      // Molly: lively livebearer, frequently changing layer and heading.
+      steer.y+=Math.sin(t*.60+a.rand*11)*.11;
+      steer.x+=Math.cos(t*.73+a.rand*14)*.12;
     }else if(sp.id==='betta'||sp.id==='angelfish'){
       steer.y+=Math.sin(t*.33+a.rand*25)*.055;
     }else if(sp.id==='ocellaris-clown'){
@@ -992,6 +1007,9 @@ export class FishSystem {
     let targetSpeed=cruise*activity*a.paceBias;
     // Visual tempo by species, separate from shared movement archetypes.
     if(sp.id==='betta')targetSpeed*=.77;
+    if(sp.id==='fancy-goldfish')targetSpeed*=.78;
+    if(sp.id==='discus')targetSpeed*=.70;
+    if(sp.id==='molly')targetSpeed*=1.10;
     if(angel)targetSpeed*=1.06;
     if(sp.id==='guppy')targetSpeed*=1.08;
     if(sp.id==='ocellaris-clown')targetSpeed*=.88;
