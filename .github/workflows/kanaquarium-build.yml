@@ -73,6 +73,11 @@ jobs:
           path: _aquarium-build/tank-seal-*.png
           if-no-files-found: ignore
           retention-days: 14
+      - name: Browser newly added freshwater species and deduplication
+        run: |
+          cp aquarium-integration/tests/new-freshwater-species-smoke.mjs _aquarium-build/new-freshwater-species-smoke.mjs
+          cd _aquarium-build
+          node new-freshwater-species-smoke.mjs
       - name: Commit compiled game into site
         if: github.ref == 'refs/heads/main'
         run: |
