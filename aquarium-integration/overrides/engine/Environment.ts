@@ -155,6 +155,7 @@ export class EnvironmentSystem {
   private disposables: (THREE.Material | THREE.BufferGeometry | THREE.Texture)[] = [];
   private mood: MoodDef = MOODS.daylight;
   private water: WaterType = 'freshwater';
+  private sealDims: TankDimsWorld | null = null;
   private snowTex: THREE.Texture;
   private bubbleTex: THREE.Texture;
 
@@ -189,6 +190,7 @@ export class EnvironmentSystem {
     this.water = water;
 
     const { halfW, halfD, height, floorY, surfaceY } = dims;
+    this.sealDims = { ...dims };
     this.fill.position.set(0, surfaceY + 0.3, halfD * 2);
 
     // — Fog density scales inversely with tank size so a nano tank isn't a
@@ -203,18 +205,60 @@ export class EnvironmentSystem {
       const seg = 48;
       const geo = new THREE.PlaneGeometry(halfW * 2, halfD * 2, seg, Math.round(seg * (halfD / halfW)));
       geo.rotateX(-Math.PI / 2);
+      // Keep the exposed sand and its solid side skirt on the exact same dune curve.
+      const duneY = (x: number, z: number) =>
+        Math.sin(x * 9 + 2) * Math.cos(z * 7) * 0.008 + Math.sin(x * 3.2) * 0.012;
       const pos = geo.getAttribute('position');
       for (let i = 0; i < pos.count; i++) {
-        const x = pos.getX(i), z = pos.getZ(i);
-        pos.setY(i, Math.sin(x * 9 + 2) * Math.cos(z * 7) * 0.008 + Math.sin(x * 3.2) * 0.012);
+        pos.setY(i, duneY(pos.getX(i), pos.getZ(i)));
       }
       geo.computeVertexNormals();
       const mat = new THREE.MeshStandardMaterial({ map: tex.map, bumpMap: tex.bumpMap, bumpScale: 0.13, roughness: 0.91 });
       applyUnderwater(mat, { caustics: true, causticStrength: 1.9 }); // sand shows caustics most
       const floor = new THREE.Mesh(geo, mat);
       floor.position.y = floorY;
+      floor.name = 'aquarium-substrate-top';
       this.group.add(floor);
-      this.disposables.push(geo, mat, tex.map, tex.bumpMap);
+
+      // The original sand was an infinitely thin plane. From a low angle its
+      // raised edges revealed the empty 20 mm space down to the support base.
+      // Build four real, closed side skirts following the SAME edge vertices;
+      // this works for every footprint without covering the natural dunes.
+      const skirtBottom = floorY - 0.023; // overlaps the existing plinth top (-0.020)
+      const skirtMat = new THREE.MeshStandardMaterial({
+        map: tex.map, roughness: 0.91, side: THREE.DoubleSide,
+      });
+      applyUnderwater(skirtMat, { caustics: true, causticStrength: 1.9 });
+      for (const [axis, edge] of [
+        ['x', -halfD], ['x', halfD], ['z', -halfW], ['z', halfW],
+      ] as const) {
+        const sections = 48;
+        const verts: number[] = [], uvs: number[] = [];
+        const extent = axis === 'x' ? halfW : halfD;
+        for (let i = 0; i < sections; i++) {
+          const u0 = i / sections, u1 = (i + 1) / sections;
+          const v0 = (u0 * 2 - 1) * extent, v1 = (u1 * 2 - 1) * extent;
+          const x0 = axis === 'x' ? v0 : edge, z0 = axis === 'x' ? edge : v0;
+          const x1 = axis === 'x' ? v1 : edge, z1 = axis === 'x' ? edge : v1;
+          const y0 = floorY + duneY(x0, z0), y1 = floorY + duneY(x1, z1);
+          verts.push(
+            x0,y0,z0, x0,skirtBottom,z0, x1,y1,z1,
+            x1,y1,z1, x0,skirtBottom,z0, x1,skirtBottom,z1,
+          );
+          uvs.push(u0,1, u0,0, u1,1, u1,1, u0,0, u1,0);
+        }
+        const skirtGeo = new THREE.BufferGeometry();
+        skirtGeo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+        skirtGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+        skirtGeo.computeVertexNormals();
+        const skirt = new THREE.Mesh(skirtGeo, skirtMat);
+        skirt.name = axis === 'x'
+          ? (edge < 0 ? 'aquarium-substrate-back' : 'aquarium-substrate-front')
+          : (edge < 0 ? 'aquarium-substrate-left' : 'aquarium-substrate-right');
+        this.group.add(skirt);
+        this.disposables.push(skirtGeo);
+      }
+      this.disposables.push(geo, mat, skirtMat, tex.map, tex.bumpMap);
     }
 
     // — Background poster behind the back glass (like a real tank) —
@@ -263,35 +307,58 @@ export class EnvironmentSystem {
         side: THREE.DoubleSide,
         depthWrite: false,
       });
-      const panes: [number, number, [number, number, number], [number, number, number]][] = [
-        [halfW * 2, height * 1.06, [0, floorY + height * 0.53, halfD], [0, 0, 0]],           // front
-        [halfW * 2, height * 1.06, [0, floorY + height * 0.53, -halfD], [0, Math.PI, 0]],    // back
-        [halfD * 2, height * 1.06, [-halfW, floorY + height * 0.53, 0], [0, Math.PI / 2, 0]],
-        [halfD * 2, height * 1.06, [halfW, floorY + height * 0.53, 0], [0, -Math.PI / 2, 0]],
+      // Geometry is recomputed on every tank resize. Slightly overlap all four
+      // wall corners and the real bottom plate: exact coplanar contact can show
+      // hairline gaps at oblique camera angles.
+      const t = Math.max(0.006, halfW * 0.012);
+      const seal = Math.max(t * 0.75, Math.min(halfW, halfD) * 0.004);
+      const plinthTop = floorY - 0.020; // see base plinth below
+      const wallBottom = plinthTop - seal;
+      const wallTop = floorY + height * 1.06;
+      const wallHeight = wallTop - wallBottom, wallMid = (wallTop + wallBottom) / 2;
+      const panes: [string, number, number, [number, number, number], [number, number, number]][] = [
+        ['front', halfW * 2 + seal * 2, wallHeight, [0, wallMid, halfD], [0, 0, 0]],
+        ['back', halfW * 2 + seal * 2, wallHeight, [0, wallMid, -halfD], [0, Math.PI, 0]],
+        ['left', halfD * 2 + seal * 2, wallHeight, [-halfW, wallMid, 0], [0, Math.PI / 2, 0]],
+        ['right', halfD * 2 + seal * 2, wallHeight, [halfW, wallMid, 0], [0, -Math.PI / 2, 0]],
       ];
-      for (const [w, h, p, r] of panes) {
+      for (const [name, w, h, p, r] of panes) {
         const pane = new THREE.Mesh(new THREE.PlaneGeometry(w, h), glassMat);
+        pane.name = 'aquarium-glass-' + name;
         pane.position.set(...p);
         pane.rotation.set(...r);
         pane.renderOrder = 6;
         this.group.add(pane);
         this.disposables.push(pane.geometry);
       }
-      this.disposables.push(glassMat);
-      // Silicone edges: thin dark strips at the four vertical corners + rims.
+      // The tank used to have no bottom glass at all. This continuous plate
+      // bridges the substrate, side panes and the support base with small
+      // overlaps, while staying below the sand and above the opaque plinth.
+      const bottomThickness = Math.max(t * 2.5, 0.016);
+      const bottomTop = plinthTop + Math.max(t * 1.25, 0.010);
+      const bottomPane = new THREE.Mesh(
+        new THREE.BoxGeometry(halfW * 2 + seal * 2, bottomThickness, halfD * 2 + seal * 2),
+        glassMat,
+      );
+      bottomPane.name = 'aquarium-glass-bottom';
+      bottomPane.position.y = bottomTop - bottomThickness / 2;
+      bottomPane.renderOrder = 6;
+      this.group.add(bottomPane);
+      this.disposables.push(bottomPane.geometry, glassMat);
+
+      // Silicone edges follow the extended walls and bottom plate.
       const edgeMat = new THREE.MeshStandardMaterial({ color: '#101418', roughness: 0.6 });
-      const t = Math.max(0.006, halfW * 0.012);
       const mkEdge = (sx: number, sy: number, sz: number, x: number, y: number, z: number) => {
         const e = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), edgeMat);
+        e.name = 'aquarium-silicone-edge';
         e.position.set(x, y, z);
         this.group.add(e);
         this.disposables.push(e.geometry);
       };
-      const yMid = floorY + height * 0.53, hFull = height * 1.06;
       for (const [x, z] of [[-halfW, -halfD], [halfW, -halfD], [-halfW, halfD], [halfW, halfD]]) {
-        mkEdge(t, hFull, t, x, yMid, z);
+        mkEdge(t, wallHeight, t, x, wallMid, z);
       }
-      for (const y of [floorY - 0.002, floorY + height * 1.06 - 0.004]) {
+      for (const y of [wallBottom + t * 0.5, wallTop - t * 0.5]) {
         mkEdge(halfW * 2 + t, t, t, 0, y, halfD);
         mkEdge(halfW * 2 + t, t, t, 0, y, -halfD);
         mkEdge(t, t, halfD * 2 + t, -halfW, y, 0);
@@ -304,6 +371,7 @@ export class EnvironmentSystem {
         new THREE.MeshStandardMaterial({ color: '#0a0c10', roughness: 0.4 })
       );
       base.position.y = floorY - 0.045;
+      base.name = 'aquarium-base-plinth';
       this.group.add(base);
       this.disposables.push(base.geometry, base.material as THREE.Material);
     }
@@ -401,6 +469,24 @@ export class EnvironmentSystem {
     } else {
       this.bubbles = null;
     }
+  }
+
+  // QA-only geometry information: browser tests verify physical intersections
+  // at every tank size instead of relying on a single screenshot/pixel color.
+  getSealSnapshot() {
+    const read = (name: string) => {
+      const object = this.group.getObjectByName(name);
+      if (!object) return null;
+      const box = new THREE.Box3().setFromObject(object);
+      return { min: box.min.toArray(), max: box.max.toArray() };
+    };
+    return {
+      dims: this.sealDims,
+      base: read('aquarium-base-plinth'),
+      bottom: read('aquarium-glass-bottom'),
+      panes: ['front', 'back', 'left', 'right'].map(name => read('aquarium-glass-' + name)),
+      skirts: ['front', 'back', 'left', 'right'].map(name => read('aquarium-substrate-' + name)),
+    };
   }
 
   // Called every frame: day/night interpolation + ray billboarding.

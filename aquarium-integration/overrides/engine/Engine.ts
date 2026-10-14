@@ -150,6 +150,7 @@ export class Engine {
           return this.ecology.snapshot();
         };
       Object.assign(window,{
+        __kan42Seams:()=>this.environment.getSealSnapshot(),
         __kan42Arrange:()=>this.fish.qaArrange(this.simEnv),
         __kan42Follow:(key:string|null)=>this.followFish(key),
         __kan42Day:(factor:number)=>{this.dayFactor=factor;this.simEnv.dayFactor=factor;},

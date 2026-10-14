@@ -60,6 +60,19 @@ jobs:
           cp aquarium-integration/tests/camera-controls-smoke.mjs _aquarium-build/camera-controls-smoke.mjs
           cd _aquarium-build
           node camera-controls-smoke.mjs
+      - name: Browser tank bottom seal across 5-180 gallons
+        run: |
+          cp aquarium-integration/tests/tank-seal-smoke.mjs _aquarium-build/tank-seal-smoke.mjs
+          cd _aquarium-build
+          node tank-seal-smoke.mjs
+      - name: Preserve bottom-seal review screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tank-seal-review
+          path: _aquarium-build/tank-seal-*.png
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Commit compiled game into site
         if: github.ref == 'refs/heads/main'
         run: |
