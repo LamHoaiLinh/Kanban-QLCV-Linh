@@ -114,7 +114,7 @@
       'labelOptions','cardColumnSelect','deleteCardBtn','duplicateCardBtn','columnDialog','columnForm','columnDialogTitle','columnNameInput','columnColorOptions',
       'deleteColumnBtn','clearColumnContentBtn','duplicateColumnBtn','quickCaptureDialog','quickCaptureForm','quickCaptureTitleInput','quickCaptureColumnSelect','quickCaptureDestinationHint','backgroundDialog','backgroundOptions','guideDialog','settingsBtn','settingsDialog','settingsExportBtn','quickCaptureProjectName','quickCaptureDefaultColumnSelect','quickCaptureStatus','dailyMoveEnabled','dailyMoveProjectName','dailyMoveRules','addDailyMoveRuleBtn','dailyMoveStatus','openDeletedContentBtn','deletedContentCount','deletedContentDialog','deletedArchiveTabBtn','deletedTrashTabBtn','deletedArchivePanel','deletedTrashPanel','deletedArchiveCount','deletedTrashCount','deletedArchiveList','deletedTrashList','emptyTrashBtn','openResetDataBtn','resetDataDialog','resetDataForm','resetBackupBtn','resetConfirmInput','resetDeleteBtn','resetBackupStatus','importSelectDialog','importSectionList','importSelectAllBtn','importSectionsConfirmBtn','confirmDialog','confirmTitle','confirmMessage','globalTooltip','toast',
       'clockCurrentTime','clockDayPeriod','clockWeekday','clockDate','clockLunarDate','timerDisplay','timerDialogDisplay','timerEndTime','timerAgentStatus','clockStatus','timerMinutesInput','timerSecondsInput','timerLabelInput','timerStartPauseBtn','timerResetBtn','timerStopAlarmBtn','timerTestAlarmBtn','timerLocalAlarmInput','timerRepeatAlarmInput','timerNotifyInput','timerPresetEditor','timerPresetEditTitle','timerPresetLabelInput','timerPresetMinutesInput','timerPresetSecondsInput','saveTimerPresetBtn','cancelTimerPresetEditBtn','resetTimerPresetBtn','deskClockWidget','deskClockControls','clockToggleBtn','quickStopAlarmBtn','clockDialog',
-      'clockAlarmTabBtn','clockSpecialTabBtn','clockWorkTabBtn','clockAlarmPanel','clockSpecialPanel','clockWorkPanel','specialDateNameInput','specialDateTypeSelect','specialBirthdayFields','specialBirthdayDateInput','specialMemorialFields','specialLunarDateInput','addSpecialDateBtn','cancelSpecialDateEditBtn','specialTickerSettingInput','specialDateSearchInput','specialDateMonthFilter','specialDateList','specialDateCount','specialDateEmpty','specialReminderBar','specialReminderText','specialReminderToggle','exportSpecialDatesBtn','importSpecialDatesBtn','importSpecialDatesFile','workDateTitleInput','workDateInput','workRepeatMonthlyInput','workRepeatYearlyInput','addWorkDateBtn','cancelWorkDateEditBtn','workTickerSettingInput','workDateSearchInput','workDateMonthFilter','workDateList','workDateCount','workDateEmpty','workReminderBar','workReminderText','workReminderToggle'
+      'clockAlarmTabBtn','clockSpecialTabBtn','clockWorkTabBtn','clockAlarmPanel','clockSpecialPanel','clockWorkPanel','specialDateNameInput','specialDateTypeSelect','specialBirthdayFields','specialSolarDateLabel','specialBirthdayDateInput','specialMemorialFields','specialLunarDateInput','addSpecialDateBtn','cancelSpecialDateEditBtn','specialTickerSettingInput','specialDateSearchInput','specialDateMonthFilter','specialDateList','specialDateCount','specialDateEmpty','specialReminderBar','specialReminderText','specialReminderToggle','exportSpecialDatesBtn','importSpecialDatesBtn','importSpecialDatesFile','workDateTitleInput','workDateInput','workRepeatMonthlyInput','workRepeatYearlyInput','addWorkDateBtn','cancelWorkDateEditBtn','workTickerSettingInput','workDateSearchInput','workDateMonthFilter','workDateList','workDateCount','workDateEmpty','workReminderBar','workReminderText','workReminderToggle'
     ].forEach(id => refs[id] = document.getElementById(id));
   }
 
@@ -1503,7 +1503,7 @@
 
   const IMPORT_SECTION_DEFS=[
     {id:'projects',label:'Dự án, công việc & ghi chú',desc:'Các dự án, cột, thẻ và ghi chú nhanh theo dự án.'},
-    {id:'specialDates',label:'Sinh nhật / Ngày giỗ',desc:'Danh sách ngày đặc biệt và dữ liệu nhắc hằng năm.'},
+    {id:'specialDates',label:'Sinh nhật / Giỗ / Lễ - Kỷ niệm',desc:'Danh sách ngày đặc biệt và dữ liệu nhắc hằng năm.'},
     {id:'workDates',label:'Lịch Công việc',desc:'Các lịch nhắc công việc theo ngày, tháng hoặc năm.'},
     {id:'clock',label:'Đồng hồ & preset hẹn giờ',desc:'Thời lượng, preset, chuông, thông báo và tùy chọn đồng hồ.'},
     {id:'settings',label:'Giao diện & quy tắc KanBan',desc:'Theme, hình nền, nhập nhanh và quy tắc tự chuyển ngày.'},
@@ -2147,7 +2147,7 @@
   function normalizeSpecialDates(input) {
     if (!Array.isArray(input)) return [];
     return input.map(item => {
-      const type = item?.type === 'memorial' ? 'memorial' : 'birthday';
+      const type = item?.type === 'memorial' ? 'memorial' : item?.type === 'anniversary' ? 'anniversary' : 'birthday';
       const name = String(item?.name || '').trim().slice(0,80);
       const day = Math.max(1,Math.min(type === 'memorial' ? 30 : 31,Number.parseInt(item?.day,10) || 1));
       const month = Math.max(1,Math.min(12,Number.parseInt(item?.month,10) || 1));
@@ -2156,7 +2156,7 @@
       return {
         id:String(item?.id || uid('date')),
         type,
-        name:name || (type === 'birthday' ? 'Sinh nhật' : 'Ngày giỗ'),
+        name:name || (type === 'birthday' ? 'Sinh nhật' : type === 'anniversary' ? 'Ngày lễ - Kỷ niệm' : 'Ngày giỗ'),
         day,month,year,
         leap:false
       };
@@ -2205,6 +2205,8 @@
     const memorial = refs.specialDateTypeSelect.value === 'memorial';
     refs.specialBirthdayFields.hidden = memorial;
     refs.specialMemorialFields.hidden = !memorial;
+    refs.specialSolarDateLabel.textContent = refs.specialDateTypeSelect.value === 'anniversary'
+      ? 'Ngày lễ / kỷ niệm dương lịch' : 'Ngày sinh dương lịch';
   }
 
   function formatFlexibleSpecialDateDraft(event) {
@@ -2248,18 +2250,20 @@
   function addSpecialDate() {
     const clock=state.settings.clock || (state.settings.clock=createDefaultClockSettings());
     const name=refs.specialDateNameInput.value.trim();
-    const type=refs.specialDateTypeSelect.value==='memorial' ? 'memorial' : 'birthday';
+    const type=['birthday','memorial','anniversary'].includes(refs.specialDateTypeSelect.value) ? refs.specialDateTypeSelect.value : 'birthday';
     if (!name) {
       showToast('Bạn hãy nhập tên người hoặc nội dung cần nhắc.');
       refs.specialDateNameInput.focus();
       return;
     }
-    const input=type==='birthday' ? refs.specialBirthdayDateInput : refs.specialLunarDateInput;
-    const parsed=parseFlexibleSpecialDate(input.value,type==='birthday'?31:30);
+    const input=type==='memorial' ? refs.specialLunarDateInput : refs.specialBirthdayDateInput;
+    const parsed=parseFlexibleSpecialDate(input.value,type==='memorial'?30:31);
     if (!parsed) {
-      showToast(type==='birthday'
-        ? 'Ngày sinh nhập dạng dd/mm hoặc dd/mm/yyyy.'
-        : 'Ngày giỗ nhập dạng dd/mm hoặc dd/mm/yyyy.');
+      showToast(type==='memorial'
+        ? 'Ngày giỗ nhập dạng dd/mm hoặc dd/mm/yyyy.'
+        : type==='anniversary'
+          ? 'Ngày lễ / kỷ niệm nhập dạng dd/mm hoặc dd/mm/yyyy.'
+          : 'Ngày sinh nhập dạng dd/mm hoặc dd/mm/yyyy.');
       input.focus();
       return;
     }
@@ -2272,7 +2276,7 @@
       }
     } else {
       clock.specialDates.push({id:uid('date'),type,name,year:parsed.year,month:parsed.month,day:parsed.day,leap:false});
-      showToast(type==='birthday' ? 'Đã thêm ngày sinh nhật.' : 'Đã thêm ngày giỗ âm lịch.');
+      showToast(type==='birthday' ? 'Đã thêm ngày sinh nhật.' : type==='anniversary' ? 'Đã thêm ngày lễ - kỷ niệm dương lịch.' : 'Đã thêm ngày giỗ âm lịch.');
     }
     resetSpecialDateEditor(false);
     saveNow();
@@ -2286,7 +2290,7 @@
     if (!item) return;
     editingSpecialDateId=id;
     refs.specialDateNameInput.value=item.name || '';
-    refs.specialDateTypeSelect.value=item.type==='memorial' ? 'memorial' : 'birthday';
+    refs.specialDateTypeSelect.value=['birthday','memorial','anniversary'].includes(item.type) ? item.type : 'birthday';
     updateSpecialDateFields();
     const formatted=`${String(item.day).padStart(2,'0')}/${String(item.month).padStart(2,'0')}${item.year?'/'+item.year:''}`;
     if (item.type==='memorial') {
@@ -2347,6 +2351,7 @@
   function formatSpecialDateItem(item) {
     const dd=String(item.day).padStart(2,'0'),mm=String(item.month).padStart(2,'0');
     const y=item.year ? `/${item.year}` : '';
+    if (item.type === 'anniversary') return `${dd}/${mm}${y} · Ngày lễ - Kỷ niệm · Dương lịch`;
     if (item.type === 'birthday') return `${dd}/${mm}${y} · Dương lịch`;
     return `${dd}/${mm}${y} · Âm lịch`;
   }
@@ -2366,7 +2371,7 @@
     const filtered=items.filter(item => {
       if (query && !foldSpecialSearch(item.name).includes(query)) return false;
       if (monthValue==='current') {
-        const currentMonth=item.type==='birthday' ? now.getMonth()+1 : lunarNow.month;
+        const currentMonth=item.type==='memorial' ? lunarNow.month : now.getMonth()+1;
         if (item.month!==currentMonth) return false;
       } else if (monthValue!=='all' && item.month!==Number(monthValue)) {
         return false;
@@ -2379,10 +2384,10 @@
     refs.specialDateEmpty.hidden = filtered.length > 0;
     refs.specialDateEmpty.textContent = items.length
       ? 'Không có ngày nào khớp bộ lọc.'
-      : 'Chưa có sinh nhật hoặc ngày giỗ nào.';
+      : 'Chưa có sinh nhật, ngày giỗ hoặc lễ - kỷ niệm nào.';
     refs.specialDateList.innerHTML = filtered.map(item => `
       <div class="special-date-item" data-special-date-id="${escapeAttr(item.id)}" data-tooltip="Nhấp kép để sửa">
-        <span class="special-date-kind ${item.type}">${item.type === 'birthday' ? 'SN' : 'GIỖ'}</span>
+        <span class="special-date-kind ${item.type}">${item.type === 'birthday' ? 'SN' : item.type === 'anniversary' ? 'LỄ/KN' : 'GIỖ'}</span>
         <div class="special-date-copy">
           <strong>${escapeHtml(item.name)}</strong>
           <small>${escapeHtml(formatSpecialDateItem(item))}</small>
@@ -2604,7 +2609,7 @@
 
   function specialDateShareKey(item) {
     return [
-      item?.type === 'memorial' ? 'memorial' : 'birthday',
+      item?.type === 'memorial' ? 'memorial' : item?.type === 'anniversary' ? 'anniversary' : 'birthday',
       foldSpecialSearch(item?.name || ''),
       Number(item?.day) || 0,
       Number(item?.month) || 0
@@ -2614,7 +2619,7 @@
   function exportSpecialDatesJson() {
     const items=normalizeSpecialDates(state?.settings?.clock?.specialDates || []);
     if (!items.length) {
-      showToast('Chưa có Sinh nhật / Ngày giỗ để xuất.');
+      showToast('Chưa có ngày đặc biệt để xuất.');
       return;
     }
     const payload={
@@ -2635,12 +2640,12 @@
     const url=URL.createObjectURL(blob);
     const link=document.createElement('a');
     link.href=url;
-    link.download=`kanban-sinh-nhat-ngay-gio-${dateStamp()}.json`;
+    link.download=`kanban-ngay-dac-biet-${dateStamp()}.json`;
     document.body.appendChild(link);
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
-    showToast(`Đã xuất ${items.length} ngày Sinh nhật / Ngày giỗ.`);
+    showToast(`Đã xuất ${items.length} ngày đặc biệt.`);
   }
 
   function extractImportedSpecialDates(parsed) {
@@ -2661,7 +2666,7 @@
       if (!Array.isArray(raw)) throw new Error('missing-special-dates');
 
       const incoming=raw.map(item=>{
-        const type=item?.type==='memorial' ? 'memorial' : item?.type==='birthday' ? 'birthday' : null;
+        const type=['birthday','memorial','anniversary'].includes(item?.type) ? item.type : null;
         const name=String(item?.name || '').trim().slice(0,80);
         const day=Number.parseInt(item?.day,10);
         const month=Number.parseInt(item?.month,10);
@@ -2669,7 +2674,7 @@
         if (!type || !name || !Number.isFinite(day) || !Number.isFinite(month)) return null;
         if (day<1 || day>(type==='memorial'?30:31) || month<1 || month>12) return null;
         if (yearRaw!==null && (!Number.isFinite(yearRaw) || yearRaw<1800 || yearRaw>2200)) return null;
-        if (type==='birthday') {
+        if (type!=='memorial') {
           const checkYear=yearRaw || 2000;
           const test=new Date(checkYear,month-1,day,12,0,0,0);
           if (test.getFullYear()!==checkYear || test.getMonth()!==month-1 || test.getDate()!==day) return null;
@@ -2677,7 +2682,7 @@
         return {id:uid('date'),type,name,day,month,year:yearRaw,leap:false};
       }).filter(Boolean);
       if (!incoming.length) {
-        showToast('File không có Sinh nhật / Ngày giỗ hợp lệ.');
+        showToast('File không có ngày đặc biệt hợp lệ.');
         return;
       }
 
@@ -2715,7 +2720,7 @@
       showToast(parts.length ? `Đã nhập: ${parts.join(', ')}.` : 'Không có dữ liệu mới để nhập.');
     } catch (error) {
       console.error(error);
-      showToast('File JSON Sinh nhật / Ngày giỗ không hợp lệ.');
+      showToast('File JSON ngày đặc biệt không hợp lệ.');
     }
   }
 
@@ -2749,7 +2754,8 @@
       const lunar=solarToVietnameseLunar(date.getDate(),date.getMonth()+1,date.getFullYear());
       items.forEach(item => {
         let match=false;
-        if (item.type === 'birthday') {
+        if (item.type !== 'memorial') {
+          // Sinh nhật và lễ / kỷ niệm cùng lặp theo ngày dương lịch hằng năm.
           match=item.day===date.getDate() && item.month===date.getMonth()+1;
         } else {
           // Ngày giỗ tự dùng kỳ tháng âm chính; kỳ tháng nhuận cùng số tháng không nhắc lặp lần hai.
@@ -2757,7 +2763,7 @@
         }
         if (!match) return;
         const when=offset===0?'Hôm nay':offset===1?'Ngày mai':'2 ngày nữa';
-        const what=item.type==='birthday'?'Sinh nhật':'Giỗ';
+        const what=item.type==='birthday'?'Sinh nhật':item.type==='anniversary'?'Ngày lễ - Kỷ niệm':'Giỗ';
         out.push({id:item.id,offset,hue:reminderHue(item),text:`${when}: ${what} ${item.name}`});
       });
     }

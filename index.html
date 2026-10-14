@@ -8,7 +8,7 @@
   <title>Kanban Cá Nhân</title>
   <link rel="manifest" href="manifest.webmanifest?v=3.2">
   <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=6.43">
+  <link rel="stylesheet" href="styles.css?v=6.44">
   <link rel="stylesheet" href="office-tools/office-tools.css?v=5.3.0">
   <link rel="stylesheet" href="office-tools/worksheet-editor.css?v=1.2.0">
   <link rel="stylesheet" href="kantool-extra.css?v=1.2.0">
@@ -293,7 +293,7 @@
         </div></details>
         <details><summary>Đồng hồ, báo thức & lịch nhắc</summary><div class="guide-group-body">
           <p><strong>Đồng hồ:</strong> bấm trực tiếp vào đồng hồ để mở. Có thể đặt phút/giây, sửa các preset và tắt chuông ngay bằng nút TẮT.</p>
-          <p><strong>Sinh nhật / Ngày giỗ:</strong> sinh nhật dùng dương lịch, ngày giỗ dùng âm lịch Việt Nam. Có thể nhập dd/mm hoặc dd/mm/yyyy, tìm theo tên và lọc theo tháng.</p>
+          <p><strong>Sinh nhật / Ngày giỗ / Lễ - Kỷ niệm:</strong> sinh nhật và lễ - kỷ niệm dùng dương lịch, ngày giỗ dùng âm lịch Việt Nam. Có thể nhập dd/mm hoặc dd/mm/yyyy, tìm theo tên và lọc theo tháng.</p>
           <p><strong>Lịch Công việc:</strong> hỗ trợ ngày cụ thể, lặp hàng tháng hoặc hằng năm; KanBan nhắc trước 2 ngày, ngày mai và hôm nay.</p>
         </div></details>
         <details><summary>KanPass · tài khoản & mật khẩu</summary><div class="guide-group-body">
@@ -432,7 +432,7 @@
 
       <div class="clock-tabs" role="tablist" aria-label="Chức năng đồng hồ">
         <button id="clockAlarmTabBtn" class="clock-tab active" type="button" data-clock-tab="alarm" role="tab" aria-selected="true">Báo thức</button>
-        <button id="clockSpecialTabBtn" class="clock-tab" type="button" data-clock-tab="special" role="tab" aria-selected="false">Sinh nhật / Ngày giỗ</button>
+        <button id="clockSpecialTabBtn" class="clock-tab" type="button" data-clock-tab="special" role="tab" aria-selected="false">Sinh nhật / Ngày giỗ / Kỷ niệm</button>
         <button id="clockWorkTabBtn" class="clock-tab clock-tab-work" type="button" data-clock-tab="work" role="tab" aria-selected="false">Lịch Công việc</button>
       </div>
 
@@ -523,15 +523,15 @@
       <div id="clockSpecialPanel" class="clock-tab-panel" hidden>
         <div class="special-date-intro">
           <strong>Nhắc trước 2 ngày</strong>
-          <span>Chỉ hiện dòng chữ nhắc trên KanBan, không phát chuông. Sinh nhật dùng dương lịch; ngày giỗ dùng âm lịch Việt Nam.</span>
+          <span>Chỉ hiện dòng chữ nhắc trên KanBan, không phát chuông. Sinh nhật và lễ - kỷ niệm dùng dương lịch; ngày giỗ dùng âm lịch Việt Nam.</span>
         </div>
 
         <div class="special-date-form">
-          <label class="field special-name-field"><span>Tên người / nội dung</span><input id="specialDateNameInput" type="text" maxlength="80" placeholder="Ví dụ: Bố, Mẹ, Bà Ngoại, Bà Nội"></label>
-          <label class="field"><span>Loại ngày</span><select id="specialDateTypeSelect"><option value="birthday">Sinh nhật · Dương lịch</option><option value="memorial">Ngày giỗ · Âm lịch</option></select></label>
+          <label class="field special-name-field"><span>Tên người / nội dung</span><input id="specialDateNameInput" type="text" maxlength="80" placeholder="Ví dụ: Bố, Mẹ, Ngày cưới, Ngày 3/8"></label>
+          <label class="field"><span>Loại ngày</span><select id="specialDateTypeSelect"><option value="birthday">Sinh nhật · Dương lịch</option><option value="memorial">Ngày giỗ · Âm lịch</option><option value="anniversary">Ngày lễ - Kỷ niệm · Dương lịch</option></select></label>
 
           <div id="specialBirthdayFields" class="special-date-fields">
-            <label class="field"><span>Ngày sinh dương lịch</span><input id="specialBirthdayDateInput" class="special-date-free-input" type="text" inputmode="numeric" maxlength="10" placeholder="dd/mm hoặc dd/mm/yyyy" autocomplete="off"></label>
+            <label class="field"><span id="specialSolarDateLabel">Ngày sinh dương lịch</span><input id="specialBirthdayDateInput" class="special-date-free-input" type="text" inputmode="numeric" maxlength="10" placeholder="dd/mm hoặc dd/mm/yyyy" autocomplete="off"></label>
           </div>
 
           <div id="specialMemorialFields" class="special-date-fields" hidden>
@@ -567,11 +567,11 @@
         <div class="special-date-sharebar">
           <div class="special-date-share-copy">
             <strong>Chia sẻ danh sách</strong>
-            <span>Chỉ Sinh nhật / Ngày giỗ</span>
+            <span>Sinh nhật / Ngày giỗ / Lễ - Kỷ niệm</span>
           </div>
           <div class="special-date-share-actions">
-            <button id="exportSpecialDatesBtn" class="secondary-btn compact-btn" type="button" data-tooltip="Xuất riêng danh sách Sinh nhật / Ngày giỗ thành file JSON">Xuất JSON</button>
-            <button id="importSpecialDatesBtn" class="secondary-btn compact-btn" type="button" data-tooltip="Nhập và gộp danh sách Sinh nhật / Ngày giỗ từ file JSON">Nhập JSON</button>
+            <button id="exportSpecialDatesBtn" class="secondary-btn compact-btn" type="button" data-tooltip="Xuất riêng danh sách ngày đặc biệt thành file JSON">Xuất JSON</button>
+            <button id="importSpecialDatesBtn" class="secondary-btn compact-btn" type="button" data-tooltip="Nhập và gộp danh sách ngày đặc biệt từ file JSON">Nhập JSON</button>
             <input id="importSpecialDatesFile" type="file" accept=".json,application/json" hidden>
           </div>
         </div>
@@ -580,7 +580,7 @@
           <span id="specialDateCount">0 ngày</span>
         </div>
         <div id="specialDateList" class="special-date-list"></div>
-        <div id="specialDateEmpty" class="special-date-empty">Chưa có sinh nhật hoặc ngày giỗ nào.</div>
+        <div id="specialDateEmpty" class="special-date-empty">Chưa có sinh nhật, ngày giỗ hoặc lễ - kỷ niệm nào.</div>
       </div>
 
       <div id="clockWorkPanel" class="clock-tab-panel" hidden>
@@ -756,7 +756,7 @@
   <div id="globalTooltip" class="global-tooltip" role="tooltip" hidden></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="dragdrop.js?v=3.3"></script>
-  <script src="app.js?v=5.2"></script>
+  <script src="app.js?v=5.3"></script>
   <script src="music-player.js?v=3.3"></script>
   <script src="kalo-launcher.js?v=1.0.5"></script>
   <script src="capture-launcher.js?v=1.5.0"></script>
