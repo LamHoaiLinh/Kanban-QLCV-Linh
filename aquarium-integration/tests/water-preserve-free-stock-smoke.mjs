@@ -16,7 +16,12 @@ try{
  const page=await browser.newPage(),errors=[];
  page.on('pageerror',e=>errors.push(e.message));
  await page.setViewport({width:1280,height:800});
- await page.evaluateOnNewDocument(()=>localStorage.clear());
+ await page.evaluateOnNewDocument(()=>{
+   // Only clear the first document; reload must retain persisted aquariums.
+   if(sessionStorage.getItem('__waterSmokeStarted')!=='1'){
+     localStorage.clear();sessionStorage.setItem('__waterSmokeStarted','1');
+   }
+ });
  await page.goto('http://127.0.0.1:4228/?kanban=1&qa=1',{waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.__kan42Store&&window.__kan42Probe&&window.__kanEcoFastForward);
  await page.evaluate(()=>window.__kan42Pause());
