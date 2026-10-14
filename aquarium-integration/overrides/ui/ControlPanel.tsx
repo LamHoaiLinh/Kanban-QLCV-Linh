@@ -123,7 +123,7 @@ function TankTab() {
           <button className={isSalt ? 'active' : ''} onClick={() => setWater('saltwater')}>🪸 Nước mặn</button>
         </div>
         <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: '6px 2px 0' }}>
-          Hồ nước ngọt và nước mặn được lưu riêng: đổi qua lại sẽ khôi phục cá, cây, san hô và trang trí của mỗi loại, không xóa dữ liệu.
+          Lần đầu chuyển loại nước: tự tạo hồ ngẫu nhiên cùng dung tích, đủ cá, cây hoặc san hô và trang trí. Chuyển lại: giữ nguyên bố cục đã thiết kế.
         </p>
       </div>
 
