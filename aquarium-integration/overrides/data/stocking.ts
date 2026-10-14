@@ -19,6 +19,39 @@ export function effectiveFishCap(config:TankConfig,performanceCap=100):number {
   const bio=count?Math.floor(tankDims(config.gallons).capacity/Math.max(.1,cost/count)):100;
   return Math.max(0,Math.min(100,sizeFishCap(config.gallons),bio,performanceCap));
 }
+// Allocate a *view* of the user's freely chosen population to the GPU.
+// Never alter the user's inventory. Quality controls only the number of
+// simultaneously simulated instances; minGroup, bioload, maxPerTank and
+// suggested gallon limits belong in advice, not in the '+' button.
+// Deterministic allocation preserves existing instances where possible.
+export function renderStock(
+  config:TankConfig, performanceCap=100,
+):Record<string,number>{
+  const cap=Math.max(0,Math.min(ABSOLUTE_FISH_CAP,Math.floor(performanceCap)));
+  const requested=Object.entries(config.fish)
+    .map(([id,raw])=>({id,sp:speciesById.get(id),count:Math.max(0,Math.floor(Number(raw)||0))}))
+    .filter(e=>e.sp?.water===config.water&&e.count>0);
+  const visible:Record<string,number>={};
+  let remaining=cap;
+  // Reserve one visible instance per species (when possible). Then fill in
+  // round-robin so adding a rare fish still makes it appear at near-capacity.
+  for(const e of requested){
+    if(remaining===0)break;
+    visible[e.id]=1;remaining--;
+  }
+  while(remaining>0){
+    let changed=false;
+    for(const e of requested){
+      if(remaining===0)break;
+      if((visible[e.id]??0)>=e.count)continue;
+      visible[e.id]=(visible[e.id]??0)+1;
+      remaining--;changed=true;
+    }
+    if(!changed)break;
+  }
+  return visible;
+}
+
 // Retain named fish first, then complete social groups, then allocate spare capacity fairly.
 // Original keys and names remain in the snapshot, including names outside a trimmed live view.
 export function normalizeStock(config:TankConfig,performanceCap=100):TankConfig {
