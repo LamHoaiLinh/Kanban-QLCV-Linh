@@ -17,6 +17,8 @@ import type { EcoMode } from '../engine/Ecology';
 export interface AppState {
   config: TankConfig;
   savedTanks: Record<string, TankConfig>;
+  // Last independent setup for each water type; persisted across reloads.
+  waterDrafts: Partial<Record<'freshwater' | 'saltwater', TankConfig>>;
 
   // Settings (persisted)
   quality: QualityTier | 'auto';
@@ -66,6 +68,7 @@ export const useStore = create<AppState>()(
     (set, get) => ({
       config: sharedConfig ?? DEFAULT_TANK,
       savedTanks: {},
+      waterDrafts: {},
       quality: 'auto',
       audioOn: false, // muted by default — browsers block autoplay anyway
       audioVolume: 0.6,
@@ -95,7 +98,7 @@ export const useStore = create<AppState>()(
           ?original:before;
         const fitted=volumeChange&&!explicitStock
           ?resizeStock(source,patch.gallons!)
-          :normalizeStock({...before,...patch});
+          :{...before,...patch};
         const next=volumeChange&&!explicitStock
           ?{...before,...patch,fish:fitted.fish,fishNames:fitted.fishNames}
           :fitted;
@@ -118,28 +121,40 @@ export const useStore = create<AppState>()(
         }
       },
 
-      // Switching water type swaps the whole library, so stock must be cleared —
-      // a neon tetra cannot live in a reef. We drop fish/flora but keep size etc.
+      // Changing the displayed ecosystem must never destroy another one.
+      // Keep both independent tank drafts in localStorage; newly visited water
+      // starts empty only once, and revisiting restores its fish/plant inventory,
+      // names, decorations and environment options exactly as last left.
       setWater: (water) =>
         set((s) => {
           if (s.config.water === water) return s;
+          const waterDrafts={...s.waterDrafts,[s.config.water]:structuredClone(s.config)};
+          const previous=waterDrafts[water];
+          const config=previous
+            ?structuredClone(previous)
+            :{
+              ...s.config,water,fish:{},flora:{},fishNames:{},
+              decor:s.config.decor.filter(d=>decorForWater(water).some(x=>x.id===d)),
+              substrate:water==='saltwater'?'crushedcoral' as const:'sand' as const,
+              background:water==='saltwater'?'reef' as const:'natural' as const,
+              lighting:water==='saltwater'?'actinic' as const:'daylight' as const,
+            };
           return {
-            resizeSnapshot:null,
-            config: {
-              ...s.config, water, fish: {}, flora: {}, fishNames: {},
-              decor: s.config.decor.filter((d) => decorForWater(water).some((x) => x.id === d)),
-              substrate: water === 'saltwater' ? 'crushedcoral' : 'sand',
-              background: water === 'saltwater' ? 'reef' : 'natural',
-              lighting: water === 'saltwater' ? 'actinic' : 'daylight',
-            },
+            waterDrafts,config,resizeSnapshot:null,
+            followFishKey:null,selectedFishKey:null,
           };
         }),
+
 
       setFishCount: (id, count) =>
         set((s) => {
           const fish = { ...s.config.fish };
-          if (count <= 0) delete fish[id]; else fish[id] = Math.min(count, 100);
-          return { config: normalizeStock({ ...s.config, fish }),resizeSnapshot:null };
+          // This is an interactive visualization, not a fish shop: the user
+          // decides the count. Render performance limits are applied separately
+          // by the engine; never discard the requested population here.
+          if (count <= 0) delete fish[id];
+          else fish[id] = Math.min(9999,Math.max(1,Math.floor(count)));
+          return { config: { ...s.config, fish },resizeSnapshot:null };
         }),
 
       setFloraCount: (id, count) =>
@@ -200,7 +215,7 @@ export const useStore = create<AppState>()(
           const config=structuredClone(saved);
           if(config.name==='Surprise Tank'||config.name==='Hồ cá bất ngờ')
             config.name='Hồ cá ngẫu nhiên';
-          set({config:normalizeStock(config),resizeSnapshot:null,followFishKey:null,selectedFishKey:null});
+          set({config,resizeSnapshot:null,followFishKey:null,selectedFishKey:null});
         }
       },
 
@@ -225,6 +240,7 @@ export const useStore = create<AppState>()(
       partialize: (s) => ({
         config: s.config,
         savedTanks: s.savedTanks,
+        waterDrafts: s.waterDrafts,
         // A resize backup is durable too: reloading while viewing a nano tank
         // must never irreversibly discard the original large-tank species.
         resizeSnapshot: s.resizeSnapshot,
@@ -245,7 +261,11 @@ export const useStore = create<AppState>()(
         // Keep saved tank keys intact, but migrate built-in random labels.
         if(merged.config?.name==='Surprise Tank'||merged.config?.name==='Hồ cá bất ngờ')
           merged.config={...merged.config,name:'Hồ cá ngẫu nhiên'};
-        merged.config=normalizeStock(merged.config);
+        // Older persisted versions did not have independent water drafts.
+        // Their currently active tank remains valid, and other water starts
+        // empty until the user populates it.
+        if(!merged.waterDrafts || typeof merged.waterDrafts!=='object')
+          merged.waterDrafts={};
         return merged;
       },
     }
