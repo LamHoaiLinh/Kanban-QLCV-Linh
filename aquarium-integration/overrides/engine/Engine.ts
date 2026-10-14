@@ -10,7 +10,7 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
 import type { QualityTier, TankConfig } from '../types';
-import { effectiveFishCap, normalizeStock } from '../data/stocking';
+import { renderStock } from '../data/stocking';
 import { tankDims } from '../data/tanks';
 import { installUnderwaterFog, SharedUniforms } from './shaders';
 import { EcoSystem, type EcoMode } from './Ecology';
@@ -372,7 +372,9 @@ export class Engine {
   private lastStructureKey = '';
   private lastFishKey = '';
   applyConfig(config: TankConfig, force = false): void {
-    config=normalizeStock(config);
+    // Keep only a safe GPU-visible view. The Zustand store keeps all user
+    // requested fish, even above the 60-100 active simulation limit.
+    config={...config,fish:renderStock(config,this.quality.maxFish)};
     const initial=!this.config;
     const resized=!!this.config&&this.config.gallons!==config.gallons;
     const structureKey = JSON.stringify([
@@ -460,7 +462,7 @@ export class Engine {
 
     if (fishChanged) {
       this.lastFishKey = fishKey;
-      this.fish.rebuild(config.fish, this.simEnv, effectiveFishCap(config,this.quality.maxFish),resized);
+      this.fish.rebuild(config.fish, this.simEnv, this.quality.maxFish,resized);
     }
   }
 
@@ -530,9 +532,9 @@ export class Engine {
     return null;
   }
 
-  queueFishDrop(clientX?:number,clientY?:number):void{
+  queueFishDrop(clientX?:number,clientY?:number,speciesId?:string,count=1):void{
     const p=this.tankPoint(clientX,clientY);
-    this.fish.queueDrop(p.x,p.z);
+    this.fish.queueDrop(p.x,p.z,speciesId,count);
   }
 
   feedAt(clientX:number,clientY:number,kind:FoodKind='normal',count=this.clickFoodCount):boolean{
