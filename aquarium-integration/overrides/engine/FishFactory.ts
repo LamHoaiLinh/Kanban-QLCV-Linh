@@ -356,7 +356,14 @@ function buildFishGeometry(sp: SpeciesDef,low=false): THREE.BufferGeometry {
       const x = tipX+(1-notch)*sh.tailFork*sh.tailSize*.85+(sh.finLong?.007*Math.sin(t*Math.PI*12):0);
       pts.push([x, y]);
     }
-    addFin(pts, 1);
+    if (sp.id === 'fancy-goldfish') {
+      // Paired caudal lobes: spread out in depth instead of looking
+      // like one thin generic tail when the camera orbits the tank.
+      addFin(pts, 1, -0.013, -0.28);
+      addFin(pts, 1, 0.013, 0.28);
+    } else {
+      addFin(pts, 1);
+    }
   }
 
   // — Dorsal: rounded continuous translucent membrane, smooth at both ends.
