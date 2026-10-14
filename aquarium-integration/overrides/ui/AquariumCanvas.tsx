@@ -6,23 +6,27 @@ import { useEffect, useRef } from 'react';
 import { Engine } from '../engine/Engine';
 import { setEngine, getEngine } from '../engine/engineRef';
 import { useStore } from '../state/store';
-import { normalizeStock, effectiveFishCap } from '../data/stocking';
 
 // Keep all stock changes in one place so buttons and mouse shortcuts behave identically.
 let mostRecentAdded:string|null=null;
+let pendingClickPoint:{x:number;y:number}|null=null;
 export function addAquariumFish(clientX?:number,clientY?:number):void{
   const s=useStore.getState();
-  const total=Object.values(s.config.fish).reduce((sum,n)=>sum+n,0);
-  if(total>=effectiveFishCap(s.config)){s.showToast('Đã đạt sức chứa của bể. Hãy tăng dung tích hoặc bớt cá.');return;}
   const choices=Object.entries(s.config.fish).filter(([id,n])=>n>0&&!id.includes('snail')&&!id.includes('shrimp'));
   const id=choices.length?choices[Math.floor(Math.random()*choices.length)][0]
     :(s.config.water==='freshwater'?'guppy':'green-chromis');
-  const proposed=normalizeStock({...s.config,fish:{...s.config.fish,[id]:(s.config.fish[id]||0)+1}});
-  if((proposed.fish[id]||0)<=(s.config.fish[id]||0)){s.showToast('Loài này đã đạt giới hạn phù hợp với bể.');return;}
-  getEngine()?.queueFishDrop(clientX,clientY);
-  s.setFishCount(id,(s.config.fish[id]||0)+1);
-  mostRecentAdded=id;
-  s.showToast('Cá mới đang rơi vào hồ');
+  const count=s.config.fish[id]||0;
+  pendingClickPoint=Number.isFinite(clientX)&&Number.isFinite(clientY)
+    ?{x:clientX!,y:clientY!}:null;
+  try{s.setFishCount(id,count+1);}
+  finally{pendingClickPoint=null;}
+  if((useStore.getState().config.fish[id]||0)>count){
+    mostRecentAdded=id;
+    const total=Object.values(useStore.getState().config.fish).reduce((sum,n)=>sum+n,0);
+    s.showToast(total>100
+      ?'Đã lưu thêm cá. Hồ chỉ hiển thị tối đa 100 con để giữ FPS ổn định.'
+      :'Cá mới đang được thả từ mặt nước xuống hồ');
+  }
 }
 export function removeAquariumFish():void{
   const s=useStore.getState();
@@ -105,6 +109,20 @@ export function AquariumCanvas() {
     let resizeTimer:ReturnType<typeof setTimeout>|undefined;
     const unsub = useStore.subscribe((state, prev) => {
       if (state.config !== prev.config) {
+        // Trigger arrivals for BOTH the side-panel '+' and the in-tank add
+        // shortcut. Presets, saved-tank loads, resizes and water switches must
+        // not replay arrival animations for all pre-existing fish.
+        const manualFishEdit=state.config.water===prev.config.water &&
+          state.config.gallons===prev.config.gallons &&
+          state.config.flora===prev.config.flora &&
+          state.config.decor===prev.config.decor &&
+          state.config.name===prev.config.name;
+        if(manualFishEdit){
+          for(const [id,count] of Object.entries(state.config.fish)){
+            const delta=count-(prev.config.fish[id]??0);
+            if(delta>0)engine.queueFishDrop(pendingClickPoint?.x,pendingClickPoint?.y,id,delta);
+          }
+        }
         clearTimeout(resizeTimer);
         const sliderResize=state.config.gallons!==prev.config.gallons&&state.config.name===prev.config.name&&state.config.water===prev.config.water&&state.config.decor===prev.config.decor&&state.config.flora===prev.config.flora;
         if(sliderResize)resizeTimer=setTimeout(()=>engine.applyConfig(useStore.getState().config),180);
