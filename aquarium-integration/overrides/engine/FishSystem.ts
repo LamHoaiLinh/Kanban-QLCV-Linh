@@ -250,7 +250,7 @@ export class FishSystem {
     key:a.key,pos:a.pos.toArray(),vel:a.vel.toArray(),yaw:a.prevYaw,mode:a.mode,
     travel:a.travel,collisions:a.collisions,stuck:a.stuckTime,recoveries:a.recoveries,
     history:a.history,peck:a.peck?{stage:a.peck.stage,t:a.peck.t,hz:a.peck.hz,beats:a.peck.beats,surface:a.peck.surface}:null,
-    jump:a.jump?{...a.jump}:null,jaw:a.jaw
+    jump:a.jump?{...a.jump}:null,drop:a.drop?{...a.drop}:null,jaw:a.jaw
   })))};}
   qaAction(key:string,action:'peck'|'dash',env:SimEnv,roll=.25,surface?:string){
     const a=this.findByKey(key)?.agent;if(!a)return false;
@@ -306,7 +306,9 @@ export class FishSystem {
       }))
     );
   }
-  private pendingDrop:{x:number;z:number}|null=null;
+  // Specific fish introduced with '+' enter from above the waterline.
+  // A per-species queue avoids another existing species stealing the drop.
+  private pendingDrops:Array<{x:number;z:number;speciesId?:string}>=[];
   private splashes:Array<{mesh:THREE.Mesh<THREE.RingGeometry,THREE.MeshBasicMaterial>;age:number}>=[];
   // Soft spherical keep-out zones approximate rocks, wood trunks and larger corals.
   private collisionRadius(a:Agent):number{return Math.max(0.007,a.scale*.30)}
@@ -476,7 +478,10 @@ export class FishSystem {
     }
     return {fish,wallViolations,solidOverlaps,maxOverlap};
   }
-  queueDrop(x:number,z:number):void{this.pendingDrop={x,z};}
+  queueDrop(x:number,z:number,speciesId?:string,count=1):void{
+    for(let i=0;i<Math.min(Math.max(0,Math.floor(count)),100);i++)
+      this.pendingDrops.push({x,z,speciesId});
+  }
   private splash(x:number,z:number,y:number):void{
     const geometry=new THREE.RingGeometry(.018,.030,32);
     const material=new THREE.MeshBasicMaterial({color:0x9beeff,transparent:true,opacity:.88,depthTest:false,depthWrite:false,side:THREE.DoubleSide});
@@ -576,14 +581,26 @@ export class FishSystem {
           agent.jump=old.jump?{...old.jump}:undefined;
           agent.peck=old.peck?{...old.peck,point:old.peck.point.clone(),normal:old.peck.normal.clone()}:undefined;
         }
-        if(!old&&this.pendingDrop&&!isCrawler(sp)){
-          const p=this.pendingDrop;this.pendingDrop=null;
-          agent.pos.set(p.x,env.surfaceY+Math.max(.13,env.surfaceY*.22),p.z);
-          agent.vel.set(0,-.03,0);
-          const band=this.zoneBand(sp,env);
-          agent.drop={stage:'fall',velocityY:-.03,elapsed:0,targetY:THREE.MathUtils.lerp(band[0],band[1],.55)};
+        if(!old&&!reseed&&!isCrawler(sp)){
+          const idx=this.pendingDrops.findIndex(p=>!p.speciesId||p.speciesId===sp.id);
+          if(idx>=0){
+            const p=this.pendingDrops.splice(idx,1)[0];
+            const dx=(Math.random()-.5)*.025,dz=(Math.random()-.5)*.025;
+            // Spawn visibly ABOVE the surface; don't push back into the tank
+            // through normal collision/spacing checks before the drop starts.
+            const inset=Math.min(env.halfW*.25,Math.max(.012,agent.scale*.6));
+            agent.pos.set(
+              THREE.MathUtils.clamp(p.x+dx,-env.halfW+inset,env.halfW-inset),
+              env.surfaceY+Math.max(.13,env.surfaceY*.22),
+              THREE.MathUtils.clamp(p.z+dz,-env.halfD+inset,env.halfD-inset)
+            );
+            agent.vel.set(0,-.03,0);
+            const band=this.zoneBand(sp,env);
+            agent.drop={stage:'fall',velocityY:-.03,elapsed:0,
+              targetY:THREE.MathUtils.lerp(band[0],band[1],.55)};
+          }
         }
-        if(reseed||!old){
+        if((reseed||!old)&&!agent.drop){
           for(let retry=0;retry<48;retry++){
             if(!isCrawler(sp))this.constrain(agent,env);
             if(spawned.every(b=>agent.pos.distanceTo(b.pos)>(agent.scale+b.scale)*.30)&&
@@ -602,7 +619,7 @@ export class FishSystem {
       this.populations.push(pop);
       this.group.add(mesh);
     }
-    this.pendingDrop=null;
+    this.pendingDrops=[];
     if(oldAgents.size===0)this.feedTimer=0;
   }
 
