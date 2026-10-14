@@ -463,6 +463,10 @@ export class Engine {
     if (fishChanged) {
       this.lastFishKey = fishKey;
       this.fish.rebuild(config.fish, this.simEnv, this.quality.maxFish,resized);
+    } else {
+      // Counts over the GPU cap are still kept in the store. Do not leave a
+      // stale drop request that could animate an unrelated future rebuild.
+      this.fish.clearQueuedDrops();
     }
   }
 
