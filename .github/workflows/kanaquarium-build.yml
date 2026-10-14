@@ -78,6 +78,11 @@ jobs:
           cp aquarium-integration/tests/new-freshwater-species-smoke.mjs _aquarium-build/new-freshwater-species-smoke.mjs
           cd _aquarium-build
           node new-freshwater-species-smoke.mjs
+      - name: Browser freshwater and saltwater preservation plus fish drop
+        run: |
+          cp aquarium-integration/tests/water-preserve-free-stock-smoke.mjs _aquarium-build/water-preserve-free-stock-smoke.mjs
+          cd _aquarium-build
+          node water-preserve-free-stock-smoke.mjs
       - name: Commit compiled game into site
         if: github.ref == 'refs/heads/main'
         run: |
