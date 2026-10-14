@@ -69,6 +69,10 @@ try{
  await toTab('Bể');await selectWater('saltwater');
  let salt=await inspect();
  assert(salt.water==='saltwater','Could not switch to saltwater');
+ assert(salt.gallons===fresh.gallons,'Auto aquarium changed the requested gallon size');
+ assert(Object.values(salt.fish).some(n=>n>0),'Auto marine aquarium was empty');
+ assert(Object.values(salt.flora).some(n=>n>0),'Auto marine aquarium has no coral');
+ assert(salt.decor.includes('reef-rock'),'Auto marine aquarium has no reef rock');
  await toTab('Cá');await addByLabel('Cá thia xanh ngọc',3);
  await toTab('San hô');
  const floraLabels=await page.$$eval('.species-row .name',els=>els.map(e=>e.textContent.trim()));
@@ -93,6 +97,38 @@ try{
  restored=await inspect();
  assert(JSON.stringify(restored.fish)===JSON.stringify(fresh.fish),'Freshwater lost on reload');
  assert(JSON.stringify(restored.flora)===JSON.stringify(fresh.flora),'Freshwater plants lost on reload');
+ // Prime the 60-fish low-quality GPU cap, then click '+' twelve times.
+ // This used to show only 5-6 visible arrivals, with the remainder silently
+ // appearing inside the water (or disappearing at the rendering cap).
+ await page.evaluate(()=>{
+   window.__kan42Quality('low');
+   window.__kan42Store('primeCap');
+ });
+ await toTab('Cá');
+ const baseline=await page.evaluate(()=>{
+   const p=window.__kan42Probe();
+   return {active:p.telemetry.fish.length,arrivals:p.telemetry.arrivals};
+ });
+ assert(baseline.active===60,'QA fixture did not saturate 60 GPU slots');
+ await addByLabel('Cá bảy màu',12);
+ const twelve=await page.evaluate(()=>{
+   const p=window.__kan42Probe();
+   const above=p.telemetry.fish.filter(f=>f.drop?.stage==='fall' &&
+     f.pos[1]>window.__kanFoodProbe().dims.surfaceY+.08).length;
+   return {config:window.__kan42Store('get').config,active:p.telemetry.fish.length,
+     arrivals:p.telemetry.arrivals,above};
+ });
+ assert(twelve.config.fish.guppy===72,'Twelve clicks did not save twelve extra guppies');
+ assert(twelve.active===60,'Rendering should remain capped at sixty');
+ assert(twelve.arrivals.started-baseline.arrivals.started===12,
+   'Every plus click must schedule its own above-water entry');
+ assert(twelve.arrivals.reused-baseline.arrivals.reused===12,
+   'At the GPU cap, every click should use an existing visible fish for entry');
+ assert(twelve.above>=12,'Twelve new arrivals were not visible above the water');
+ await page.evaluate(()=>window.__kanEcoFastForward(3));
+ const finish=await page.evaluate(()=>window.__kan42Probe().telemetry.arrivals);
+ assert(finish.splashed-baseline.arrivals.splashed>=12,'Not all twelve fish splashed down');
+ assert(finish.pending===0,'Fish-arrival queue not empty');
  assert(errors.length===0,'Browser errors '+errors.join(';'));
- console.log('PASS water-preserve-free-stock: both ecosystems and flora survive swaps and reload; repeated + accepts 4 guppies and 3 goldfish; new fish fell from above surface');
+ console.log('PASS water-preserve-free-stock: auto-populated same-size marine aquascape, both ecosystems survive reload, 12/12 arrivals above water at 60-fish GPU cap');
 }finally{await browser?.close();server.kill('SIGTERM')}
