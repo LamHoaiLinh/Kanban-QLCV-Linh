@@ -482,6 +482,7 @@ export class FishSystem {
     for(let i=0;i<Math.min(Math.max(0,Math.floor(count)),100);i++)
       this.pendingDrops.push({x,z,speciesId});
   }
+  clearQueuedDrops():void{this.pendingDrops=[];}
   private splash(x:number,z:number,y:number):void{
     const geometry=new THREE.RingGeometry(.018,.030,32);
     const material=new THREE.MeshBasicMaterial({color:0x9beeff,transparent:true,opacity:.88,depthTest:false,depthWrite:false,side:THREE.DoubleSide});
