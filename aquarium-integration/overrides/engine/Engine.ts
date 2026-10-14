@@ -376,6 +376,8 @@ export class Engine {
     // requested fish, even above the 60-100 active simulation limit.
     config={...config,fish:renderStock(config,this.quality.maxFish)};
     const initial=!this.config;
+    const switchedWater=!!this.config&&this.config.water!==config.water;
+    if(switchedWater)this.fish.clearQueuedDrops();
     const resized=!!this.config&&this.config.gallons!==config.gallons;
     const structureKey = JSON.stringify([
       config.water, Math.round(config.gallons * 10), config.substrate,
@@ -464,9 +466,10 @@ export class Engine {
       this.lastFishKey = fishKey;
       this.fish.rebuild(config.fish, this.simEnv, this.quality.maxFish,resized);
     } else {
-      // Counts over the GPU cap are still kept in the store. Do not leave a
-      // stale drop request that could animate an unrelated future rebuild.
-      this.fish.clearQueuedDrops();
+      // The inventory can increase while the GPU-visible count stays constant
+      // at its limit. Play queued above-water arrivals on existing instances
+      // instead of discarding the user's '+' clicks.
+      this.fish.processQueuedArrivals(this.simEnv);
     }
   }
 
