@@ -104,6 +104,10 @@ try{
    window.__kan42Quality('low');
    window.__kan42Store('primeCap');
  });
+ // Resizing is intentionally debounced by 180ms in AquariumCanvas. The
+ // geometry count must be checked AFTER the asynchronous scene rebuild.
+ await page.waitForFunction(()=>window.__kan42Probe().telemetry.fish.length===60,
+   {timeout:20000});
  await toTab('Cá');
  const baseline=await page.evaluate(()=>{
    const p=window.__kan42Probe();
