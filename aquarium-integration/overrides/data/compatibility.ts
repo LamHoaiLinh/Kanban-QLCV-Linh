@@ -34,6 +34,14 @@ export function stockingWarnings(config: TankConfig): StockingWarning[] {
     warnings.push({ severity: 'caution', message: `Bể hơi đông cá (${Math.round((load / cap) * 100)}% sức chứa). Nên nâng cấp lọc hoặc giảm số cá.` });
   }
 
+  // The virtual tank does not model temperature yet. Still warn about
+  // incompatible temperature needs when coldwater goldfish meets warmwater cichlids.
+  if (species.some(({sp})=>sp.id==='fancy-goldfish') &&
+      species.some(({sp})=>sp.id==='discus'||sp.id==='german-blue-ram')) {
+    warnings.push({ severity: 'caution', message:
+      'Cá vàng ba đuôi hợp nước mát hơn, còn cá dĩa/phượng hoàng cần nước ấm ổn định. Không nên ghép các nhóm này trong bể thực tế.' });
+  }
+
   for (const { sp, n } of species) {
     // 2. Schooling minimums — a lone schooler is a stressed schooler.
     if (sp.minGroup > 1 && n < sp.minGroup) {
