@@ -81,6 +81,12 @@ export function AquariumCanvas() {
     if(new URLSearchParams(location.search).get('qa')==='1')Object.assign(window,{
       __kan42Store:(action:string)=>{
         const s=useStore.getState();
+        if(action==='primeCap'){
+          // QA-only: saturate the low-tier 60-fish renderer so 12 successive
+          // '+' clicks can be tested without making 60 slow UI interactions.
+          s.setConfig({gallons:180,fish:{guppy:60},fishNames:{}});
+          return useStore.getState().config;
+        }
         if(action==='exercise'){
           s.setConfig({gallons:180,fish:{'neon-tetra':100},fishNames:{'neon-tetra:99':'Linh'}});
           s.saveTank('QA42');const saved=JSON.stringify(useStore.getState().savedTanks.QA42);
