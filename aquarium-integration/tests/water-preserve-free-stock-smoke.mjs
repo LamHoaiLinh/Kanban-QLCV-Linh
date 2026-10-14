@@ -46,7 +46,7 @@ try{
  await addByLabel('Cá bảy màu',1);
  const atEntry=await page.evaluate((start)=>{
    const p=window.__kan42Probe();
-   return {surface:p.dims.surfaceY,agent:p.telemetry.fish.find(x=>x.key==='guppy:'+start)};
+   return {surface:window.__kanFoodProbe().dims.surfaceY,agent:p.telemetry.fish.find(x=>x.key==='guppy:'+start)};
  },start);
  assert(atEntry.agent?.drop?.stage==='fall','Manual fish did not start an entry animation');
  assert(atEntry.agent.pos[1]>atEntry.surface+.08,'New fish must start visibly above the surface');
