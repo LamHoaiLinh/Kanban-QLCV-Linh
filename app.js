@@ -114,7 +114,7 @@
       'labelOptions','cardColumnSelect','deleteCardBtn','duplicateCardBtn','columnDialog','columnForm','columnDialogTitle','columnNameInput','columnColorOptions',
       'deleteColumnBtn','clearColumnContentBtn','duplicateColumnBtn','quickCaptureDialog','quickCaptureForm','quickCaptureTitleInput','quickCaptureColumnSelect','quickCaptureDestinationHint','backgroundDialog','backgroundOptions','guideDialog','settingsBtn','settingsDialog','settingsExportBtn','quickCaptureProjectName','quickCaptureDefaultColumnSelect','quickCaptureStatus','dailyMoveEnabled','dailyMoveProjectName','dailyMoveRules','addDailyMoveRuleBtn','dailyMoveStatus','openDeletedContentBtn','deletedContentCount','deletedContentDialog','deletedArchiveTabBtn','deletedTrashTabBtn','deletedArchivePanel','deletedTrashPanel','deletedArchiveCount','deletedTrashCount','deletedArchiveList','deletedTrashList','emptyTrashBtn','openResetDataBtn','resetDataDialog','resetDataForm','resetBackupBtn','resetConfirmInput','resetDeleteBtn','resetBackupStatus','importSelectDialog','importSectionList','importSelectAllBtn','importSectionsConfirmBtn','confirmDialog','confirmTitle','confirmMessage','globalTooltip','toast',
       'clockCurrentTime','clockDayPeriod','clockWeekday','clockDate','clockLunarDate','timerDisplay','timerDialogDisplay','timerEndTime','timerAgentStatus','clockStatus','timerMinutesInput','timerSecondsInput','timerLabelInput','timerStartPauseBtn','timerResetBtn','timerStopAlarmBtn','timerTestAlarmBtn','timerLocalAlarmInput','timerRepeatAlarmInput','timerNotifyInput','timerPresetEditor','timerPresetEditTitle','timerPresetLabelInput','timerPresetMinutesInput','timerPresetSecondsInput','saveTimerPresetBtn','cancelTimerPresetEditBtn','resetTimerPresetBtn','deskClockWidget','deskClockControls','clockToggleBtn','quickStopAlarmBtn','clockDialog',
-      'clockAlarmTabBtn','clockSpecialTabBtn','clockWorkTabBtn','clockAlarmPanel','clockSpecialPanel','clockWorkPanel','specialDateNameInput','specialDateTypeSelect','specialBirthdayFields','specialSolarDateLabel','specialBirthdayDateInput','specialMemorialFields','specialLunarDateInput','addSpecialDateBtn','cancelSpecialDateEditBtn','specialTickerSettingInput','specialDateSearchInput','specialDateMonthFilter','specialDateList','specialDateCount','specialDateEmpty','specialReminderBar','specialReminderText','specialReminderToggle','exportSpecialDatesBtn','importSpecialDatesBtn','importSpecialDatesFile','workDateTitleInput','workDateInput','workRepeatMonthlyInput','workRepeatYearlyInput','addWorkDateBtn','cancelWorkDateEditBtn','workTickerSettingInput','workDateSearchInput','workDateMonthFilter','workDateList','workDateCount','workDateEmpty','workReminderBar','workReminderText','workReminderToggle'
+      'clockAlarmTabBtn','clockSpecialTabBtn','clockWorkTabBtn','clockAlarmPanel','clockSpecialPanel','clockWorkPanel','specialDateNameInput','specialDateTypeSelect','specialBirthdayFields','specialSolarDateLabel','specialBirthdayDateInput','specialMemorialFields','specialLunarDateInput','addSpecialDateBtn','cancelSpecialDateEditBtn','specialTickerSettingInput','specialEarlyReminderInput','specialDateSearchInput','specialDateMonthFilter','specialDateList','specialDateCount','specialDateEmpty','specialReminderBar','specialReminderText','specialReminderToggle','exportSpecialDatesBtn','importSpecialDatesBtn','importSpecialDatesFile','workDateTitleInput','workDateInput','workRepeatMonthlyInput','workRepeatYearlyInput','addWorkDateBtn','cancelWorkDateEditBtn','workTickerSettingInput','workDateSearchInput','workDateMonthFilter','workDateList','workDateCount','workDateEmpty','workReminderBar','workReminderText','workReminderToggle'
     ].forEach(id => refs[id] = document.getElementById(id));
   }
 
@@ -256,6 +256,7 @@
     refs.importSpecialDatesBtn.addEventListener('click', () => refs.importSpecialDatesFile.click());
     refs.importSpecialDatesFile.addEventListener('change', importSpecialDatesJson);
     refs.specialTickerSettingInput.addEventListener('change', event => setReminderTickerEnabled(event.target.checked));
+    refs.specialEarlyReminderInput.addEventListener('change', event => setSpecialEarlyReminderEnabled(event.target.checked));
     refs.specialReminderToggle.addEventListener('change', event => setReminderTickerEnabled(event.target.checked));
     refs.addWorkDateBtn.addEventListener('click', addWorkDate);
     refs.cancelWorkDateEditBtn.addEventListener('click', resetWorkDateEditor);
@@ -1580,11 +1581,12 @@
       state.settings.clock={
         ...importedClock,
         specialDates:pick.has('specialDates')?importedClock.specialDates:currentClock.specialDates,
+        earlyReminder:pick.has('specialDates')?importedClock.earlyReminder:currentClock.earlyReminder,
         workDates:pick.has('workDates')?importedClock.workDates:currentClock.workDates
       };
       changed=true;
     }else{
-      if(pick.has('specialDates')){state.settings.clock.specialDates=importedClock.specialDates;state.settings.clock.reminderTicker=importedClock.reminderTicker;changed=true}
+      if(pick.has('specialDates')){state.settings.clock.specialDates=importedClock.specialDates;state.settings.clock.reminderTicker=importedClock.reminderTicker;state.settings.clock.earlyReminder=importedClock.earlyReminder;changed=true}
       if(pick.has('workDates')){state.settings.clock.workDates=importedClock.workDates;state.settings.clock.workReminderTicker=importedClock.workReminderTicker;changed=true}
     }
     if(pick.has('settings')){
@@ -2084,6 +2086,7 @@
       timerPresets:DEFAULT_TIMER_PRESETS.map(item => ({...item})),
       specialDates:[],
       reminderTicker:true,
+      earlyReminder:true,
       workDates:[],
       workReminderTicker:true
     };
@@ -2139,6 +2142,7 @@
       timerPresets:normalizeTimerPresets(input?.timerPresets),
       specialDates:normalizeSpecialDates(input?.specialDates),
       reminderTicker:input?.reminderTicker !== false,
+      earlyReminder:input?.earlyReminder !== false,
       workDates:normalizeWorkDates(input?.workDates),
       workReminderTicker:input?.workReminderTicker !== false
     };
@@ -2399,6 +2403,7 @@
       </div>`).join('');
     refs.specialTickerSettingInput.checked = clock.reminderTicker !== false;
     refs.specialReminderToggle.checked = clock.reminderTicker !== false;
+    refs.specialEarlyReminderInput.checked = clock.earlyReminder !== false;
   }
 
   function addWorkDate() {
@@ -2733,6 +2738,14 @@
     renderSpecialReminderBar(new Date(),true);
   }
 
+  function setSpecialEarlyReminderEnabled(enabled) {
+    const clock=state.settings.clock || (state.settings.clock=createDefaultClockSettings());
+    clock.earlyReminder=Boolean(enabled);
+    refs.specialEarlyReminderInput.checked=clock.earlyReminder;
+    saveNow();
+    renderSpecialReminderBar(new Date(),true);
+  }
+
   function dateAtLocalNoon(base,offsetDays) {
     return new Date(base.getFullYear(),base.getMonth(),base.getDate()+offsetDays,12,0,0,0);
   }
@@ -2749,7 +2762,9 @@
     const items = clock?.specialDates || [];
     if (!items.length) return [];
     const out=[];
-    for (let offset=0;offset<=2;offset+=1) {
+    // Nhắc ở ngày -7, -6, -5 và -2, -1, 0; không nhắc ngày -4, -3.
+    const offsets=clock.earlyReminder !== false ? [0,1,2,5,6,7] : [0,1,2];
+    for (const offset of offsets) {
       const date=dateAtLocalNoon(baseDate,offset);
       const lunar=solarToVietnameseLunar(date.getDate(),date.getMonth()+1,date.getFullYear());
       items.forEach(item => {
@@ -2762,7 +2777,7 @@
           match=item.day===lunar.day && item.month===lunar.month && !lunar.leap;
         }
         if (!match) return;
-        const when=offset===0?'Hôm nay':offset===1?'Ngày mai':'2 ngày nữa';
+        const when=offset===0?'Hôm nay':offset===1?'Ngày mai':offset===2?'2 ngày nữa':offset===7?'Tuần sau':`${offset} ngày nữa`;
         const what=item.type==='birthday'?'Sinh nhật':item.type==='anniversary'?'Ngày lễ - Kỷ niệm':'Giỗ';
         out.push({id:item.id,offset,hue:reminderHue(item),text:`${when}: ${what} ${item.name}`});
       });

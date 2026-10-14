@@ -293,7 +293,7 @@
         </div></details>
         <details><summary>Đồng hồ, báo thức & lịch nhắc</summary><div class="guide-group-body">
           <p><strong>Đồng hồ:</strong> bấm trực tiếp vào đồng hồ để mở. Có thể đặt phút/giây, sửa các preset và tắt chuông ngay bằng nút TẮT.</p>
-          <p><strong>Sinh nhật / Ngày giỗ / Lễ - Kỷ niệm:</strong> sinh nhật và lễ - kỷ niệm dùng dương lịch, ngày giỗ dùng âm lịch Việt Nam. Có thể nhập dd/mm hoặc dd/mm/yyyy, tìm theo tên và lọc theo tháng.</p>
+          <p><strong>Sinh nhật / Ngày giỗ / Lễ - Kỷ niệm:</strong> sinh nhật và lễ - kỷ niệm dùng dương lịch, ngày giỗ dùng âm lịch Việt Nam. Có thể nhập dd/mm hoặc dd/mm/yyyy, tìm theo tên và lọc theo tháng. Có thể nhắc chuẩn bị trước 7–5 ngày, im lặng 4–3 ngày rồi nhắc lại từ 2 ngày trước đến đúng ngày.</p>
           <p><strong>Lịch Công việc:</strong> hỗ trợ ngày cụ thể, lặp hàng tháng hoặc hằng năm; KanBan nhắc trước 2 ngày, ngày mai và hôm nay.</p>
         </div></details>
         <details><summary>KanPass · tài khoản & mật khẩu</summary><div class="guide-group-body">
@@ -522,8 +522,9 @@
 
       <div id="clockSpecialPanel" class="clock-tab-panel" hidden>
         <div class="special-date-intro">
-          <strong>Nhắc trước 2 ngày</strong>
-          <span>Chỉ hiện dòng chữ nhắc trên KanBan, không phát chuông. Sinh nhật và lễ - kỷ niệm dùng dương lịch; ngày giỗ dùng âm lịch Việt Nam.</span>
+          <strong>Nhắc trước 7–5 ngày và 2–0 ngày</strong>
+          <span>Nhắc chuẩn bị trước 7, 6, 5 ngày; im lặng 4, 3 ngày; nhắc lại trước 2 ngày, ngày mai và hôm nay. Chỉ hiện chữ chạy trên KanBan, không phát chuông. Ngày giỗ theo âm lịch Việt Nam.</span>
+          <label class="special-ticker-setting"><input id="specialEarlyReminderInput" type="checkbox" checked><span>Nhắc chuẩn bị trước 7–5 ngày</span></label>
         </div>
 
         <div class="special-date-form">
@@ -756,7 +757,7 @@
   <div id="globalTooltip" class="global-tooltip" role="tooltip" hidden></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="dragdrop.js?v=3.3"></script>
-  <script src="app.js?v=5.3"></script>
+  <script src="app.js?v=5.4"></script>
   <script src="music-player.js?v=3.3"></script>
   <script src="kalo-launcher.js?v=1.0.5"></script>
   <script src="capture-launcher.js?v=1.5.0"></script>
