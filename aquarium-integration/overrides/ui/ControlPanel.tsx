@@ -122,11 +122,9 @@ function TankTab() {
           <button className={!isSalt ? 'active' : ''} onClick={() => setWater('freshwater')}>🌿 Nước ngọt</button>
           <button className={isSalt ? 'active' : ''} onClick={() => setWater('saltwater')}>🪸 Nước mặn</button>
         </div>
-        {Object.keys(config.fish).length > 0 && (
-          <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: '6px 2px 0' }}>
-            Thay loại nước sẽ xóa đàn cá hiện có vì sinh vật nước ngọt và nước mặn không thể ở chung.
-          </p>
-        )}
+        <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: '6px 2px 0' }}>
+          Hồ nước ngọt và nước mặn được lưu riêng: đổi qua lại sẽ khôi phục cá, cây, san hô và trang trí của mỗi loại, không xóa dữ liệu.
+        </p>
       </div>
 
       <div className="section">
@@ -332,6 +330,11 @@ function FishTab() {
         </div>
       )}
 
+      <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: '5px 2px 9px' }}>
+        Nhấn + để thả từng con cá từ mặt nước xuống. Có thể chọn số lượng tùy ý;
+        tối đa 100 sinh vật được hiển thị cùng lúc (60 khi máy chạy chế độ thấp).
+        Số lượng đã chọn vượt mức này vẫn được lưu nguyên vẹn.
+      </p>
       <div className="search-row">
         <input
           type="search" placeholder="Tìm cá theo tên hoặc màu…"
