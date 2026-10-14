@@ -60,6 +60,37 @@ jobs:
           cp aquarium-integration/tests/camera-controls-smoke.mjs _aquarium-build/camera-controls-smoke.mjs
           cd _aquarium-build
           node camera-controls-smoke.mjs
+      - name: Commit compiled game into site
+        if: github.ref == 'refs/heads/main'
+        run: |
+          rm -rf aquarium-game
+          mkdir -p aquarium-game
+          cp -r _aquarium-build/dist/. aquarium-game/
+          printf 'Base project: https://github.com/jamisonhill/aquarium\nLicense: MIT (see upstream LICENSES.md)\nCustomized for KanBan.\n' > aquarium-game/LICENSE_SOURCE.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          # Keep existing aquarium-review assets intact; camera release only.
+          git add aquarium-game
+          if ! git diff --cached --quiet; then
+            git commit -m "build: compile KanAquarium 3D for GitHub Pages"
+            git push
+          fi
+      - name: Verify deployed Pages and root aquarium launcher
+        if: github.ref == 'refs/heads/main'
+        run: |
+          cp aquarium-integration/tests/realism42-production-smoke.mjs _aquarium-build/realism42-production-smoke.mjs
+          cd _aquarium-build
+          node realism42-production-smoke.mjs
+      - name: Preserve production verification
+        if: always() && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: realism42-production-review
+          path: |
+            _aquarium-build/realism42-production.png
+            _aquarium-build/realism42-production-report.json
+          if-no-files-found: ignore
+          retention-days: 30
       - name: Browser Realism 4 - flexible fins, habitats, 20 event classes, 60 fish
         run: |
           cp aquarium-integration/tests/realism4-habitats-smoke.mjs _aquarium-build/realism4-habitats-smoke.mjs
@@ -145,37 +176,5 @@ jobs:
             _aquarium-build/realism42-report.json
             _aquarium-build/realism42-event-audit.json
             _aquarium-build/realism42-surfaces-review.json
-          if-no-files-found: ignore
-          retention-days: 30
-      - name: Commit compiled game into site
-        if: github.ref == 'refs/heads/main'
-        run: |
-          rm -rf aquarium-game
-          mkdir -p aquarium-game
-          cp -r _aquarium-build/dist/. aquarium-game/
-          printf 'Base project: https://github.com/jamisonhill/aquarium\nLicense: MIT (see upstream LICENSES.md)\nCustomized for KanBan.\n' > aquarium-game/LICENSE_SOURCE.txt
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          mkdir -p aquarium-review
-          cp -r _aquarium-build/review42/. aquarium-review/
-          git add aquarium-game aquarium-review
-          if ! git diff --cached --quiet; then
-            git commit -m "build: compile KanAquarium 3D for GitHub Pages"
-            git push
-          fi
-      - name: Verify deployed Pages and root aquarium launcher
-        if: github.ref == 'refs/heads/main'
-        run: |
-          cp aquarium-integration/tests/realism42-production-smoke.mjs _aquarium-build/realism42-production-smoke.mjs
-          cd _aquarium-build
-          node realism42-production-smoke.mjs
-      - name: Preserve production verification
-        if: always() && github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v4
-        with:
-          name: realism42-production-review
-          path: |
-            _aquarium-build/realism42-production.png
-            _aquarium-build/realism42-production-report.json
           if-no-files-found: ignore
           retention-days: 30
