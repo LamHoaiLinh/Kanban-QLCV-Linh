@@ -10,6 +10,7 @@ import { decodeShareHash } from './share';
 import { speciesForWater } from '../data/species';
 import { floraForWater } from '../data/flora';
 import { decorForWater } from '../data/decor';
+import { createRandomWaterTank } from '../data/randomWaterTank';
 import { tankDims } from '../data/tanks';
 import { normalizeStock, resizeStock } from '../data/stocking';
 import type { EcoMode } from '../engine/Ecology';
@@ -121,24 +122,22 @@ export const useStore = create<AppState>()(
         }
       },
 
-      // Changing the displayed ecosystem must never destroy another one.
-      // Keep both independent tank drafts in localStorage; newly visited water
-      // starts empty only once, and revisiting restores its fish/plant inventory,
-      // names, decorations and environment options exactly as last left.
+      // One virtual aquarium for each ecosystem. Never lose the previous
+      // design. On first entry, generate a planted/decorated/populated tank
+      // at the SAME gallon size; on later entries restore the saved layout.
+      // A truly empty draft left by the former version is also initialized.
       setWater: (water) =>
         set((s) => {
           if (s.config.water === water) return s;
           const waterDrafts={...s.waterDrafts,[s.config.water]:structuredClone(s.config)};
           const previous=waterDrafts[water];
-          const config=previous
-            ?structuredClone(previous)
-            :{
-              ...s.config,water,fish:{},flora:{},fishNames:{},
-              decor:s.config.decor.filter(d=>decorForWater(water).some(x=>x.id===d)),
-              substrate:water==='saltwater'?'crushedcoral' as const:'sand' as const,
-              background:water==='saltwater'?'reef' as const:'natural' as const,
-              lighting:water==='saltwater'?'actinic' as const:'daylight' as const,
-            };
+          const emptyDraft=!previous || (
+            Object.values(previous.fish??{}).every(n=>n<=0) &&
+            Object.values(previous.flora??{}).every(n=>n<=0)
+          );
+          const config=emptyDraft
+            ?createRandomWaterTank(water,s.config.gallons)
+            :{...structuredClone(previous),gallons:s.config.gallons};
           return {
             waterDrafts,config,resizeSnapshot:null,
             followFishKey:null,selectedFishKey:null,
