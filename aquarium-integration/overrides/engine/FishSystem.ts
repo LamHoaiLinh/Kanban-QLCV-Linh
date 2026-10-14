@@ -486,6 +486,7 @@ export class FishSystem {
       this.pendingDrops.push({x,z,speciesId});
   }
   clearQueuedDrops():void{this.pendingDrops=[];}
+  processQueuedArrivals(env:SimEnv):void{if(this.pendingDrops.length)this.startWaitingArrivals(env);}
   private startArrival(a:Agent,p:{x:number;z:number},env:SimEnv):void{
     const inset=Math.min(env.halfW*.25,Math.max(.012,a.scale*.6));
     const dx=(Math.random()-.5)*.025,dz=(Math.random()-.5)*.025;
