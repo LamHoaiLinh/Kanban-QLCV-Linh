@@ -365,9 +365,9 @@ function FishTab() {
                 onClick={() => setExpanded(expanded === sp.id ? null : sp.id)}
               >ⓘ</button>
               <div className="stepper">
-                <button aria-label={`Bớt một ${sp.common}`} onClick={() => setFishCount(sp.id, count - 1)} disabled={count === 0}>−</button>
+                <button aria-label={`Bớt một ${sp.common}`} onClick={() => setFishCount(sp.id, (useStore.getState().config.fish[sp.id] ?? 0) - 1)} disabled={count === 0}>−</button>
                 <span className="count">{count}</span>
-                <button aria-label={`Thêm một ${sp.common}`} onClick={() => setFishCount(sp.id, count + 1)}>+</button>
+                <button aria-label={`Thêm một ${sp.common}`} onClick={() => setFishCount(sp.id, (useStore.getState().config.fish[sp.id] ?? 0) + 1)}>+</button>
               </div>
             </div>
             {expanded === sp.id && <SpeciesDetails sp={sp} />}
