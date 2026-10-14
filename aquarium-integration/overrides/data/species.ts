@@ -201,7 +201,7 @@ export const SPECIES: SpeciesDef[] = [
   {
     id: 'discus', common: 'Cá dĩa', scientific: 'Symphysodon aequifasciatus',
     water: 'freshwater', adultSizeIn: 7, lengthM: 0.14,
-    temperament: 'peaceful', careLevel: 'expert', zone: 'mid', archetype: 'hoverer',
+    temperament: 'peaceful', careLevel: 'advanced', zone: 'mid', archetype: 'hoverer',
     minGroup: 5, bioload: 9, minGallons: 75,
     habitat: 'Nhánh sông Amazon ấm, dòng chảy chậm và nhiều rễ cây chìm.',
     funFact: 'Cá bố mẹ có thể tiết chất nhầy dinh dưỡng trên da để nuôi cá con.',
