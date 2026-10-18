@@ -132,6 +132,7 @@ interface FoodBit {
   state:'air'|'float'|'sink'|'toss'|'settled'|'gone';
   kind:FoodKind;sprite:THREE.Sprite;support?:'wood'|'floor';
   floatOnContact?:boolean;floatLifetime?:number;
+  airFallSpeed?:number;sinkFallSpeed?:number;
   toss?:{velocity:THREE.Vector3;remaining:number;halfW:number;halfD:number};
   retryAt?:number;misses?:number;
 }
@@ -171,7 +172,10 @@ export class FoodSystem {
     // away from the pointer, especially with an oblique camera.
     const bit:FoodBit={pos:new THREE.Vector3(x,startY,z),
       age:0,state:mode==='inside'?'sink':'air',kind,sprite,
-      floatOnContact:mode==='top-float',floatLifetime:10+Math.random()*6};
+      floatOnContact:mode==='top-float',floatLifetime:10+Math.random()*6,
+      // Variation only for food dropped from above; underwater feeding stays unchanged.
+      airFallSpeed:mode==='inside'?undefined:.11+Math.random()*.16,
+      sinkFallSpeed:mode==='inside'?undefined:.055+Math.random()*.07};
     sprite.position.copy(bit.pos);this.group.add(sprite);this.bits.push(bit);
   }
   scatterAboveSurface(x:number,z:number,startY:number,kind:FoodKind,
@@ -182,13 +186,25 @@ export class FoodSystem {
     const mode=Array.from({length:count},(_,i)=>i<floating?'top-float' as const:'top-sink' as const);
     // Shuffle each pinch so that floating food is spatially interleaved.
     for(let i=mode.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[mode[i],mode[j]]=[mode[j],mode[i]];}
-    const spread=Math.min(.012,halfW*.09,halfD*.11);
+    // Fan the pinch out around the click, rather than stacking ten icons in
+    // roughly the same few pixels. Golden-angle placement + jitter gives
+    // visible separation without a fixed geometric pattern.
+    const radiusX=Math.min(.061,halfW*.28);
+    const radiusZ=Math.min(.047,halfD*.32);
+    const rotation=Math.random()*Math.PI*2;
+    const angleStep=Math.PI*(3-Math.sqrt(5));
+    const baseY=Math.max(startY,surfaceY+.035);
     for(let i=0;i<count;i++){
-      const ox=i===0?0:(Math.random()-.5)*spread*2;
-      const oz=i===0?0:(Math.random()-.5)*spread*2;
+      const radius=i===0?0:Math.sqrt((i+.1)/(count-.2))*(.76+Math.random()*.24);
+      const angle=rotation+i*angleStep+(Math.random()-.5)*.26;
+      const ox=Math.cos(angle)*radius*radiusX;
+      const oz=Math.sin(angle)*radius*radiusZ;
       const px=THREE.MathUtils.clamp(x+ox,-halfW+.014,halfW-.014);
       const pz=THREE.MathUtils.clamp(z+oz,-halfD+.014,halfD-.014);
-      this.scatter(px,pz,Math.max(startY,surfaceY+.035)+Math.random()*.008,kind,mode[i]);
+      // Each flake starts at its own height; paired with individual fall
+      // speeds, some arrive at the surface noticeably before others.
+      const heightOffset=.006+Math.random()*.091;
+      this.scatter(px,pz,baseY+heightOffset,kind,mode[i]);
     }
     this.surfaceDrops++;
     return {floating,sinking:count-floating};
@@ -218,7 +234,7 @@ export class FoodSystem {
     for(let i=this.bits.length-1;i>=0;i--){
       const b=this.bits[i];b.age+=dt;const special=b.kind!=='normal';
       if(b.state==='air'){
-        b.pos.y-=dt*(special?.15:.19);
+        b.pos.y-=dt*(b.airFallSpeed??(special?.15:.19));
         if(b.pos.y<=surfaceY-.007){
           b.pos.y=surfaceY-.007;
           b.state=b.floatOnContact?'float':'sink';
@@ -243,7 +259,7 @@ export class FoodSystem {
         }
       }else if(b.state==='sink'){
         const previous=b.pos.clone(),next=b.pos.clone();
-        next.y-=dt*(special?.075:.090);
+        next.y-=dt*(b.sinkFallSpeed??(special?.075:.090));
         next.x+=Math.sin(b.age*2.2+b.pos.z*35)*dt*.003;
         const impact=solidHit?.(previous,next);
         if(impact&&impact.y>floorY+.012){
