@@ -60,6 +60,8 @@ export class Engine {
   private kanAquariumMode=new URLSearchParams(location.search).has('kanban');
   private clickFoodCount=0;
   private lastFoodSpawn:THREE.Vector3|null=null;
+  private lastFeedOrigin:'above'|'inside'|null=null;
+  private lastSurfaceSplit:{floating:number;sinking:number}|null=null;
   private pointerDown={x:0,y:0};
   // DOM overlay tied to 3D food positions: guaranteed legibility independent
   // of transparent water, frustum culling, camera zoom and postprocessing.
@@ -178,7 +180,7 @@ export class Engine {
           start.y=bounds.max.y+.035;
           this.fish.feed(start.x,start.z,this.simEnv,'normal',start.y);
           const pellet=this.fish.food.bits[this.fish.food.bits.length-1];
-          for(let i=0;i<35;i++)this.fish.food.update(.05,this.dims.floorY,this.simEnv.foodSolidHit);
+          for(let i=0;i<35;i++)this.fish.food.update(.05,this.dims.floorY,this.dims.surfaceY,this.simEnv.foodSolidHit);
           return {support:pellet.support??null,state:pellet.state,
             pelletY:pellet.pos.y,woodTop:bounds.max.y,floorY:this.dims.floorY};
         },
@@ -191,6 +193,9 @@ export class Engine {
         dims:{halfW:this.dims.halfW,halfD:this.dims.halfD,
           floorY:this.dims.floorY,surfaceY:this.dims.surfaceY},
         lastSpawn:this.lastFoodSpawn?.toArray()??null,
+        lastFeedOrigin:this.lastFeedOrigin,
+        lastSurfaceSplit:this.lastSurfaceSplit,
+        biteStats:{attempts:this.fish.food.biteAttempts,misses:this.fish.food.missedBites},
         lastScreen:this.lastFoodSpawn?(()=>{
           const point=this.lastFoodSpawn.clone().project(this.rig.camera);
           return [point.x,point.y,point.z];
@@ -198,7 +203,30 @@ export class Engine {
         obstacles:this.simEnv.obstacles.map(o=>[o.pos.x,o.pos.y,o.pos.z,o.radius]),
         food:this.fish.food.bits.map(bit=>({
           pos:bit.pos.toArray(),kind:bit.kind,state:bit.state,age:bit.age,
+          surfaceFloat:!!bit.floatOnContact,misses:bit.misses??0,
         })),
+      });
+      // QA-only helpers are excluded from ordinary Kanban sessions.
+      Object.assign(window,{
+        __kanFoodFindSurfaceTap:()=>{
+          const rect=this.renderer.domElement.getBoundingClientRect();
+          for(let iy=5;iy<=48;iy+=2)for(let ix=25;ix<=75;ix+=5){
+            const x=rect.left+rect.width*ix/100,y=rect.top+rect.height*iy/100;
+            if(this.foodAboveSurfacePoint(x,y))return {x,y,fx:ix/100,fy:iy/100};
+          }
+          return null;
+        },
+        __kanFoodStep:(seconds:number)=>{
+          const n=Math.min(400,Math.max(0,Math.ceil(seconds/.025)));
+          for(let i=0;i<n;i++)this.fish.food.update(.025,this.dims.floorY,this.dims.surfaceY,this.simEnv.foodSolidHit);
+          return this.fish.food.bits.map(bit=>({state:bit.state,y:bit.pos.y,surfaceFloat:!!bit.floatOnContact,misses:bit.misses??0}));
+        },
+        __kanFoodForceMiss:()=>{
+          const pellet=this.fish.food.bits.find(bit=>bit.kind==='normal'&&bit.state!=='gone');
+          if(!pellet)return null;
+          this.fish.food.miss(pellet,new THREE.Vector3(1,0,.2),this.simEnv);
+          return {state:pellet.state,misses:pellet.misses,pos:pellet.pos.toArray()};
+        },
       });
       (window as Window & {__kanFoodTestCamera?:(mode:'orbit'|'cinematic'|'still')=>void}).__kanFoodTestCamera=
         (mode)=>this.setCameraMode(mode);
@@ -539,15 +567,47 @@ export class Engine {
     return null;
   }
 
+  // Ray hits the air pocket above the tank's waterline. Only an actual
+  // intersection with the tank footprint counts: background taps remain inert.
+  private foodAboveSurfacePoint(clientX:number,clientY:number):THREE.Vector3|null{
+    const rect=this.renderer.domElement.getBoundingClientRect();
+    if(!Number.isFinite(clientX)||!Number.isFinite(clientY)||
+      clientX<rect.left||clientX>rect.right||clientY<rect.top||clientY>rect.bottom)return null;
+    this.raycaster.setFromCamera(this.toNdc(clientX,clientY),this.rig.camera);
+    const ray=this.raycaster.ray;
+    const pad=Math.min(.012,this.dims.halfW*.07,this.dims.halfD*.07);
+    const tankHeight=this.dims.surfaceY-this.dims.floorY;
+    const above=new THREE.Box3(
+      new THREE.Vector3(-this.dims.halfW+pad,this.dims.surfaceY+.014,-this.dims.halfD+pad),
+      new THREE.Vector3(this.dims.halfW-pad,this.dims.surfaceY+Math.max(.12,tankHeight*.38),this.dims.halfD-pad)
+    );
+    const entry=ray.intersectBox(above,new THREE.Vector3());
+    if(!entry)return null;
+    const water=new THREE.Box3(
+      new THREE.Vector3(-this.dims.halfW+pad,this.dims.floorY+pad,-this.dims.halfD+pad),
+      new THREE.Vector3(this.dims.halfW-pad,this.dims.surfaceY-pad,this.dims.halfD-pad)
+    );
+    const firstWater=ray.intersectBox(water,new THREE.Vector3());
+    if(firstWater && firstWater.distanceTo(ray.origin)<entry.distanceTo(ray.origin)-.001)return null;
+    // Avoid classifying an underwater click as above-water on oblique cameras.
+    const surfaceProjection=new THREE.Vector3(entry.x,this.dims.surfaceY,entry.z).project(this.rig.camera);
+    const clickedY=this.toNdc(clientX,clientY).y;
+    if(clickedY<=surfaceProjection.y+.015)return null;
+    return entry;
+  }
+
   queueFishDrop(clientX?:number,clientY?:number,speciesId?:string,count=1):void{
     const p=this.tankPoint(clientX,clientY);
     this.fish.queueDrop(p.x,p.z,speciesId,count);
   }
 
   feedAt(clientX:number,clientY:number,kind:FoodKind='normal',count=this.clickFoodCount):boolean{
-    const hit=this.foodPoint(clientX,clientY);
+    const above=this.foodAboveSurfacePoint(clientX,clientY);
+    const hit=above || this.foodPoint(clientX,clientY);
     if(!hit)return false;
-    this.fish.feed(hit.x,hit.z,this.simEnv,kind,hit.y);
+    const split=this.fish.feed(hit.x,hit.z,this.simEnv,kind,hit.y,Boolean(above));
+    this.lastFeedOrigin=above?'above':'inside';
+    this.lastSurfaceSplit=above?split:null;
     this.lastFoodSpawn=hit.clone();
     this.ecology.feed(kind);
     this.callbacks.onFed?.(kind,count);

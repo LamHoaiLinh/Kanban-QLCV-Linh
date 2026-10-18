@@ -60,7 +60,7 @@ try{
     return probe;
   }
   // Top, central and low click positions: none may be teleported to surface.
-  for(const [x,y] of [[.40,.34],[.40,.48],[.40,.63]])
+  for(const [x,y] of [[.40,.42],[.40,.52],[.40,.63]])
     await dropAt(x,y);
   // Same screen point should produce different physical depths, never drift
   // horizontally off the pointing ray at the moment the pellet is created.
