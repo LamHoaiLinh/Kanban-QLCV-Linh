@@ -163,6 +163,25 @@ export class Engine {
           return this.ecology.snapshot();
         };
       Object.assign(window,{
+        __kanFavoriteLayout:()=>{
+          // QA fingerprint from actual generated mesh vertices & transforms.
+          const summarize=(root:THREE.Group)=>{
+            const lines:string[]=[];
+            root.traverse(obj=>{
+              if(!(obj instanceof THREE.Mesh))return;
+              const attr=obj.geometry.getAttribute('position');
+              const sample:number[]=[];
+              if(attr)for(let i=0;i<attr.count;i+=Math.max(1,Math.floor(attr.count/50))){
+                sample.push(Math.round(attr.getX(i)*100000),Math.round(attr.getY(i)*100000),Math.round(attr.getZ(i)*100000));
+              }
+              lines.push(JSON.stringify([obj.name,
+                obj.position.toArray().map(v=>+v.toFixed(5)),
+                obj.rotation.toArray().slice(0,3).map(v=>+v.toFixed(5)),sample]));
+            });
+            return lines.join('|');
+          };
+          return {decor:summarize(this.decor.group),flora:summarize(this.flora.group)};
+        },
         __kan42Seams:()=>this.environment.getSealSnapshot(),
         __kan42Arrange:()=>this.fish.qaArrange(this.simEnv),
         __kan42Follow:(key:string|null)=>this.followFish(key),
