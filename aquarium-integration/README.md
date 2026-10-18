@@ -7,3 +7,9 @@ KanAquarium uses the MIT-licensed upstream 3D aquarium by jamisonhill/aquarium (
 - Larger fish show gentle scale texture and less plastic reflections; discus has softer organic markings.
 - Browser smoke test checks favorite save, randomize, reload and exact scenery geometry.
 - Release validation: the compiled GitHub Pages aquarium includes the favorite tank persistence and fish-mesh update.
+
+## Large fish movement and proportion update (2026-10-18)
+- Discus glide more naturally with fewer near-stationary rests and less head/pitch jitter.
+- Angelfish caudal fins now grow from a connected strip embedded in the rear body rather than a point at the peduncle.
+- Larger fish (adult size at least 5 inches) vary across three recognizable size cohorts; smaller species retain their existing size distribution.
+- 3D browser regression checks discus movement, angelfish caudal root and per-fish size ranges.
