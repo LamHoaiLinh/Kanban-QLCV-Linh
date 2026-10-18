@@ -58,9 +58,13 @@ self.addEventListener('fetch', event => {
 
   async function fetchAndCache() {
     const response = await fetch(request);
-    if (response.ok && response.type !== 'opaque') {
-      const cache = await caches.open(cacheName);
-      await cache.put(request,response.clone()).catch(error => console.debug('Cache put:',error));
+    const heavyGameMedia = isGame && /\.(glb|bin|mp4|webm|mov|mp3|wav|ogg|flac|m4a|png|jpe?g|webp|gif)$/i.test(url.pathname);
+    const size = Number(response.headers.get('content-length') || 0);
+    if (response.ok && response.type !== 'opaque' && !heavyGameMedia && (!size || size < 2*1024*1024)) {
+      const cacheJob = caches.open(cacheName)
+        .then(cache => cache.put(request,response.clone()))
+        .catch(error => console.debug('Cache put:',error));
+      event.waitUntil(cacheJob);
     }
     return response;
   }
