@@ -211,8 +211,8 @@ export const SPECIES: SpeciesDef[] = [
     palette: pal({ base: '#cb6d56', belly: '#f4c190', back: '#2f5f95',
       pattern: 'none', patternColor: '#245f8b',
       fin: '#2a8fa5', finOpacity: 0.68, iridescence: 0.48, eyeColor: '#b92823' }),
-    swim: swim({ cruise: 0.57, burst: 2.2, freqBase: 1.4,
-      mode: 2, turnRate: 1.65, amp: 0.10 }),
+    swim: swim({ cruise: 0.57, burst: 2.2, freqBase: 1.55,
+      mode: 1, turnRate: 1.65, amp: 0.115 }),
   },
   {
     id: 'german-blue-ram', common: 'Cá phượng hoàng lam', scientific: 'Mikrogeophagus ramirezi',

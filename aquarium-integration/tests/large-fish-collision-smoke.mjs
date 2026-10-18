@@ -31,12 +31,21 @@ try{
   const before=await page.evaluate(()=>window.__kanLargeContactProbe());
   assert(before.overlap.overlaps>0&&before.overlap.maxPenetration>.03,
     'Forced geometry did not actually intersect: '+JSON.stringify(before.overlap));
-  await page.evaluate(()=>window.__kan42Step(.8));
+  // First frame must NOT "teleport" the pair. Previous solver shifted each
+  // fish 10-30mm EVERY FRAME, making collisions look like sudden dashes.
+  await page.evaluate(()=>window.__kan42Step(1/60));
+  const first=await page.evaluate(()=>window.__kanLargeContactProbe());
+  assert(first.overlap.maxFramePush<=.022/60+.00008,
+    'Instantaneous collision push too fast: '+JSON.stringify(first.overlap));
+  assert(first.overlap.maxPenetration>before.overlap.maxPenetration*.60,
+    'Collision instantly ejected fish instead of separating smoothly');
+  // Collisions should recover progressively rather than in one frame.
+  await page.evaluate(()=>window.__kan42Step(1.2));
   const after=await page.evaluate(()=>window.__kanLargeContactProbe());
-  assert(after.overlap.maxPenetration<before.overlap.maxPenetration*.5,
-    'Large fish intersection did not resolve: '+JSON.stringify({before:before.overlap,after:after.overlap}));
-  assert(after.overlap.maxPenetration<.028,
-    'Visible fish interpenetration still severe after settling: '+JSON.stringify(after.overlap));
+  assert(after.overlap.maxPenetration<before.overlap.maxPenetration-.008,
+    'Large fish did not gradually separate: '+JSON.stringify({before:before.overlap,after:after.overlap}));
+  assert(after.overlap.pushSpeed<=.0221,
+    'Sustained contact speed exceeded permitted gentle push: '+JSON.stringify(after.overlap));
   assert(after.overlap.events>0,'No physical fish collision was recorded');
   assert(after.physics.wallViolations===0,'Fish collision pushes into glass: '+JSON.stringify(after.physics));
   // Under varied fish sizes, collision scales with each individual rather
@@ -45,5 +54,5 @@ try{
   assert(Math.max(...discus.map(x=>x.ratio))-Math.min(...discus.map(x=>x.ratio))>.25,
     'Large fish size groups were changed unexpectedly');
   assert(!errors.length,'Browser runtime errors: '+errors.join('; '));
-  console.log('PASS: cross-species big-fish avoidance and pair correction, no wall clipping, size groups unchanged');
+  console.log('PASS: contact push speed capped per agent, gradual fish separation, no wall clipping, size groups unchanged');
 }finally{await browser?.close();server.kill('SIGTERM');}

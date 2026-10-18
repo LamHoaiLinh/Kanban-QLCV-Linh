@@ -461,6 +461,8 @@ export class FishSystem {
   // and scales, but are intentionally looser than the decorative fins.
   private nearbySwimmers:Agent[]=[];
   private fishCollisionEvents=0;
+  private maxLastCollisionShift=0;
+  private maxLastCollisionShiftSpeed=0;
   private largeBody(a:Agent):boolean {
     return !a.sp.invert&&!isCrawler(a.sp)&&
       (a.sp.adultSizeIn>=5||a.sp.id==='angelfish'||a.sp.id==='discus');
@@ -514,18 +516,23 @@ export class FishSystem {
       const approach=THREE.MathUtils.clamp((influence-d)/Math.max(.008,influence),0,1);
       // Anticipate the other fish and turn aside BEFORE bodies overlap.
       // Stronger for large/large pairs; small companions glide aside gently.
-      const strength=(this.largeBody(a)?2.3:1.25)*approach*approach;
+      const strength=(this.largeBody(a)?.92:.60)*approach*approach;
       steer.x+=q.nx*strength;
       steer.y+=q.ny*strength*.64;
       steer.z+=q.nz*strength;
     }
   }
-  private resolveBodyIntersections(env:SimEnv):void {
-    // Low-cost pair projections after every fish has integrated this frame;
-    // only one of the two fish must be large. No pass-through from one species
-    // into another, including mixed-size angelfish and discus groups.
+  private resolveBodyIntersections(env:SimEnv,dt:number):void {
+    // Previously each overlapping pair received up to 3 x 10mm EVERY FRAME.
+    // In a crowded tank the same fish was pushed many times by multiple
+    // neighbors, creating apparent teleportation ("superhero" swimming).
+    // A fixed total per-agent displacement budget, measured in metres per
+    // simulation second, makes contact calm at 30/60/120 fps alike.
     const fish=this.nearbySwimmers;
-    for(let pass=0;pass<3;pass++){
+    const perFishBudget=.022*dt; // ≤2.2 cm/s of extra collision motion
+    const used=new Map<Agent,number>();
+    let frameMax=0;
+    for(let pass=0;pass<2;pass++){
       let changed=false;
       const moved=new Set<Agent>();
       for(let i=0;i<fish.length;i++){
@@ -538,28 +545,39 @@ export class FishSystem {
           if(dx*dx+dy*dy+dz*dz>broad*broad)continue;
           const q=this.pairBodyGap(a,b);
           if(q.gap>=-.001)continue;
-          // Bounded adjustment avoids sudden jumps in crowded aquariums.
-          const correction=Math.min(-q.gap+.0015,.010);
           const am=this.largeBody(a)?Math.max(.015,a.scale):Math.max(.007,a.scale*.65);
           const bm=this.largeBody(b)?Math.max(.015,b.scale):Math.max(.007,b.scale*.65);
           const total=am+bm,aw=bm/total,bw=am/total;
-          a.pos.x+=q.nx*correction*aw;a.pos.y+=q.ny*correction*aw;a.pos.z+=q.nz*correction*aw;
-          b.pos.x-=q.nx*correction*bw;b.pos.y-=q.ny*correction*bw;b.pos.z-=q.nz*correction*bw;
-          // Remove inward relative velocity rather than reversing direction
-          // suddenly; animation and head yaw remain under swim controller.
+          // Split each correction, but NEVER exceed either fish's remaining
+          // TOTAL budget after all previous contacts in this frame.
+          const remainingA=Math.max(0,perFishBudget-(used.get(a)||0));
+          const remainingB=Math.max(0,perFishBudget-(used.get(b)||0));
+          const correction=Math.max(0,Math.min(-q.gap+.0015,
+            remainingA/Math.max(.001,aw),remainingB/Math.max(.001,bw)));
+          if(correction<=1e-9)continue;
+          const shiftA=correction*aw,shiftB=correction*bw;
+          a.pos.x+=q.nx*shiftA;a.pos.y+=q.ny*shiftA;a.pos.z+=q.nz*shiftA;
+          b.pos.x-=q.nx*shiftB;b.pos.y-=q.ny*shiftB;b.pos.z-=q.nz*shiftB;
+          used.set(a,(used.get(a)||0)+shiftA);
+          used.set(b,(used.get(b)||0)+shiftB);
+          frameMax=Math.max(frameMax,used.get(a)!,used.get(b)!);
+          // Soften any inward relative velocity; do not bounce or accelerate
+          // the pair outward. Normal swim steering handles subsequent motion.
           const closing=(a.vel.x-b.vel.x)*q.nx+
             (a.vel.y-b.vel.y)*q.ny+(a.vel.z-b.vel.z)*q.nz;
           if(closing<0){
-            a.vel.addScaledVector(_v1.set(q.nx,q.ny,q.nz),-closing*aw*.75);
-            b.vel.addScaledVector(_v1,-closing*bw*.75);
+            const vnx=q.nx*closing*.34,vny=q.ny*closing*.34,vnz=q.nz*closing*.34;
+            a.vel.x-=vnx*aw;a.vel.y-=vny*aw;a.vel.z-=vnz*aw;
+            b.vel.x+=vnx*bw;b.vel.y+=vny*bw;b.vel.z+=vnz*bw;
           }
           moved.add(a);moved.add(b);changed=true;this.fishCollisionEvents++;
         }
       }
       if(!changed)break;
-      // Re-apply actual tank/glass/wood bounds after correction.
       for(const a of moved)this.constrain(a,env);
     }
+    this.maxLastCollisionShift=frameMax;
+    this.maxLastCollisionShiftSpeed=dt>0?frameMax/dt:0;
   }
   getFishBodyContactSnapshot(){
     const fish=this.populations.flatMap(p=>p.agents).filter(a=>this.canContact(a));
@@ -572,7 +590,9 @@ export class FishSystem {
       const penetration=Math.max(0,-q.gap);
       if(penetration>.003){overlaps++;maxPenetration=Math.max(maxPenetration,penetration);}
     }
-    return {pairs,overlaps,maxPenetration,events:this.fishCollisionEvents};
+    return {pairs,overlaps,maxPenetration,events:this.fishCollisionEvents,
+      maxFramePush:this.maxLastCollisionShift,
+      pushSpeed:this.maxLastCollisionShiftSpeed};
   }
   qaOverlapLargeFish(env:SimEnv):boolean{
     const big=this.populations.flatMap(p=>p.agents)
@@ -1084,7 +1104,7 @@ export class FishSystem {
     }
     // Resolve contacts AFTER all fish have moved, then update rendered poses
     // once. This prevents one-frame fish intersections in the InstancedMesh.
-    this.resolveBodyIntersections(env);
+    this.resolveBodyIntersections(env,dt);
     for(const pop of this.populations){
       for(const a of pop.agents)this.writeInstance(pop,a,dt);
       pop.mesh.instanceMatrix.needsUpdate=true;
@@ -1837,7 +1857,10 @@ export class FishSystem {
     a.phase += TAU * Math.min(f, 14) * dt;
     // Pectoral flutter fades in as forward speed fades out.
     const speedFactor = THREE.MathUtils.clamp(speed / (sp.swim.cruise * L * SPEED_SCALE + 1e-6), 0, 1);
-    a.flap = THREE.MathUtils.damp(a.flap, 1 - speedFactor * 0.85, 4, dt);
+    // Discus maintain visible, gentle sculling of the pectorals even while
+    // cruising; other species keep the original speed-responsive flutter.
+    const flapTarget=sp.id==='discus'?.62+.30*(1-speedFactor):1-speedFactor*.85;
+    a.flap = THREE.MathUtils.damp(a.flap, flapTarget, 4, dt);
 
     pop.dyn.setXYZW(a.index, a.phase, a.bend, a.flap, a.jaw);
   }
