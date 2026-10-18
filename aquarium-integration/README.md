@@ -6,3 +6,4 @@ KanAquarium uses the MIT-licensed upstream 3D aquarium by jamisonhill/aquarium (
 - Angelfish tail joins the body more closely; discus caudal fin has a short rounded silhouette.
 - Larger fish show gentle scale texture and less plastic reflections; discus has softer organic markings.
 - Browser smoke test checks favorite save, randomize, reload and exact scenery geometry.
+- Release validation: the compiled GitHub Pages aquarium includes the favorite tank persistence and fish-mesh update.
