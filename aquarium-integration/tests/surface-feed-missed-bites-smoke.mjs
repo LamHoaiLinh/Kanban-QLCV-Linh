@@ -43,7 +43,24 @@ try{
   if(initial.filter(b=>b.surfaceFloat).length!==floating ||
      !initial.every(b=>b.state==='air'||b.state==='float'||b.state==='sink'))
     throw Error('Surface pellets were not initialized correctly');
-  await page.evaluate(()=>window.__kanFoodStep(3.0));
+  // A pinch needs visible separation in both horizontal directions, plus
+  // different starting heights. All ten must still count towards the
+  // established 30–40% floating requirement.
+  const extent=axis=>{
+    const values=initial.map(bit=>bit.pos[axis]);
+    return Math.max(...values)-Math.min(...values);
+  };
+  if(extent(0)<.03||extent(2)<.022||extent(1)<.035)
+    throw Error('Food bunches up rather than scattering in 3D: '+
+      JSON.stringify({x:extent(0),z:extent(2),height:extent(1)}));
+  await page.evaluate(()=>window.__kanFoodStep(.1));
+  const afterShort=await page.evaluate(()=>window.__kanFoodProbe());
+  const shortBits=afterShort.food.slice(-10);
+  const speeds=initial.map((bit,i)=>(bit.pos[1]-shortBits[i].pos[1])/.1);
+  const speedRange=Math.max(...speeds)-Math.min(...speeds);
+  if(speedRange<.032||shortBits.some(bit=>bit.state!=='air'))
+    throw Error('Surface flakes do not have independent falling speeds: '+JSON.stringify(speeds));
+  await page.evaluate(()=>window.__kanFoodStep(2.9));
   const after=await page.evaluate(()=>window.__kanFoodProbe());
   const spawned=after.food.slice(-10);
   if(spawned.filter(b=>b.state==='float').length!==floating)
