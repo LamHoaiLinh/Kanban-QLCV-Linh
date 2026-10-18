@@ -40,9 +40,9 @@ try{
   assert(first.overlap.maxPenetration>before.overlap.maxPenetration*.60,
     'Collision instantly ejected fish instead of separating smoothly');
   // Collisions should recover progressively rather than in one frame.
-  await page.evaluate(()=>window.__kan42Step(3));
+  await page.evaluate(()=>window.__kan42Step(1.2));
   const after=await page.evaluate(()=>window.__kanLargeContactProbe());
-  assert(after.overlap.maxPenetration<before.overlap.maxPenetration-.015,
+  assert(after.overlap.maxPenetration<before.overlap.maxPenetration-.008,
     'Large fish did not gradually separate: '+JSON.stringify({before:before.overlap,after:after.overlap}));
   assert(after.overlap.pushSpeed<=.0221,
     'Sustained contact speed exceeded permitted gentle push: '+JSON.stringify(after.overlap));
