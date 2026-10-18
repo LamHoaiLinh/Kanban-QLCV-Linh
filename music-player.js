@@ -35,6 +35,7 @@
   let playbackRequestId = 0;
   let pendingResumeSeconds = 0;
   let lastPositionSaveAt = 0;
+  let loadedTrackId = null;
 
   document.addEventListener('DOMContentLoaded', initMusicPlayer);
 
@@ -144,6 +145,7 @@
       showMusicToast('Thư mục chỉ mở được trong phiên này. Trình duyệt không lưu được quyền truy cập.');
     }
     await loadTracksFromDirectoryHandle(handle, persisted ? id : null);
+    if (!persisted && tracks.length) refs.musicStatus.textContent = 'Chưa lưu được quyền thư mục. Lần sau cần chọn lại thư mục nhạc.';
   }
 
   async function loadTracksFromDirectoryHandle(handle, directoryId = null) {
@@ -458,6 +460,7 @@
       const file = await track.getFile();
       if (requestId !== playbackRequestId) return; // Bỏ kết quả mở file đã lỗi thời.
       releaseObjectUrl();
+      loadedTrackId = track.id;
       pendingResumeSeconds = savedTime;
       currentObjectUrl = URL.createObjectURL(file);
       player.src = currentObjectUrl;
@@ -469,6 +472,7 @@
       renderPlaylist();
       if (autoplay) await player.play();
     } catch (error) {
+      if (requestId !== playbackRequestId) return;
       console.error('Không thể phát bài hát:', error);
       showMusicToast('Không thể phát tệp nhạc này.');
       refs.musicStatus.textContent = 'Lỗi phát nhạc';
@@ -583,7 +587,7 @@
   }
 
   function rememberPlaybackPosition(force = false) {
-    if (!player.src || currentIndex < 0 || !tracks.length) return;
+    if (!player.src || currentIndex < 0 || !tracks.length || loadedTrackId !== tracks[currentIndex].id) return;
     const now = Date.now();
     if (!force && now-lastPositionSaveAt < 5000) return;
     lastPositionSaveAt = now;
@@ -944,6 +948,7 @@
     playbackRequestId++;
     pendingResumeSeconds = 0;
     player.pause();
+    loadedTrackId = null;
     player.removeAttribute('src');
     player.load();
     releaseObjectUrl();
