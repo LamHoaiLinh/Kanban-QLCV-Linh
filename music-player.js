@@ -792,58 +792,104 @@
 
   async function restoreMostRecentFolder() {
     const recent = settings.recentFolders[0];
-    if (!recent) return;
-    refs.musicRecentBtn.hidden = false;
+    if (!recent) return renderRecentFolders();
     refs.musicRecentName.textContent = recent.name;
     try {
       const handle = await getDirectoryHandle(recent.id);
-      if (!handle) { refs.musicStatus.textContent = 'Không còn quyền truy cập. Nhấn Browse để chọn lại thư mục.'; return; }
+      if (!handle) {
+        rememberedHandleMissing = true;
+        refs.musicStatus.textContent = 'Tên thư mục còn lưu nhưng quyền truy cập đã mất. Hãy chọn lại thư mục một lần.';
+        renderRecentFolders();
+        return;
+      }
+      recentHandleCache.set(recent.id,handle);
       const permission = await queryReadPermission(handle);
       if (permission === 'granted') {
-        await loadTracksFromDirectoryHandle(handle, recent.id);
+        await loadTracksFromDirectoryHandle(handle,recent.id);
       } else {
-        refs.musicStatus.textContent = 'Đã nhớ thư mục. Nhấn “Mở lại” để xác nhận quyền đọc và tải nhạc.';
+        requiresReconnect = true;
+        refs.musicStatus.textContent = 'Đã nhớ thư mục – Chrome yêu cầu xác nhận quyền đọc.';
+        renderTrackContext();
+        renderRecentFolders();
       }
     } catch (error) {
-      console.debug('Không thể tự mở thư mục gần đây:', error);
+      console.warn('Không thể khôi phục quyền thư mục gần đây:',error);
+      rememberedHandleMissing = true;
+      refs.musicStatus.textContent = 'Không đọc được quyền thư mục đã lưu. Hãy chọn lại thư mục.';
+      renderRecentFolders();
     }
   }
 
-  async function reopenMostRecentFolder() {
+  function reopenMostRecentFolder() {
     const recent = settings.recentFolders[0];
     if (!recent) return browseMusicDirectory();
-    await openRecentFolderById(recent.id);
+    return openRecentFolderById(recent.id);
   }
 
-  async function openSelectedRecentFolder() {
+  function openSelectedRecentFolder() {
     const id = refs.musicRecentSelect.value;
     if (!id) return;
-    await openRecentFolderById(id);
+    return openRecentFolderById(id);
   }
 
+  // Khi handle đã nằm trong RAM, requestPermission bắt đầu ngay từ thao tác bấm.
   async function openRecentFolderById(id) {
     try {
-      const handle = await getDirectoryHandle(id);
+      const handle = recentHandleCache.get(id) || await getDirectoryHandle(id);
       if (!handle) {
-        showMusicToast('Quyền thư mục gần đây không còn. Hãy Browse lại thư mục.');
+        rememberedHandleMissing = true;
+        requiresReconnect = false;
+        renderRecentFolders();
+        showMusicToast('Không còn quyền truy cập đã lưu. Hãy chọn lại thư mục.');
         return;
       }
-      await loadTracksFromDirectoryHandle(handle, id);
+      recentHandleCache.set(id,handle);
+      const permissionRequest = handle.requestPermission
+        ? handle.requestPermission({mode:'read'})
+        : Promise.resolve(await queryReadPermission(handle));
+      refs.musicStatus.textContent = 'Đang yêu cầu Chrome cấp lại quyền đọc…';
+      const permission = await permissionRequest;
+      if (permission !== 'granted') {
+        requiresReconnect = true;
+        refs.musicStatus.textContent = 'Chưa được cấp quyền. Nhấn Khôi phục nhạc để thử lại.';
+        renderRecentFolders();
+        return;
+      }
+      requiresReconnect = false;
+      await loadTracksFromDirectoryHandle(handle,id);
     } catch (error) {
-      console.error('Không thể mở thư mục gần đây:', error);
-      showMusicToast('Không thể mở thư mục gần đây.');
+      console.error('Không thể mở thư mục gần đây:',error);
+      requiresReconnect = true;
+      refs.musicStatus.textContent = 'Chrome chưa cấp được quyền đọc. Hãy thử nút Khôi phục nhạc.';
+      renderRecentFolders();
+      showMusicToast('Không thể khôi phục quyền thư mục nhạc.');
     }
   }
 
   function renderRecentFolders() {
     const recent = settings.recentFolders || [];
     const latest = recent[0];
-    refs.musicRecentBtn.hidden = !latest;
+    const reconnect = Boolean(latest && requiresReconnect && !tracks.length && !rememberedHandleMissing);
+    refs.musicRecentBtn.hidden = !latest || reconnect || tracks.length > 0;
     refs.musicRecentName.textContent = latest?.name || '';
     refs.musicRecentSelect.innerHTML = recent.length
       ? recent.map(item => `<option value="${escapeAttr(item.id)}">${escapeHtml(item.name)}</option>`).join('')
       : '<option value="">Chưa có thư mục gần đây</option>';
     refs.musicOpenRecentBtn.disabled = !recent.length;
+    refs.musicBrowseBtn.classList.toggle('music-needs-reconnect',reconnect);
+    refs.musicBrowseBtn.textContent = reconnect
+      ? 'Khôi phục '+(settings.lastTrackCount ? settings.lastTrackCount+' bài nhạc' : 'thư mục nhạc')
+      : tracks.length ? 'Đổi thư mục nhạc' : 'Browse thư mục nhạc';
+    refs.musicBrowseBtn.dataset.tooltip = reconnect
+      ? 'Mở lại thư mục đã lưu, không cần Browse từ đầu'
+      : 'Chọn thư mục nhạc trên máy tính';
+    refs.musicChangeFolderBtn.hidden = !reconnect;
+    refs.musicRestoreNotice.hidden = !reconnect;
+    if (reconnect) {
+      const count = settings.lastTrackCount ? settings.lastTrackCount+' bài' : 'danh sách nhạc';
+      refs.musicRestoreNotice.textContent =
+        'Đã nhớ '+count+' trong “'+latest.name+'”. Chrome đang tạm giữ quyền đọc. Nhấn nút Khôi phục phía trên; khi Chrome hỏi, chọn “Cho phép mỗi lần truy cập” để lần sau tự tải nhạc.';
+    }
   }
 
   function rememberRecentFolder(folder) {
