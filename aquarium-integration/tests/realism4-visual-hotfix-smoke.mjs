@@ -42,6 +42,14 @@ try{
   const angel=probe.fins.find(f=>f.id==='angelfish');
   if(!angel?.medianStrip||angel.medianTips<40)
     throw Error('Angelfish dorsal/anal membranes still rigid fans '+JSON.stringify(angel));
+  // Lower-fin root must be embedded in the curved belly; before this fix
+  // the anal membrane originated BELOW the skin and exposed a dark gap.
+  for(const f of probe.fins){
+    if(f.analRootInset!==null&&f.analRootInset!==undefined&&f.analRootInset<=0)
+      throw Error('Detached anal fin root: '+JSON.stringify(f));
+    if(f.pelvicRootRadius!==null&&f.pelvicRootRadius!==undefined&&f.pelvicRootRadius>=1)
+      throw Error('Pelvic fin root outside fish flank: '+JSON.stringify(f));
+  }
   for(const f of probe.fins){
     if(f.id==='angelfish'||f.id==='betta'||f.id==='guppy'){
       if(f.flexible<30)throw Error('Not enough flexible vertices '+JSON.stringify(f));
@@ -70,7 +78,7 @@ try{
   if(probe.fins.some(f=>!f.mouth.every(Number.isFinite)))
     throw Error('A mouth animation produced invalid vertex dynamics');
   if(errors.length)throw Error('WebGL runtime errors: '+errors.join('; '));
-  console.log('PASS visual hotfix: 360-degree thick wood + TWO ring cuts; capped solid driftwood; 3D fish membranes, visible tip rows, reversible A/B fin mode and finite fish physics.');
+  console.log('PASS visual hotfix: attached belly/anal/pelvic fins, 360-degree thick wood + TWO ring cuts; capped solid driftwood; 3D fish membranes, visible tip rows, reversible A/B fin mode and finite fish physics.');
 } finally {
   if(browser)await browser.close();
   server.kill('SIGTERM');
