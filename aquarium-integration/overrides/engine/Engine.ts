@@ -163,6 +163,25 @@ export class Engine {
           return this.ecology.snapshot();
         };
       Object.assign(window,{
+        __kanFavoriteLayout:()=>{
+          // QA fingerprint from actual generated mesh vertices & transforms.
+          const summarize=(root:THREE.Group)=>{
+            const lines:string[]=[];
+            root.traverse(obj=>{
+              if(!(obj instanceof THREE.Mesh))return;
+              const attr=obj.geometry.getAttribute('position');
+              const sample:number[]=[];
+              if(attr)for(let i=0;i<attr.count;i+=Math.max(1,Math.floor(attr.count/50))){
+                sample.push(Math.round(attr.getX(i)*100000),Math.round(attr.getY(i)*100000),Math.round(attr.getZ(i)*100000));
+              }
+              lines.push(JSON.stringify([obj.name,
+                obj.position.toArray().map(v=>+v.toFixed(5)),
+                [obj.rotation.x,obj.rotation.y,obj.rotation.z].map(v=>+v.toFixed(5)),sample]));
+            });
+            return lines.join('|');
+          };
+          return {decor:summarize(this.decor.group),flora:summarize(this.flora.group)};
+        },
         __kan42Seams:()=>this.environment.getSealSnapshot(),
         __kan42Arrange:()=>this.fish.qaArrange(this.simEnv),
         __kan42Follow:(key:string|null)=>this.followFish(key),
@@ -466,6 +485,17 @@ export class Engine {
 
     if (structureChanged) {
       this.lastStructureKey = structureKey;
+      // Deterministic hardscape/flora composition: a saved layout recreates
+      // identical rock/wood/plant placement on every visit, even after restart.
+      // Names, animation time and fish swimming positions do not affect layout.
+      const stableLayout=JSON.stringify([config.water,config.gallons,
+        config.substrate,config.background,config.decor,config.flora]);
+      let seed=2166136261;
+      for(let i=0;i<stableLayout.length;i++){
+        seed=Math.imul(seed^stableLayout.charCodeAt(i),16777619)>>>0;
+      }
+      this.decor.setLayoutSeed(seed^0x1a28a);
+      this.flora.setLayoutSeed(seed^0x2b517);
       const d = tankDims(config.gallons);
       this.dims = {
         halfW: d.width / 2,

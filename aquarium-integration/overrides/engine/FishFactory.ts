@@ -135,9 +135,9 @@ function buildFishAsset(sp: SpeciesDef): FishAsset {
   const map = fishTextureWithEye(sp);
   const body = new THREE.MeshStandardMaterial({
     map,
-    roughness: sp.shape.eelLike ? 0.49 : sp.id==='betta' || sp.id==='guppy' ? 0.44 : 0.42,
-    metalness: 0.34 * sp.palette.iridescence, // structural shimmer on tetras etc.
-    envMapIntensity: 0.58 + sp.palette.iridescence * 0.65,
+    roughness: sp.shape.eelLike ? .49 : (sp.id==='angelfish'||sp.id==='discus'||sp.adultSizeIn>=6) ? .57 : sp.id==='betta'||sp.id==='guppy'?.44:.42,
+    metalness: (sp.id==='angelfish'||sp.id==='discus'||sp.adultSizeIn>=6 ? .14 : .34)*sp.palette.iridescence,
+    envMapIntensity: (sp.id==='angelfish'||sp.id==='discus'||sp.adultSizeIn>=6 ? .36 : .58)+sp.palette.iridescence*.42,
   });
   const fins = new THREE.MeshStandardMaterial({
     color: new THREE.Color(sp.palette.fin),
@@ -193,6 +193,55 @@ function fishTextureWithEye(sp: SpeciesDef): THREE.Texture {
     ctx.beginPath();ctx.moveTo(gx-gh*.12,gy-gh*.55);
     ctx.bezierCurveTo(gx+gh*.25,gy-gh*.20,gx+gh*.30,gy+gh*.30,gx-gh*.10,gy+gh*.54);
     ctx.stroke();ctx.restore();
+  }
+  // Large fish have overlapping fine scale edges, not one smooth
+  // flat plastic coat. Paint this once onto the existing body texture.
+  if(!sp.invert && (sp.id==='angelfish'||sp.id==='discus'||sp.adultSizeIn>=6)){
+    const midX=W*.46,midY=H*.5;
+    const rx=W*(sp.id==='angelfish'?.24:.33);
+    const ry=H*(sp.id==='angelfish'?.38:.40);
+    ctx.save();
+    ctx.beginPath();ctx.ellipse(midX,midY,rx,ry,0,0,TAU);ctx.clip();
+    const sw=Math.max(5,W*.033),sh=Math.max(4,H*.035);
+    ctx.lineWidth=Math.max(.55,H*.0017);
+    for(let row=0,y=midY-ry-sh;y<midY+ry+sh;row++,y+=sh){
+      for(let x=midX-rx-sw;x<midX+rx+sw;x+=sw){
+        const xx=x+(row%2)*sw*.5;
+        ctx.beginPath();ctx.ellipse(xx,y,sw*.50,sh*.40,0,.14*Math.PI,.88*Math.PI);
+        ctx.strokeStyle=row%3===0?'rgba(255,248,230,.22)':'rgba(20,53,57,.095)';
+        ctx.stroke();
+      }
+    }
+    if(sp.id==='discus'){
+      // Organic wavy, feathered turquoise markings instead of straight
+      // bars looking like brush strokes. Low contrast preserves the scales.
+      for(let band=0;band<11;band++){
+        const x0=W*(.215+band*.055),phase=band*.73;
+        for(const off of [-1,0,1]){
+          ctx.beginPath();
+          for(let i=0;i<=30;i++){
+            const t=i/30,y=H*(.15+t*.7);
+            const wave=W*(.014*Math.sin(t*12.4+phase)+.005*Math.sin(t*27.2-phase));
+            const xx=x0+wave+off*W*.0025;
+            if(i===0)ctx.moveTo(xx,y);else ctx.lineTo(xx,y);
+          }
+          ctx.strokeStyle=off===0?'rgba(51,135,164,.31)':'rgba(73,161,186,.09)';
+          ctx.lineWidth=Math.max(.6,H*(off===0?.0036:.004));
+          ctx.stroke();
+        }
+      }
+      for(let band=0;band<5;band++){
+        ctx.beginPath();
+        for(let i=0;i<=22;i++){
+          const t=i/22,x=W*(.23+t*.52);
+          const y=H*(.29+band*.085)+H*.014*Math.sin(t*11+band*.9);
+          if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+        }
+        ctx.strokeStyle='rgba(239,176,144,.17)';
+        ctx.lineWidth=Math.max(.6,H*.002);ctx.stroke();
+      }
+    }
+    ctx.restore();
   }
   tex.needsUpdate = true;
   return tex;
@@ -366,28 +415,51 @@ function buildFishGeometry(sp: SpeciesDef,low=false): THREE.BufferGeometry {
     }
   };
 
-  // — Caudal (tail) fin — a fan from the peduncle, forked by tailFork.
+  // — Caudal fin: special forms for angelfish and discus.
+  // Other species retain their existing outlines and animation.
   {
-    const rootX = tailBaseX + 0.02;
-    const tipX = -0.5;
-    const H = sh.height * (0.55 + sh.tailFork * 0.45) * (sh.finLong ? 1.35 : 1);
-    const pts: [number, number][] = [[rootX, 0]];
-    const N = low?10:sh.finLong ? 28 : 16;
-    for (let k = 0; k <= N; k++) {
-      const t = k / N;                     // 0 top → 1 bottom of trailing edge
-      const y = (0.5-t)*H*(1+.007*Math.sin(t*Math.PI*6));
-      // Fork: pull the middle of the trailing edge forward.
-      const notch = Math.pow(Math.abs(0.5 - t) * 2, 1.4);
-      const x = tipX+(1-notch)*sh.tailFork*sh.tailSize*.85+(sh.finLong?.007*Math.sin(t*Math.PI*12):0);
-      pts.push([x, y]);
-    }
-    if (sp.id === 'fancy-goldfish') {
-      // Paired caudal lobes: spread out in depth instead of looking
-      // like one thin generic tail when the camera orbits the tank.
-      addFin(pts, 1, -0.013, -0.28);
-      addFin(pts, 1, 0.013, 0.28);
-    } else {
-      addFin(pts, 1);
+    const angel=sp.id==='angelfish',discus=sp.id==='discus';
+    // Positive X enters the body, preventing a detached tail seam.
+    const rootX=tailBaseX+(angel?.044:discus?.037:.02);
+    const tipX=-.5;
+    if(discus){
+      // A short rounded paddle with a broad peduncle, built from connected
+      // cross-sections: unlike a single fan root it does not form a triangle.
+      const rows=low?4:8,cols=low?12:22,base=positions.length/3;
+      for(let row=0;row<=rows;row++){
+        const t=row/rows,advance=t*t*(3-2*t);
+        const x=THREE.MathUtils.lerp(rootX,tipX+.012,t);
+        const halfH=THREE.MathUtils.lerp(.038,.115,Math.sin(t*Math.PI*.76));
+        for(let j=0;j<=cols;j++){
+          const v=j/cols,rounded=1-.095*Math.pow(Math.abs(v*2-1),4);
+          const px=x+.009*advance*Math.pow(Math.abs(v*2-1),2);
+          positions.push(px,(.5-v)*2*halfH*rounded,.006*Math.sin(v*Math.PI)*Math.sin(t*Math.PI));
+          uvs.push(.89+t*.08,.16+v*.68);
+          parts.push(1);flutter.push(0);finFlex.push(t);
+          const c=1-.16*t;
+          colors.push(c,c*.99,c*.98);
+        }
+      }
+      for(let row=0;row<rows;row++)for(let j=0;j<cols;j++){
+        const a=base+row*(cols+1)+j,b=a+cols+1;
+        indices.push(a,b,a+1,b,b+1,a+1);
+      }
+    }else{
+      const H=sh.height*(angel?.63:(.55+sh.tailFork*.45))*(sh.finLong?1.35:1);
+      const pts:[number,number][]=[[rootX,0]];
+      const N=low?10:sh.finLong?28:16;
+      for(let k=0;k<=N;k++){
+        const t=k/N,y=(.5-t)*H*(1+.007*Math.sin(t*Math.PI*6));
+        const notch=Math.pow(Math.abs(.5-t)*2,angel?1.2:1.4);
+        const x=angel
+          ?tipX+.018*(1-notch)+.004*Math.sin(t*Math.PI*4)
+          :tipX+(1-notch)*sh.tailFork*sh.tailSize*.85+(sh.finLong?.007*Math.sin(t*Math.PI*12):0);
+        pts.push([x,y]);
+      }
+      if(sp.id==='fancy-goldfish'){
+        addFin(pts,1,-.013,-.28);
+        addFin(pts,1,.013,.28);
+      }else addFin(pts,1);
     }
   }
 

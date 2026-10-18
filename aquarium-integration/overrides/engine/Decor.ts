@@ -140,6 +140,15 @@ function cappedWoodTube(
 }
 
 export class DecorSystem {
+  private rngState=1;
+  setLayoutSeed(seed:number):void{this.rngState=(seed>>>0)||1;}
+  private random():number {
+    let x=this.rngState;
+    x^=x<<13;x^=x>>>17;x^=x<<5;
+    this.rngState=x>>>0;
+    return this.rngState/4294967296;
+  }
+
   group = new THREE.Group();
   private materials: THREE.Material[] = [];
 
@@ -388,11 +397,11 @@ export class DecorSystem {
         case 'river-rocks': {
           const rock = this.mat({ map: rockTexture('#5e5852'), roughness: 0.9 });
           for (let i = 0; i < 5; i++) {
-            const r = (0.03 + Math.random() * 0.05) * scale + 0.015;
+            const r = (0.03 + this.random() * 0.05) * scale + 0.015;
             const g = displace(new THREE.SphereGeometry(r, 10, 8), 0.25, i + 2);
             const m = new THREE.Mesh(g, rock);
-            m.position.set(halfW * (0.15 + Math.random() * 0.5), floorY + r * 0.55, halfD * (Math.random() * 0.8 - 0.5));
-            m.rotation.set(Math.random(), Math.random() * Math.PI, Math.random());
+            m.position.set(halfW * (0.15 + this.random() * 0.5), floorY + r * 0.55, halfD * (this.random() * 0.8 - 0.5));
+            m.rotation.set(this.random(), this.random() * Math.PI, this.random());
             this.group.add(m);
             out.obstacles.push({ pos: m.position.clone(), radius: r * 1.1 });
             out.anchors.push(m.position.clone().add(new THREE.Vector3(0, r * 0.8, 0)));
@@ -406,8 +415,8 @@ export class DecorSystem {
           for (let i = 0; i < 3; i++) {
             const w = (0.16 - i * 0.03) * scale + 0.04, d = (0.12 - i * 0.02) * scale + 0.03, h = 0.014 * scale + 0.006;
             const m = new THREE.Mesh(displace(new THREE.BoxGeometry(w, h, d, 4, 1, 4), 0.08, i + 5), slate);
-            m.position.set(cx + (Math.random() - 0.5) * 0.03, y + h / 2 + (i > 0 ? 0.02 : 0), cz + (Math.random() - 0.5) * 0.03);
-            m.rotation.y = Math.random() * 0.6;
+            m.position.set(cx + (this.random() - 0.5) * 0.03, y + h / 2 + (i > 0 ? 0.02 : 0), cz + (this.random() - 0.5) * 0.03);
+            m.rotation.y = this.random() * 0.6;
             this.group.add(m);
             y = m.position.y + h / 2;
           }
@@ -420,16 +429,16 @@ export class DecorSystem {
           // A porous rock wall across the back — the reef's skeleton.
           const rockMat = this.mat({ map: rockTexture('#6a625a'), roughness: 0.95 });
           for (let i = 0; i < 7; i++) {
-            const r = (0.06 + Math.random() * 0.09) * scale + 0.02;
+            const r = (0.06 + this.random() * 0.09) * scale + 0.02;
             const g = displace(new THREE.SphereGeometry(r, 12, 9), 0.45, i * 1.7 + 1);
             const m = new THREE.Mesh(g, rockMat);
             const x = -halfW * 0.8 + (i / 6) * halfW * 1.6;
-            m.position.set(x + (Math.random() - 0.5) * 0.06, floorY + r * (0.4 + Math.random() * 0.5), -halfD * (0.35 + Math.random() * 0.3));
-            m.rotation.set(Math.random(), Math.random() * Math.PI, Math.random());
+            m.position.set(x + (this.random() - 0.5) * 0.06, floorY + r * (0.4 + this.random() * 0.5), -halfD * (0.35 + this.random() * 0.3));
+            m.rotation.set(this.random(), this.random() * Math.PI, this.random());
             this.group.add(m);
             out.obstacles.push({ pos: m.position.clone(), radius: r });
             out.shelters.push(m.position.clone().add(new THREE.Vector3(0.03, r * 0.3, r * 0.9)));
-            out.anchors.push(m.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * r, r * 0.85, (Math.random() - 0.5) * r * 0.5)));
+            out.anchors.push(m.position.clone().add(new THREE.Vector3((this.random() - 0.5) * r, r * 0.85, (this.random() - 0.5) * r * 0.5)));
           }
           break;
         }

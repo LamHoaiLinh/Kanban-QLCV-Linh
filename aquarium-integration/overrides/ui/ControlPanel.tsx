@@ -14,7 +14,7 @@ import { encodeShareUrl } from '../state/share';
 import { isNativeIOS, nativeShare } from '../platform/native';
 import type { SpeciesDef, FloraDef } from '../types';
 
-type Tab = 'tank' | 'fish' | 'flora' | 'decor' | 'saved' | 'settings';
+type Tab = 'tank' | 'fish' | 'flora' | 'decor' | 'favorites' | 'saved' | 'settings';
 const OLD_NAMES:Record<string,string>={
 'Amazon Community':'Cộng đồng Amazon','Nano Planted':'Hồ thủy sinh mini','Reef Lagoon':'Đầm san hô','Betta Oasis':'Ốc đảo Betta',
 'Blackwater Stream':'Suối nước trà','Tang Highway':'Đại dương xanh','My Aquarium':'Hồ cá của tôi','My Tank':'Hồ của tôi','Surprise Tank':'Hồ cá ngẫu nhiên','Hồ cá bất ngờ':'Hồ cá ngẫu nhiên'
@@ -84,6 +84,7 @@ export function ControlPanel() {
             ['fish', 'Cá'],
             ['flora', isSalt ? 'San hô' : 'Cây'],
             ['decor', 'Trang trí'],
+            ['favorites', '★ Yêu thích'],
             ['saved', 'Đã lưu'],
             ['settings', 'Cài đặt'],
           ] as [Tab, string][]
@@ -98,6 +99,7 @@ export function ControlPanel() {
         {tab === 'fish' && <FishTab />}
         {tab === 'flora' && <FloraTab />}
         {tab === 'decor' && <DecorTab />}
+        {tab === 'favorites' && <FavoritesTab />}
         {tab === 'saved' && <SavedTab />}
         {tab === 'settings' && <SettingsTab />}
       </div>
@@ -115,10 +117,19 @@ function TankTab() {
   const randomizeSize = useStore((s) => s.randomizeSize);
   const applyPreset = useStore((s) => s.applyPreset);
   const randomize = useStore((s) => s.randomize);
+  const saveFavorite=useStore((s)=>s.saveFavorite);
+  const showToast=useStore((s)=>s.showToast);
   const isSalt = config.water === 'saltwater';
 
   return (
     <>
+      <div className="section">
+        <button className="btn" onClick={()=>{
+          const name=config.name?.trim()||'Bể yêu thích';
+          if(useStore.getState().savedTanks[name]&&!window.confirm('Cập nhật bể đã lưu “'+name+'”?'))return;
+          saveFavorite(name);showToast('Đã thêm bể vào Yêu thích.');
+        }}>★ Lưu bể này vào yêu thích</button>
+      </div>
       <div className="section">
         <h2>Loại nước</h2>
         <div className="seg" role="radiogroup" aria-label="Loại nước">
@@ -502,10 +513,64 @@ function DecorTab() {
   );
 }
 
+// ─────────────────────── Favorite aquariums ───────────────────────
+function FavoritesTab(){
+  const config=useStore(s=>s.config);
+  const savedTanks=useStore(s=>s.savedTanks);
+  const favoriteNames=useStore(s=>s.favoriteNames);
+  const defaultFavorite=useStore(s=>s.defaultFavorite);
+  const saveFavorite=useStore(s=>s.saveFavorite);
+  const loadTank=useStore(s=>s.loadTank);
+  const toggleFavorite=useStore(s=>s.toggleFavorite);
+  const setDefaultFavorite=useStore(s=>s.setDefaultFavorite);
+  const showToast=useStore(s=>s.showToast);
+  const [name,setName]=useState(viTank(config.name||'Bể yêu thích'));
+  return <>
+    <div className="section">
+      <h2>★ Bể cá yêu thích</h2>
+      <p className="favorite-hint">Giữ lại đàn cá, cây, trang trí, kích thước và bố cục để mở lại lần sau.</p>
+      <div className="name-input">
+        <input value={name} maxLength={40} aria-label="Đặt tên bể yêu thích"
+          onChange={e=>setName(e.target.value)}/>
+        <button className="btn primary" onClick={()=>{
+          const n=name.trim()||'Bể yêu thích';
+          if(savedTanks[n]&&!window.confirm('Thay bể đã lưu “'+n+'” bằng bố cục hiện tại?'))return;
+          saveFavorite(n);showToast('Đã lưu bể yêu thích “'+n+'”.');
+        }}>★ Lưu bể</button>
+      </div>
+      <p className="favorite-hint">Bể đã lưu trên trình duyệt này, không bị thay đổi khi anh tạo bể ngẫu nhiên khác.</p>
+    </div>
+    <div className="section">
+      <h2>Danh sách yêu thích ({favoriteNames.length})</h2>
+      {!favoriteNames.length&&<p className="favorite-hint">Chưa có bể yêu thích.</p>}
+      {favoriteNames.filter(n=>!!savedTanks[n]).map(n=><div key={n} className="favorite-row">
+        <div className="favorite-details">
+          <strong>★ {viTank(n)}</strong>
+          <small>{savedTanks[n].water==='freshwater'?'Nước ngọt':'Nước mặn'} · {li(savedTanks[n].gallons)} lít · {Object.values(savedTanks[n].fish).reduce((a,b)=>a+b,0)} cá</small>
+        </div>
+        <div className="favorite-actions">
+          <button className="btn" onClick={()=>{loadTank(n);showToast('Đã mở bể “'+n+'”.');}}>Mở bể</button>
+          <button className={'btn'+(defaultFavorite===n?' primary':'')}
+            title="Tự mở bể này khi vào Hồ Cá"
+            aria-label={'Tự mở khi vào hồ: '+n}
+            onClick={()=>setDefaultFavorite(defaultFavorite===n?null:n)}>
+            {defaultFavorite===n?'✓ Tự mở':'Tự mở'}
+          </button>
+          <button className="btn" title="Bỏ khỏi yêu thích (vẫn giữ trong Đã lưu)"
+            aria-label={'Bỏ yêu thích '+n} onClick={()=>toggleFavorite(n)}>☆</button>
+        </div>
+      </div>)}
+      {defaultFavorite&&<p className="favorite-hint">Bể “{viTank(defaultFavorite)}” sẽ tự mở khi vào Hồ Cá lần sau.</p>}
+    </div>
+  </>;
+}
+
 // ─────────────────────── Saved tab ───────────────────────
 function SavedTab() {
   const config = useStore((s) => s.config);
   const savedTanks = useStore((s) => s.savedTanks);
+  const favoriteNames=useStore(s=>s.favoriteNames);
+  const toggleFavorite=useStore(s=>s.toggleFavorite);
   const saveTank = useStore((s) => s.saveTank);
   const loadTank = useStore((s) => s.loadTank);
   const deleteTank = useStore((s) => s.deleteTank);
@@ -534,6 +599,8 @@ function SavedTab() {
         {names.map((n) => (
           <div className="saved-row" key={n}>
             <span className="s-name">{viTank(n)}</span>
+            <button className="btn" title={favoriteNames.includes(n)?'Bỏ yêu thích':'Thêm vào yêu thích'}
+              onClick={()=>toggleFavorite(n)}>{favoriteNames.includes(n)?'★':'☆'}</button>
             <button className="btn" onClick={() => loadTank(n)}>Mở</button>
             <button className="btn danger" aria-label={`Xóa hồ ${viTank(n)}`} onClick={() => deleteTank(n)}>🗑</button>
           </div>

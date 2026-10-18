@@ -18,6 +18,8 @@ import type { EcoMode } from '../engine/Ecology';
 export interface AppState {
   config: TankConfig;
   savedTanks: Record<string, TankConfig>;
+  favoriteNames: string[];
+  defaultFavorite: string | null;
   // Last independent setup for each water type; persisted across reloads.
   waterDrafts: Partial<Record<'freshwater' | 'saltwater', TankConfig>>;
 
@@ -57,6 +59,9 @@ export interface AppState {
   saveTank: (name: string) => void;
   loadTank: (name: string) => void;
   deleteTank: (name: string) => void;
+  saveFavorite: (name: string) => void;
+  toggleFavorite: (name: string) => void;
+  setDefaultFavorite: (name: string | null) => void;
   set: (patch: Partial<AppState>) => void;
   showToast: (msg: string) => void;
 }
@@ -71,6 +76,8 @@ export const useStore = create<AppState>()(
     (set, get) => ({
       config: sharedConfig ?? DEFAULT_TANK,
       savedTanks: {},
+      favoriteNames: [],
+      defaultFavorite: null,
       waterDrafts: {},
       quality: 'auto',
       audioOn: false, // muted by default — browsers block autoplay anyway
@@ -215,6 +222,28 @@ export const useStore = create<AppState>()(
           config: { ...s.config, name },
         })),
 
+      saveFavorite: (name) => set((s) => {
+        const safeName=name.trim().slice(0,40) || 'Bể yêu thích';
+        const existing={ ...s.savedTanks, [safeName]:{...structuredClone(s.config),name:safeName} };
+        return {
+          savedTanks:existing,
+          favoriteNames:s.favoriteNames.includes(safeName)?s.favoriteNames:[...s.favoriteNames,safeName],
+        };
+      }),
+
+      toggleFavorite: (name) => set((s) => {
+        if(!s.savedTanks[name])return s;
+        const wasFavorite=s.favoriteNames.includes(name);
+        return {
+          favoriteNames:wasFavorite?s.favoriteNames.filter(n=>n!==name):[...s.favoriteNames,name],
+          defaultFavorite:wasFavorite && s.defaultFavorite===name?null:s.defaultFavorite,
+        };
+      }),
+
+      setDefaultFavorite: (name) => set((s) => ({
+        defaultFavorite:name && s.favoriteNames.includes(name) && !!s.savedTanks[name]?name:null,
+      })),
+
       loadTank: (name) => {
         const saved = get().savedTanks[name];
         if(saved){
@@ -229,7 +258,10 @@ export const useStore = create<AppState>()(
         set((s) => {
           const savedTanks = { ...s.savedTanks };
           delete savedTanks[name];
-          return { savedTanks };
+          return { savedTanks,
+            favoriteNames:s.favoriteNames.filter(n=>n!==name),
+            defaultFavorite:s.defaultFavorite===name?null:s.defaultFavorite,
+          };
         }),
 
       set: (patch) => set(patch),
@@ -246,6 +278,8 @@ export const useStore = create<AppState>()(
       partialize: (s) => ({
         config: s.config,
         savedTanks: s.savedTanks,
+        favoriteNames:s.favoriteNames,
+        defaultFavorite:s.defaultFavorite,
         waterDrafts: s.waterDrafts,
         // A resize backup is durable too: reloading while viewing a nano tank
         // must never irreversibly discard the original large-tank species.
@@ -262,8 +296,16 @@ export const useStore = create<AppState>()(
         if(typeof merged.smartCinema!=='boolean')merged.smartCinema=true;
         if(merged.ecoMode!=='natural'&&merged.ecoMode!=='relax')
           merged.ecoMode='natural';
-        // A fresh share link always wins over the previously persisted tank.
-        if (sharedConfig) merged.config = sharedConfig;
+        // Migrate prior versions: their saved aquariums remain available.
+        merged.favoriteNames=Array.isArray(merged.favoriteNames)
+          ?merged.favoriteNames.filter(n=>typeof n==='string'&&!!merged.savedTanks?.[n]):[];
+        if(typeof merged.defaultFavorite!=='string' ||
+          !merged.favoriteNames.includes(merged.defaultFavorite) ||
+          !merged.savedTanks?.[merged.defaultFavorite])merged.defaultFavorite=null;
+        // An explicitly preferred favorite re-opens at startup. Shared
+        // links still take precedence and never erase the favorite library.
+        if (sharedConfig) merged.config=sharedConfig;
+        else if(merged.defaultFavorite)merged.config=structuredClone(merged.savedTanks[merged.defaultFavorite]);
         // Keep saved tank keys intact, but migrate built-in random labels.
         if(merged.config?.name==='Surprise Tank'||merged.config?.name==='Hồ cá bất ngờ')
           merged.config={...merged.config,name:'Hồ cá ngẫu nhiên'};
