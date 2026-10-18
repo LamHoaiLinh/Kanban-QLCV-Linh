@@ -297,6 +297,7 @@ function buildFishGeometry(sp: SpeciesDef,low=false): THREE.BufferGeometry {
     const columns=low?9:sh.finLong?22:13,rows=low?3:sh.finLong?8:5;
     const base=positions.length/3;
     const stride=rows+1;
+    const angelAnal=sp.id==='angelfish'&&sign<0;
     for(let j=0;j<=columns;j++){
       const t=j/columns,u=THREE.MathUtils.lerp(startU,endU,t);
       const x=.5-u*bodyLen;
@@ -310,23 +311,27 @@ function buildFishGeometry(sp: SpeciesDef,low=false): THREE.BufferGeometry {
       const bellyY=centerY-hh;
       const rootY=sign>0
         ?hh*1.12 // preserve the original dorsal fin silhouette
-        :bellyY+hh*.06;
+        :bellyY+hh*(angelAnal?.09:.06);
       if(sign<0)minAnalRootInset=Math.min(minAnalRootInset,rootY-bellyY);
       // Real angel dorsals are asymmetric, gently serrated rays — NOT a
       // uniformly inflated triangular sail. The main lobe curves backward.
-      const arc=sp.id==='angelfish'?
-        Math.pow(Math.max(0,Math.sin(Math.PI*Math.pow(t,.79))),.83):
-        Math.pow(Math.max(0,Math.sin(Math.PI*t)),sh.finLong?.48:1.12);
-      const rayEdge=sp.id==='angelfish'?1+.018*Math.cos(t*Math.PI*16):1;
+      const arc=angelAnal
+        ?Math.pow(Math.max(0,Math.sin(Math.PI*Math.pow(t,.90))),1.05)
+        :sp.id==='angelfish'
+          ?Math.pow(Math.max(0,Math.sin(Math.PI*Math.pow(t,.79))),.83)
+          :Math.pow(Math.max(0,Math.sin(Math.PI*t)),sh.finLong?.48:1.12);
+      // Anal fin of an angelfish has a smooth, continuous edge; strong
+      // serrations here looked like detached triangular shards from the side.
+      const rayEdge=angelAnal?1:sp.id==='angelfish'?1+.018*Math.cos(t*Math.PI*16):1;
       const tipEnvelope=arc*rayEdge*(.86+.14*t);
       const tipHeight=rise*sh.height*tipEnvelope*
-        (sp.id==='angelfish'?.46:1);
+        (angelAnal?.40:sp.id==='angelfish'?.46:1);
       for(let k=0;k<=rows;k++){
         const w=k/rows;
         const soft=w*w*(3-2*w);
         // Trailing edge bends aft; center is gently curved across Z so
         // specular lighting catches the membrane instead of a flat triangle.
-        const trail=sp.id==='angelfish'?.075:sh.finLong?.060:.013;
+        const trail=angelAnal?.041:sp.id==='angelfish'?.075:sh.finLong?.060:.013;
         const px=x-trail*soft*(.55+.45*t);
         // Reattach the lower edge WITHOUT shrinking the visible fin:
         // the old tip used -hh as its origin. Fade the correction from
@@ -337,8 +342,9 @@ function buildFishGeometry(sp: SpeciesDef,low=false): THREE.BufferGeometry {
           (1+.012*Math.sin(t*16*Math.PI)*w)-lowerTipCorrection;
         // Rounded membrane cross-section: a little lateral ridge along each
         // ray catches light as it folds, unlike a zero-curvature flat plate.
-        const pz=(Math.sin(Math.PI*t)*(sp.id==='angelfish'?.033:.018)
-          +Math.sin(t*15+u*3)*.004+Math.sin(t*34)*.003)
+        const pz=(Math.sin(Math.PI*t)*(angelAnal?.009:sp.id==='angelfish'?.033:.018)
+          +Math.sin(t*15+u*3)*(angelAnal?.0015:.004)
+          +Math.sin(t*34)*(angelAnal?.0008:.003))
           *soft*sign;
         positions.push(px,py,pz);
         uvs.push(.87+t*.08,.13+.74*w);
@@ -346,7 +352,8 @@ function buildFishGeometry(sp: SpeciesDef,low=false): THREE.BufferGeometry {
         flutter.push(0);
         finFlex.push(w);
         // Subtle fin rays and edge translucency, not a uniform plastic sheet.
-        const ray=.80+.20*(.5+.5*Math.cos(t*Math.PI*20));
+        const ray=angelAnal?.95+.05*(.5+.5*Math.cos(t*Math.PI*20))
+          :.80+.20*(.5+.5*Math.cos(t*Math.PI*20));
         const pigment=(1-.30*w)*ray;
         colors.push(pigment,pigment*.995,pigment*.98);
       }
@@ -390,7 +397,8 @@ function buildFishGeometry(sp: SpeciesDef,low=false): THREE.BufferGeometry {
   }
   // — Anal: independent membrane with the same fixed-root elasticity.
   if(sh.analHeight>.02){
-    addMedianFin(.55,.85,-1,sh.analHeight);
+    addMedianFin(sp.id==='angelfish'?.51:.55,
+      sp.id==='angelfish'?.89:.85,-1,sh.analHeight);
   }
 
   // — Pectoral fins — small side sheets near the head; these scull/flutter.
@@ -427,8 +435,16 @@ function buildFishGeometry(sp: SpeciesDef,low=false): THREE.BufferGeometry {
       // the solid flank rather than floating beside the fish.
       const radial=(pelvicY-cy)**2/(hh*hh)+(z/bodyHalfWidth)**2;
       maxPelvicRootRadius=Math.max(maxPelvicRootRadius,radial);
-      addFin([[x0,pelvicY],[x0-.025,pelvicY-.023],
-        [x0-.090,pelvicY-.047],[x0-.055,pelvicY-.005]],2,z,side*.12);
+      if(sp.id==='angelfish'){
+        // Two thin, trailing ventral filaments rather than broad triangles.
+        // The shared root is embedded inside the flank, so it cannot appear
+        // to float separately from the pale belly at oblique camera angles.
+        addFin([[x0,pelvicY],[x0-.047,pelvicY-.19],
+          [x0-.059,pelvicY-.198],[x0-.013,pelvicY-.009]],2,z,side*.018);
+      }else{
+        addFin([[x0,pelvicY],[x0-.025,pelvicY-.023],
+          [x0-.090,pelvicY-.047],[x0-.055,pelvicY-.005]],2,z,side*.12);
+      }
     }
   }
   if(sp.id.includes('shrimp')){
@@ -491,6 +507,7 @@ function buildFishGeometry(sp: SpeciesDef,low=false): THREE.BufferGeometry {
   geo.userData.taperedFins=true;
   geo.userData.rootThickness=sh.finLong?.010:.004;
   geo.userData.analRootInset=Number.isFinite(minAnalRootInset)?minAnalRootInset:null;
+  geo.userData.angelLowerFinRefined=sp.id==='angelfish';
   geo.userData.pelvicRootRadius=maxPelvicRootRadius||null;
   return geo;
 }
