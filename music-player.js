@@ -10,7 +10,7 @@
    */
 
   const MUSIC_STORAGE_KEY = 'linh_kanban_music_settings_v1';
-  const MUSIC_SETTINGS_VERSION = 3; // v2: mặc định phát lặp toàn bộ playlist
+  const MUSIC_SETTINGS_VERSION = 4; // v4: ghi nhớ số bài và hướng dẫn khôi phục quyền Chrome
   const MUSIC_DB_NAME = 'linh_kanban_music_db';
   const MUSIC_DB_VERSION = 1;
   const MUSIC_HANDLE_STORE = 'directoryHandles';
@@ -36,6 +36,9 @@
   let pendingResumeSeconds = 0;
   let lastPositionSaveAt = 0;
   let loadedTrackId = null;
+  let requiresReconnect = false;
+  let rememberedHandleMissing = false;
+  const recentHandleCache = new Map();
 
   document.addEventListener('DOMContentLoaded', initMusicPlayer);
 
@@ -56,12 +59,14 @@
       'musicPrevLine','musicCurrentLine','musicNextLine','musicPrevBtn','musicPlayPauseBtn','musicNextBtn','musicShuffleBtn',
       'musicRepeatBtn','musicProgress','musicCurrentTime','musicDuration','musicVolume','musicPlaylistBtn','musicStatus',
       'musicPlaylistDialog','musicPlaylistList','musicPlaylistCount','musicPlaylistFolder','musicSortSelect','musicRecentSelect',
-      'musicOpenRecentBtn','musicPlaylistBrowseBtn','musicPlaylistEmpty','musicPlaylistSearch','musicPlaylistSearchClear'
+      'musicOpenRecentBtn','musicPlaylistBrowseBtn','musicPlaylistEmpty','musicPlaylistSearch','musicPlaylistSearchClear',
+      'musicChangeFolderBtn','musicRestoreNotice'
     ].forEach(id => refs[id] = document.getElementById(id));
   }
 
   function bindEvents() {
-    refs.musicBrowseBtn.addEventListener('click', browseMusicDirectory);
+    refs.musicBrowseBtn.addEventListener('click', () => requiresReconnect ? reopenMostRecentFolder() : browseMusicDirectory());
+    refs.musicChangeFolderBtn.addEventListener('click', browseMusicDirectory);
     refs.musicFolderInput.addEventListener('change', loadFilesFromInput);
     refs.musicRecentBtn.addEventListener('click', reopenMostRecentFolder);
     refs.musicPlaylistBtn.addEventListener('click', openPlaylistDialog);
@@ -138,6 +143,7 @@
     let persisted = false;
     try {
       await putDirectoryHandle(id, handle);
+      recentHandleCache.set(id, handle);
       rememberRecentFolder({ id, name: handle.name, lastUsed: Date.now() });
       persisted = true;
     } catch (error) {
@@ -153,10 +159,14 @@
     try {
       const permission = await ensureReadPermission(handle);
       if (!permission) {
-        showMusicToast('Bạn chưa cấp quyền đọc thư mục nhạc.');
+        requiresReconnect = Boolean(directoryId);
+        refs.musicStatus.textContent = 'Chưa được phép đọc thư mục. Nhấn Khôi phục nhạc và xác nhận với Chrome.';
+        showMusicToast('Chrome chưa cấp quyền đọc thư mục nhạc.');
         renderRecentFolders();
         return;
       }
+      requiresReconnect = false;
+      rememberedHandleMissing = false;
 
       const found = [];
       await collectTracksFromDirectory(handle, '', found);
@@ -226,6 +236,7 @@
     metadataGeneration += 1;
     tracks = nextTracks;
     currentIndex = -1;
+    requiresReconnect = false;
     shuffleHistory = [];
     playlistVisibleLimit = 250;
     currentDirectoryId = directoryId;
@@ -237,6 +248,7 @@
       rememberRecentFolder({ id: directoryId, name: currentDirectoryName, lastUsed: Date.now() });
     }
     settings.lastFolderName = currentDirectoryName;
+    settings.lastTrackCount = tracks.length;
     saveMusicSettings();
 
     refs.musicFolderLabel.textContent = currentDirectoryName || 'Chưa chọn thư mục';
@@ -250,6 +262,7 @@
     if (tracks.length) {
       const rememberedIndex = rememberedTrackId ? tracks.findIndex(track => track.id === rememberedTrackId) : -1;
       currentIndex = rememberedIndex >= 0 ? rememberedIndex : 0;
+      rememberTrackPreview();
       renderTrackContext();
       hydrateMetadataInBackground(metadataGeneration);
       showMusicToast(`Đã tải ${tracks.length} bài hát.`);
@@ -452,6 +465,7 @@
     }
 
     currentIndex = normalizedIndex;
+    rememberTrackPreview();
     const track = tracks[currentIndex];
     const savedTime = settings.lastTrackId === track.id && settings.lastDirectoryId === currentDirectoryId
       ? Number(settings.lastTrackTime) || 0 : 0;
@@ -621,12 +635,25 @@
   }
 
   function renderTrackContext() {
-    const previous = getTrackAt(currentIndex - 1);
-    const current = getTrackAt(currentIndex);
-    const next = getTrackAt(currentIndex + 1);
+    // Tên ba bài gần đây có thể hiện lại dù Chrome tạm thu hồi quyền đọc file.
+    const preview = !tracks.length && settings.recentFolders.length ? settings.lastTrackPreview : null;
+    const previous = getTrackAt(currentIndex - 1) || preview?.previous;
+    const current = getTrackAt(currentIndex) || preview?.current;
+    const next = getTrackAt(currentIndex + 1) || preview?.next;
     renderContextLine(refs.musicPrevLine, previous, 'Bài trước');
     renderContextLine(refs.musicCurrentLine, current, 'Chưa chọn bài');
     renderContextLine(refs.musicNextLine, next, 'Bài tiếp theo');
+  }
+
+  function rememberTrackPreview() {
+    if (!tracks.length || currentIndex < 0) return;
+    const snapshot = (track) => track ? {title:track.title || track.name,artist:track.artist || ''} : null;
+    settings.lastTrackPreview = {
+      previous:snapshot(getTrackAt(currentIndex - 1)),
+      current:snapshot(getTrackAt(currentIndex)),
+      next:snapshot(getTrackAt(currentIndex + 1))
+    };
+    saveMusicSettings();
   }
 
   function renderContextLine(element, track, fallback) {
@@ -758,6 +785,7 @@
       : (a, b) => compareVietnamese(a.relativePath, b.relativePath);
     tracks.sort(compare);
     if (currentId) currentIndex = tracks.findIndex(track => track.id === currentId);
+    if (currentIndex >= 0) rememberTrackPreview();
     renderTrackContext();
     renderPlaylist();
   }
@@ -974,6 +1002,8 @@
     const defaults = {
       settingsVersion: MUSIC_SETTINGS_VERSION,
       lastTrackTime: 0,
+      lastTrackCount: 0,
+      lastTrackPreview: null,
       volume: 0.72,
       shuffle: false,
       repeat: 'all',
@@ -997,6 +1027,8 @@
         settingsVersion: MUSIC_SETTINGS_VERSION,
         volume: clamp(Number(raw?.volume ?? defaults.volume), 0, 1),
         lastTrackTime: clamp(Number(raw?.lastTrackTime ?? 0),0,86400),
+        lastTrackCount: Math.max(0,Math.floor(Number(raw?.lastTrackCount)||0)),
+        lastTrackPreview: raw?.lastTrackPreview && typeof raw.lastTrackPreview === 'object' ? raw.lastTrackPreview : null,
         shuffle: Boolean(raw?.shuffle),
         repeat: repeatMode,
         sortMode: raw?.sortMode === 'title-asc' ? 'title-asc' : 'file-asc',
