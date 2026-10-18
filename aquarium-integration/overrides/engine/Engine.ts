@@ -176,7 +176,7 @@ export class Engine {
               }
               lines.push(JSON.stringify([obj.name,
                 obj.position.toArray().map(v=>+v.toFixed(5)),
-                obj.rotation.toArray().slice(0,3).map(v=>+v.toFixed(5)),sample]));
+                [obj.rotation.x,obj.rotation.y,obj.rotation.z].map(v=>+v.toFixed(5)),sample]));
             });
             return lines.join('|');
           };
