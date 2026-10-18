@@ -127,10 +127,20 @@ interface Population {
 
 // ── KanAquarium: individual pellets and high-priority rare cookies ──
 export type FoodKind = 'normal' | 'fish-cookie' | 'bear-cookie';
-interface FoodBit {pos:THREE.Vector3;age:number;state:'float'|'sink'|'settled'|'gone';kind:FoodKind;sprite:THREE.Sprite;support?:'wood'|'floor'}
+interface FoodBit {
+  pos:THREE.Vector3;age:number;
+  state:'air'|'float'|'sink'|'toss'|'settled'|'gone';
+  kind:FoodKind;sprite:THREE.Sprite;support?:'wood'|'floor';
+  floatOnContact?:boolean;floatLifetime?:number;
+  toss?:{velocity:THREE.Vector3;remaining:number;halfW:number;halfD:number};
+  retryAt?:number;misses?:number;
+}
 export class FoodSystem {
   bits:FoodBit[]=[];
   onEat?:()=>void;
+  biteAttempts=0;
+  missedBites=0;
+  surfaceDrops=0;
   private group=new THREE.Group();
   private mats=new Map<string,THREE.SpriteMaterial>();
   private readonly variants:Record<FoodKind,string[]>={
@@ -147,7 +157,7 @@ export class FoodSystem {
       this.mats.set(file,new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false,depthWrite:false,alphaTest:0.02,toneMapped:false}));
     }
   }
-  scatter(x:number,z:number,startY:number,kind:FoodKind='normal'):void{
+  scatter(x:number,z:number,startY:number,kind:FoodKind='normal',mode:'inside'|'top-float'|'top-sink'='inside'):void{
     if(this.bits.length>=65)this.remove(this.bits[0]);
     const files=this.variants[kind],name=files[Math.floor(Math.random()*files.length)];
     const sprite=new THREE.Sprite(this.mats.get(name)!);
@@ -160,18 +170,78 @@ export class FoodSystem {
     // Preserve the exact screen ray: horizontal scattering would shift the pellet
     // away from the pointer, especially with an oblique camera.
     const bit:FoodBit={pos:new THREE.Vector3(x,startY,z),
-      age:0,state:'sink',kind,sprite};
+      age:0,state:mode==='inside'?'sink':'air',kind,sprite,
+      floatOnContact:mode==='top-float',floatLifetime:10+Math.random()*6};
     sprite.position.copy(bit.pos);this.group.add(sprite);this.bits.push(bit);
+  }
+  scatterAboveSurface(x:number,z:number,startY:number,kind:FoodKind,
+    surfaceY:number,halfW:number,halfD:number):{floating:number;sinking:number}{
+    // Each normal tap is a small pinch of 10 flakes: precisely 3-4 float.
+    const count=kind==='normal'?10:1;
+    const floating=kind==='normal'?(Math.random()<.5?3:4):(Math.random()<.35?1:0);
+    const mode=Array.from({length:count},(_,i)=>i<floating?'top-float' as const:'top-sink' as const);
+    // Shuffle each pinch so that floating food is spatially interleaved.
+    for(let i=mode.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[mode[i],mode[j]]=[mode[j],mode[i]];}
+    const spread=Math.min(.012,halfW*.09,halfD*.11);
+    for(let i=0;i<count;i++){
+      const ox=i===0?0:(Math.random()-.5)*spread*2;
+      const oz=i===0?0:(Math.random()-.5)*spread*2;
+      const px=THREE.MathUtils.clamp(x+ox,-halfW+.014,halfW-.014);
+      const pz=THREE.MathUtils.clamp(z+oz,-halfD+.014,halfD-.014);
+      this.scatter(px,pz,Math.max(startY,surfaceY+.035)+Math.random()*.008,kind,mode[i]);
+    }
+    this.surfaceDrops++;
+    return {floating,sinking:count-floating};
+  }
+
+  // Missed bites displace food briefly along the mouth trajectory.
+  // It is not consumed; after the nudge, gravity carries it down again.
+  miss(bit:FoodBit,heading:THREE.Vector3,env:SimEnv):void{
+    this.biteAttempts++;this.missedBites++;
+    const forward=heading.lengthSq()>1e-7?heading.clone().normalize():new THREE.Vector3(1,0,0);
+    const speed=.09+Math.random()*.055;
+    bit.toss={velocity:new THREE.Vector3(
+      forward.x*speed+(Math.random()-.5)*.03,
+      .065+Math.random()*.045,
+      forward.z*speed+(Math.random()-.5)*.03
+    ),remaining:.22+Math.random()*.13,halfW:env.halfW,halfD:env.halfD};
+    bit.state='toss';bit.misses=(bit.misses??0)+1;
+    bit.retryAt=bit.age+.50;
+    bit.floatOnContact=false;
   }
   private remove(bit:FoodBit):void{
     this.group.remove(bit.sprite);
     const i=this.bits.indexOf(bit);if(i>=0)this.bits.splice(i,1);
   }
-  update(dt:number,floorY:number,solidHit?:(from:THREE.Vector3,to:THREE.Vector3)=>THREE.Vector3|null):void{
+  update(dt:number,floorY:number,surfaceY:number,
+    solidHit?:(from:THREE.Vector3,to:THREE.Vector3)=>THREE.Vector3|null):void{
     for(let i=this.bits.length-1;i>=0;i--){
       const b=this.bits[i];b.age+=dt;const special=b.kind!=='normal';
-      // Sinking starts immediately when the food is released.
-      if(b.state==='sink'){
+      if(b.state==='air'){
+        b.pos.y-=dt*(special?.15:.19);
+        if(b.pos.y<=surfaceY-.007){
+          b.pos.y=surfaceY-.007;
+          b.state=b.floatOnContact?'float':'sink';
+        }
+      }else if(b.state==='float'){
+        b.pos.y=surfaceY-.009+Math.sin(b.age*2.5+b.pos.x*20)*.0015;
+        b.pos.x+=Math.sin(b.age*1.2+b.pos.z*12)*dt*.001;
+        if(b.age>(b.floatLifetime??12))b.state='sink';
+      }else if(b.state==='toss'&&b.toss){
+        const impulse=b.toss;
+        b.pos.addScaledVector(impulse.velocity,dt);
+        impulse.velocity.y-=dt*.48;
+        b.pos.x=THREE.MathUtils.clamp(b.pos.x,-impulse.halfW+.009,impulse.halfW-.009);
+        b.pos.z=THREE.MathUtils.clamp(b.pos.z,-impulse.halfD+.009,impulse.halfD-.009);
+        b.pos.y=Math.min(surfaceY+.025,b.pos.y);
+        impulse.remaining-=dt;
+        if(impulse.remaining<=0||b.pos.y<=floorY+.012){
+          b.pos.y=Math.max(floorY+.01,b.pos.y);
+          b.state=b.pos.y<=floorY+.012?'settled':'sink';
+          if(b.state==='settled')b.support='floor';
+          b.toss=undefined;
+        }
+      }else if(b.state==='sink'){
         const previous=b.pos.clone(),next=b.pos.clone();
         next.y-=dt*(special?.075:.090);
         next.x+=Math.sin(b.age*2.2+b.pos.z*35)*dt*.003;
@@ -194,7 +264,8 @@ export class FoodSystem {
   nearest(p:THREE.Vector3,maxDist:number,settledOnly:boolean,excluded?:FoodBit):FoodBit|null{
     let best:FoodBit|null=null,score=Infinity;
     for(const b of this.bits){
-      if(b===excluded||b.state==='gone'||b.age<(b.kind==='normal'?.35:.45))continue;
+      if(b===excluded||b.state==='gone'||b.state==='air'||b.state==='toss'||
+        b.age<(b.kind==='normal'?.35:.45)||(b.retryAt??0)>b.age)continue;
       const special=b.kind!=='normal';
       if(!special&&settledOnly&&b.state!=='settled')continue;
       if(!special&&!settledOnly&&b.state==='settled'&&b.support!=='wood'&&b.pos.distanceToSquared(p)>Math.pow(maxDist*.55,2))continue;
@@ -206,7 +277,7 @@ export class FoodSystem {
     }
     return best;
   }
-  eat(b:FoodBit):void{b.state='gone';this.remove(b);this.onEat?.()}
+  eat(b:FoodBit):void{this.biteAttempts++;b.state='gone';this.remove(b);this.onEat?.()}
 }
 // ── The fish system proper ──
 export class FishSystem {
@@ -702,9 +773,12 @@ export class FishSystem {
   }
 
   feed(x: number, z: number, env: SimEnv, kind:FoodKind='normal',
-    startY=env.surfaceY-.035): void {
-    this.food.scatter(x,z,startY,kind);
-    this.feedTimer = kind==='normal'?22:34; // finite excitement, longer for special cakes
+    startY=env.surfaceY-.035, fromAbove=false): {floating:number;sinking:number} {
+    const result=fromAbove
+      ? this.food.scatterAboveSurface(x,z,startY,kind,env.surfaceY,env.halfW,env.halfD)
+      : (this.food.scatter(x,z,startY,kind),{floating:0,sinking:1});
+    this.feedTimer = kind==='normal'?22:34;
+    return result;
   }
 
   // Find a fish agent by its stable key (for follow-cam / naming).
@@ -723,7 +797,7 @@ export class FishSystem {
   update(dt: number, env: SimEnv): void {
     dt = Math.min(dt, 0.05); // clamp to avoid physics explosions on tab-return
     this.feedTimer = Math.max(0, this.feedTimer - dt);
-    this.food.update(dt, env.floorY,env.foodSolidHit);
+    this.food.update(dt, env.floorY,env.surfaceY,env.foodSolidHit);
     this.updateSplashes(dt);
     if(this.pendingDrops.length)this.startWaitingArrivals(env);
     // Director is observational and never alters population sizes or persistence.
@@ -987,9 +1061,16 @@ export class FishSystem {
         // Food is detected locally, approached with a gradual slowdown and
         // only swallowed when it reaches the fish's mouth region.
         a.feedDistance=d;
-        if(d<L*.43+(.003)){ 
-          this.food.eat(target);
-          a.feedTarget=undefined;a.feedStall=0;a.feedCooldown=env.time+.6+Math.random()*.8;
+        if(d<L*.43+(.003)){
+          // ~17.5% of pellet bites miss. Food follows the snout briefly
+          // before gravity takes over; a later bite may still consume it.
+          const missed=target.kind==='normal'&&(target.misses??0)<2&&Math.random()<.175;
+          if(missed){
+            const forward=a.vel.lengthSq()>1e-7?a.vel:_v2;
+            this.food.miss(target,forward,env);
+            a.feedAvoid=target;a.feedAvoidUntil=env.time+.42;
+          }else this.food.eat(target);
+          a.feedTarget=undefined;a.feedStall=0;a.feedCooldown=env.time+.45+Math.random()*.55;
           a.jawTime=.24;
           a.mode='feed';a.modeT=.26;a.gulp=undefined;
         } else if(d>1e-6){
