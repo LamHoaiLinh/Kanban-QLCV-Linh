@@ -81,12 +81,24 @@ try{
  salt=await inspect();
  await toTab('Bể');await selectWater('freshwater');
  let restored=await inspect();
+ assert(restored.water==='freshwater' && Object.values(restored.fish).some(n=>n>0),
+   'Freshwater switch did not generate a populated tank');
+ const restoreDraft=async()=>page.evaluate(()=>{
+   const button=[...document.querySelectorAll('.panel button')]
+     .find(b=>b.textContent.includes('Lấy lại hồ cũ'));
+   if(!button)throw Error('Missing restore previous water layout button');
+   button.click();
+ });
+ await restoreDraft();restored=await inspect();
  for(const key of ['fish','flora','fishNames','decor','substrate','background','lighting'])
-   assert(JSON.stringify(restored[key])===JSON.stringify(fresh[key]),'Freshwater lost '+key);
+   assert(JSON.stringify(restored[key])===JSON.stringify(fresh[key]),'Restoring freshwater lost '+key);
  await selectWater('saltwater');
  restored=await inspect();
+ assert(restored.water==='saltwater' && Object.values(restored.fish).some(n=>n>0),
+   'Saltwater switch did not generate a populated tank');
+ await restoreDraft();restored=await inspect();
  for(const key of ['fish','flora','fishNames','decor','substrate','background','lighting'])
-   assert(JSON.stringify(restored[key])===JSON.stringify(salt[key]),'Saltwater lost '+key);
+   assert(JSON.stringify(restored[key])===JSON.stringify(salt[key]),'Restoring saltwater lost '+key);
  // LocalStorage persistence across a real reload (not just a React transition).
  await page.reload({waitUntil:'domcontentloaded'});
  await page.waitForFunction(()=>window.__kan42Store);
@@ -95,8 +107,10 @@ try{
  assert(JSON.stringify(afterReload.fish)===JSON.stringify(salt.fish),'Saltwater lost on reload');
  await toTab('Bể');await selectWater('freshwater');
  restored=await inspect();
- assert(JSON.stringify(restored.fish)===JSON.stringify(fresh.fish),'Freshwater lost on reload');
- assert(JSON.stringify(restored.flora)===JSON.stringify(fresh.flora),'Freshwater plants lost on reload');
+ assert(Object.values(restored.fish).some(n=>n>0),'New freshwater random tank was empty after reload');
+ await restoreDraft();restored=await inspect();
+ assert(JSON.stringify(restored.fish)===JSON.stringify(fresh.fish),'Saved freshwater layout lost on reload');
+ assert(JSON.stringify(restored.flora)===JSON.stringify(fresh.flora),'Saved freshwater plants lost on reload');
  // Prime the 60-fish low-quality GPU cap, then click '+' twelve times.
  // This used to show only 5-6 visible arrivals, with the remainder silently
  // appearing inside the water (or disappearing at the rendering cap).
