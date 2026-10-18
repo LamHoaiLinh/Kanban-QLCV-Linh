@@ -328,8 +328,13 @@ function buildFishGeometry(sp: SpeciesDef,low=false): THREE.BufferGeometry {
         // specular lighting catches the membrane instead of a flat triangle.
         const trail=sp.id==='angelfish'?.075:sh.finLong?.060:.013;
         const px=x-trail*soft*(.55+.45*t);
+        // Reattach the lower edge WITHOUT shrinking the visible fin:
+        // the old tip used -hh as its origin. Fade the correction from
+        // zero at the embedded root to full at the free outer edge.
+        const originalAnalRoot=-hh;
+        const lowerTipCorrection=sign<0?(rootY-originalAnalRoot)*soft:0;
         const py=rootY+sign*tipHeight*w*
-          (1+.012*Math.sin(t*16*Math.PI)*w);
+          (1+.012*Math.sin(t*16*Math.PI)*w)-lowerTipCorrection;
         // Rounded membrane cross-section: a little lateral ridge along each
         // ray catches light as it folds, unlike a zero-curvature flat plate.
         const pz=(Math.sin(Math.PI*t)*(sp.id==='angelfish'?.033:.018)
