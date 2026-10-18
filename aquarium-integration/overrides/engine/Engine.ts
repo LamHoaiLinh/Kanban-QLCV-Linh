@@ -196,6 +196,7 @@ export class Engine {
         lastFeedOrigin:this.lastFeedOrigin,
         lastSurfaceSplit:this.lastSurfaceSplit,
         biteStats:{attempts:this.fish.food.biteAttempts,misses:this.fish.food.missedBites},
+        mouthContact:this.fish.qaFoodMouthContact(),
         lastScreen:this.lastFoodSpawn?(()=>{
           const point=this.lastFoodSpawn.clone().project(this.rig.camera);
           return [point.x,point.y,point.z];
