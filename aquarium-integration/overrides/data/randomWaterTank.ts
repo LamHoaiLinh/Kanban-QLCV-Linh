@@ -32,14 +32,33 @@ export function createRandomWaterTank(
       Math.max(1, scaled, Math.min(sp.minGroup, capacity < 15 ? 2 : 8)));
     fish[id] = count;
   }
-  // Small saltwater templates start at 75 gal: without a fallback they can
-  // have zero fish at 5-20 gal. The tiny 5-9g case is an *illustrative*
-  // virtual display (an actual clownfish needs a larger tank).
-  if (!Object.keys(fish).length) {
-    const id = water === 'saltwater'
-      ? (capacity >= 30 ? 'green-chromis' : 'ocellaris-clown')
-      : (capacity < 10 ? 'guppy' : 'neon-tetra');
-    fish[id] = capacity < 10 ? 1 : capacity < 30 ? 3 : 6;
+  // Invertebrates (shrimps/snails) count as species in the data model but
+  // are not visible swimming fish. A nano preset containing only them was
+  // previously misclassified as a populated aquarium.
+  const swimmerCount = () => Object.entries(fish).reduce((total,[id,count]) => {
+    const sp=speciesById.get(id);
+    return total + (sp && !sp.invert ? count : 0);
+  },0);
+  const targetSwimmers = capacity < 10 ? 3 : capacity < 20 ? 5 : capacity < 40 ? 7 : 10;
+  if (swimmerCount() < targetSwimmers) {
+    const candidates=water==='freshwater'
+      ? (capacity<10 ? ['guppy','betta','ember-tetra']
+        : capacity<20 ? ['guppy','ember-tetra','endler-guppy','betta']
+          : ['guppy','cardinal-tetra','harlequin-rasbora','endler-guppy','ember-tetra'])
+      : (capacity<10 ? ['ocellaris-clown']
+        : capacity<30 ? ['ocellaris-clown','firefish']
+          : ['green-chromis','ocellaris-clown','firefish']);
+    for (const id of candidates) {
+      const sp=speciesById.get(id);
+      // The 5-9 gallon marine display is deliberately virtual/illustrative:
+      // no regular marine swimmer in this catalog is recommended under 10g.
+      if (!sp || sp.water!==water || sp.invert || (sp.minGallons>capacity && !(water==='saltwater' && capacity<10))) continue;
+      const needed=targetSwimmers-swimmerCount();
+      if(needed<=0)break;
+      const max=sp.maxPerTank??24;
+      const increment=Math.max(0,Math.min(needed,max-(fish[id]??0)));
+      if (increment>0) fish[id]=(fish[id]??0)+increment;
+    }
   }
   const availableFlora = new Set(floraForWater(water).map(p => p.id));
   const flora: Record<string,number> = {};
