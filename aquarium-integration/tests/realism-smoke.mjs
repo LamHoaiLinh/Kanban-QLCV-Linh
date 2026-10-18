@@ -69,10 +69,7 @@ try{
       button.click();
     },label);
   };
-  for(const [name,expectedSpecies] of [
-    ['Toàn cảnh ông tiên','endler-guppy'],
-    ['Trăng xanh san hô','cerith-snail']
-  ]){
+  for(const name of ['Toàn cảnh ông tiên','Trăng xanh san hô']){
     await ensureTankPanel();
     await page.evaluate(name=>{
       const button=[...document.querySelectorAll('.preset-list button')]
@@ -87,8 +84,13 @@ try{
     const nano=await currentConfig();
     if(nano.gallons!==5||Object.values(nano.fish).reduce((a,b)=>a+b,0)<1)
       throw Error('Previously populated tank became empty on resize '+JSON.stringify(nano));
-    if(!nano.fish[expectedSpecies])
-      throw Error('No suitable nano fallback '+JSON.stringify(nano.fish));
+    // Resizing now creates a newly stocked random aquarium, not a filtered
+    // copy of the previous species list. Verify at least one swimming fish,
+    // not solely shrimp/snails.
+    const swimmers=Object.entries(nano.fish).filter(([id,count])=>
+      count>0&&!/(shrimp|snail|crab|clam|starfish|urchin)/i.test(id));
+    if(!swimmers.length)
+      throw Error('No swimming fish in random nano tank '+JSON.stringify(nano.fish));
     // A page reload while the 5-gallon view is active must not erase the
     // saved pre-resize composition; reopening KanBan restores the same tank.
     if(name==='Toàn cảnh ông tiên'){
@@ -100,11 +102,21 @@ try{
     }
     await chooseSize('Nhỏ');
     await chooseSize('Rất lớn');
+    const randomLarge=await currentConfig();
+    if(randomLarge.gallons!==120||!Object.values(randomLarge.fish).some(n=>n>0))
+      throw Error('Size change failed to create new stocked large aquarium: '+name);
+    await ensureTankPanel();
+    await page.evaluate(()=>{
+      const button=[...document.querySelectorAll('.panel button')]
+        .find(b=>b.textContent?.includes('Khôi phục bể trước khi thu nhỏ'));
+      if(!button)throw Error('Missing original tank recovery button');
+      button.click();
+    });
     const restored=await currentConfig();
     if(JSON.stringify(restored.fish)!==JSON.stringify(baseline.fish)||
        JSON.stringify(restored.fishNames)!==JSON.stringify(baseline.fishNames))
-      throw Error('Original fish/names not restored after nano resize '+name);
-    console.log('PASS adaptive resize '+name+' nano='+JSON.stringify(nano.fish));
+      throw Error('Original fish/names not restored by explicit undo '+name);
+    console.log('PASS random resize and explicit undo '+name+' nano='+JSON.stringify(nano.fish));
   }
   for(let i=0;i<30;i++){
     await ensureTankPanel();
