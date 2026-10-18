@@ -737,7 +737,7 @@ export class Engine {
       el.dataset.satiety=String(fish.satiety);
       el.classList.toggle('is-critical',fish.satiety<=19);
       el.classList.toggle('is-hungry',fish.satiety<=45&&fish.satiety>19);
-      el.querySelector('.kan-fish-satiety-name')!.textContent=fish.name+' · '+fish.satiety+'%';
+      el.querySelector('.kan-fish-satiety-name')!.textContent='No '+fish.satiety+'% · '+fish.name;
       (el.querySelector('.kan-fish-satiety-fill') as HTMLSpanElement).style.width=fish.satiety+'%';
       el.style.transform='translate3d('+x.toFixed(1)+'px,'+y.toFixed(1)+'px,0) translate(-50%,-100%)';
       alive.add(fish.key);
