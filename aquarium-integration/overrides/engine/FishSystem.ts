@@ -455,6 +455,140 @@ export class FishSystem {
   private arrivalFallbacks=0;
   private splashes:Array<{mesh:THREE.Mesh<THREE.RingGeometry,THREE.MeshBasicMaterial>;age:number}>=[];
   // Soft spherical keep-out zones approximate rocks, wood trunks and larger corals.
+  // Large fish have tall, flattened bodies: the old boids applied only to
+  // schoolers of the SAME species, with no fish-to-fish physical collision.
+  // These lightweight oriented ellipsoid envelopes cover different species
+  // and scales, but are intentionally looser than the decorative fins.
+  private nearbySwimmers:Agent[]=[];
+  private fishCollisionEvents=0;
+  private largeBody(a:Agent):boolean {
+    return !a.sp.invert&&!isCrawler(a.sp)&&
+      (a.sp.adultSizeIn>=5||a.sp.id==='angelfish'||a.sp.id==='discus');
+  }
+  private canContact(a:Agent):boolean {
+    return !a.sp.invert&&!isCrawler(a.sp)&&!a.drop&&a.jump?.stage!=='breach';
+  }
+  private bodyCenter(a:Agent,out:THREE.Vector3):THREE.Vector3 {
+    // Fish geometry goes from a nose at +.5 to a shorter rear body, so its
+    // centre lies forward of the instanced pivot, not at agent.pos.
+    const yaw=a.prevYaw;
+    return out.set(a.pos.x+Math.cos(yaw)*a.scale*.12,
+      a.pos.y,a.pos.z-Math.sin(yaw)*a.scale*.12);
+  }
+  private bodySupport(a:Agent,nx:number,ny:number,nz:number):number {
+    const yaw=a.prevYaw,c=Math.cos(yaw),sn=Math.sin(yaw);
+    const forward=nx*c-nz*sn,lateral=nx*sn+nz*c;
+    const main=(a.sp.id==='discus'||a.sp.id==='angelfish');
+    const len=a.scale*(main?.365:.385);
+    const tall=a.scale*a.sp.shape.height*(main?.49:.43);
+    // A little extra visual space in depth prevents large overlapping
+    // silhouettes from looking like one fish passes THROUGH another.
+    const side=a.scale*a.sp.shape.width*.52+(this.largeBody(a)?.014:.003);
+    return Math.sqrt((forward*len)**2+(ny*tall)**2+(lateral*side)**2);
+  }
+  private pairBodyGap(a:Agent,b:Agent):{
+    nx:number;ny:number;nz:number;gap:number;safe:number
+  }{
+    const ap=this.bodyCenter(a,_v3),bp=this.bodyCenter(b,new THREE.Vector3());
+    const dx=ap.x-bp.x,dy=ap.y-bp.y,dz=ap.z-bp.z;
+    const d=Math.hypot(dx,dy,dz);
+    // Stable fallback for identical positions (e.g. batch-added fish).
+    const theta=(a.index+1)*1.618+(b.index+1)*.73;
+    const nx=d>1e-7?dx/d:Math.cos(theta);
+    const ny=d>1e-7?dy/d:0;
+    const nz=d>1e-7?dz/d:Math.sin(theta);
+    const safe=this.bodySupport(a,nx,ny,nz)+this.bodySupport(b,-nx,-ny,-nz)+.003;
+    return {nx,ny,nz,gap:d-safe,safe};
+  }
+  private avoidNearbyBodies(a:Agent,steer:THREE.Vector3):void {
+    if(!this.canContact(a))return;
+    for(const b of this.nearbySwimmers){
+      if(a===b||(!this.largeBody(a)&&!this.largeBody(b)))continue;
+      const dx=a.pos.x-b.pos.x,dy=a.pos.y-b.pos.y,dz=a.pos.z-b.pos.z;
+      const broad=(a.scale+b.scale)*.92+.025;
+      if(dx*dx+dy*dy+dz*dz>broad*broad)continue;
+      const q=this.pairBodyGap(a,b);
+      const influence=q.safe*1.55;
+      const d=q.gap+q.safe;
+      if(d>=influence)continue;
+      const approach=THREE.MathUtils.clamp((influence-d)/Math.max(.008,influence),0,1);
+      // Anticipate the other fish and turn aside BEFORE bodies overlap.
+      // Stronger for large/large pairs; small companions glide aside gently.
+      const strength=(this.largeBody(a)?2.3:1.25)*approach*approach;
+      steer.x+=q.nx*strength;
+      steer.y+=q.ny*strength*.64;
+      steer.z+=q.nz*strength;
+    }
+  }
+  private resolveBodyIntersections(env:SimEnv):void {
+    // Low-cost pair projections after every fish has integrated this frame;
+    // only one of the two fish must be large. No pass-through from one species
+    // into another, including mixed-size angelfish and discus groups.
+    const fish=this.nearbySwimmers;
+    for(let pass=0;pass<3;pass++){
+      let changed=false;
+      const moved=new Set<Agent>();
+      for(let i=0;i<fish.length;i++){
+        const a=fish[i];
+        for(let j=i+1;j<fish.length;j++){
+          const b=fish[j];
+          if(!this.largeBody(a)&&!this.largeBody(b))continue;
+          const broad=(a.scale+b.scale)*.91+.025;
+          const dx=a.pos.x-b.pos.x,dy=a.pos.y-b.pos.y,dz=a.pos.z-b.pos.z;
+          if(dx*dx+dy*dy+dz*dz>broad*broad)continue;
+          const q=this.pairBodyGap(a,b);
+          if(q.gap>=-.001)continue;
+          // Bounded adjustment avoids sudden jumps in crowded aquariums.
+          const correction=Math.min(-q.gap+.0015,.010);
+          const am=this.largeBody(a)?Math.max(.015,a.scale):Math.max(.007,a.scale*.65);
+          const bm=this.largeBody(b)?Math.max(.015,b.scale):Math.max(.007,b.scale*.65);
+          const total=am+bm,aw=bm/total,bw=am/total;
+          a.pos.x+=q.nx*correction*aw;a.pos.y+=q.ny*correction*aw;a.pos.z+=q.nz*correction*aw;
+          b.pos.x-=q.nx*correction*bw;b.pos.y-=q.ny*correction*bw;b.pos.z-=q.nz*correction*bw;
+          // Remove inward relative velocity rather than reversing direction
+          // suddenly; animation and head yaw remain under swim controller.
+          const closing=(a.vel.x-b.vel.x)*q.nx+
+            (a.vel.y-b.vel.y)*q.ny+(a.vel.z-b.vel.z)*q.nz;
+          if(closing<0){
+            a.vel.addScaledVector(_v1.set(q.nx,q.ny,q.nz),-closing*aw*.75);
+            b.vel.addScaledVector(_v1,-closing*bw*.75);
+          }
+          moved.add(a);moved.add(b);changed=true;this.fishCollisionEvents++;
+        }
+      }
+      if(!changed)break;
+      // Re-apply actual tank/glass/wood bounds after correction.
+      for(const a of moved)this.constrain(a,env);
+    }
+  }
+  getFishBodyContactSnapshot(){
+    const fish=this.populations.flatMap(p=>p.agents).filter(a=>this.canContact(a));
+    let pairs=0,overlaps=0,maxPenetration=0;
+    for(let i=0;i<fish.length;i++)for(let j=i+1;j<fish.length;j++){
+      const a=fish[i],b=fish[j];
+      if(!this.largeBody(a)&&!this.largeBody(b))continue;
+      pairs++;
+      const q=this.pairBodyGap(a,b);
+      const penetration=Math.max(0,-q.gap);
+      if(penetration>.003){overlaps++;maxPenetration=Math.max(maxPenetration,penetration);}
+    }
+    return {pairs,overlaps,maxPenetration,events:this.fishCollisionEvents};
+  }
+  qaOverlapLargeFish(env:SimEnv):boolean{
+    const big=this.populations.flatMap(p=>p.agents)
+      .filter(a=>this.canContact(a)&&this.largeBody(a)).slice(0,2);
+    if(big.length<2)return false;
+    const x=0,y=(env.floorY+env.surfaceY)*.5,z=0;
+    for(const [i,a] of big.entries()){
+      a.pos.set(x,y,z);a.vel.set(i===0?.018:-.018,0,0);
+      a.prevYaw=i===0?0:Math.PI;
+      a.anchor.set(i===0?.2:-.2,y,0);
+      a.mode='cruise';a.modeT=10;
+      a.peck=undefined;a.drop=undefined;a.jump=undefined;
+    }
+    return true;
+  }
+
   private collisionRadius(a:Agent):number{return Math.max(0.007,a.scale*.30)}
   // The physical vertical envelope must include dorsal + anal fins, not only
   // the body centre. Tall angels formerly poked rigid triangles through the
@@ -912,6 +1046,7 @@ export class FishSystem {
     if(this.pendingDrops.length)this.startWaitingArrivals(env);
     // Director is observational and never alters population sizes or persistence.
     const allAgents=this.populations.flatMap(p=>p.agents);
+    this.nearbySwimmers=allAgents.filter(a=>this.canContact(a));
     this.habitat.update(dt,allAgents,env);
     for(let i=this.pendingDashes.length-1;i>=0;i--){
       const pending=this.pendingDashes[i];if(pending.at>env.time)continue;
@@ -932,7 +1067,7 @@ export class FishSystem {
     }
 
     for (const pop of this.populations) {
-      const { sp, agents, mesh, dyn } = pop;
+      const { sp, agents } = pop;
       for (const a of agents) {
         // Simulation-time hunger only: closed/background tabs do not starve fish.
         // No death, injury, or irreversible penalty at zero.
@@ -945,10 +1080,15 @@ export class FishSystem {
         else this.updateFish(a, agents, dt, env);
         if(!isCrawler(sp)&&!a.drop&&a.jump?.stage!=='breach')this.constrain(a,env,dt);
         a.travel+=a.pos.distanceTo(before);
-        this.writeInstance(pop, a, dt);
       }
-      mesh.instanceMatrix.needsUpdate = true;
-      dyn.needsUpdate = true;
+    }
+    // Resolve contacts AFTER all fish have moved, then update rendered poses
+    // once. This prevents one-frame fish intersections in the InstancedMesh.
+    this.resolveBodyIntersections(env);
+    for(const pop of this.populations){
+      for(const a of pop.agents)this.writeInstance(pop,a,dt);
+      pop.mesh.instanceMatrix.needsUpdate=true;
+      pop.dyn.needsUpdate=true;
     }
   }
 
@@ -1195,6 +1335,7 @@ export class FishSystem {
 
     // One event at most can steer a fish through a measured corridor.
     this.habitat.steer(a,steer,dt,env);
+    this.avoidNearbyBodies(a,steer);
     if(a.needCueUntil>env.time&&this.feedTimer<=0&&a.satiety<65){
       steer.y+=THREE.MathUtils.clamp((env.surfaceY-a.scale*.67-a.pos.y)*5,0,.95);
       if(a.pos.y>env.surfaceY-Math.max(.045,a.scale*.95))
