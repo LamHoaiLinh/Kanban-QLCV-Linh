@@ -41,7 +41,9 @@ try{
   const angel=p.fins.find(f=>f.id==='angelfish');
   assert(angel?.angelCaudalAttached&&angel.caudalAttachmentVertices>10,
     'Angelfish tail still only rooted at thin caudal stalk: '+JSON.stringify(angel));
-  await page.evaluate(()=>{window.__kan42Pause();window.__kan42Step(8);});
+  // Observe real animation frames rather than forcing hundreds of heavy
+  // physics frames synchronously on a software-rendered CI GPU.
+  await new Promise(r=>setTimeout(r,3000));
   p=await page.evaluate(()=>window.__kanBigFishProbe());
   const discus=p.fish.find(g=>g.species==='discus').fish;
   assert(discus.every(f=>Number.isFinite(f.pitch)&&Math.abs(f.pitch)<.145),
