@@ -36,6 +36,16 @@
   let pendingResumeSeconds = 0;
   let lastPositionSaveAt = 0;
   let loadedTrackId = null;
+  let playbackWanted = false;
+  let interruptedPauseTimer = null;
+  let recoverTimer = null;
+  let consecutivePlaybackFailures = 0;
+  const playbackDiagnostics = [];
+  function logPlaybackEvent(type, detail = '') {
+    playbackDiagnostics.push({at:new Date().toISOString(),type,detail,track:tracks[currentIndex]?.name || '',time:Math.round(player.currentTime||0),paused:player.paused,repeat:settings.repeat});
+    if (playbackDiagnostics.length>30) playbackDiagnostics.shift();
+    if (['error','unexpected-pause','skip'].includes(type)) console.warn('[Kanban music]',type,detail);
+  }
   let requiresReconnect = false;
   let rememberedHandleMissing = false;
   const recentHandleCache = new Map();
@@ -90,7 +100,13 @@
     player.addEventListener('durationchange', updateProgressUi);
     player.addEventListener('timeupdate', () => { updateProgressUi(); rememberPlaybackPosition(); });
     player.addEventListener('play', updatePlaybackState);
-    player.addEventListener('pause', () => { updatePlaybackState(); rememberPlaybackPosition(true); });
+    player.addEventListener('playing', () => {
+      clearTimeout(recoverTimer);
+      consecutivePlaybackFailures = 0;
+      logPlaybackEvent('playing');
+    });
+    player.addEventListener('pause', () => { updatePlaybackState(); rememberPlaybackPosition(true); checkUnexpectedMusicPause(); });
+    player.addEventListener('stalled', () => scheduleMusicRecovery('stalled',12000));
     player.addEventListener('ended', handleTrackEnded);
     player.addEventListener('error', handleAudioError);
 
@@ -465,6 +481,9 @@
     }
 
     currentIndex = normalizedIndex;
+    if (autoplay) playbackWanted = true;
+    clearTimeout(interruptedPauseTimer);
+    clearTimeout(recoverTimer);
     rememberTrackPreview();
     const track = tracks[currentIndex];
     const savedTime = settings.lastTrackId === track.id && settings.lastDirectoryId === currentDirectoryId
@@ -488,8 +507,9 @@
     } catch (error) {
       if (requestId !== playbackRequestId) return;
       console.error('Không thể phát bài hát:', error);
-      showMusicToast('Không thể phát tệp nhạc này.');
-      refs.musicStatus.textContent = 'Lỗi phát nhạc';
+      refs.musicStatus.textContent = 'Không phát được bài hát.';
+      if (autoplay && error?.name !== 'NotAllowedError' && error?.name !== 'AbortError')
+        scheduleMusicRecovery(error?.name || 'play-error',800);
     }
   }
 
@@ -506,8 +526,15 @@
       await playTrack(currentIndex);
       return;
     }
-    if (player.paused) await player.play().catch(handleAudioError);
-    else player.pause();
+    if (player.paused) {
+      playbackWanted = true;
+      await player.play().catch(handleAudioError);
+    } else {
+      playbackWanted = false;
+      clearTimeout(interruptedPauseTimer);
+      clearTimeout(recoverTimer);
+      player.pause();
+    }
   }
 
   function playNext() {
@@ -522,6 +549,8 @@
     if (next < tracks.length) playTrack(next);
     else if (settings.repeat === 'all') playTrack(0);
     else {
+      playbackWanted = false;
+      logPlaybackEvent('playlist-end');
       player.pause();
       player.currentTime = 0;
       updateProgressUi();
@@ -1013,6 +1042,9 @@
   }
 
   function stopPlaybackAndReleaseUrl() {
+    playbackWanted = false;
+    clearTimeout(recoverTimer);
+    clearTimeout(interruptedPauseTimer);
     playbackRequestId++;
     pendingResumeSeconds = 0;
     player.pause();
@@ -1115,7 +1147,8 @@
     window.KanbanMusicPlayer = {
       clearAllData: clearAllMusicData,
       togglePlayback,
-      browseDirectory: browseMusicDirectory
+      browseDirectory: browseMusicDirectory,
+      getPlaybackDiagnostics: () => playbackDiagnostics.slice()
     };
   }
 
