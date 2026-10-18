@@ -423,6 +423,7 @@ export class FishSystem {
     pelvicRootRadius:p.mesh.geometry.userData.pelvicRootRadius,
     vertices:p.mesh.geometry.getAttribute('position').count,
     medianStrip:p.mesh.geometry.userData.medianMembraneStrip===true,
+    angelLowerFinRefined:p.mesh.geometry.userData.angelLowerFinRefined===true,
     medianTips:[...Array(p.mesh.geometry.getAttribute('aFinFlex').count).keys()]
       .filter(i=>p.mesh.geometry.getAttribute('aPart').getX(i)===2 &&
         p.mesh.geometry.getAttribute('aFinFlex').getX(i)>.95).length,
