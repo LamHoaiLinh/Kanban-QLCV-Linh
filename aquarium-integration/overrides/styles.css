@@ -357,3 +357,12 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .kan-fish-satiety.is-critical{border-color:rgba(255,150,116,.85);background:rgba(65,27,25,.9)}
 .kan-fish-satiety.is-critical .kan-fish-satiety-fill{background:#ea705d}
 @media(max-width:650px){.kan-fish-satiety{width:86px;padding:3px 4px;font-size:9px}}
+
+/* Favorite aquariums: compact controls suitable for the narrow panel. */
+.favorite-hint{margin:5px 0 10px;font-size:12px;color:var(--text-dim);line-height:1.45}
+.favorite-row{margin:8px 0;padding:9px;border:1px solid var(--panel-border);border-radius:11px;background:rgba(255,255,255,.025)}
+.favorite-details{display:flex;flex-direction:column;gap:3px;min-width:0}
+.favorite-details strong{font-size:13px;overflow-wrap:anywhere}
+.favorite-details small{font-size:11px;color:var(--text-dim)}
+.favorite-actions{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.favorite-actions .btn{padding:6px 8px;font-size:11.5px}
