@@ -61,8 +61,9 @@ self.addEventListener('fetch', event => {
     const heavyGameMedia = isGame && /\.(glb|bin|mp4|webm|mov|mp3|wav|ogg|flac|m4a|png|jpe?g|webp|gif)$/i.test(url.pathname);
     const size = Number(response.headers.get('content-length') || 0);
     if (response.ok && response.type !== 'opaque' && !heavyGameMedia && (!size || size < 2*1024*1024)) {
+      const cacheCopy = response.clone(); // Clone trước khi trả response cho trình duyệt.
       const cacheJob = caches.open(cacheName)
-        .then(cache => cache.put(request,response.clone()))
+        .then(cache => cache.put(request,cacheCopy))
         .catch(error => console.debug('Cache put:',error));
       event.waitUntil(cacheJob);
     }
