@@ -221,6 +221,14 @@ export class Engine {
         })),
       });
       Object.assign(window,{
+        __kanSatietySave:()=>this.fish.saveSatietySnapshot(),
+        __kanSatietyScreenPoint:(key:string)=>{
+          const fish=this.fish.getSatietyDisplay().find(x=>x.key===key);
+          if(!fish)return null;
+          const rect=this.renderer.domElement.getBoundingClientRect();
+          const pt=fish.pos.clone().project(this.rig.camera);
+          return {x:rect.left+(pt.x+1)*rect.width*.5,y:rect.top+(1-pt.y)*rect.height*.5};
+        },
         __kanSatietySet:(key:string,value:number)=>{
           const ok=this.fish.qaSetSatiety(key,value);
           if(ok)this.syncSatietyHud();
