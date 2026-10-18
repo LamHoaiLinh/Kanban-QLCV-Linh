@@ -1857,7 +1857,10 @@ export class FishSystem {
     a.phase += TAU * Math.min(f, 14) * dt;
     // Pectoral flutter fades in as forward speed fades out.
     const speedFactor = THREE.MathUtils.clamp(speed / (sp.swim.cruise * L * SPEED_SCALE + 1e-6), 0, 1);
-    a.flap = THREE.MathUtils.damp(a.flap, 1 - speedFactor * 0.85, 4, dt);
+    // Discus maintain visible, gentle sculling of the pectorals even while
+    // cruising; other species keep the original speed-responsive flutter.
+    const flapTarget=sp.id==='discus'?.62+.30*(1-speedFactor):1-speedFactor*.85;
+    a.flap = THREE.MathUtils.damp(a.flap, flapTarget, 4, dt);
 
     pop.dyn.setXYZW(a.index, a.phase, a.bend, a.flap, a.jaw);
   }
