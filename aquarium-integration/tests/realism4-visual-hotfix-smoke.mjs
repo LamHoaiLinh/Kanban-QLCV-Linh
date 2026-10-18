@@ -42,6 +42,10 @@ try{
   const angel=probe.fins.find(f=>f.id==='angelfish');
   if(!angel?.medianStrip||angel.medianTips<40)
     throw Error('Angelfish dorsal/anal membranes still rigid fans '+JSON.stringify(angel));
+  if(!angel.angelLowerFinRefined)
+    throw Error('Angelfish-specific anal/pelvic fin shape not installed');
+  if(probe.fins.some(f=>f.id!=='angelfish'&&f.angelLowerFinRefined))
+    throw Error('Angelfish fin changes leaked into unrelated fish species');
   // Lower-fin root must be embedded in the curved belly; before this fix
   // the anal membrane originated BELOW the skin and exposed a dark gap.
   for(const f of probe.fins){
