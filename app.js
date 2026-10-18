@@ -3,6 +3,9 @@
 
   const STORAGE_KEY = 'linh_personal_kanban_v1';
   const VERSION = 23;
+  let lastPersistedRaw = null;
+  let storageProtectionReason = '';
+  let brokenStoredRaw = '';
   const DEFAULT_BACKGROUND_ID = 'bg6';
   const KAN_ALARM_AGENT = 'http://127.0.0.1:47632';
   const KAN_ALARM_HEADERS = {'X-KanBan-Agent':'linh-kanban-v1','Content-Type':'application/json'};
@@ -94,6 +97,7 @@
     bindEvents();
     state = loadState();
     ensureActiveProject();
+    if (storageProtectionReason) setTimeout(showStorageSafetyBanner,0);
     const dailyMoveResult = runDailyMovesIfNeeded();
     lastObservedLocalDate = localDateStamp();
     applyTheme();
@@ -336,6 +340,8 @@
     });
     initTooltips();
     window.addEventListener('beforeunload', saveNow);
+    window.addEventListener('storage', onExternalKanbanStorage);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) checkConcurrentKanbanStorage(); });
     window.addEventListener('resize', fitProjectLabels);
     window.addEventListener('focus', () => { checkDailyMoveAfterResume(); syncAlarmFromAgent(); });
     document.addEventListener('visibilitychange', () => {
@@ -440,13 +446,16 @@
   }
 
   function loadState() {
+    let raw = null;
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      raw = localStorage.getItem(STORAGE_KEY);
+      lastPersistedRaw = raw;
       return raw ? normalizeState(JSON.parse(raw)) : createDefaultState();
     } catch (error) {
-      console.error(error);
-      setTimeout(() => showToast('Dữ liệu cũ bị lỗi, đã tạo bảng mới.'), 100);
-      return createDefaultState();
+      console.error('Dữ liệu Kanban bị lỗi, đã KHÓA GHI để bảo toàn bản gốc:', error);
+      storageProtectionReason = 'corrupt';
+      brokenStoredRaw = raw || '';
+      return createDefaultState(); // Chỉ hiển thị tạm, không được tự động ghi đè.
     }
   }
 
@@ -1413,22 +1422,114 @@
   }
 
   function saveNow() {
-    if (!state) return;
+    if (!state) return false;
     clearTimeout(saveTimer);
+    if (storageProtectionReason) {
+      refs.saveStatus.textContent = 'Tạm dừng lưu – bảo vệ dữ liệu';
+      refs.saveStatus.classList.remove('saving');
+      showStorageSafetyBanner();
+      return false;
+    }
     refs.saveStatus.textContent = 'Đang lưu…';
     refs.saveStatus.classList.add('saving');
     try {
-      localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+      const storedRaw = localStorage.getItem(STORAGE_KEY);
+      if (storedRaw !== lastPersistedRaw) {
+        storageProtectionReason = 'conflict';
+        return saveNow();
+      }
+      const nextRaw = JSON.stringify(state);
+      localStorage.setItem(STORAGE_KEY,nextRaw);
+      lastPersistedRaw = nextRaw;
+      scheduleKanbanAutoBackup(nextRaw);
       saveTimer = setTimeout(() => {
         refs.saveStatus.textContent = 'Đã lưu';
         refs.saveStatus.classList.remove('saving');
       },220);
+      return true;
     } catch (error) {
       console.error(error);
       refs.saveStatus.textContent = 'Lỗi lưu';
       refs.saveStatus.classList.remove('saving');
       showToast('Không thể lưu. Trình duyệt có thể đã hết dung lượng.');
+      return false;
     }
+  }
+
+  function onExternalKanbanStorage(event) {
+    if (event.key === STORAGE_KEY && event.newValue !== lastPersistedRaw) {
+      storageProtectionReason = 'conflict';
+      showStorageSafetyBanner();
+    }
+  }
+
+  function checkConcurrentKanbanStorage() {
+    if (storageProtectionReason) return;
+    try {
+      if (localStorage.getItem(STORAGE_KEY) !== lastPersistedRaw) {
+        storageProtectionReason = 'conflict';
+        showStorageSafetyBanner();
+      }
+    } catch(error) { console.warn(error); }
+  }
+
+  function downloadStorageSnapshot(raw, filename) {
+    const url = URL.createObjectURL(new Blob([raw],{type:'application/json;charset=utf-8'}));
+    const link = document.createElement('a');
+    link.href = url; link.download = filename;
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  function showStorageSafetyBanner() {
+    if (!storageProtectionReason || !document.body) return;
+    let banner = document.getElementById('kanbanStorageSafety');
+    if (banner) return;
+    banner = document.createElement('section');
+    banner.id = 'kanbanStorageSafety';
+    banner.setAttribute('role','alert');
+    banner.style.cssText = 'position:fixed;z-index:999999;top:8px;left:50%;transform:translateX(-50%);width:min(95vw,700px);box-sizing:border-box;background:#fff6e8;color:#502b10;border:2px solid #c87927;border-radius:12px;padding:14px;box-shadow:0 8px 30px #0003;font:14px/1.45 system-ui,sans-serif';
+    const title = document.createElement('strong');
+    title.textContent = storageProtectionReason === 'corrupt'
+      ? 'Dữ liệu Kanban không đọc được – đã chặn ghi đè'
+      : 'Có thay đổi Kanban từ tab khác – đã tạm dừng lưu';
+    const note = document.createElement('p');
+    note.textContent = storageProtectionReason === 'corrupt'
+      ? 'Bảng đang thấy là dữ liệu tạm. Hãy tải dữ liệu gốc hoặc bản sao trước khi tạo bảng mới.'
+      : 'Có nguy cơ ghi đè công việc. Hãy xuất dữ liệu của tab này rồi tải lại để nhận phiên mới.';
+    note.style.margin = '6px 0';
+    const actions = document.createElement('div');
+    actions.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px';
+    const button = (label,action) => {
+      const el = document.createElement('button');
+      el.type='button'; el.textContent=label;
+      el.style.cssText='background:white;color:#502b10;border:1px solid #ad763f;border-radius:6px;padding:7px 10px;cursor:pointer';
+      el.addEventListener('click',action); actions.appendChild(el);
+    };
+    if (storageProtectionReason === 'corrupt') {
+      button('Tải dữ liệu gốc',() => downloadStorageSnapshot(brokenStoredRaw,'kanban-du-lieu-goc-can-phuc-hoi.json'));
+      button('Tạo bảng mới',() => {
+        if (!confirm('Dữ liệu gốc sẽ bị thay thế. Anh đã tải bản gốc xuống máy chưa?')) return;
+        try {
+          const backupKey='linh_personal_kanban_corrupt_'+Date.now();
+          localStorage.setItem(backupKey,brokenStoredRaw);
+          if (localStorage.getItem(backupKey) !== brokenStoredRaw) throw Error('Không xác nhận được bản sao');
+        } catch (error) {
+          alert('Không thể tạo bản sao an toàn trong trình duyệt. Hãy tải file gốc xuống máy trước khi xử lý.');
+          return;
+        }
+        storageProtectionReason='';
+        lastPersistedRaw=localStorage.getItem(STORAGE_KEY);
+        banner.remove();
+        saveNow();
+      });
+    } else {
+      button('Tải bản của tab này',() => downloadStorageSnapshot(JSON.stringify({app:'Kanban Cá Nhân',data:state,exportedAt:nowIso()},null,2),'kanban-tab-can-doi-chieu.json'));
+      button('Tải lại phiên mới',() => location.reload());
+    }
+    button('Tải bản sao tự động',downloadLatestKanbanAutoBackup);
+    banner.append(title,note,actions);
+    document.body.appendChild(banner);
   }
 
   function readJsonPreference(key) {
@@ -1626,6 +1727,13 @@
       const available=availableImportSections(parsed,raw);
       const selected=await chooseImportSections(available);
       if(!selected.length)return;
+      if (storageProtectionReason) {
+        if (!selected.includes('projects')) {showToast('Hãy chọn nhóm Dự án khi khôi phục dữ liệu đã khóa.');return;}
+        if (!confirm('Khôi phục dữ liệu Kanban bằng bản sao vừa chọn? Bản gốc nên được tải về máy trước.')) return;
+        storageProtectionReason='';
+        lastPersistedRaw=localStorage.getItem(STORAGE_KEY);
+        document.getElementById('kanbanStorageSafety')?.remove();
+      }
       let passImported=false,passError='';
       if(selected.includes('kanpass')){
         try{passImported=await importKanPassSection(parsed.kanpass)}
@@ -1991,6 +2099,10 @@
     removeAppStorage(localStorage);
     removeAppStorage(sessionStorage);
     await removeAppCaches();
+    await clearKanbanAutoBackups();
+    storageProtectionReason = '';
+    lastPersistedRaw = localStorage.getItem(STORAGE_KEY);
+    document.getElementById('kanbanStorageSafety')?.remove();
 
     state = createDefaultState();
     refs.searchInput.value = '';
