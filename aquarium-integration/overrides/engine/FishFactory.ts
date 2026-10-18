@@ -307,7 +307,7 @@ function buildFishGeometry(sp: SpeciesDef,low=false): THREE.BufferGeometry {
       // zero, so both parts still move together without a visible slit.
       const bellyY=centerY-hh;
       const rootY=sign>0
-        ?centerY+hh-hh*.035
+        ?hh*1.12 // preserve the original dorsal fin silhouette
         :bellyY+hh*.06;
       // Real angel dorsals are asymmetric, gently serrated rays — NOT a
       // uniformly inflated triangular sail. The main lobe curves backward.
