@@ -1013,10 +1013,47 @@
   }
 
   function handleAudioError(error) {
-    if (error instanceof Event) console.warn('Trình duyệt không phát được định dạng này:', player.error);
-    else console.warn('Lỗi phát nhạc:', error);
-    refs.musicStatus.textContent = 'Không phát được tệp';
+    const reason = player.error?.code || error?.name || 'media-error';
+    logPlaybackEvent('error',String(reason));
+    refs.musicStatus.textContent = 'Không phát được bài hát.';
     updatePlaybackState();
+    scheduleMusicRecovery(String(reason),900);
+  }
+
+  function checkUnexpectedMusicPause() {
+    if (!playbackWanted || player.ended || !player.src) return;
+    const captured = playbackRequestId;
+    clearTimeout(interruptedPauseTimer);
+    interruptedPauseTimer = setTimeout(() => {
+      if (!playbackWanted || !player.paused || player.ended ||
+          captured !== playbackRequestId || !loadedTrackId ||
+          tracks[currentIndex]?.id !== loadedTrackId) return;
+      logPlaybackEvent('unexpected-pause');
+      player.play().catch(error => {
+        logPlaybackEvent('error', error?.name || 'resume-blocked');
+        if (error?.name !== 'NotAllowedError') scheduleMusicRecovery('resume-failed',800);
+      });
+    },1500);
+  }
+
+  function scheduleMusicRecovery(reason, delay=900) {
+    if (!playbackWanted || !tracks.length || recoverTimer) return;
+    const captured = playbackRequestId;
+    recoverTimer = setTimeout(() => {
+      recoverTimer = null;
+      if (!playbackWanted || captured !== playbackRequestId || (!player.paused && player.readyState>=3)) return;
+      if (++consecutivePlaybackFailures > Math.min(tracks.length,5)) {
+        playbackWanted = false;
+        refs.musicStatus.textContent = 'Nhạc tạm dừng. Nhấn Phát để nghe tiếp.';
+        logPlaybackEvent('error','retries-exhausted');
+        return;
+      }
+      const next = tracks.length>1 ? (currentIndex+1)%tracks.length : currentIndex;
+      logPlaybackEvent('skip',reason);
+      if(next===currentIndex) {
+        player.play().catch(() => {playbackWanted=false;});
+      } else playTrack(next);
+    },delay);
   }
 
   function updateControlsAvailability() {
