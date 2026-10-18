@@ -60,6 +60,11 @@ jobs:
           cp aquarium-integration/tests/food3d-smoke.mjs _aquarium-build/food3d-smoke.mjs
           cd _aquarium-build
           node food3d-smoke.mjs
+      - name: Browser surface feeding and missed fish bites
+        run: |
+          cp aquarium-integration/tests/surface-feed-missed-bites-smoke.mjs _aquarium-build/surface-feed-missed-bites-smoke.mjs
+          cd _aquarium-build
+          node surface-feed-missed-bites-smoke.mjs
       - name: Browser Free Camera and professional camera controls
         run: |
           cp aquarium-integration/tests/camera-controls-smoke.mjs _aquarium-build/camera-controls-smoke.mjs
