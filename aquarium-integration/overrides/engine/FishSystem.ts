@@ -424,6 +424,12 @@ export class FishSystem {
     vertices:p.mesh.geometry.getAttribute('position').count,
     medianStrip:p.mesh.geometry.userData.medianMembraneStrip===true,
     angelLowerFinRefined:p.mesh.geometry.userData.angelLowerFinRefined===true,
+    angelCaudalAttached:p.mesh.geometry.userData.angelCaudalAttached===true,
+    caudalAttachmentVertices:p.sp.id==='angelfish'?
+      [...Array(p.mesh.geometry.getAttribute('position').count).keys()].filter(i=>
+        p.mesh.geometry.getAttribute('aPart').getX(i)===1 &&
+        p.mesh.geometry.getAttribute('position').getX(i) > -.145 &&
+        Math.abs(p.mesh.geometry.getAttribute('position').getY(i)) < .13).length:0,
     medianTips:[...Array(p.mesh.geometry.getAttribute('aFinFlex').count).keys()]
       .filter(i=>p.mesh.geometry.getAttribute('aPart').getX(i)===2 &&
         p.mesh.geometry.getAttribute('aFinFlex').getX(i)>.95).length,
@@ -797,6 +803,27 @@ export class FishSystem {
     if(oldAgents.size===0)this.feedTimer=0;
   }
 
+  private individualSize(sp:SpeciesDef,index:number):number {
+    // Three distinguishable body sizes for big fish. A cycle through the
+    // cohorts guarantees variety even in a small school; small species keep
+    // the former ±18% distribution, and crawlers do not change scale.
+    if(sp.adultSizeIn<5 || isCrawler(sp))
+      return sp.lengthM*(.82+Math.random()*.36);
+    const idOffset=[...sp.id].reduce((sum,char)=>sum+char.charCodeAt(0),0)%3;
+    const cohort=(index+idOffset)%3;
+    const [min,max]=([[.70,.83],[.89,1.04],[1.10,1.20]] as const)[cohort];
+    return sp.lengthM*(min+Math.random()*(max-min));
+  }
+
+  getFishSizeMotionSnapshot(){
+    return this.populations.map(p=>({species:p.sp.id,adultSizeIn:p.sp.adultSizeIn,
+        fish:p.agents.filter(a=>!a.drop).map(a=>({
+          key:a.key,scale:a.scale,baseLength:a.sp.lengthM,
+          ratio:a.scale/a.sp.lengthM,mode:a.mode,
+          speed:a.vel.length(),pitch:a.prevPitch,yaw:a.prevYaw
+        }))}));
+  }
+
   private spawnAgent(sp: SpeciesDef, i: number, env: SimEnv): Agent {
     const zoneY = this.zoneBand(sp, env);
     const pos = new THREE.Vector3(
@@ -813,7 +840,7 @@ export class FishSystem {
       phase: Math.random() * TAU,
       bend: 0, flap: 0, jaw:0,jawTime:0,
       rand: Math.random(),
-      scale: sp.lengthM * (0.82 + Math.random() * 0.36),
+      scale:this.individualSize(sp,i),
       mode: 'cruise', modeT: 1 + Math.random() * 4,
       anchor: new THREE.Vector3(
         (Math.random() - 0.5) * env.halfW * 1.4,
@@ -1265,9 +1292,11 @@ export class FishSystem {
       steer.y+=Math.sin(t*.30+a.rand*24)*.075;
       steer.x+=Math.sin(t*.39+a.rand*16)*.065;
     }else if(sp.id==='discus'){
-      // A shy discus stays in midwater with gentle corrections.
-      steer.y+=Math.sin(t*.22+a.rand*19)*.035;
-      steer.z+=Math.sin(t*.26+a.rand*12)*.035;
+      // Discus glide calmly. Strong periodic vertical steering made the
+      // head nod while the body almost stopped moving.
+      steer.y+=Math.sin(t*.16+a.rand*19)*.010;
+      steer.z+=Math.sin(t*.22+a.rand*12)*.028;
+      steer.x+=Math.cos(t*.18+a.rand*15)*.026;
     }else if(sp.id==='molly'){
       // Molly: lively livebearer, frequently changing layer and heading.
       steer.y+=Math.sin(t*.60+a.rand*11)*.11;
@@ -1296,13 +1325,13 @@ export class FishSystem {
     // Visual tempo by species, separate from shared movement archetypes.
     if(sp.id==='betta')targetSpeed*=.77;
     if(sp.id==='fancy-goldfish')targetSpeed*=.78;
-    if(sp.id==='discus')targetSpeed*=.70;
+    if(sp.id==='discus')targetSpeed*=.84;
     if(sp.id==='molly')targetSpeed*=1.10;
     if(angel)targetSpeed*=1.06;
     if(sp.id==='guppy')targetSpeed*=1.08;
     if(sp.id==='ocellaris-clown')targetSpeed*=.88;
     if(sp.id==='dwarf-gourami'||sp.id==='honey-gourami')targetSpeed*=.82;
-    if (a.mode === 'rest') targetSpeed = cruise * (angel?.58:.06);
+    if (a.mode === 'rest') targetSpeed = cruise * (angel?.58:sp.id==='discus'?.46:.06);
     if(a.mode==='dart')
       targetSpeed=maxSpeed*(sp.id==='betta'?.63:sp.id==='angelfish'?.72:1);
     if(a.mode==='feed'){
@@ -1404,12 +1433,19 @@ export class FishSystem {
         } else this.newAnchorNear(a, env, 0.4);
         break;
       case 'hoverer':
-        // Angelfish hover while still moving forward with their pectorals.
-        // Six-second nearly-frozen rests looked like a stuck, twitching mesh.
-        a.mode=r<(sp.id==='angelfish'?.12:.6)?'rest':'cruise';
-        a.modeT=sp.id==='angelfish'?3+Math.random()*4:4+Math.random()*6;
-        if(a.mode==='cruise')this.newAnchorNear(a,env,.5);
-        else if(sp.id==='angelfish')a.anchor.copy(a.pos);
+        if(sp.id==='discus'){
+          // Most of the time a discus cruises between gentle targets.
+          // Short resting periods still retain visible forward movement.
+          a.mode=r<.08?'rest':'cruise';
+          a.modeT=4.5+Math.random()*5.5;
+          if(a.mode==='cruise')this.newAnchorNear(a,env,.42);
+          else a.anchor.copy(a.pos);
+        }else{
+          a.mode=r<(sp.id==='angelfish'?.12:.6)?'rest':'cruise';
+          a.modeT=sp.id==='angelfish'?3+Math.random()*4:4+Math.random()*6;
+          if(a.mode==='cruise')this.newAnchorNear(a,env,.5);
+          else if(sp.id==='angelfish')a.anchor.copy(a.pos);
+        }
         break;
       case 'ambusher':
         if (r < 0.75 * (2 - activity)) { a.mode = 'rest'; a.modeT = 6 + Math.random() * 10; this.anchorToShelter(a, env); }
@@ -1601,11 +1637,11 @@ export class FishSystem {
       const desiredYaw=aimed
         ? Math.atan2(-aim!.z,aim!.x)
         : a.peck&&a.peck.stage!=='approach'?Math.atan2(a.peck.normal.z,-a.peck.normal.x)
-          : horizontal<.0035?a.prevYaw:Math.atan2(-a.vel.z,a.vel.x);
+          : horizontal<(sp.id==='discus'?.012:.0035)?a.prevYaw:Math.atan2(-a.vel.z,a.vel.x);
       let difference=desiredYaw-a.prevYaw;
       while(difference>Math.PI)difference-=TAU;
       while(difference<-Math.PI)difference+=TAU;
-      const turnRate=sp.swim.turnRate*dt*(sp.id==='betta'?.67:sp.id==='angelfish'?.43:1);
+      const turnRate=sp.swim.turnRate*dt*(sp.id==='betta'?.67:sp.id==='angelfish'?.43:sp.id==='discus'?.65:1);
       yaw=a.prevYaw+THREE.MathUtils.clamp(difference,-turnRate,turnRate);
       pitch = Math.asin(THREE.MathUtils.clamp(speed > 1e-5 ? a.vel.y / speed : 0, -1, 1));
       if(aimed&&aim){
@@ -1613,17 +1649,22 @@ export class FishSystem {
         // Limit body tilt to avoid unrealistically piercing the water surface.
         const goalPitch=Math.atan2(aim.y,Math.hypot(aim.x,aim.z));
         pitch=THREE.MathUtils.clamp(goalPitch,-.40,
-          sp.id==='angelfish'?.32:.72);
+          sp.id==='angelfish'?.32:sp.id==='discus'?.40:.72);
         pitch=THREE.MathUtils.damp(a.prevPitch,pitch,9,dt);
       }
       // Normal swimming stays near level; an air-gulping cory points steeply.
-      const maxPitch = a.gulp||a.jump ? 1.45 : aimed ? .72 : 0.5;
+      const maxPitch = a.gulp||a.jump ? 1.45 : aimed ? (sp.id==='discus'?.40:.72) : sp.id==='discus'?.12:.5;
       if(a.peck&&a.peck.stage!=='approach')pitch=THREE.MathUtils.damp(a.prevPitch,Math.asin(-a.peck.normal.y),4,dt);
       else pitch=THREE.MathUtils.clamp(pitch,-maxPitch,
         sp.id==='angelfish'?.19:maxPitch);
       if(sp.id==='angelfish'&&!aimed){
         const desired=Math.abs(pitch)<.08?0:THREE.MathUtils.clamp(pitch,-.16,.14);
         pitch=THREE.MathUtils.damp(a.prevPitch,desired,1.35,dt);
+      }else if(sp.id==='discus'&&!aimed&&!a.peck&&!a.gulp&&!a.jump){
+        // Dead zone removes visible head ticks from small vertical velocity
+        // jitter, while feeding and real surface pecks can still tilt.
+        const desired=Math.abs(pitch)<.045?0:THREE.MathUtils.clamp(pitch,-.09,.09);
+        pitch=THREE.MathUtils.damp(a.prevPitch,desired,1.6,dt);
       }
     }
 
@@ -1634,8 +1675,9 @@ export class FishSystem {
     a.prevYaw = yaw;
     a.prevPitch = pitch;
     const targetRoll=THREE.MathUtils.clamp((-dYaw/Math.max(dt,1e-4))*
-      speed*(sp.id==='angelfish'?.55:1.4),
-      sp.id==='angelfish'?-.18:-.6,sp.id==='angelfish'?.18:.6);
+      speed*(sp.id==='angelfish'?.55:sp.id==='discus'?.55:1.4),
+      sp.id==='angelfish'?-.18:sp.id==='discus'?-.12:-.6,
+      sp.id==='angelfish'?.18:sp.id==='discus'?.12:.6);
     a.bend = THREE.MathUtils.damp(a.bend, THREE.MathUtils.clamp((dYaw / Math.max(dt, 1e-4)) * 0.5, -0.5, 0.5), 6, dt);
 
     _e.set(targetRoll * 0.6, yaw, pitch, 'YZX');

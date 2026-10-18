@@ -182,6 +182,20 @@ export class Engine {
           };
           return {decor:summarize(this.decor.group),flora:summarize(this.flora.group)};
         },
+        __kanBigFishScene:()=>{
+          if(!this.config)return false;
+          this.applyConfig({...this.config,water:'freshwater',gallons:180,
+            name:'QA large fish size and swimming',
+            fish:{angelfish:6,discus:6,guppy:6},decor:[],flora:{},
+            lighting:'daylight'},true);
+          this.setCameraMode('still');
+          return true;
+        },
+        __kanBigFishProbe:()=>({
+          fish:this.fish.getFishSizeMotionSnapshot(),
+          fins:this.fish.getFinSnapshot(),
+          physics:this.fish.getPhysicsSnapshot(this.simEnv),
+        }),
         __kan42Seams:()=>this.environment.getSealSnapshot(),
         __kan42Arrange:()=>this.fish.qaArrange(this.simEnv),
         __kan42Follow:(key:string|null)=>this.followFish(key),
