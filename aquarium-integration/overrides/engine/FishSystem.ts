@@ -104,7 +104,12 @@ interface Agent {
   jump?:{stage:'up'|'breach'|'dive'|'recover';t:number;vy:number;apex:number;willBreach:boolean;splashed?:boolean};
   nextPeck:number;
   nextJump:number;
-  hunger: number;           // >0 after feeding starts; seeks food
+  hunger: number;           // legacy temporary value, retained for compatibility
+  satiety:number;           // 100 = full, 19 or less = critically hungry
+  appetiteRate:number;      // independent satiety loss per second, active simulation only
+  nextNeedCue:number;
+  needCueUntil:number;
+  feedJoyUntil:number;
   feedDistance?: number; // current target range used for smooth approach
   feedTarget?:FoodBit;feedLastDistance?:number;feedStall?:number;
   feedAim?:THREE.Vector3; // only during active food approach; orientation tracks mouth target
@@ -303,6 +308,9 @@ export class FishSystem {
   onEcoEvent?:(event:'graze'|'rest'|'shelter'|'school')=>void;
   populations: Population[] = [];
   private feedTimer = 0;   // seconds of "the fish are hungry/excited" remaining
+  private readonly satietyKey='kan_aquarium_fish_satiety_v1';
+  private satietySignature='';
+  private satietySaveAt=0;
   private habitat = new HabitatDirector();
   private softFinsOn=true;
   private nextSurfaceDash=65;
@@ -334,6 +342,35 @@ export class FishSystem {
     const actors=this.populations.flatMap(p=>p.agents).filter(a=>this.jumpEligible(a)&&!a.jump&&!a.drop).slice(0,Math.min(3,count));
     actors.forEach((a,i)=>this.pendingDashes.push({key:a.key,at:env.time+i*.45,roll:.25,qa:true}));return actors.length;
   }
+  // Read-only positions and energy levels for small per-fish HUD overlays.
+  getSatietyDisplay(){
+    return this.populations.flatMap(p=>p.agents
+      .filter(a=>!a.sp.invert&&!isCrawler(a.sp)&&!a.drop)
+      .map(a=>({key:a.key,name:a.sp.common,pos:a.pos,scale:a.scale,
+        satiety:Math.max(0,Math.min(100,Math.round(a.satiety)))})));
+  }
+
+  saveSatietySnapshot(){
+    if(!this.satietySignature)return;
+    try{
+      const fish:Record<string,number>={};
+      for(const p of this.populations)for(const a of p.agents)
+        fish[a.key]=Math.round(Math.max(0,Math.min(100,a.satiety))*100)/100;
+      localStorage.setItem(this.satietyKey,JSON.stringify({
+        signature:this.satietySignature,fish,at:Date.now()
+      }));
+    }catch(error){console.debug('Lưu độ no cá không khả dụng',error);}
+  }
+
+  private readSatietySnapshot(signature:string):Record<string,number>{
+    try{
+      const saved=JSON.parse(localStorage.getItem(this.satietyKey)||'null');
+      if(saved?.signature!==signature||!saved.fish||typeof saved.fish!=='object')return {};
+      // No offline starvation. Returning to the hobby should always be relaxing.
+      return saved.fish as Record<string,number>;
+    }catch{return {};}
+  }
+
   getTelemetry(){return {jump:{...this.jumpStats},arrivals:this.getArrivalSnapshot(),fish:this.populations.flatMap(p=>p.agents.map(a=>({
     key:a.key,pos:a.pos.toArray(),vel:a.vel.toArray(),yaw:a.prevYaw,mode:a.mode,
     travel:a.travel,collisions:a.collisions,stuck:a.stuckTime,recoveries:a.recoveries,
@@ -661,6 +698,7 @@ export class FishSystem {
   // (Re)build all populations for a new tank config.
   rebuild(fishCounts: Record<string, number>, env: SimEnv, maxFish: number, reseed=false): void {
     if(reseed){this.food.bits.forEach(b=>this.food.eat(b));this.patchCooldown.clear();}
+    this.saveSatietySnapshot();
     const oldAgents=new Map(this.populations.flatMap(p=>p.agents.map(a=>[a.key,a] as const)));
     for (const p of this.populations) {
       this.group.remove(p.mesh);
@@ -674,6 +712,10 @@ export class FishSystem {
     const budget=Math.min(100,maxFish);
     const counts=requested>budget?normalizeStock({gallons:180,water:this.populations[0]?.sp.water??
       speciesById.get(Object.keys(fishCounts)[0])?.water??'freshwater',fish:fishCounts,fishNames:{}} as TankConfig,budget).fish:fishCounts;
+    const signature=Object.entries(counts).sort(([a],[b])=>a.localeCompare(b))
+      .map(([id,n])=>id+':'+n).join('|');
+    const storedSatiety=oldAgents.size===0&&!reseed?this.readSatietySnapshot(signature):{};
+    this.satietySignature=signature;
     const spawned:Agent[]=[];
     for (const [id, rawCount] of Object.entries(counts)) {
       const sp = speciesById.get(id);
@@ -705,6 +747,11 @@ export class FishSystem {
           agent.moveOrigin.copy(old.moveOrigin??old.pos);
           agent.jaw=old.jaw??0;agent.jawTime=old.jawTime??0;
           agent.rand=old.rand;agent.scale=old.scale;agent.hunger=old.hunger;agent.paceBias=old.paceBias??1;
+          agent.satiety=old.satiety??agent.satiety;
+          agent.appetiteRate=old.appetiteRate??agent.appetiteRate;
+          agent.nextNeedCue=old.nextNeedCue??agent.nextNeedCue;
+          agent.needCueUntil=old.needCueUntil??0;
+          agent.feedJoyUntil=old.feedJoyUntil??0;
           agent.drop=old.drop?{...old.drop}:undefined;
           agent.acceleration.copy(old.acceleration);agent.travel=old.travel;agent.collisions=old.collisions;
           agent.recoveries=old.recoveries;agent.history=[...old.history];agent.nextPeck=old.nextPeck;agent.nextJump=old.nextJump;
@@ -712,6 +759,8 @@ export class FishSystem {
           agent.peck=old.peck?{...old.peck,point:old.peck.point.clone(),normal:old.peck.normal.clone()}:undefined;
         }
         if(!old&&!reseed){
+          const remembered=Number(storedSatiety[agent.key]);
+          if(Number.isFinite(remembered))agent.satiety=THREE.MathUtils.clamp(remembered,0,100);
           const idx=this.pendingDrops.findIndex(p=>!p.speciesId||p.speciesId===sp.id);
           if(idx>=0)this.startArrival(agent,this.pendingDrops.splice(idx,1)[0],env);
         }
@@ -768,6 +817,10 @@ export class FishSystem {
       acceleration:new THREE.Vector3(),travel:0,collisions:0,recoveries:0,history:[],
       nextPeck:env.time+10+Math.random()*35,nextJump:env.time+120+Math.random()*180,
       hunger: 0,paceBias:.86+Math.random()*.30,
+      satiety:78+Math.random()*22,
+      appetiteRate:.046+Math.random()*.035,
+      nextNeedCue:env.time+9+Math.random()*20,needCueUntil:0,
+      feedJoyUntil:0,
     };
     if (isCrawler(sp)) {
       // Crawlers split between the glass and the floor ("grazing the glass").
@@ -814,6 +867,9 @@ export class FishSystem {
   update(dt: number, env: SimEnv): void {
     dt = Math.min(dt, 0.05); // clamp to avoid physics explosions on tab-return
     this.feedTimer = Math.max(0, this.feedTimer - dt);
+    if(env.time-this.satietySaveAt>=18){
+      this.satietySaveAt=env.time;this.saveSatietySnapshot();
+    }
     this.food.update(dt, env.floorY,env.surfaceY,env.foodSolidHit);
     this.updateSplashes(dt);
     if(this.pendingDrops.length)this.startWaitingArrivals(env);
@@ -841,6 +897,9 @@ export class FishSystem {
     for (const pop of this.populations) {
       const { sp, agents, mesh, dyn } = pop;
       for (const a of agents) {
+        // Simulation-time hunger only: closed/background tabs do not starve fish.
+        // No death, injury, or irreversible penalty at zero.
+        a.satiety=Math.max(0,a.satiety-dt*a.appetiteRate);
         const before=a.pos.clone();
         if (this.animateJump(a,dt,env)) {}
         else if(this.animatePeck(a,dt,env)) {}
@@ -1011,6 +1070,15 @@ export class FishSystem {
     const L = a.scale;
     a.feedDistance=undefined;
     a.feedAim=undefined;
+    // A hungry fish occasionally rises and pecks at the surface to ask for food.
+    // Bottom feeders retain their bottom-dwelling instincts.
+    const canAsk=sp.zone!=='bottom' && sp.archetype!=='bottom' && sp.archetype!=='nocturnal';
+    if(canAsk&&a.satiety<65&&this.feedTimer<=0&&!a.jump&&!a.gulp){
+      if(env.time>a.nextNeedCue){
+        a.needCueUntil=env.time+1.5+Math.random()*1.4;
+        a.nextNeedCue=env.time+13+Math.random()*17;
+      }
+    }
     a.jawTime=Math.max(0,a.jawTime-dt);
     a.jaw=THREE.MathUtils.damp(a.jaw,a.jawTime>0?1:0,a.jawTime>0?19:11,dt);
     const cruise = sp.swim.cruise * L * SPEED_SCALE * speciesPace(sp); // body-lengths/s → m/s
@@ -1090,9 +1158,20 @@ export class FishSystem {
 
     // One event at most can steer a fish through a measured corridor.
     this.habitat.steer(a,steer,dt,env);
+    if(a.needCueUntil>env.time&&this.feedTimer<=0&&a.satiety<65){
+      steer.y+=THREE.MathUtils.clamp((env.surfaceY-a.scale*.67-a.pos.y)*5,0,.95);
+      if(a.pos.y>env.surfaceY-Math.max(.045,a.scale*.95))
+        a.jawTime=Math.max(a.jawTime,.14);
+    }
+    if(a.feedJoyUntil>env.time){
+      // A gentle post-meal wiggle and small school acceleration, no teleport.
+      steer.x+=Math.sin(env.time*2.8+a.rand*17)*.13;
+      steer.z+=Math.cos(env.time*2.5+a.rand*19)*.13;
+    }
 
     // 6) Feeding overrides almost everything — fish RACE for food.
-    if(this.feedTimer>0&&this.food.active&&(a.feedCooldown??0)<=env.time){
+    if(this.feedTimer>0&&this.food.active&&(a.feedCooldown??0)<=env.time &&
+      (a.satiety<93 || (Math.floor(env.time*.7+a.rand*9)%3===0))){
       const bottomFeeder=sp.zone==='bottom';
       let target=this.food.nearest(a.pos,Math.max(.25,L*8),bottomFeeder,
         (a.feedAvoidUntil??0)>env.time?a.feedAvoid:undefined);
@@ -1138,7 +1217,11 @@ export class FishSystem {
             const forward=mouth.clone().sub(a.pos);
             this.food.miss(target,forward,env);
             a.feedAvoid=target;a.feedAvoidUntil=env.time+.42;
-          }else this.food.eat(target);
+          }else {
+            this.food.eat(target);
+            a.satiety=Math.min(100,a.satiety+(target.kind==='normal'?16:28));
+            a.feedJoyUntil=env.time+5+Math.random()*3;
+          }
           a.feedTarget=undefined;a.feedAim=undefined;a.feedStall=0;
           a.feedCooldown=env.time+.45+Math.random()*.55;
           a.jawTime=.25;
@@ -1220,6 +1303,8 @@ export class FishSystem {
       }
     }
     if (a.mode === 'forage') targetSpeed = cruise * 0.4;
+    if(a.satiety<=19&&a.mode!=='feed')targetSpeed*=.76;
+    if(a.feedJoyUntil>env.time&&a.mode!=='rest')targetSpeed*=1.12;
     // A mild, comfortable ecology subtly changes activity, never stops swimming.
     if(env.ecoMode==='natural')targetSpeed*=Math.max(.86,Math.min(1.03,env.ecoComfort??1));
     if(env.ecoMode==='natural'&&a.mode==='rest')targetSpeed*=.75;
