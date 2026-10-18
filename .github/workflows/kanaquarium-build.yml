@@ -45,6 +45,11 @@ jobs:
             sudo apt-get update -qq
             sudo apt-get install -y chromium-browser || sudo apt-get install -y chromium
           fi
+      - name: Browser large-fish collisions and cross-species spacing
+        run: |
+          cp aquarium-integration/tests/large-fish-collision-smoke.mjs _aquarium-build/large-fish-collision-smoke.mjs
+          cd _aquarium-build
+          node large-fish-collision-smoke.mjs
       - name: Browser large fish glide, individual sizes and angelfish tail
         run: |
           cp aquarium-integration/tests/large-fish-motion-size-smoke.mjs _aquarium-build/large-fish-motion-size-smoke.mjs
