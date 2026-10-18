@@ -298,7 +298,17 @@ function buildFishGeometry(sp: SpeciesDef,low=false): THREE.BufferGeometry {
     for(let j=0;j<=columns;j++){
       const t=j/columns,u=THREE.MathUtils.lerp(startU,endU,t);
       const x=.5-u*bodyLen;
-      const rootY=sign*(bodyProfile(u,sp)*(sign>0?1.12:1));
+      const hh=bodyProfile(u,sp);
+      const centerY=hh*.12*Math.sin(u*Math.PI);
+      // The body section is centred slightly ABOVE its spline. Previously
+      // the anal root used -hh, below the actual belly (centerY-hh), leaving
+      // a dark detached seam along the entire lower fin. Embed its root
+      // 6% of body half-height inside the belly; at w=0 shader flexion is
+      // zero, so both parts still move together without a visible slit.
+      const bellyY=centerY-hh;
+      const rootY=sign>0
+        ?centerY+hh-hh*.035
+        :bellyY+hh*.06;
       // Real angel dorsals are asymmetric, gently serrated rays — NOT a
       // uniformly inflated triangular sail. The main lobe curves backward.
       const arc=sp.id==='angelfish'?
@@ -397,10 +407,15 @@ function buildFishGeometry(sp: SpeciesDef,low=false): THREE.BufferGeometry {
   if(!sh.eelLike&&!sp.invert){
     const x0=.5-.39*bodyLen;
     const hh=bodyProfile(.39,sp);
+    const cy=hh*.12*Math.sin(.39*Math.PI);
+    // Pelvic roots were too far out on the lower side of the body (z=.63*width
+    // while y=-.76*height). Place each root slightly inside the curved flank;
+    // the fin fans still extend freely below the belly.
+    const pelvicY=cy-hh*.72;
     for(const side of [-1,1]){
-      const z=side*hh*sh.width*.63;
-      addFin([[x0,-hh*.76],[x0-.025,-hh*.76-.023],
-        [x0-.090,-hh*.76-.047],[x0-.055,-hh*.76-.005]],2,z,side*.12);
+      const z=side*hh*sh.width*.43;
+      addFin([[x0,pelvicY],[x0-.025,pelvicY-.023],
+        [x0-.090,pelvicY-.047],[x0-.055,pelvicY-.005]],2,z,side*.12);
     }
   }
   if(sp.id.includes('shrimp')){
