@@ -107,6 +107,7 @@ interface Agent {
   hunger: number;           // >0 after feeding starts; seeks food
   feedDistance?: number; // current target range used for smooth approach
   feedTarget?:FoodBit;feedLastDistance?:number;feedStall?:number;
+  feedAim?:THREE.Vector3; // only during active food approach; orientation tracks mouth target
   feedAvoid?:FoodBit;feedAvoidUntil?:number;feedCooldown?:number;
   paceBias:number;
   drop?:{stage:'fall'|'dive';velocityY:number;elapsed:number;targetY:number};
@@ -965,10 +966,51 @@ export class FishSystem {
     return false;
   }
 
+  // Fish meshes are built with their nose at local +X ~= 0.5 body lengths.
+  // Transform the actual rendered heading and pitch, not the fish centre:
+  // fins and back may overlap pellets but can never consume them.
+  private mouthWorldPoint(a:Agent):THREE.Vector3 {
+    const local=new THREE.Vector3(a.scale*.475,-a.scale*.018,0);
+    local.applyEuler(new THREE.Euler(0,a.prevYaw,a.prevPitch,'YZX'));
+    return local.add(a.pos);
+  }
+
+  private foodMouthReach(a:Agent):number {
+    // Small collision volume around the snout, including visible pellet radius.
+    return Math.max(.0028,Math.min(.012,a.scale*.095+.002));
+  }
+
+  // QA uses this very same predicate as the live feeding state machine.
+  private mouthTouchesFood(a:Agent,point:THREE.Vector3):boolean {
+    return this.mouthWorldPoint(a).distanceToSquared(point)<=this.foodMouthReach(a)**2;
+  }
+
+  qaFoodMouthContact(){
+    const a=this.populations.flatMap(p=>p.agents)
+      .filter(a=>!a.sp.invert&&!isCrawler(a.sp)&&!a.drop)
+      .sort((x,y)=>y.scale-x.scale)[0];
+    if(!a)return null;
+    const mouth=this.mouthWorldPoint(a);
+    const back=a.pos.clone().add(new THREE.Vector3(0,a.scale*.38,0));
+    return {
+      fish:a.key,scale:a.scale,body:a.pos.toArray(),mouth:mouth.toArray(),
+      reach:this.foodMouthReach(a),
+      mouthContact:this.mouthTouchesFood(a,mouth),
+      bodyContact:this.mouthTouchesFood(a,a.pos),
+      dorsalContact:this.mouthTouchesFood(a,back),
+      bodyToMouth:a.pos.distanceTo(mouth),
+      lastRealBite:this.lastRealBiteContact
+    };
+  }
+
+  private lastRealBiteContact: {mouthDistance:number;bodyDistance:number;reach:number;
+    floating:boolean; jaw:number} | null = null;
+
   private updateFish(a: Agent, school: Agent[], dt: number, env: SimEnv): void {
     const sp = a.sp;
     const L = a.scale;
     a.feedDistance=undefined;
+    a.feedAim=undefined;
     a.jawTime=Math.max(0,a.jawTime-dt);
     a.jaw=THREE.MathUtils.damp(a.jaw,a.jawTime>0?1:0,a.jawTime>0?19:11,dt);
     const cruise = sp.swim.cruise * L * SPEED_SCALE * speciesPace(sp); // body-lengths/s → m/s
@@ -1015,7 +1057,7 @@ export class FishSystem {
 
     // 3) Depth-band preference — a soft pull back into the species' layer.
     //    Suspended during an air-gulp run: the whole point is leaving the zone.
-    if (!a.gulp&&!this.habitat.inCorridor(a)) {
+    if (!a.gulp&&!this.habitat.inCorridor(a)&&a.feedTarget?.state!=='float') {
       const [y0, y1] = this.zoneBand(sp, env);
       if (a.pos.y < y0) steer.y += (y0 - a.pos.y) * 1.6;
       if (a.pos.y > y1) steer.y -= (a.pos.y - y1) * 1.6;
@@ -1074,28 +1116,38 @@ export class FishSystem {
         const special=target.kind!=='normal';
         _v2.copy(target.pos).sub(a.pos);
         const d = _v2.length();
-        // Food is detected locally, approached with a gradual slowdown and
-        // only swallowed when it reaches the fish's mouth region.
-        a.feedDistance=d;
-        const biteReach=target.state==='float'?L*.78+.01:L*.43+.003;
-        if(d<biteReach){
-          // ~17.5% of pellet bites miss. Food follows the snout briefly
-          // before gravity takes over; a later bite may still consume it.
+        // Approach with the snout: never count dorsal fin, tail or body
+        // overlap as an eaten pellet. Keep the exact mesh heading in sync.
+        a.feedAim=target.pos;
+        const mouth=this.mouthWorldPoint(a);
+        const mouthDistance=mouth.distanceTo(target.pos);
+        const reach=this.foodMouthReach(a);
+        a.feedDistance=mouthDistance;
+        if(mouthDistance<Math.max(reach*3,L*.85)){
+          // Open the jaw as the snout arrives, BEFORE any pellet disappears.
+          a.jawTime=Math.max(a.jawTime,.22);
+          a.mode='feed';a.modeT=Math.max(a.modeT,.35);
+        }
+        if(this.mouthTouchesFood(a,target.pos)&&a.jaw>=.22){
+          this.lastRealBiteContact={mouthDistance,bodyDistance:d,reach,
+            floating:target.state==='float',jaw:a.jaw};
+          // Keep the established 17.5% missed-bite effect, but only once
+          // the mouth really reaches the food.
           const missed=target.kind==='normal'&&(target.misses??0)<2&&Math.random()<.175;
           if(missed){
-            const forward=a.vel.lengthSq()>1e-7?a.vel:_v2;
+            const forward=mouth.clone().sub(a.pos);
             this.food.miss(target,forward,env);
             a.feedAvoid=target;a.feedAvoidUntil=env.time+.42;
           }else this.food.eat(target);
-          a.feedTarget=undefined;a.feedStall=0;a.feedCooldown=env.time+.45+Math.random()*.55;
-          a.jawTime=.24;
+          a.feedTarget=undefined;a.feedAim=undefined;a.feedStall=0;
+          a.feedCooldown=env.time+.45+Math.random()*.55;
+          a.jawTime=.25;
           a.mode='feed';a.modeT=.26;a.gulp=undefined;
         } else if(d>1e-6){
           const dir=_v2.divideScalar(d);
           const forward=a.vel.lengthSq()>1e-6?dir.dot(a.vel.clone().normalize()):1;
-          // Do not spin 180 degrees instantly for a pellet directly behind the fish.
+          // Move/turn toward the pellet until the projected mouth contacts.
           if(forward>-.65||d<L*1.8){
-            if(d<L*1.2)a.jawTime=Math.max(a.jawTime,.085);
             steer.addScaledVector(dir,special?4.1:3.4);
             a.mode='feed';a.modeT=Math.max(a.modeT,.45);
           }
@@ -1448,20 +1500,33 @@ export class FishSystem {
       const horizontal=Math.hypot(a.vel.x,a.vel.z);
       // Near-zero horizontal movement used to flip atan2 by 180° every frame
       // while the fish hovered against the glass. Hold the last stable heading.
-      const desiredYaw=a.peck&&a.peck.stage!=='approach'?Math.atan2(a.peck.normal.z,-a.peck.normal.x):horizontal<.0035?
-        a.prevYaw:Math.atan2(-a.vel.z,a.vel.x);
+      const aim=a.feedAim?.clone().sub(a.pos);
+      const aimLength=aim?.length()||0;
+      const aimed=aimLength>1e-5&&aimLength<Math.max(.10,a.scale*2.4);
+      const desiredYaw=aimed
+        ? Math.atan2(-aim!.z,aim!.x)
+        : a.peck&&a.peck.stage!=='approach'?Math.atan2(a.peck.normal.z,-a.peck.normal.x)
+          : horizontal<.0035?a.prevYaw:Math.atan2(-a.vel.z,a.vel.x);
       let difference=desiredYaw-a.prevYaw;
       while(difference>Math.PI)difference-=TAU;
       while(difference<-Math.PI)difference+=TAU;
       const turnRate=sp.swim.turnRate*dt*(sp.id==='betta'?.67:sp.id==='angelfish'?.43:1);
       yaw=a.prevYaw+THREE.MathUtils.clamp(difference,-turnRate,turnRate);
       pitch = Math.asin(THREE.MathUtils.clamp(speed > 1e-5 ? a.vel.y / speed : 0, -1, 1));
+      if(aimed&&aim){
+        // At floating pellets the fish visibly raises its snout to nibble.
+        // Limit body tilt to avoid unrealistically piercing the water surface.
+        const goalPitch=Math.atan2(aim.y,Math.hypot(aim.x,aim.z));
+        pitch=THREE.MathUtils.clamp(goalPitch,-.40,
+          sp.id==='angelfish'?.32:.72);
+        pitch=THREE.MathUtils.damp(a.prevPitch,pitch,9,dt);
+      }
       // Normal swimming stays near level; an air-gulping cory points steeply.
-      const maxPitch = a.gulp||a.jump ? 1.45 : 0.5;
+      const maxPitch = a.gulp||a.jump ? 1.45 : aimed ? .72 : 0.5;
       if(a.peck&&a.peck.stage!=='approach')pitch=THREE.MathUtils.damp(a.prevPitch,Math.asin(-a.peck.normal.y),4,dt);
       else pitch=THREE.MathUtils.clamp(pitch,-maxPitch,
         sp.id==='angelfish'?.19:maxPitch);
-      if(sp.id==='angelfish'){
+      if(sp.id==='angelfish'&&!aimed){
         const desired=Math.abs(pitch)<.08?0:THREE.MathUtils.clamp(pitch,-.16,.14);
         pitch=THREE.MathUtils.damp(a.prevPitch,desired,1.35,dt);
       }
