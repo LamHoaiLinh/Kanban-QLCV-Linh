@@ -45,6 +45,11 @@ jobs:
             sudo apt-get update -qq
             sudo apt-get install -y chromium-browser || sudo apt-get install -y chromium
           fi
+      - name: Browser large fish glide, individual sizes and angelfish tail
+        run: |
+          cp aquarium-integration/tests/large-fish-motion-size-smoke.mjs _aquarium-build/large-fish-motion-size-smoke.mjs
+          cd _aquarium-build
+          node large-fish-motion-size-smoke.mjs
       - name: Browser favorite tanks and identical layout restoration
         run: |
           cp aquarium-integration/tests/favorite-tanks-smoke.mjs _aquarium-build/favorite-tanks-smoke.mjs
