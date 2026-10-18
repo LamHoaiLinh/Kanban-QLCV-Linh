@@ -136,8 +136,8 @@ function buildFishAsset(sp: SpeciesDef): FishAsset {
   const body = new THREE.MeshStandardMaterial({
     map,
     roughness: sp.shape.eelLike ? .49 : (sp.id==='angelfish'||sp.id==='discus'||sp.adultSizeIn>=6) ? .57 : sp.id==='betta'||sp.id==='guppy'?.44:.42,
-    metalness: (sp.id==='angelfish'||sp.id==='discus'||sp.adultSizeIn>=6?.14:.34)*sp.palette.iridescence,
-    envMapIntensity: (sp.id==='angelfish'||sp.id==='discus'||sp.adultSizeIn>=6?.36:.58)+sp.palette.iridescence*.42,
+    metalness: (sp.id==='angelfish'||sp.id==='discus'||sp.adultSizeIn>=6 ? .14 : .34)*sp.palette.iridescence,
+    envMapIntensity: (sp.id==='angelfish'||sp.id==='discus'||sp.adultSizeIn>=6 ? .36 : .58)+sp.palette.iridescence*.42,
   });
   const fins = new THREE.MeshStandardMaterial({
     color: new THREE.Color(sp.palette.fin),
