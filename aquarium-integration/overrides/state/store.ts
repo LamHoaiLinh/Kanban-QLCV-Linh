@@ -46,6 +46,8 @@ export interface AppState {
   // Actions
   setConfig: (patch: Partial<TankConfig>) => void;
   setWater: (water: 'freshwater' | 'saltwater') => void;
+  restoreWaterDraft: () => void;
+  randomizeSize: (gallons:number) => void;
   setFishCount: (id: string, count: number) => void;
   setFloraCount: (id: string, count: number) => void;
   toggleDecor: (id: string) => void;
@@ -122,28 +124,33 @@ export const useStore = create<AppState>()(
         }
       },
 
-      // One virtual aquarium for each ecosystem. Never lose the previous
-      // design. On first entry, generate a planted/decorated/populated tank
-      // at the SAME gallon size; on later entries restore the saved layout.
-      // A truly empty draft left by the former version is also initialized.
-      setWater: (water) =>
-        set((s) => {
-          if (s.config.water === water) return s;
-          const waterDrafts={...s.waterDrafts,[s.config.water]:structuredClone(s.config)};
-          const previous=waterDrafts[water];
-          const emptyDraft=!previous || (
-            Object.values(previous.fish??{}).every(n=>n<=0) &&
-            Object.values(previous.flora??{}).every(n=>n<=0)
-          );
-          const config=emptyDraft
-            ?createRandomWaterTank(water,s.config.gallons)
-            :{...structuredClone(previous),gallons:s.config.gallons};
-          return {
-            waterDrafts,config,resizeSnapshot:null,
-            followFishKey:null,selectedFishKey:null,
-          };
-        }),
+      // Switching ecosystems composes a fresh, stocked aquarium at the
+      // current size, while keeping the old layout for explicit restoration.
+      setWater: (water) => set((s) => {
+        if (s.config.water === water) return s;
+        return {
+          waterDrafts:{...s.waterDrafts,[s.config.water]:structuredClone(s.config)},
+          config:createRandomWaterTank(water,s.config.gallons),
+          resizeSnapshot:null,followFishKey:null,selectedFishKey:null,
+        };
+      }),
 
+      // Restore the user's former design only when requested.
+      restoreWaterDraft: () => set((s) => {
+        const saved=s.waterDrafts[s.config.water];
+        if (!saved) return s;
+        return {config:structuredClone(saved),resizeSnapshot:null,
+          followFishKey:null,selectedFishKey:null};
+      }),
+
+      // Only explicit UI size changes create a NEW full random composition.
+      // Slider previews still use setConfig() and keep the original snapshot.
+      randomizeSize: (gallons) => set((s) => {
+        const target=Math.max(5,Math.min(180,Math.round(gallons)));
+        return {config:createRandomWaterTank(s.config.water,target),
+          resizeSnapshot:structuredClone(s.resizeSnapshot??s.config),
+          followFishKey:null,selectedFishKey:null};
+      }),
 
       setFishCount: (id, count) =>
         set((s) => {
