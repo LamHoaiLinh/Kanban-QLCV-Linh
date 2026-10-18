@@ -419,6 +419,8 @@ export class FishSystem {
   getHabitatSnapshot(env:SimEnv){return this.habitat.snapshot(env);}
   getFinSnapshot(){return this.populations.map(p=>({id:p.sp.id,
     tapered:p.mesh.geometry.userData.taperedFins===true,rootThickness:p.mesh.geometry.userData.rootThickness,
+    analRootInset:p.mesh.geometry.userData.analRootInset,
+    pelvicRootRadius:p.mesh.geometry.userData.pelvicRootRadius,
     vertices:p.mesh.geometry.getAttribute('position').count,
     medianStrip:p.mesh.geometry.userData.medianMembraneStrip===true,
     medianTips:[...Array(p.mesh.geometry.getAttribute('aFinFlex').count).keys()]
