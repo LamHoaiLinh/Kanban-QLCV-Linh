@@ -424,6 +424,12 @@ export class FishSystem {
     vertices:p.mesh.geometry.getAttribute('position').count,
     medianStrip:p.mesh.geometry.userData.medianMembraneStrip===true,
     angelLowerFinRefined:p.mesh.geometry.userData.angelLowerFinRefined===true,
+    angelCaudalAttached:p.mesh.geometry.userData.angelCaudalAttached===true,
+    caudalAttachmentVertices:p.sp.id==='angelfish'?
+      [...Array(p.mesh.geometry.getAttribute('position').count).keys()].filter(i=>
+        p.mesh.geometry.getAttribute('aPart').getX(i)===1 &&
+        p.mesh.geometry.getAttribute('position').getX(i) > -.145 &&
+        Math.abs(p.mesh.geometry.getAttribute('position').getY(i)) < .13).length:0,
     medianTips:[...Array(p.mesh.geometry.getAttribute('aFinFlex').count).keys()]
       .filter(i=>p.mesh.geometry.getAttribute('aPart').getX(i)===2 &&
         p.mesh.geometry.getAttribute('aFinFlex').getX(i)>.95).length,
@@ -809,9 +815,8 @@ export class FishSystem {
     return sp.lengthM*(min+Math.random()*(max-min));
   }
 
-  getLargeFishMotionSnapshot(){
-    return this.populations.filter(p=>p.sp.id==='discus'||p.sp.id==='angelfish'||p.sp.adultSizeIn>=5)
-      .map(p=>({species:p.sp.id,adultSizeIn:p.sp.adultSizeIn,
+  getFishSizeMotionSnapshot(){
+    return this.populations.map(p=>({species:p.sp.id,adultSizeIn:p.sp.adultSizeIn,
         fish:p.agents.filter(a=>!a.drop).map(a=>({
           key:a.key,scale:a.scale,baseLength:a.sp.lengthM,
           ratio:a.scale/a.sp.lengthM,mode:a.mode,
