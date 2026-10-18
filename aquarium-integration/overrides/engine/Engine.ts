@@ -206,6 +206,23 @@ export class Engine {
           surfaceFloat:!!bit.floatOnContact,misses:bit.misses??0,
         })),
       });
+      // QA-only helpers are excluded from ordinary Kanban sessions.
+      Object.assign(window,{
+        __kanFoodFindSurfaceTap:()=>{
+          const rect=this.renderer.domElement.getBoundingClientRect();
+          for(let iy=5;iy<=48;iy+=2)for(let ix=25;ix<=75;ix+=5){
+            const x=rect.left+rect.width*ix/100,y=rect.top+rect.height*iy/100;
+            if(this.foodAboveSurfacePoint(x,y))return {x,y,fx:ix/100,fy:iy/100};
+          }
+          return null;
+        },
+        __kanFoodForceMiss:()=>{
+          const pellet=this.fish.food.bits.find(bit=>bit.kind==='normal'&&bit.state!=='gone');
+          if(!pellet)return null;
+          this.fish.food.miss(pellet,new THREE.Vector3(1,0,.2),this.simEnv);
+          return {state:pellet.state,misses:pellet.misses,pos:pellet.pos.toArray()};
+        },
+      });
       (window as Window & {__kanFoodTestCamera?:(mode:'orbit'|'cinematic'|'still')=>void}).__kanFoodTestCamera=
         (mode)=>this.setCameraMode(mode);
       // QA-only 60-fish load, does not alter saved tanks or production store.
