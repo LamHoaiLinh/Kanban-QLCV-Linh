@@ -444,8 +444,41 @@ function buildFishGeometry(sp: SpeciesDef,low=false): THREE.BufferGeometry {
         const a=base+row*(cols+1)+j,b=a+cols+1;
         indices.push(a,b,a+1,b,b+1,a+1);
       }
+    }else if(angel){
+      // Angelfish caudal is a CONTINUOUS membrane, not a point-rooted fan
+      // stuck onto the narrow tail stem. Start a broad strip inside the
+      // actual rear body and taper smoothly through the peduncle before
+      // opening into a soft, slightly forked tail.
+      const base=positions.length/3;
+      const rows=low?9:19,cols=low?12:24;
+      const attachmentX=tailBaseX+.135;
+      const bodyU=THREE.MathUtils.clamp((.5-attachmentX)/bodyLen,0,1);
+      const attachHalfH=bodyProfile(bodyU,sp)*.53;
+      for(let i=0;i<=rows;i++){
+        const t=i/rows;
+        const x=THREE.MathUtils.lerp(attachmentX,tipX+.006,t);
+        // At the narrow peduncle the fin remains slim, then grows towards
+        // the rear edge; the first part overlaps opaque body geometry.
+        const halfH=t<.32
+          ?THREE.MathUtils.lerp(attachHalfH,.035,THREE.MathUtils.smoothstep(t,0,.32))
+          :THREE.MathUtils.lerp(.035,sh.height*.38,THREE.MathUtils.smoothstep(t,.32,1));
+        for(let j=0;j<=cols;j++){
+          const v=j/cols,edge=Math.abs(v*2-1);
+          const ptX=x+(t>.68?.010*Math.sin((t-.68)/.32*Math.PI)*edge:0);
+          const ptY=(1-2*v)*halfH*(1-.045*Math.pow(edge,4));
+          positions.push(ptX,ptY,.003*Math.sin(v*Math.PI)*Math.sin(t*Math.PI));
+          uvs.push(.88+t*.1,.12+v*.76);
+          parts.push(1);flutter.push(0);finFlex.push(t);
+          const pigment=1-.15*t;
+          colors.push(pigment,pigment*.99,pigment*.98);
+        }
+      }
+      for(let i=0;i<rows;i++)for(let j=0;j<cols;j++){
+        const a=base+i*(cols+1)+j,b=a+cols+1;
+        indices.push(a,b,a+1,b,b+1,a+1);
+      }
     }else{
-      const H=sh.height*(angel?.63:(.55+sh.tailFork*.45))*(sh.finLong?1.35:1);
+      const H=sh.height*(.55+sh.tailFork*.45)*(sh.finLong?1.35:1);
       const pts:[number,number][]=[[rootX,0]];
       const N=low?10:sh.finLong?28:16;
       for(let k=0;k<=N;k++){
@@ -580,6 +613,8 @@ function buildFishGeometry(sp: SpeciesDef,low=false): THREE.BufferGeometry {
   geo.userData.rootThickness=sh.finLong?.010:.004;
   geo.userData.analRootInset=Number.isFinite(minAnalRootInset)?minAnalRootInset:null;
   geo.userData.angelLowerFinRefined=sp.id==='angelfish';
+  geo.userData.angelCaudalAttached=sp.id==='angelfish';
+  geo.userData.angelCaudalInset=sp.id==='angelfish'?.135:0;
   geo.userData.pelvicRootRadius=maxPelvicRootRadius||null;
   return geo;
 }
