@@ -129,7 +129,7 @@ function buildFishAsset(sp: SpeciesDef): FishAsset {
     // Snails are rigid — zero amplitude keeps the shell from wobbling.
     uAmp: { value: sp.id.includes('snail') ? 0 : sp.swim.amp },
     uMode: { value: sp.swim.mode },
-    uFinSoftness: { value: sp.invert || sp.shape.eelLike ? 0 : sp.id==='angelfish' ? .085 : sp.shape.finLong ? .045 : .018 },
+    uFinSoftness: { value: sp.invert || sp.shape.eelLike ? 0 : sp.id==='angelfish' ? .085 : sp.id==='discus' ? .062 : sp.shape.finLong ? .045 : .018 },
   };
 
   const map = fishTextureWithEye(sp);
