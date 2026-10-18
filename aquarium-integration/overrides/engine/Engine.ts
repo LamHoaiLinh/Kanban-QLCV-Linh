@@ -216,6 +216,11 @@ export class Engine {
           }
           return null;
         },
+        __kanFoodStep:(seconds:number)=>{
+          const n=Math.min(400,Math.max(0,Math.ceil(seconds/.025)));
+          for(let i=0;i<n;i++)this.fish.food.update(.025,this.dims.floorY,this.dims.surfaceY,this.simEnv.foodSolidHit);
+          return this.fish.food.bits.map(bit=>({state:bit.state,y:bit.pos.y,surfaceFloat:!!bit.floatOnContact,misses:bit.misses??0}));
+        },
         __kanFoodForceMiss:()=>{
           const pellet=this.fish.food.bits.find(bit=>bit.kind==='normal'&&bit.state!=='gone');
           if(!pellet)return null;
