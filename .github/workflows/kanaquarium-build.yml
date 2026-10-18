@@ -65,6 +65,11 @@ jobs:
           cp aquarium-integration/tests/surface-feed-missed-bites-smoke.mjs _aquarium-build/surface-feed-missed-bites-smoke.mjs
           cd _aquarium-build
           node surface-feed-missed-bites-smoke.mjs
+      - name: Browser individual satiety and hover HUD
+        run: |
+          cp aquarium-integration/tests/satiety-hover-smoke.mjs _aquarium-build/satiety-hover-smoke.mjs
+          cd _aquarium-build
+          node satiety-hover-smoke.mjs
       - name: Browser Free Camera and professional camera controls
         run: |
           cp aquarium-integration/tests/camera-controls-smoke.mjs _aquarium-build/camera-controls-smoke.mjs
