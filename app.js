@@ -186,6 +186,7 @@
     refs.themeBtn.addEventListener('click', toggleTheme);
     refs.settingsBtn.addEventListener('click', openSettingsDialog);
     refs.settingsExportBtn.addEventListener('click', exportData);
+    document.getElementById('downloadAutoBackupBtn')?.addEventListener('click', downloadLatestKanbanAutoBackup);
     refs.quickCaptureDefaultColumnSelect.addEventListener('change', updateQuickCaptureDefaultColumn);
     refs.dailyMoveEnabled.addEventListener('change', toggleDailyMoveEnabled);
     refs.addDailyMoveRuleBtn.addEventListener('click', addDailyMoveRule);
@@ -1530,6 +1531,80 @@
     button('Tải bản sao tự động',downloadLatestKanbanAutoBackup);
     banner.append(title,note,actions);
     document.body.appendChild(banner);
+  }
+
+  // Bản sao local tự động: giữ tối đa 7 ngày ghi, 24 giờ/lần, không có mật khẩu KanPass.
+  let autoBackupRunning = false;
+  const AUTO_BACKUP_DB = 'linh_kanban_auto_backups_v1';
+  const AUTO_BACKUP_STORE = 'snapshots';
+  const AUTO_BACKUP_TIMESTAMP = 'linh_personal_kanban_backup_time';
+
+  function openKanbanAutoBackupDb() {
+    return new Promise((resolve,reject) => {
+      const req = indexedDB.open(AUTO_BACKUP_DB,1);
+      req.onupgradeneeded = () => {
+        if (!req.result.objectStoreNames.contains(AUTO_BACKUP_STORE))
+          req.result.createObjectStore(AUTO_BACKUP_STORE,{keyPath:'time'});
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function scheduleKanbanAutoBackup(raw) {
+    if (!raw || autoBackupRunning || !('indexedDB' in window)) return;
+    let lastTime=0;
+    try {lastTime=Number(localStorage.getItem(AUTO_BACKUP_TIMESTAMP)||0);}catch{}
+    if (Date.now()-lastTime < 24*60*60*1000) return;
+    autoBackupRunning=true;
+    let db;
+    try {
+      db=await openKanbanAutoBackupDb();
+      await new Promise((resolve,reject) => {
+        const tx=db.transaction(AUTO_BACKUP_STORE,'readwrite');
+        const store=tx.objectStore(AUTO_BACKUP_STORE);
+        const request=store.getAllKeys();
+        request.onsuccess=() => {
+          const keys=(request.result||[]).sort((a,b)=>a-b);
+          keys.slice(0,Math.max(0,keys.length-6)).forEach(k=>store.delete(k));
+          store.put({time:Date.now(),raw});
+        };
+        request.onerror=()=>reject(request.error);
+        tx.oncomplete=resolve;
+        tx.onerror=()=>reject(tx.error);
+        tx.onabort=()=>reject(tx.error);
+      });
+      try {localStorage.setItem(AUTO_BACKUP_TIMESTAMP,String(Date.now()));} catch {}
+    } catch(error){console.warn('Không tạo được snapshot tự động:',error);}
+    finally {db?.close();autoBackupRunning=false;}
+  }
+
+  async function downloadLatestKanbanAutoBackup() {
+    let db;
+    try {
+      db=await openKanbanAutoBackupDb();
+      const record=await new Promise((resolve,reject) => {
+        const tx=db.transaction(AUTO_BACKUP_STORE,'readonly');
+        const cursor=tx.objectStore(AUTO_BACKUP_STORE).openCursor(null,'prev');
+        cursor.onsuccess=()=>resolve(cursor.result?.value||null);
+        cursor.onerror=()=>reject(cursor.error);
+      });
+      if (!record) {showToast('Trình duyệt chưa có bản sao tự động.');return;}
+      downloadStorageSnapshot(record.raw,'kanban-tu-dong-'+new Date(record.time).toISOString().slice(0,10)+'.json');
+    } catch(error){console.warn(error);showToast('Không thể tải bản sao tự động.');}
+    finally {db?.close();}
+  }
+
+  async function clearKanbanAutoBackups() {
+    let db;
+    try {
+      db=await openKanbanAutoBackupDb();
+      db.close();
+      await new Promise(resolve => {
+        const req=indexedDB.deleteDatabase(AUTO_BACKUP_DB);
+        req.onsuccess=resolve;req.onerror=resolve;req.onblocked=resolve;
+      });
+    } catch(error){console.warn(error);}
   }
 
   function readJsonPreference(key) {
