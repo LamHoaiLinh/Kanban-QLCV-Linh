@@ -1061,7 +1061,8 @@ export class FishSystem {
         // Food is detected locally, approached with a gradual slowdown and
         // only swallowed when it reaches the fish's mouth region.
         a.feedDistance=d;
-        if(d<L*.43+(.003)){
+        const biteReach=target.state==='float'?L*.78+.01:L*.43+.003;
+        if(d<biteReach){
           // ~17.5% of pellet bites miss. Food follows the snout briefly
           // before gravity takes over; a later bite may still consume it.
           const missed=target.kind==='normal'&&(target.misses??0)<2&&Math.random()<.175;
