@@ -110,6 +110,9 @@ function TankTab() {
   const config = useStore((s) => s.config);
   const setConfig = useStore((s) => s.setConfig);
   const setWater = useStore((s) => s.setWater);
+  const restoreWaterDraft = useStore((s) => s.restoreWaterDraft);
+  const savedWaterDraft = useStore((s) => s.waterDrafts[s.config.water]);
+  const randomizeSize = useStore((s) => s.randomizeSize);
   const applyPreset = useStore((s) => s.applyPreset);
   const randomize = useStore((s) => s.randomize);
   const isSalt = config.water === 'saltwater';
@@ -123,8 +126,11 @@ function TankTab() {
           <button className={isSalt ? 'active' : ''} onClick={() => setWater('saltwater')}>🪸 Nước mặn</button>
         </div>
         <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: '6px 2px 0' }}>
-          Lần đầu chuyển loại nước: tự tạo hồ ngẫu nhiên cùng dung tích, đủ cá, cây hoặc san hô và trang trí. Chuyển lại: giữ nguyên bố cục đã thiết kế.
+          Chuyển loại nước sẽ tạo hồ ngẫu nhiên có cá và trang trí.
         </p>
+        {savedWaterDraft && (
+          <button className="btn" onClick={restoreWaterDraft}>↶ Lấy lại hồ cũ</button>
+        )}
       </div>
 
       <div className="section">
@@ -136,6 +142,11 @@ function TankTab() {
             value={config.gallons}
             aria-label="Dung tích của hồ cá"
             onChange={(e) => setConfig({ gallons: Number(e.target.value) })}
+            onPointerUp={(e) => randomizeSize(Number(e.currentTarget.value))}
+            onKeyUp={(e) => {
+              if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(e.key))
+                randomizeSize(Number(e.currentTarget.value));
+            }}
           />
           <span className="value">{li(config.gallons)} lít</span>
         </div>
@@ -145,7 +156,7 @@ function TankTab() {
               key={p.name}
               className={Math.abs(config.gallons - p.gallons) <= 3 ? 'active' : ''}
               title={p.blurb}
-              onClick={() => setConfig({ gallons: p.gallons })}
+              onClick={() => randomizeSize(p.gallons)}
             >
               {p.name}
             </button>
