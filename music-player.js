@@ -10,7 +10,7 @@
    */
 
   const MUSIC_STORAGE_KEY = 'linh_kanban_music_settings_v1';
-  const MUSIC_SETTINGS_VERSION = 2; // v2: mặc định phát lặp toàn bộ playlist
+  const MUSIC_SETTINGS_VERSION = 3; // v2: mặc định phát lặp toàn bộ playlist
   const MUSIC_DB_NAME = 'linh_kanban_music_db';
   const MUSIC_DB_VERSION = 1;
   const MUSIC_HANDLE_STORE = 'directoryHandles';
@@ -30,6 +30,11 @@
   let metadataGeneration = 0;
   let shuffleHistory = [];
   let toastTimer = null;
+  let playlistUpdateTimer = null;
+  let playlistVisibleLimit = 250;
+  let playbackRequestId = 0;
+  let pendingResumeSeconds = 0;
+  let lastPositionSaveAt = 0;
 
   document.addEventListener('DOMContentLoaded', initMusicPlayer);
 
@@ -75,16 +80,16 @@
     refs.musicProgress.addEventListener('input', seekTrack);
     refs.musicVolume.addEventListener('input', changeVolume);
 
-    player.addEventListener('loadedmetadata', updateProgressUi);
+    player.addEventListener('loadedmetadata', resumeSavedMusicPosition);
     player.addEventListener('durationchange', updateProgressUi);
-    player.addEventListener('timeupdate', updateProgressUi);
+    player.addEventListener('timeupdate', () => { updateProgressUi(); rememberPlaybackPosition(); });
     player.addEventListener('play', updatePlaybackState);
-    player.addEventListener('pause', updatePlaybackState);
+    player.addEventListener('pause', () => { updatePlaybackState(); rememberPlaybackPosition(true); });
     player.addEventListener('ended', handleTrackEnded);
     player.addEventListener('error', handleAudioError);
 
     document.addEventListener('keydown', handleKeyboardShortcut);
-    document.addEventListener('visibilitychange', saveMusicSettings);
+    document.addEventListener('visibilitychange', () => rememberPlaybackPosition(true));
     window.addEventListener('beforeunload', cleanupMusicPlayer);
 
     ['dragenter','dragover'].forEach(type => refs.musicPlayer.addEventListener(type, handleDragOver));
@@ -117,15 +122,28 @@
   }
 
   async function rememberAndLoadDirectory(handle) {
-    const existing = settings.recentFolders.find(item => item.name === handle.name);
-    const id = existing?.id || makeDirectoryId(handle.name);
+    // Tên thư mục không duy nhất: dùng isSameEntry để nhận biết đúng đường dẫn.
+    let id = null;
+    for (const folder of settings.recentFolders) {
+      try {
+        const oldHandle = await getDirectoryHandle(folder.id);
+        if (oldHandle?.isSameEntry && await oldHandle.isSameEntry(handle)) {
+          id = folder.id;
+          break;
+        }
+      } catch (error) { console.debug('Không so được thư mục gần đây:',error); }
+    }
+    id ||= makeDirectoryId(handle.name);
+    let persisted = false;
     try {
       await putDirectoryHandle(id, handle);
       rememberRecentFolder({ id, name: handle.name, lastUsed: Date.now() });
+      persisted = true;
     } catch (error) {
       console.warn('Không thể lưu quyền thư mục gần đây:', error);
+      showMusicToast('Thư mục chỉ mở được trong phiên này. Trình duyệt không lưu được quyền truy cập.');
     }
-    await loadTracksFromDirectoryHandle(handle, id);
+    await loadTracksFromDirectoryHandle(handle, persisted ? id : null);
   }
 
   async function loadTracksFromDirectoryHandle(handle, directoryId = null) {
@@ -181,6 +199,7 @@
       getFile: async () => file
     }));
     setTrackCollection(records, folderName, null);
+    if (records.length) showMusicToast('Trình duyệt chỉ nhớ thư mục trong phiên này. Dùng Chrome/Edge để ghi nhớ lâu dài.');
     if (!records.length) showMusicToast('Không tìm thấy tệp nhạc được hỗ trợ.');
   }
 
@@ -206,6 +225,7 @@
     tracks = nextTracks;
     currentIndex = -1;
     shuffleHistory = [];
+    playlistVisibleLimit = 250;
     currentDirectoryId = directoryId;
     currentDirectoryName = folderName || '';
     sortTracks(false);
@@ -253,11 +273,12 @@
           console.debug('Không đọc được metadata:', track.name, error);
         }
         if (generation !== metadataGeneration) return;
-        renderTrackContext();
-        renderPlaylist();
+        if (track.id === getTrackAt(currentIndex)?.id || track.id === getTrackAt(currentIndex-1)?.id || track.id === getTrackAt(currentIndex+1)?.id) renderTrackContext();
+        schedulePlaylistUpdate();
       }
     });
     await Promise.all(workers);
+    schedulePlaylistUpdate();
     if (generation === metadataGeneration && settings.sortMode === 'title-asc') sortTracks(true);
   }
 
@@ -421,6 +442,7 @@
     if (!tracks.length) return;
     const normalizedIndex = normalizeIndex(index);
     if (normalizedIndex < 0) return;
+    const requestId = ++playbackRequestId;
 
     if (rememberHistory && currentIndex >= 0 && currentIndex !== normalizedIndex) {
       shuffleHistory.push(currentIndex);
@@ -429,14 +451,19 @@
 
     currentIndex = normalizedIndex;
     const track = tracks[currentIndex];
+    const savedTime = settings.lastTrackId === track.id && settings.lastDirectoryId === currentDirectoryId
+      ? Number(settings.lastTrackTime) || 0 : 0;
     setLoadingState(`Đang mở “${track.title}”…`);
     try {
       const file = await track.getFile();
+      if (requestId !== playbackRequestId) return; // Bỏ kết quả mở file đã lỗi thời.
       releaseObjectUrl();
+      pendingResumeSeconds = savedTime;
       currentObjectUrl = URL.createObjectURL(file);
       player.src = currentObjectUrl;
       player.load();
       settings.lastTrackId = track.id;
+      settings.lastTrackTime = savedTime;
       saveMusicSettings();
       renderTrackContext();
       renderPlaylist();
@@ -545,6 +572,27 @@
     saveMusicSettings();
   }
 
+  function resumeSavedMusicPosition() {
+    const duration = player.duration;
+    if (pendingResumeSeconds > 0 && Number.isFinite(duration) && duration > 5) {
+      try {player.currentTime = Math.min(pendingResumeSeconds,Math.max(0,duration-3));}
+      catch (error) {console.debug('Không đặt được vị trí phát:',error);}
+    }
+    pendingResumeSeconds = 0;
+    updateProgressUi();
+  }
+
+  function rememberPlaybackPosition(force = false) {
+    if (!player.src || currentIndex < 0 || !tracks.length) return;
+    const now = Date.now();
+    if (!force && now-lastPositionSaveAt < 5000) return;
+    lastPositionSaveAt = now;
+    settings.lastTrackId = tracks[currentIndex].id;
+    settings.lastTrackTime = Number.isFinite(player.currentTime) ? player.currentTime : 0;
+    settings.lastDirectoryId = currentDirectoryId;
+    saveMusicSettings();
+  }
+
   function updateProgressUi() {
     const duration = Number.isFinite(player.duration) ? player.duration : 0;
     const current = Number.isFinite(player.currentTime) ? player.currentTime : 0;
@@ -586,6 +634,7 @@
 
   // ===== Danh sách bài hát đầy đủ =====
   function openPlaylistDialog() {
+    playlistVisibleLimit = 250;
     renderPlaylist();
     renderRecentFolders();
     refs.musicPlaylistDialog.showModal();
@@ -637,7 +686,8 @@
     refs.musicPlaylistEmpty.textContent = tracks.length
       ? 'Không tìm thấy bài hát phù hợp. Hãy thử từ khóa khác.'
       : 'Chưa có bài hát. Hãy chọn hoặc kéo thả một thư mục nhạc.';
-    refs.musicPlaylistList.innerHTML = visible.map(({ track, index }) => {
+    const page = visible.slice(0,playlistVisibleLimit);
+    refs.musicPlaylistList.innerHTML = page.map(({ track, index }) => {
       const active = index === currentIndex;
       const artist = track.artist ? `<span class="playlist-track-artist">${escapeHtml(track.artist)}</span>` : '';
       return `<button class="playlist-track${active ? ' active' : ''}" type="button" data-track-index="${index}">
@@ -645,9 +695,22 @@
         <span class="playlist-track-copy"><span class="playlist-track-title">${escapeHtml(track.title)}</span>${artist}<span class="playlist-track-path">${escapeHtml(track.relativePath)}</span></span>
       </button>`;
     }).join('');
+    if (visible.length > playlistVisibleLimit) {
+      const more = document.createElement('button');
+      more.type='button'; more.className='secondary-btn music-more-tracks';
+      more.dataset.musicLoadMore='true';
+      more.textContent='Hiện thêm 250 bài ('+page.length+'/'+visible.length+')';
+      refs.musicPlaylistList.appendChild(more);
+    }
+  }
+
+  function schedulePlaylistUpdate() {
+    if (!refs.musicPlaylistDialog?.open || playlistUpdateTimer) return;
+    playlistUpdateTimer = setTimeout(() => { playlistUpdateTimer = null; renderPlaylist(); }, 250);
   }
 
   function handlePlaylistSearch() {
+    playlistVisibleLimit = 250;
     const previousScrollTop = refs.musicPlaylistList.scrollTop;
     renderPlaylist();
     refs.musicPlaylistList.scrollTop = getPlaylistSearchQuery() ? 0 : previousScrollTop;
@@ -668,6 +731,7 @@
   }
 
   function handlePlaylistClick(event) {
+    if (event.target.closest('[data-music-load-more]')) { playlistVisibleLimit += 250; renderPlaylist(); return; }
     const row = event.target.closest('[data-track-index]');
     if (!row) return;
     playTrack(Number(row.dataset.trackIndex));
@@ -701,10 +765,12 @@
     refs.musicRecentName.textContent = recent.name;
     try {
       const handle = await getDirectoryHandle(recent.id);
-      if (!handle) return;
+      if (!handle) { refs.musicStatus.textContent = 'Không còn quyền truy cập. Nhấn Browse để chọn lại thư mục.'; return; }
       const permission = await queryReadPermission(handle);
       if (permission === 'granted') {
         await loadTracksFromDirectoryHandle(handle, recent.id);
+      } else {
+        refs.musicStatus.textContent = 'Đã nhớ thư mục. Nhấn “Mở lại” để xác nhận quyền đọc và tải nhạc.';
       }
     } catch (error) {
       console.debug('Không thể tự mở thư mục gần đây:', error);
@@ -839,7 +905,8 @@
   }
 
   function handleKeyboardShortcut(event) {
-    if (!event.ctrlKey || event.code !== 'Space') return;
+    if (!event.ctrlKey || event.code !== 'Space' || event.altKey || event.shiftKey) return;
+    if (event.target?.closest?.('input,textarea,select,[contenteditable], [role="textbox"]')) return;
     event.preventDefault();
     togglePlayback();
   }
@@ -874,6 +941,8 @@
   }
 
   function stopPlaybackAndReleaseUrl() {
+    playbackRequestId++;
+    pendingResumeSeconds = 0;
     player.pause();
     player.removeAttribute('src');
     player.load();
@@ -890,6 +959,7 @@
 
   function cleanupMusicPlayer() {
     settings.volume = player.volume;
+    rememberPlaybackPosition(true);
     saveMusicSettings();
     releaseObjectUrl();
   }
@@ -898,6 +968,7 @@
   function loadMusicSettings() {
     const defaults = {
       settingsVersion: MUSIC_SETTINGS_VERSION,
+      lastTrackTime: 0,
       volume: 0.72,
       shuffle: false,
       repeat: 'all',
@@ -909,9 +980,9 @@
     };
     try {
       const raw = JSON.parse(localStorage.getItem(MUSIC_STORAGE_KEY) || 'null');
-      // Nâng dữ liệu cũ lên v2: lần đầu cập nhật sẽ bật Repeat All mặc định.
+      // Dữ liệu v1 mặc định Repeat All; bản v3 lưu vị trí phát khi đóng trang.
       // Sau lần này, lựa chọn người dùng tiếp tục được lưu bình thường.
-      const isLegacySettings = Number(raw?.settingsVersion || 0) < MUSIC_SETTINGS_VERSION;
+      const isLegacySettings = Number(raw?.settingsVersion || 0) < 2;
       const repeatMode = isLegacySettings
         ? 'all'
         : (['off','all','one'].includes(raw?.repeat) ? raw.repeat : defaults.repeat);
@@ -920,6 +991,7 @@
         ...(raw || {}),
         settingsVersion: MUSIC_SETTINGS_VERSION,
         volume: clamp(Number(raw?.volume ?? defaults.volume), 0, 1),
+        lastTrackTime: clamp(Number(raw?.lastTrackTime ?? 0),0,86400),
         shuffle: Boolean(raw?.shuffle),
         repeat: repeatMode,
         sortMode: raw?.sortMode === 'title-asc' ? 'title-asc' : 'file-asc',
