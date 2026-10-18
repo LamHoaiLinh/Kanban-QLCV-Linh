@@ -342,3 +342,18 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 @media(max-width:650px){
   .kanban-camera-toggle{top:150px;left:6px;padding:7px 9px;font-size:11px}
 }
+
+/* Small per-fish satiety HUD: only hovered fish, or persistently at 0–19%.
+   The layer never steals input from feeding, camera, or fish controls. */
+.kan-fish-satiety-layer{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:12;contain:layout style}
+.kan-fish-satiety{position:absolute;left:0;top:0;width:106px;min-height:27px;box-sizing:border-box;padding:4px 6px;
+  color:#f3fff9;background:rgba(4,39,43,.82);border:1px solid rgba(194,243,226,.55);
+  border-radius:7px;box-shadow:0 2px 9px #001c2350;pointer-events:none;
+  font:600 10px/1.25 system-ui,sans-serif;text-align:center;white-space:nowrap}
+.kan-fish-satiety-name{overflow:hidden;text-overflow:ellipsis}
+.kan-fish-satiety-track{margin-top:4px;height:4px;background:rgba(255,255,255,.22);border-radius:4px;overflow:hidden}
+.kan-fish-satiety-fill{display:block;width:100%;height:100%;border-radius:4px;background:#66d8a3;transition:width .24s ease}
+.kan-fish-satiety.is-hungry .kan-fish-satiety-fill{background:#f3b04d}
+.kan-fish-satiety.is-critical{border-color:rgba(255,150,116,.85);background:rgba(65,27,25,.9)}
+.kan-fish-satiety.is-critical .kan-fish-satiety-fill{background:#ea705d}
+@media(max-width:650px){.kan-fish-satiety{width:86px;padding:3px 4px;font-size:9px}}
