@@ -350,6 +350,13 @@ export class FishSystem {
         satiety:Math.max(0,Math.min(100,Math.round(a.satiety)))})));
   }
 
+  qaSetSatiety(key:string,value:number):boolean {
+    const fish=this.findByKey(key)?.agent;
+    if(!fish)return false;
+    fish.satiety=THREE.MathUtils.clamp(value,0,100);
+    return true;
+  }
+
   saveSatietySnapshot(){
     if(!this.satietySignature)return;
     try{
