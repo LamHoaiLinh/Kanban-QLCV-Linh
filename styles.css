@@ -1996,3 +1996,19 @@ body.kalo-open{overflow:hidden!important}
 .kan-aquarium-open{overflow:hidden!important}
 @media(min-width:1250px){.desk-clock{margin-right:7px!important;min-width:310px!important;max-width:355px!important}.header-actions .office-launcher{gap:5px!important}}
 @media(max-width:700px){.office-launcher .aquarium-launch-btn{width:60px!important;min-width:60px!important;height:44px!important;min-height:44px!important}}
+
+/* Khôi phục thư mục nhạc khi Chrome cần xác nhận lại quyền đọc. */
+.music-restore-notice {
+  margin: 5px 0 7px;
+  border: 1px solid rgba(54,130,105,.34);
+  background: rgba(220,246,234,.82);
+  border-radius: 9px;
+  padding: 8px 9px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #244a3e;
+  overflow-wrap: anywhere;
+}
+.music-restore-notice[hidden], #musicChangeFolderBtn[hidden] { display: none !important; }
+.music-restore-notice strong { display: block; margin-bottom: 3px; }
+#musicBrowseBtn.music-needs-reconnect { outline: 2px solid rgba(47,141,107,.30); outline-offset: 2px; }
