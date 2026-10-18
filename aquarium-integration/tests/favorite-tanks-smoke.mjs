@@ -38,7 +38,7 @@ try {
   const field='input[aria-label="Đặt tên bể yêu thích"]';
   await page.waitForSelector(field);
   await page.click(field,{clickCount:3});
-  await page.keyboard.press('ControlOrMeta+A');
+  await page.keyboard.press('Control+A');
   await page.type(field,'Be yeu thich cua anh');
   await page.evaluate(()=>{
     const button=[...document.querySelectorAll('.panel button')].find(b=>b.textContent.includes('Lưu bể'));
