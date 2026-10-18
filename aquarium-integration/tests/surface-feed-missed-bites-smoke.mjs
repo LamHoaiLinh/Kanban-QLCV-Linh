@@ -25,6 +25,12 @@ try{
   await page.waitForFunction(()=>typeof window.__kanFoodProbe==='function'&&
     typeof window.__kanFoodFindSurfaceTap==='function',{timeout:40000});
   await new Promise(r=>setTimeout(r,900));
+  // Mouth geometry regression: the fish centre and dorsal fin must never
+  // count as a bite; only the projected snout collider may consume pellets.
+  const geometry=await page.evaluate(()=>window.__kanFoodProbe().mouthContact);
+  if(!geometry||!geometry.mouthContact||geometry.bodyContact||geometry.dorsalContact||
+     geometry.bodyToMouth<=geometry.reach)
+    throw Error('Food is still disappearing on fish body/fin overlap: '+JSON.stringify(geometry));
   // Freeze fish while checking particle lifetimes, so a fish cannot eat a
   // pellet before the test can count the surface/sinking split.
   await page.evaluate(()=>window.__kan42Pause());
