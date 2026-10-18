@@ -291,6 +291,8 @@ function buildFishGeometry(sp: SpeciesDef,low=false): THREE.BufferGeometry {
   // Long continuous membrane: every row is attached to the fish's back/
   // belly along the *whole* root, not triangulated from ONE point. The old
   // fan created a rigid, plastic-looking triangular sail, especially on angels.
+  let minAnalRootInset=Infinity;
+  let maxPelvicRootRadius=0;
   const addMedianFin = (startU:number,endU:number,sign:1|-1,rise:number) => {
     const columns=low?9:sh.finLong?22:13,rows=low?3:sh.finLong?8:5;
     const base=positions.length/3;
@@ -298,7 +300,18 @@ function buildFishGeometry(sp: SpeciesDef,low=false): THREE.BufferGeometry {
     for(let j=0;j<=columns;j++){
       const t=j/columns,u=THREE.MathUtils.lerp(startU,endU,t);
       const x=.5-u*bodyLen;
-      const rootY=sign*(bodyProfile(u,sp)*(sign>0?1.12:1));
+      const hh=bodyProfile(u,sp);
+      const centerY=hh*.12*Math.sin(u*Math.PI);
+      // The body section is centred slightly ABOVE its spline. Previously
+      // the anal root used -hh, below the actual belly (centerY-hh), leaving
+      // a dark detached seam along the entire lower fin. Embed its root
+      // 6% of body half-height inside the belly; at w=0 shader flexion is
+      // zero, so both parts still move together without a visible slit.
+      const bellyY=centerY-hh;
+      const rootY=sign>0
+        ?hh*1.12 // preserve the original dorsal fin silhouette
+        :bellyY+hh*.06;
+      if(sign<0)minAnalRootInset=Math.min(minAnalRootInset,rootY-bellyY);
       // Real angel dorsals are asymmetric, gently serrated rays — NOT a
       // uniformly inflated triangular sail. The main lobe curves backward.
       const arc=sp.id==='angelfish'?
@@ -315,8 +328,13 @@ function buildFishGeometry(sp: SpeciesDef,low=false): THREE.BufferGeometry {
         // specular lighting catches the membrane instead of a flat triangle.
         const trail=sp.id==='angelfish'?.075:sh.finLong?.060:.013;
         const px=x-trail*soft*(.55+.45*t);
+        // Reattach the lower edge WITHOUT shrinking the visible fin:
+        // the old tip used -hh as its origin. Fade the correction from
+        // zero at the embedded root to full at the free outer edge.
+        const originalAnalRoot=-hh;
+        const lowerTipCorrection=sign<0?(rootY-originalAnalRoot)*soft:0;
         const py=rootY+sign*tipHeight*w*
-          (1+.012*Math.sin(t*16*Math.PI)*w);
+          (1+.012*Math.sin(t*16*Math.PI)*w)-lowerTipCorrection;
         // Rounded membrane cross-section: a little lateral ridge along each
         // ray catches light as it folds, unlike a zero-curvature flat plate.
         const pz=(Math.sin(Math.PI*t)*(sp.id==='angelfish'?.033:.018)
@@ -397,10 +415,20 @@ function buildFishGeometry(sp: SpeciesDef,low=false): THREE.BufferGeometry {
   if(!sh.eelLike&&!sp.invert){
     const x0=.5-.39*bodyLen;
     const hh=bodyProfile(.39,sp);
+    const cy=hh*.12*Math.sin(.39*Math.PI);
+    // Pelvic roots were too far out on the lower side of the body (z=.63*width
+    // while y=-.76*height). Place each root slightly inside the curved flank;
+    // the fin fans still extend freely below the belly.
+    const pelvicY=cy-hh*.72;
     for(const side of [-1,1]){
-      const z=side*hh*sh.width*.63;
-      addFin([[x0,-hh*.76],[x0-.025,-hh*.76-.023],
-        [x0-.090,-hh*.76-.047],[x0-.055,-hh*.76-.005]],2,z,side*.12);
+      const z=side*hh*sh.width*.43;
+      const bodyHalfWidth=hh*sh.width*(1-.07*Math.cos(.39*Math.PI*2));
+      // Normalized ellipse score <1 confirms the pelvic fin root is inside
+      // the solid flank rather than floating beside the fish.
+      const radial=(pelvicY-cy)**2/(hh*hh)+(z/bodyHalfWidth)**2;
+      maxPelvicRootRadius=Math.max(maxPelvicRootRadius,radial);
+      addFin([[x0,pelvicY],[x0-.025,pelvicY-.023],
+        [x0-.090,pelvicY-.047],[x0-.055,pelvicY-.005]],2,z,side*.12);
     }
   }
   if(sp.id.includes('shrimp')){
@@ -462,6 +490,8 @@ function buildFishGeometry(sp: SpeciesDef,low=false): THREE.BufferGeometry {
   geo.userData.lod=low?'low':'full';
   geo.userData.taperedFins=true;
   geo.userData.rootThickness=sh.finLong?.010:.004;
+  geo.userData.analRootInset=Number.isFinite(minAnalRootInset)?minAnalRootInset:null;
+  geo.userData.pelvicRootRadius=maxPelvicRootRadius||null;
   return geo;
 }
 
