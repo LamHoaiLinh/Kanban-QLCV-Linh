@@ -466,6 +466,17 @@ export class Engine {
 
     if (structureChanged) {
       this.lastStructureKey = structureKey;
+      // Deterministic hardscape/flora composition: a saved layout recreates
+      // identical rock/wood/plant placement on every visit, even after restart.
+      // Names, animation time and fish swimming positions do not affect layout.
+      const stableLayout=JSON.stringify([config.water,config.gallons,
+        config.substrate,config.background,config.decor,config.flora]);
+      let seed=2166136261;
+      for(let i=0;i<stableLayout.length;i++){
+        seed=Math.imul(seed^stableLayout.charCodeAt(i),16777619)>>>0;
+      }
+      this.decor.setLayoutSeed(seed^0x1a28a);
+      this.flora.setLayoutSeed(seed^0x2b517);
       const d = tankDims(config.gallons);
       this.dims = {
         halfW: d.width / 2,
