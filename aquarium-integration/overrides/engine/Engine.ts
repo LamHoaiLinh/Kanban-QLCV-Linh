@@ -66,6 +66,11 @@ export class Engine {
   // DOM overlay tied to 3D food positions: guaranteed legibility independent
   // of transparent water, frustum culling, camera zoom and postprocessing.
   private foodLayer:HTMLDivElement|null=null;
+  private satietyLayer:HTMLDivElement|null=null;
+  private satietyElements=new Map<string,HTMLDivElement>();
+  private hoveringFishKeys=new Set<string>();
+  private satietyHudTimer=0;
+  private lastSatietyHoverAt=0;
   private foodElements=new Map<object,HTMLDivElement>();
   // Depth-correct projection: only opaque rock, wood and plant polygons are
   // tested (not glass/water). Cached so raycasting does not stall 3D rendering.
@@ -110,6 +115,12 @@ export class Engine {
       container.appendChild(layer);
       this.foodLayer=layer;
     }
+    const satietyLayer=document.createElement('div');
+    satietyLayer.className='kan-fish-satiety-layer';
+    satietyLayer.id='kan-fish-satiety-layer';
+    satietyLayer.setAttribute('aria-label','Độ no của cá');
+    container.appendChild(satietyLayer);
+    this.satietyLayer=satietyLayer;
 
     // Image-based lighting from a neutral procedural "room" — gives PBR
     // materials something real to reflect without shipping an HDRI file.
@@ -196,6 +207,8 @@ export class Engine {
         lastFeedOrigin:this.lastFeedOrigin,
         lastSurfaceSplit:this.lastSurfaceSplit,
         biteStats:{attempts:this.fish.food.biteAttempts,misses:this.fish.food.missedBites},
+        satiety:this.fish.getSatietyDisplay().map(f=>({key:f.key,satiety:f.satiety})),
+        satietyBars:[...this.satietyElements].map(([key,node])=>({key,satiety:node.dataset.satiety})),
         mouthContact:this.fish.qaFoodMouthContact(),
         lastScreen:this.lastFoodSpawn?(()=>{
           const point=this.lastFoodSpawn.clone().project(this.rig.camera);
@@ -206,6 +219,22 @@ export class Engine {
           pos:bit.pos.toArray(),kind:bit.kind,state:bit.state,age:bit.age,
           surfaceFloat:!!bit.floatOnContact,misses:bit.misses??0,
         })),
+      });
+      Object.assign(window,{
+        __kanSatietySet:(key:string,value:number)=>{
+          const ok=this.fish.qaSetSatiety(key,value);
+          if(ok)this.syncSatietyHud();
+          return ok;
+        },
+        __kanSatietyHover:(keys:string[])=>{
+          this.hoveringFishKeys=new Set(keys);
+          this.syncSatietyHud();
+        },
+        __kanSatietyPick:(x:number,y:number)=>{
+          this.onSatietyPointerMove({clientX:x,clientY:y,pointerType:'mouse',buttons:0} as PointerEvent);
+          this.syncSatietyHud();
+          return [...this.hoveringFishKeys];
+        }
       });
       // QA-only helpers are excluded from ordinary Kanban sessions.
       Object.assign(window,{
@@ -298,6 +327,8 @@ export class Engine {
       this.renderer.domElement.addEventListener('contextmenu',this.onRightClick);
     }
 
+    this.renderer.domElement.addEventListener('pointermove',this.onSatietyPointerMove,{passive:true});
+    this.renderer.domElement.addEventListener('pointerleave',this.onSatietyPointerLeave);
     this.renderer.setAnimationLoop(this.tick);
   }
 
@@ -307,6 +338,13 @@ export class Engine {
     window.removeEventListener('resize', this.applySize);
     document.removeEventListener('visibilitychange', this.onVisibility);
     this.renderer.domElement.removeEventListener('pointerup', this.onClick);
+    this.renderer.domElement.removeEventListener('pointermove',this.onSatietyPointerMove);
+    this.renderer.domElement.removeEventListener('pointerleave',this.onSatietyPointerLeave);
+    this.fish.saveSatietySnapshot();
+    this.satietyElements.forEach(el=>el.remove());
+    this.satietyElements.clear();
+    this.satietyLayer?.remove();
+    this.satietyLayer=null;
     this.renderer.domElement.removeEventListener('pointerdown',this.rememberPointer);
     this.renderer.domElement.removeEventListener('contextmenu',this.onRightClick);
     this.rig.dispose();
@@ -623,6 +661,84 @@ export class Engine {
     );
   }
 
+  private onSatietyPointerMove=(e:PointerEvent):void=>{
+    if(e.pointerType==='touch'||e.buttons||this.disposed)return;
+    const now=performance.now();
+    if(now-this.lastSatietyHoverAt<65)return;
+    this.lastSatietyHoverAt=now;
+    this.raycaster.setFromCamera(this.toNdc(e.clientX,e.clientY),this.rig.camera);
+    // Raycast every instance intersection, not only the nearest fish.
+    // Fish behind another fish on the same viewing line retain their HUD.
+    const hits=this.raycaster.intersectObjects(this.fish.populations.map(p=>p.mesh),false);
+    const next=new Set<string>();
+    for(const hit of hits){
+      if(hit.instanceId===undefined)continue;
+      const id=hit.object.userData.speciesId as string;
+      const fish=this.fish.agentAt(id,hit.instanceId);
+      if(fish&&!fish.sp.invert)next.add(fish.key);
+    }
+    this.hoveringFishKeys=next;
+    this.satietyHudTimer=0;
+  };
+
+  private onSatietyPointerLeave=():void=>{
+    this.hoveringFishKeys.clear();
+    this.satietyHudTimer=0;
+  };
+
+  private syncSatietyHud():void{
+    if(!this.satietyLayer)return;
+    const rect=this.renderer.domElement.getBoundingClientRect();
+    if(!rect.width||!rect.height)return;
+    const fish=this.fish.getSatietyDisplay();
+    const shown=fish.filter(f=>this.hoveringFishKeys.has(f.key)||f.satiety<=19);
+    const alive=new Set<string>();
+    const occupied=new Map<string,number>();
+    const camera=this.rig.camera;
+    for(const fish of shown){
+      const projected=fish.pos.clone()
+        .add(new THREE.Vector3(0,Math.max(.015,fish.scale*.55),0))
+        .project(camera);
+      if(projected.z< -1||projected.z>1)continue;
+      let x=(projected.x+1)*.5*rect.width;
+      let y=(1-projected.y)*.5*rect.height;
+      if(x<0||x>rect.width||y<0||y>rect.height)continue;
+      // Several fish overlapping on the same viewing line: keep ALL bars,
+      // stacked slightly apart instead of discarding deeper ray hits.
+      const cell=Math.round(x/80)+':'+Math.round(y/48);
+      const offset=occupied.get(cell)||0;
+      occupied.set(cell,offset+1);
+      x=THREE.MathUtils.clamp(x,60,Math.max(60,rect.width-60));
+      y=THREE.MathUtils.clamp(y-15-offset*22,12,Math.max(12,rect.height-17));
+      let el=this.satietyElements.get(fish.key);
+      if(!el){
+        el=document.createElement('div');
+        el.className='kan-fish-satiety';
+        el.dataset.fishKey=fish.key;
+        const name=document.createElement('div');
+        name.className='kan-fish-satiety-name';
+        const meter=document.createElement('div');
+        meter.className='kan-fish-satiety-track';
+        const fill=document.createElement('span');
+        fill.className='kan-fish-satiety-fill';
+        meter.appendChild(fill);
+        el.append(name,meter);
+        this.satietyLayer.appendChild(el);
+        this.satietyElements.set(fish.key,el);
+      }
+      el.dataset.satiety=String(fish.satiety);
+      el.classList.toggle('is-critical',fish.satiety<=19);
+      el.classList.toggle('is-hungry',fish.satiety<=45&&fish.satiety>19);
+      el.querySelector('.kan-fish-satiety-name')!.textContent=fish.name+' · '+fish.satiety+'%';
+      (el.querySelector('.kan-fish-satiety-fill') as HTMLSpanElement).style.width=fish.satiety+'%';
+      el.style.transform='translate3d('+x.toFixed(1)+'px,'+y.toFixed(1)+'px,0) translate(-50%,-100%)';
+      alive.add(fish.key);
+    }
+    for(const [key,el] of this.satietyElements){
+      if(!alive.has(key)){el.remove();this.satietyElements.delete(key);}
+    }
+  }
+
   private rememberPointer=(e:PointerEvent):void=>{this.pointerDown={x:e.clientX,y:e.clientY}};
   private onRightClick=(e:MouseEvent):void=>{if(!this.kanAquariumMode)return;e.preventDefault();if(e.shiftKey)this.callbacks.onRemoveFish?.();else this.callbacks.onAddFish?.(e.clientX,e.clientY)};
   private onClick = (e: PointerEvent): void => {
@@ -825,6 +941,11 @@ export class Engine {
     this.environment.update(this.dayFactor, this.rig.camera);
     this.rig.observe(this.fish.getLiveEvents(this.simEnv),this.simEnv.obstacles);
     this.rig.update(dt);
+    this.satietyHudTimer-=dt;
+    if(this.satietyHudTimer<=0){
+      this.syncSatietyHud();
+      this.satietyHudTimer=.10;
+    }
     this.lodIn-=dt;if(this.lodIn<=0){this.lodIn=.5;this.fish.updateLod(this.rig.camera,this.container.clientHeight);}
     this.syncFoodLayer();
 
