@@ -1123,7 +1123,10 @@ class Overlay:
             edge_score=ImageStat.Stat(edge_diff,mask).mean[0]
             return gray_score*.75+edge_score*.25,info
 
-        step=max(1,h//360)
+        # So khớp từng pixel theo trục dọc. Bước nhảy 2-5px cũ dễ bỏ lỡ
+        # nghiệm thật (nhất là Explorer: mỗi hàng gần giống hàng kế bên),
+        # rồi chọn nhầm đoạn khác hoặc kết luận không có overlap.
+        step=1
         candidates=[]
         for overlap in range(min_overlap,max_overlap+1,step):
             result=measure(overlap)
@@ -1155,14 +1158,23 @@ class Overlay:
         from PIL import Image
         if not frames:raise ValueError('Chưa có đoạn nào để ghép.')
         out=frames[0].convert('RGB')
+        last_raw=out
         for current in frames[1:]:
             cur=current.convert('RGB')
             if cur.width!=out.width:
-                width=min(cur.width,out.width); out=out.crop((0,0,width,out.height)); cur=cur.crop((0,0,width,cur.height))
-            overlap=self.find_vertical_overlap(out,cur)
+                width=min(cur.width,out.width)
+                out=out.crop((0,0,width,out.height))
+                last_raw=last_raw.crop((0,0,width,last_raw.height))
+                cur=cur.crop((0,0,width,cur.height))
+            # Luôn so hai khung chụp GỐC liên tiếp. So với ảnh đã ghép làm
+            # mất header/footer cố định ở phần đuôi, khiến thuật toán đánh
+            # giá sai và ghép nguyên khung mới (lặp dữ liệu).
+            overlap=self.find_vertical_overlap(last_raw,cur)
+            last_raw=cur
             piece=cur.crop((0,overlap,cur.width,cur.height)) if overlap>0 else cur
             if piece.height<=0:continue
-            merged=Image.new('RGB',(out.width,out.height+piece.height),'white'); merged.paste(out,(0,0)); merged.paste(piece,(0,out.height)); out=merged
+            merged=Image.new('RGB',(out.width,out.height+piece.height),'white')
+            merged.paste(out,(0,0)); merged.paste(piece,(0,out.height)); out=merged
         return out
 
     def long_output_preview(self):
