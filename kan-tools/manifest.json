@@ -15,7 +15,7 @@
       ]
     },
     "capture": {
-      "version": "6.2.3",
+      "version": "6.2.4",
       "source": "capture-agent/capture_agent.py",
       "kanpassSource": "capture-agent/kanpass.py",
       "webBridgeSource": "capture-agent/kanpass_webbridge.py"
