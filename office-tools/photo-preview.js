@@ -1,6 +1,6 @@
 import {DEFAULT_EDITS,applyAdjustments,hasAdjustments} from './photo-filters.js?v=1.0.0';
 import {deformAt} from './photo-warp.js?v=1.0.0';
-import {applyMasked,createMask,stamp,variantsFrom,recipeFrom} from './photo-local.js?v=1.0.0';
+import {applyMasked,createMask,stamp,variantsFrom,recipeFrom} from './photo-local.js?v=1.0.1';
 import {runPhotoModel} from './photo-ai.js?v=1.0.0';
 /*
  KAN PHOTO preview/editor — all pixels modified in-browser, original never edited.
