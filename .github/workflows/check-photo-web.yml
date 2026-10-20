@@ -4,10 +4,13 @@ on:
     paths:
       - 'office-tools/photo-studio.js'
       - 'office-tools/photo-preview.js'
+      - 'office-tools/photo-local.js'
+      - 'office-tools/photo-ai.js'
       - 'office-tools/photo-filters.js'
       - 'office-tools/photo-warp.js'
       - 'office-tools/photo-preview.css'
       - 'tests/photo-web-smoke.mjs'
+      - 'tests/photo-batch-smoke.mjs'
       - 'office-tools/photo-studio.css'
       - 'office-tools/office-tools.js'
       - '.github/workflows/check-photo-web.yml'
@@ -26,6 +29,8 @@ jobs:
         run: |
           node --check office-tools/photo-studio.js
           node --check office-tools/photo-preview.js
+          node --check office-tools/photo-local.js
+          node --check office-tools/photo-ai.js
           node --check office-tools/photo-filters.js
           node --check office-tools/photo-warp.js
           node --check office-tools/office-tools.js
@@ -55,3 +60,4 @@ jobs:
           python3 -m http.server 8766 --bind 127.0.0.1 > /tmp/kanphoto-http.log 2>&1 &
           sleep 2
           node tests/photo-web-smoke.mjs
+          node tests/photo-batch-smoke.mjs
