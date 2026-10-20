@@ -191,11 +191,12 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
     '<div id="kpeTextFields"></div><p class="kpe-tip">Nhập chữ có dấu, chọn màu và cỡ chữ, bấm trực tiếp lên ảnh để đặt vị trí.</p>';
  }
  function endTool(){
+  loupePoint=null;
   tool=tab==='shape'?'warp':(editScope==='local'&&['basic','hsl','detail'].includes(tab)?'mask':'view');crop=null;quad=null;textPoint=null;brushPoint=null;
   action('apply').hidden=true;action('cancel').hidden=true;draw();
  }
  function switchTab(name){
-  if(busy)return;tab=name;endTool();renderPanel();
+  if(busy)return;tab=name;endTool();renderPanel();previewDirty=true;
   say(tab==='shape'?'Kéo trên ảnh bên phải để chỉnh dáng; giữ Space + chuột trái để kéo ảnh.':'Hai ảnh zoom và kéo đồng bộ; chỉ ảnh bên phải được chỉnh.');
  }
  function chooseMode(m){
@@ -247,7 +248,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
    const baseBlob=await snapshot(working,'image/png');
    const maskBlob=editScope==='local'?await snapshot(localMask,'image/png'):null;
    await onSaved(output,{baseBlob,maskBlob,settings:structuredClone(settings),scope:editScope});
-   dirty=false;undo=[];say('Đã lưu. Đóng Preview rồi bấm Tải tất cả.');}
+   dirty=false;undo=[];redo=[];clearTimeout(draftTimer);say('Đã lưu. Đóng Preview rồi bấm Tải tất cả.');}
   catch(e){say('Không lưu được: '+e.message);}finally{busy=false;}
  }
  async function loadPrevious(){
@@ -260,16 +261,23 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
    working=toCanvas(bitmap);bitmap.close();settings=old.state?.settings?structuredClone(old.state.settings):DEFAULT_EDITS();
    editScope=old.state?.scope||'global';localMask=createMask(working.width,working.height);
    if(old.state?.maskBlob){const image=await createImageBitmap(old.state.maskBlob);localMask.getContext('2d').drawImage(image,0,0);image.close();}
-   undo=[];renderDirty=true;dirty=false;endTool();renderPanel();fit();say('Đã khôi phục bản lưu trước.');
+   undo=[];redo=[];renderDirty=true;previewDirty=true;dirty=false;endTool();renderPanel();fit();say('Đã khôi phục bản lưu trước.');
   }catch(error){say('Không khôi phục được bản lưu trước: '+error.message);}finally{busy=false;}
  }
  async function restore(){
   if(busy)return;busy=true;
-  try{working=toCanvas(original);settings=DEFAULT_EDITS();editScope='global';localMask=createMask(working.width,working.height);renderDirty=true;await onReset?.();dirty=false;undo=[];endTool();renderPanel();fit();say('Đã khôi phục về ảnh gốc.');}
+  try{working=toCanvas(original);settings=DEFAULT_EDITS();editScope='global';localMask=createMask(working.width,working.height);renderDirty=true;previewDirty=true;await onReset?.();dirty=false;undo=[];redo=[];clearTimeout(draftTimer);endTool();renderPanel();fit();say('Đã khôi phục về ảnh gốc.');}
   catch(e){say('Lỗi khôi phục: '+e.message);}finally{busy=false;}
  }
- function close(){if(busy)return;if(dirty&&!window.confirm('Bạn có thay đổi chưa lưu. Bỏ những thay đổi này?'))return;modal.close();}
- function escape(){if(busy)return;if(['crop','perspective','text'].includes(tool)){endTool();return;}if(!isFit()){fit();return;}close();}
+ async function close(){
+  if(busy)return;
+  if(mobile&&dirty&&onAutoDraft){
+    clearTimeout(draftTimer);await draftNow();
+    if(draftWarning&&!window.confirm('Chưa tự giữ được bản nháp. Đóng và bỏ thay đổi chưa lưu?'))return;
+  }else if(dirty&&!window.confirm('Bạn có thay đổi chưa lưu. Bỏ những thay đổi này?'))return;
+  modal.close();
+ }
+ function escape(){if(busy)return;if(['crop','perspective','text'].includes(tool)){endTool();return;}if(!isFit()){fit();return;}void close();}
  let spaceDown=false;
  function pointerDown(e,i){
   if(e.button!==0||busy)return;
@@ -335,9 +343,10 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
   if(btn.dataset.paint){paintMode=btn.dataset.paint;renderPanel();return;}
   if(btn.dataset.mode){chooseMode(btn.dataset.mode);return;}
   const a=btn.dataset.click;
-  if(a==='close')close();if(a==='fit')fit();
+  if(a==='close')void close();if(a==='fit')fit();
   if(a==='pixel'){zoom=limit(1/Math.min(fitSide(0),fitSide(1)),.1,256);panX=panY=0;draw();}
-  if(a==='undo'){if(!undo.length){say('Không có thao tác để hoàn tác');return;}const old=undo.pop();working=old.image;settings=old.settings;editScope=old.scope;localMask=old.mask;changed();renderPanel();endTool();fit();}
+  if(a==='undo'){if(!undo.length){say('Không có thao tác để hoàn tác');return;}redo.push(takeState());const old=undo.pop();useState(old);}
+  if(a==='redo'){if(!redo.length){say('Không có thao tác để làm lại');return;}undo.push(takeState());const next=redo.pop();useState(next);}
   if(a==='restore')void restore();if(a==='previous')void loadPrevious();if(a==='save')void save();if(a==='apply')void applyMode();if(a==='cancel')endTool();
   if(['rotateL','rotateR','flipH','flipV'].includes(a))rotate(a);
   if(a==='resetHsl'){makeUndo();settings.hsl[color]={h:0,s:0,l:0};changed();renderPanel();draw();}
@@ -409,6 +418,8 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
  modal.addEventListener('cancel',e=>{e.preventDefault();escape();});
  const observer=new ResizeObserver(draw);observer.observe(by('.kpe-panes'));
  by('#kpeFilename').textContent=file.name+' · chỉnh trực tiếp trên ảnh kết quả';
- modal.addEventListener('close',()=>{observer.disconnect();clearTimeout(repaintTimer);original.close?.();result.close?.();modal.remove();});
+ modal.addEventListener('close',()=>{closed=true;observer.disconnect();clearTimeout(repaintTimer);clearTimeout(draftTimer);document.removeEventListener('visibilitychange',saveOnHide);original.close?.();result.close?.();modal.remove();});
+ const saveOnHide=()=>{if(mobile&&document.visibilityState==='hidden'&&dirty)void draftNow();};
+ if(mobile)document.addEventListener('visibilitychange',saveOnHide);
  renderPanel();modal.showModal();requestAnimationFrame(draw);
 }
