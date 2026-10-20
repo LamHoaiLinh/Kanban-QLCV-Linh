@@ -1,3 +1,4 @@
+import {openPhotoPreview} from './photo-preview.js?v=1.0.0';
 /*
  * KAN PHOTO — batch browser image enhancement. No upload endpoint, no executable.
  * Pose model provides coordinates/segmentation only; code performs pixel edits.
@@ -24,7 +25,7 @@ function addFiles(files){
    const key=file.name+'|'+file.size+'|'+file.lastModified;
    if(seen.has(key))continue;
    seen.add(key);
-   ITEMS.push({file,status:'Chờ xử lý',blob:null,note:'',url:null});
+   ITEMS.push({file,status:'Chờ xử lý',blob:null,editedBlob:null,dirty:false,note:'',url:null});
  }
  if(!ITEMS.length){show('Chọn ảnh JPG, PNG hoặc WebP.');return;}
  renderList();renderPreview(selected);
@@ -38,12 +39,19 @@ function renderList(){
  host.querySelector('#kanPhotoCount').textContent=ITEMS.length+' ảnh';
  host.querySelector('#kanPhotoRun').disabled=processing||!ITEMS.length;
  host.querySelector('#kanPhotoClear').disabled=processing||!ITEMS.length;
+ host.querySelector('#kanPhotoDownload').disabled=processing||!ITEMS.some(x=>x.blob&&!x.dirty);
+ const preview=ITEMS[selected]?.blob&&!processing;
+ for(const id of ['kanPhotoPreviewA','kanPhotoPreviewB']){const button=host.querySelector('#'+id);if(button)button.disabled=!preview;}
+}
+function markNeedsProcess(){
+ for(const item of ITEMS)if(item.blob){item.dirty=true;item.status='Đã đổi thiết lập – cần xử lý lại';}
+ renderList();if(ITEMS[selected])show('Đã đổi tùy chọn. Bấm Xử lý tất cả để cập nhật kết quả trước khi tải.');
 }
 function showUrl(el,item,after){
  if(!el)return;
  if(el.dataset.imageUrl){URL.revokeObjectURL(el.dataset.imageUrl);delete el.dataset.imageUrl;}
  el.removeAttribute('src');
- const blob=after?item.blob:item.file;
+ const blob=after?(item.editedBlob||item.blob):item.file;
  if(!blob)return;
  const url=URL.createObjectURL(blob);el.dataset.imageUrl=url;el.src=url;
 }
@@ -209,52 +217,86 @@ function saveLocal(blob,name){
 }
 async function run(){
  if(processing||!ITEMS.length)return;
- processing=true;renderList();const runBtn=host.querySelector('#kanPhotoRun'),clearBtn=host.querySelector('#kanPhotoClear');
- runBtn.disabled=true;clearBtn.disabled=true;
- api.startBusy('Đang xử lý ảnh…');let done=0,failed=0;const outputs=[];const usedNames=new Map();
+ processing=true;renderList();api.startBusy('Đang xử lý tất cả ảnh…');
+ let done=0,failed=0;
  try{
    for(let i=0;i<ITEMS.length;i++){
-     api.assertNotAborted();const item=ITEMS[i];item.status='Đang xử lý';selected=i;renderList();
+     api.assertNotAborted();
+     const item=ITEMS[i];item.status='Đang xử lý';selected=i;renderList();
      try{
-       const result=await processImage(item,(s,note)=>{show('Ảnh '+(i+1)+'/'+ITEMS.length+': '+note,Math.round(((i+s/7)/ITEMS.length)*85));});
-       item.blob=result.blob;item.note=result.note;item.status='Hoàn thành';const baseName=filename(item.file.name),n=(usedNames.get(baseName)||0)+1;usedNames.set(baseName,n);const uniqueName=n===1?baseName:baseName.replace(/(\.[^.]+)$/, '_'+n+'$1');outputs.push({blob:item.blob,name:uniqueName});
+       const result=await processImage(item,(step,label)=>{
+         show('Ảnh '+(i+1)+'/'+ITEMS.length+': '+label,Math.round(((i+step/7)/ITEMS.length)*100));
+       });
+       item.blob=result.blob;item.editedBlob=null;item.dirty=false;
+       item.note=result.note;item.status='Đã xử lý – sẵn sàng xem trước';
        done++;renderPreview(i);
-     }catch(e){item.status='Lỗi: '+(e.message||e);item.note=item.status;failed++;}
+     }catch(error){item.status='Lỗi: '+(error.message||error);item.note=item.status;item.dirty=true;failed++;}
      renderList();await pause();
    }
-   if(!outputs.length)throw Error('Không xử lý được ảnh nào.');
-   show('Đang chuẩn bị tải kết quả...',90);
+   show('Đã xử lý '+done+'/'+ITEMS.length+' ảnh'+(failed?' · '+failed+' ảnh lỗi':'')+'. Bạn có thể Preview, chỉnh lại rồi tải.',100);
+ }catch(error){show(error.name==='AbortError'?'Đã hủy tác vụ. Ảnh đã hoàn thành vẫn được giữ.':'Có lỗi: '+(error.message||error));}
+ finally{processing=false;api.endBusy('Đã kết thúc xử lý. Ảnh còn trong bộ nhớ trình duyệt.');renderList();}
+}
+async function downloadResults(){
+ if(processing)return;
+ const ready=ITEMS.filter(item=>item.blob&&!item.dirty);
+ if(!ready.length){show('Chưa có ảnh mới đã xử lý. Hãy bấm Xử lý tất cả trước.');return;}
+ const used=new Map(),outputs=ready.map(item=>{
+   const name=filename(item.file.name),index=(used.get(name)||0)+1;used.set(name,index);
+   return {blob:item.editedBlob||item.blob,name:index===1?name:name.replace(/(\.[^.]+)$/, '_'+index+'$1')};
+ });
+ processing=true;renderList();
+ try{
    if(outputs.length===1)saveLocal(outputs[0].blob,outputs[0].name);
-   else await api.downloadZip(outputs,'KAN_PHOTO_KET_QUA.zip');
-   show('Hoàn tất '+done+'/'+ITEMS.length+' ảnh'+(failed?' · '+failed+' ảnh lỗi':'')+'.',100);
- }catch(e){show(e.name==='AbortError'?'Đã hủy xử lý. Ảnh gốc không thay đổi.':'Có lỗi: '+(e.message||e));}
- finally{processing=false;api.endBusy('Đã kết thúc xử lý ảnh.');renderList();}
+   else {api.startBusy('Đang đóng gói '+outputs.length+' ảnh đã có sẵn…');await api.downloadZip(outputs,'KAN_PHOTO_KET_QUA.zip');api.endBusy('Đã tải kết quả.');}
+   show('Đã chuẩn bị tải '+outputs.length+' ảnh từ kết quả đã lưu. Không xử lý lại.',100);
+ }catch(error){api.endBusy('Tải ảnh thất bại.');show('Lỗi tải ảnh: '+(error.message||error));}
+ finally{processing=false;renderList();}
+}
+async function showLargePreview(){
+ const item=ITEMS[selected];
+ if(!item?.blob){show('Hãy bấm Xử lý tất cả trước khi mở Preview.');return;}
+ try{
+   await openPhotoPreview({
+     file:item.file,blob:item.editedBlob||item.blob,type:outputType(item.file.name),
+     onSaved:async result=>{
+       item.editedBlob=result;item.status='Đã lưu chỉnh sửa Preview';item.note='Đã chỉnh thêm trong Preview. '+(item.note||'');
+       renderList();renderPreview(selected);
+     },
+     onReset:async ()=>{
+       item.editedBlob=null;item.status='Đã khôi phục kết quả xử lý';
+       renderList();renderPreview(selected);
+     }
+   });
+ }catch(error){show('Không mở được Preview: '+(error.message||error));}
 }
 export function renderPhotoStudioTool(container,helpers){
  host=container;api=helpers;
  if(!document.getElementById('kan-photo-css')){
-   const link=document.createElement('link');link.id='kan-photo-css';link.rel='stylesheet';link.href=new URL('./photo-studio.css?v=1.0.0',import.meta.url).href;document.head.appendChild(link);
+   const link=document.createElement('link');link.id='kan-photo-css';link.rel='stylesheet';link.href=new URL('./photo-studio.css?v=1.1.0',import.meta.url).href;document.head.appendChild(link);
  }
  host.innerHTML='<section class="office-tool-panel active kphoto"><div class="office-tool-head"><div><h3>KAN PHOTO – Chỉnh ảnh nhanh</h3><p>Thêm ảnh → Xử lý tất cả → Tải kết quả. Không cần cài phần mềm.</p></div></div>'+
  '<div id="kanPhotoDrop" class="kphoto-drop" tabindex="0" role="button"><strong>＋ Kéo ảnh vào đây hoặc bấm để chọn</strong><span>JPG · PNG · WebP · Chọn nhiều ảnh cùng lúc</span><input type="file" multiple accept="image/jpeg,image/png,image/webp" hidden></div>'+
  '<div class="kphoto-head"><strong id="kanPhotoCount">0 ảnh</strong><button id="kanPhotoClear" class="office-btn" type="button">Xóa danh sách</button></div><div id="kanPhotoList" class="kphoto-list"></div>'+
- '<div class="kphoto-view"><div><b>Ảnh gốc</b><img id="kanPhotoBefore" alt="Ảnh gốc"></div><div><b>Ảnh kết quả</b><img id="kanPhotoAfter" alt="Ảnh sau xử lý"></div></div><p id="kanPhotoDetail" class="office-card-note">Xem ảnh trước và sau ngay tại đây.</p>'+
+ '<div class="kphoto-view"><div><div class="kphoto-view-title"><b>Ảnh gốc</b><button type="button" class="office-btn" id="kanPhotoPreviewA">PREVIEW ↗</button></div><img id="kanPhotoBefore" alt="Ảnh gốc"></div><div><div class="kphoto-view-title"><b>Ảnh kết quả</b><button type="button" class="office-btn" id="kanPhotoPreviewB">PREVIEW ↗</button></div><img id="kanPhotoAfter" alt="Ảnh sau xử lý"></div></div><p id="kanPhotoDetail" class="office-card-note">Xem ảnh trước và sau ngay tại đây.</p>'+
  '<div class="office-card"><h4>Tùy chọn xử lý</h4><p class="office-card-note">Đã bật sẵn chế độ mạnh phù hợp từng ảnh. Bạn có thể bỏ tick chức năng không muốn.</p><div class="kphoto-checks">'+
  checkNames.map(([key,title])=>'<label><input type="checkbox" data-kphoto="'+key+'"'+(cfg[key]?' checked':'')+'> '+title+'</label>').join('')+
  '</div><div class="kphoto-pair"><label>Thon eo <input type="range" min="0" max="100" data-kphoto-range="waistLevel" value="'+cfg.waistLevel+'"><output data-kphoto-val="waistLevel">'+cfg.waistLevel+'%</output></label><label>Thon bắp tay <input type="range" min="0" max="100" data-kphoto-range="armLevel" value="'+cfg.armLevel+'"><output data-kphoto-val="armLevel">'+cfg.armLevel+'%</output></label></div>'+
  '<details class="kphoto-advanced"><summary>Chỉnh thêm nếu cần</summary><div class="kphoto-pair">'+
  [['extraSharp','Làm nét thêm'],['extraNoise','Giảm hạt thêm'],['extraLight','Sáng hơn']].map(([key,title])=>'<label>'+title+' <input type="range" min="0" max="100" value="'+cfg[key]+'" data-kphoto-range="'+key+'"><output data-kphoto-val="'+key+'">'+cfg[key]+'%</output></label>').join('')+
  '</div></details><p class="office-card-note">Ảnh có nhiều người, thiếu vùng eo/tay hoặc không nhận diện đủ rõ sẽ không tự chỉnh vóc dáng. Mức 68% là mức điều khiển, không phải thu nhỏ 68% cơ thể.</p></div>'+
- '<div class="kphoto-actions"><progress id="kanPhotoProgress" max="100" value="0"></progress><span id="kanPhotoMessage">Sẵn sàng.</span><button id="kanPhotoRun" class="office-btn primary" type="button">XỬ LÝ TẤT CẢ &amp; TẢI KẾT QUẢ</button></div></section>';
+ '<div class="kphoto-actions"><progress id="kanPhotoProgress" max="100" value="0"></progress><span id="kanPhotoMessage">Sẵn sàng.</span><div class="kphoto-main-buttons"><button id="kanPhotoRun" class="office-btn primary" type="button">XỬ LÝ TẤT CẢ</button><button id="kanPhotoDownload" class="office-btn" type="button">TẢI TẤT CẢ</button></div></div></section>';
  const drop=host.querySelector('#kanPhotoDrop'),picker=drop.querySelector('input');
  drop.addEventListener('click',()=>picker.click());drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();picker.click();}});
  picker.addEventListener('change',e=>{addFiles([...e.target.files]);picker.value='';});
  drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('hover');});
  drop.addEventListener('dragleave',()=>drop.classList.remove('hover'));
  drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('hover');addFiles([...e.dataTransfer.files]);});
- host.querySelectorAll('[data-kphoto]').forEach(input=>input.addEventListener('change',()=>{cfg[input.dataset.kphoto]=input.checked;}));
- host.querySelectorAll('[data-kphoto-range]').forEach(input=>input.addEventListener('input',()=>{const key=input.dataset.kphotoRange;cfg[key]=+input.value;host.querySelector('[data-kphoto-val="'+key+'"]').textContent=input.value+'%';}));
+ host.querySelectorAll('[data-kphoto]').forEach(input=>input.addEventListener('change',()=>{cfg[input.dataset.kphoto]=input.checked;markNeedsProcess();}));
+ host.querySelectorAll('[data-kphoto-range]').forEach(input=>input.addEventListener('input',()=>{const key=input.dataset.kphotoRange;cfg[key]=+input.value;host.querySelector('[data-kphoto-val="'+key+'"]').textContent=input.value+'%';markNeedsProcess();}));
  host.querySelector('#kanPhotoClear').onclick=()=>{if(processing)return;ITEMS.length=0;selected=0;renderList();renderPreview(0);show('Đã xóa danh sách.');};
  host.querySelector('#kanPhotoRun').onclick=()=>void run();
+ host.querySelector('#kanPhotoDownload').onclick=()=>void downloadResults();
+ for(const id of ['kanPhotoPreviewA','kanPhotoPreviewB'])host.querySelector('#'+id).onclick=()=>void showLargePreview();
  renderList();renderPreview(selected);
 }
