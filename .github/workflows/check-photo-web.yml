@@ -3,6 +3,9 @@ on:
   push:
     paths:
       - 'office-tools/photo-studio.js'
+      - 'office-tools/photo-preview.js'
+      - 'office-tools/photo-preview.css'
+      - 'office-tools/photo-studio.css'
       - 'office-tools/office-tools.js'
       - '.github/workflows/check-photo-web.yml'
   workflow_dispatch:
@@ -19,9 +22,14 @@ jobs:
       - name: Check JavaScript syntax
         run: |
           node --check office-tools/photo-studio.js
+          node --check office-tools/photo-preview.js
           node --check office-tools/office-tools.js
       - name: Assert menu integration
         run: |
           grep -q 'data-office-nav' office-tools/office-tools.js
           grep -q 'renderPhotoStudioTool' office-tools/office-tools.js
           grep -q 'XỬ LÝ TẤT CẢ' office-tools/photo-studio.js
+          grep -q 'kanPhotoDownload' office-tools/photo-studio.js
+          grep -q 'openPhotoPreview' office-tools/photo-studio.js
+          grep -q 'correctPerspective' office-tools/photo-preview.js
+          grep -q 'kpe-modal' office-tools/photo-preview.css
