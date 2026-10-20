@@ -48,7 +48,7 @@ async function correctPerspective(src,q,progress){
 export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBatch,onLoadPrevious,onAutoDraft,editState=null}){
  if(!document.getElementById('kan-photo-preview-style')){
   const st=document.createElement('link');st.id='kan-photo-preview-style';st.rel='stylesheet';
-  st.href=new URL('./photo-preview.css?v=4.0.0',import.meta.url).href;document.head.appendChild(st);
+  st.href=new URL('./photo-preview.css?v=4.0.1',import.meta.url).href;document.head.appendChild(st);
  }
  const original=await createImageBitmap(file),result=await createImageBitmap(editState?.baseBlob||blob||file);
  const phoneScreen=()=>globalThis.matchMedia?.('(pointer: coarse)').matches && Math.min(globalThis.screen.width,globalThis.screen.height)<=680;
