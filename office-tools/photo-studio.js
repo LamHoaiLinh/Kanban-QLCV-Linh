@@ -1,6 +1,8 @@
 /* KAN PHOTO Studio: simple local image library. All editing lives in Preview. */
 import {openPhotoPreview} from './photo-preview.js?v=3.0.1';
 import {applyAdjustments} from './photo-filters.js?v=1.0.0';
+import {loadPhotoDraft,savePhotoDraft,removePhotoDraft} from './photo-drafts.js?v=1.0.0';
+const onPhone=()=>globalThis.matchMedia?.('(pointer: coarse)').matches && Math.min(screen.width,screen.height)<=680;
 const ITEMS=[];
 let selected=0,host=null,api=null,opening=false,downloading=false;
 const matches=name=>/\.(jpe?g|png|webp)$/i.test(name);
@@ -16,7 +18,9 @@ function addFiles(files){
   if(!matches(file.name))continue;
   const key=file.name+'|'+file.size+'|'+file.lastModified;
   if(seen.has(key))continue;
-  seen.add(key);ITEMS.push({file,blob:null,editState:null,history:[],status:'Chưa chỉnh'});added++;
+  seen.add(key);const item={file,blob:null,editState:null,history:[],status:'Chưa chỉnh',draftChecked:false,hasDraft:false};
+  ITEMS.push(item);added++;
+  if(onPhone())loadPhotoDraft(file).then(saved=>{if(saved){item.hasDraft=true;item.status=saved.dirty?'Có bản nháp – mở Preview để tiếp tục':'Có bản đã lưu – mở Preview để khôi phục';renderList();}}).catch(()=>{});
  }
  renderList();renderImages();
  show('Đã nạp '+added+' ảnh mới. Chọn ảnh rồi bấm MỞ PREVIEW để chỉnh.');
@@ -49,8 +53,23 @@ async function preview(){
  const item=ITEMS[selected];if(!item||opening)return;
  opening=true;renderList();
  try{
+  if(onPhone()&&!item.draftChecked){
+   item.draftChecked=true;
+   const saved=await loadPhotoDraft(item.file).catch(()=>null);
+   if(saved&&window.confirm('Tìm thấy bản chỉnh sửa lưu trên máy. Bạn muốn tiếp tục chỉnh bản này?')){
+     item.editState={baseBlob:saved.baseBlob,maskBlob:saved.maskBlob,settings:saved.settings,scope:saved.scope};
+     item.blob=saved.outputBlob||null;item.status=saved.dirty?'Đang tiếp tục bản nháp':'Đã phục hồi ảnh đã lưu';
+     renderList();renderImages();
+   }
+  }
   await openPhotoPreview({
    file:item.file,blob:item.blob||item.file,type:typeFor(item.file.name),editState:item.editState,
+   onAutoDraft:async draft=>{
+     await savePhotoDraft(item.file,draft);
+     item.editState={baseBlob:draft.baseBlob,maskBlob:draft.maskBlob,settings:draft.settings,scope:draft.scope};
+     item.hasDraft=true;item.status='Đã tự lưu nháp (chưa xuất)';
+     renderList();
+   },
    onLoadPrevious:async ()=>{
     const old=item.history.pop();if(!old)return null;
     item.blob=old.blob;item.editState=old.state;item.status='Đã khôi phục bản lưu trước';renderList();renderImages();
@@ -82,10 +101,15 @@ async function preview(){
    },
    onSaved:async (blob,state)=>{
     if(item.blob){item.history.push({blob:item.blob,state:item.editState});if(item.history.length>3)item.history.shift();}
-    item.blob=blob;item.editState=state;item.status='Đã lưu chỉnh sửa';renderList();renderImages();
+    item.blob=blob;item.editState=state;item.status='Đã lưu chỉnh sửa';
+    if(onPhone()){
+      try{await savePhotoDraft(item.file,{...state,outputBlob:blob,dirty:false});item.hasDraft=true;}
+      catch(error){show('Ảnh đã lưu để tải, nhưng bản nháp không được giữ qua lần tải lại: '+error.message);}
+    }
+    renderList();renderImages();
     show('Đã lưu '+item.file.name+'. Có thể bấm TẢI TẤT CẢ hoặc tiếp tục chỉnh ảnh khác.');
    },
-   onReset:async ()=>{if(item.blob){item.history.push({blob:item.blob,state:item.editState});if(item.history.length>3)item.history.shift();}item.blob=null;item.editState=null;item.status='Đã khôi phục ảnh gốc';renderList();renderImages();}
+   onReset:async ()=>{if(item.blob){item.history.push({blob:item.blob,state:item.editState});if(item.history.length>3)item.history.shift();}item.blob=null;item.editState=null;item.hasDraft=false;item.status='Đã khôi phục ảnh gốc';renderList();renderImages();if(onPhone())await removePhotoDraft(item.file).catch(()=>{});}
   });
  }catch(error){show('Không mở được Preview: '+(error.message||error));}
  finally{opening=false;renderList();}
@@ -131,7 +155,10 @@ export function renderPhotoStudioTool(container,helpers){
  drop.addEventListener('dragleave',()=>drop.classList.remove('hover'));
  drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('hover');addFiles([...e.dataTransfer.files]);});
  picker.onchange=e=>{addFiles([...e.target.files]);picker.value='';};
- host.querySelector('#kanPhotoClear').onclick=()=>{ITEMS.length=0;selected=0;renderList();renderImages();show('Đã xóa danh sách.');};
+ host.querySelector('#kanPhotoClear').onclick=()=>{
+  // Clear active session only. Persisted drafts intentionally remain until user restores or resets.
+  ITEMS.length=0;selected=0;renderList();renderImages();show('Đã xóa danh sách trong phiên. Bản nháp trên điện thoại vẫn được giữ.');
+ };
  host.querySelector('#kanPhotoOpen').onclick=()=>void preview();
  host.querySelectorAll('.kphoto-preview-launch').forEach(btn=>btn.onclick=()=>void preview());
  host.querySelector('#kanPhotoDownload').onclick=()=>void download();
