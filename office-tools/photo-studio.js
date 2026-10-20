@@ -7,7 +7,7 @@ const SUPPORTED=/\.(jpe?g|png|webp)$/i;
 const ITEMS=[];
 const DEFAULTS=Object.freeze({denoise:true,deblock:true,lighting:true,color:true,clarity:true,upscale:true,rescue:true,waist:true,arms:true,waistLevel:68,armLevel:68,extraSharp:0,extraNoise:0,extraLight:0});
 let cfg={...DEFAULTS},poseLandmarker=null,posePromise=null,selected=0,processing=false,previewUrl=null;
-let host=null,api=null;
+let host=null,api=null,poseUnavailable=false;
 const checkNames=[['denoise','Giảm hạt nhiễu'],['deblock','Giảm vỡ ảnh'],['lighting','Tăng sáng tự nhiên'],['color','Cân bằng màu'],['clarity','Làm rõ nét'],['upscale','Tăng độ phân giải khi ảnh nhỏ'],['rescue','Cứu ảnh yếu'],['waist','Thon eo'],['arms','Thon bắp tay']];
 const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
 const pause=()=>new Promise(resolve=>setTimeout(resolve,0));
@@ -50,18 +50,19 @@ function showUrl(el,item,after){
 function renderPreview(index){
  const item=ITEMS[index];if(!host)return;
  const a=host.querySelector('#kanPhotoBefore'),b=host.querySelector('#kanPhotoAfter');
- if(!item){a.removeAttribute('src');b.removeAttribute('src');return;}
+ if(!item){for(const el of [a,b]){if(el.dataset.imageUrl){URL.revokeObjectURL(el.dataset.imageUrl);delete el.dataset.imageUrl;}el.removeAttribute('src');}return;}
  showUrl(a,item,false);showUrl(b,item,true);
  host.querySelector('#kanPhotoDetail').textContent=item.note||'Ảnh sẽ được xem tại đây sau khi xử lý.';
 }
 async function getLandmarker(){
  if(poseLandmarker)return poseLandmarker;
+ if(poseUnavailable)throw Error('Không có bộ nhận diện cơ thể trong phiên trình duyệt này.');
  if(!posePromise)posePromise=(async()=>{
    // Models are fetched automatically; users never install anything.
    const vision=await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/+esm');
    const fs=await vision.FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.22/wasm');
    return vision.PoseLandmarker.createFromOptions(fs,{baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',delegate:'CPU'},runningMode:'IMAGE',numPoses:2,outputSegmentationMasks:true,minPoseDetectionConfidence:0.60,minPosePresenceConfidence:0.60,minTrackingConfidence:0.55});
- })().then(x=>{poseLandmarker=x;return x;}).catch(err=>{posePromise=null;throw err;});
+ })().then(x=>{poseLandmarker=x;return x;}).catch(err=>{poseUnavailable=true;posePromise=null;throw err;});
  return posePromise;
 }
 function inspect(image,w,h){
@@ -199,6 +200,7 @@ async function processImage(item,step){
    step(6,'Đang lưu kết quả');await pause();
    const type=outputType(item.file.name);
    const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error('Không xuất được ảnh.')),type,.94));
+   if(blob.type && blob.type!==type)throw Error('Trình duyệt không hỗ trợ xuất định dạng gốc '+type+'.');
    return {blob,note:notes.join(' · ')+(down<1?' · đã giảm cỡ ảnh rất lớn để tránh hết bộ nhớ':'')};
  }finally{bitmap.close?.();}
 }
