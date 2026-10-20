@@ -108,3 +108,10 @@
 .kpe-is-mobile .kpe-loupe{top:26px;right:10px;width:130px;height:130px}
 @media(max-width:375px){.kpe-is-mobile .kpe-top button[data-click="fit"]{display:none}.kpe-is-mobile .kpe-top button{min-width:40px;padding:4px}.kpe-is-mobile .kpe-tabs button{min-width:65px}}
 @media(max-height:560px){.kpe-is-mobile .kpe-sidebar{min-height:145px}.kpe-is-mobile .kpe-top{min-height:41px}.kpe-is-mobile .kpe-bottom{padding:3px 7px}}
+
+/* Touch-friendly numeric input and reset for sliders. */
+.kpe-slider .kpe-reset-slider{display:none}
+.kpe-is-mobile .kpe-slider{grid-template-columns:minmax(0,1fr) 48px 36px}
+.kpe-is-mobile .kpe-slider input{grid-column:1/4}
+.kpe-is-mobile .kpe-slider output{grid-column:2;grid-row:1;cursor:pointer;padding:4px;border-radius:5px;background:#375e44}
+.kpe-is-mobile .kpe-slider .kpe-reset-slider{display:block;grid-column:3;grid-row:1;min-width:34px;min-height:34px;padding:3px;font-size:20px}
