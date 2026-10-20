@@ -1,5 +1,5 @@
 /* KAN PHOTO Studio: simple local image library. All editing lives in Preview. */
-import {openPhotoPreview} from './photo-preview.js?v=3.0.1';
+import {openPhotoPreview} from './photo-preview.js?v=4.0.0';
 import {applyAdjustments} from './photo-filters.js?v=1.0.0';
 import {loadPhotoDraft,savePhotoDraft,removePhotoDraft} from './photo-drafts.js?v=1.0.0';
 const onPhone=()=>globalThis.matchMedia?.('(pointer: coarse)').matches && Math.min(screen.width,screen.height)<=680;
@@ -137,7 +137,7 @@ export function renderPhotoStudioTool(container,helpers){
  host=container;api=helpers;
  if(!document.getElementById('kan-photo-css')){
   const link=document.createElement('link');link.id='kan-photo-css';link.rel='stylesheet';
-  link.href=new URL('./photo-studio.css?v=2.0.0',import.meta.url).href;document.head.appendChild(link);
+  link.href=new URL('./photo-studio.css?v=2.1.0',import.meta.url).href;document.head.appendChild(link);
  }
  host.innerHTML='<section class="office-tool-panel active kphoto">'+
   '<div class="office-tool-head"><div><h3>KAN PHOTO – Chỉnh ảnh trực tiếp</h3><p>Nạp ảnh → Mở Preview → Chỉnh trong 6 tab → Lưu → Tải.</p></div></div>'+
