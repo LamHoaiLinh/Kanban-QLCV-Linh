@@ -45,10 +45,10 @@ async function correctPerspective(src,q,progress){
  ctx.putImageData(im,0,0);progress(100);return out;
 }
 
-export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBatch,editState=null}){
+export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBatch,onLoadPrevious,editState=null}){
  if(!document.getElementById('kan-photo-preview-style')){
   const st=document.createElement('link');st.id='kan-photo-preview-style';st.rel='stylesheet';
-  st.href=new URL('./photo-preview.css?v=2.0.0',import.meta.url).href;document.head.appendChild(st);
+  st.href=new URL('./photo-preview.css?v=3.0.0',import.meta.url).href;document.head.appendChild(st);
  }
  const original=await createImageBitmap(file),result=await createImageBitmap(editState?.baseBlob||blob||file);
  let working=toCanvas(result),settings=editState?.settings?structuredClone(editState.settings):DEFAULT_EDITS(),rendered=null,renderDirty=true;
@@ -65,7 +65,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
  const pigments=['#e85050','#ed9652','#d9c64c','#53b35c','#55c1be','#537ac7','#9c72cc','#cd69aa'];
  const modal=document.createElement('dialog');modal.className='kpe-modal';
  modal.innerHTML='<div class="kpe-shell">'+
-  '<header class="kpe-top"><div><strong>KAN PHOTO · CHỈNH ẢNH</strong><small id="kpeFilename"></small></div><span id="kpeZoom">100%</span><button data-click="fit">Vừa khung</button><button data-click="pixel">100%</button><button data-click="undo">↩ Hoàn tác</button><button data-click="restore">Đặt lại</button><button data-click="close">×</button></header>'+
+  '<header class="kpe-top"><div><strong>KAN PHOTO · CHỈNH ẢNH</strong><small id="kpeFilename"></small></div><span id="kpeZoom">100%</span><button data-click="fit">Vừa khung</button><button data-click="pixel">100%</button><button data-click="undo">↩ Hoàn tác</button><button data-click="previous">Bản lưu trước</button><button data-click="restore">Đặt lại</button><button data-click="close">×</button></header>'+
   '<div class="kpe-workspace"><div class="kpe-panes"><section class="kpe-side"><b>ẢNH GỐC</b><canvas data-pane="0"></canvas></section><section class="kpe-side"><b>ẢNH ĐANG CHỈNH</b><canvas data-pane="1"></canvas></section></div>'+
   '<aside class="kpe-sidebar"><nav class="kpe-tabs" aria-label="Nhóm công cụ"><button data-tab="shape">Vóc dáng</button><button data-tab="basic">Ánh sáng</button><button data-tab="hsl">HSL</button><button data-tab="detail">Chi tiết</button><button data-tab="geometry">Hình học</button><button data-tab="text">Chữ</button></nav><div class="kpe-controls" id="kpeControls"></div></aside></div>'+
   '<footer class="kpe-bottom"><span id="kpeHint">Vóc dáng: kéo mép eo hoặc cánh tay vào trong trên ảnh phải. Giữ Space + kéo để di chuyển ảnh.</span><button data-click="cancel" hidden>Hủy chỉnh</button><button data-click="apply" hidden>Áp dụng</button><button data-click="save" class="kpe-green">Lưu chỉnh sửa</button><button data-click="close">Đóng</button></footer></div>';
@@ -196,6 +196,19 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
    dirty=false;undo=[];say('Đã lưu. Đóng Preview rồi bấm Tải tất cả.');}
   catch(e){say('Không lưu được: '+e.message);}finally{busy=false;}
  }
+ async function loadPrevious(){
+  if(busy||!onLoadPrevious)return;
+  if(!window.confirm('Khôi phục phiên bản đã lưu trước? Chỉnh sửa chưa lưu sẽ bị bỏ.'))return;
+  busy=true;
+  try{
+   const old=await onLoadPrevious();if(!old){say('Chưa có bản lưu trước.');return;}
+   const bitmap=await createImageBitmap(old.state?.baseBlob||old.blob);
+   working=toCanvas(bitmap);bitmap.close();settings=old.state?.settings?structuredClone(old.state.settings):DEFAULT_EDITS();
+   editScope=old.state?.scope||'global';localMask=createMask(working.width,working.height);
+   if(old.state?.maskBlob){const image=await createImageBitmap(old.state.maskBlob);localMask.getContext('2d').drawImage(image,0,0);image.close();}
+   undo=[];renderDirty=true;dirty=false;endTool();renderPanel();fit();say('Đã khôi phục bản lưu trước.');
+  }catch(error){say('Không khôi phục được bản lưu trước: '+error.message);}finally{busy=false;}
+ }
  async function restore(){
   if(busy)return;busy=true;
   try{working=toCanvas(original);settings=DEFAULT_EDITS();editScope='global';localMask=createMask(working.width,working.height);renderDirty=true;await onReset?.();dirty=false;undo=[];endTool();renderPanel();fit();say('Đã khôi phục về ảnh gốc.');}
@@ -271,7 +284,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
   if(a==='close')close();if(a==='fit')fit();
   if(a==='pixel'){zoom=limit(1/Math.min(fitSide(0),fitSide(1)),.1,256);panX=panY=0;draw();}
   if(a==='undo'){if(!undo.length){say('Không có thao tác để hoàn tác');return;}const old=undo.pop();working=old.image;settings=old.settings;editScope=old.scope;localMask=old.mask;changed();renderPanel();endTool();fit();}
-  if(a==='restore')void restore();if(a==='save')void save();if(a==='apply')void applyMode();if(a==='cancel')endTool();
+  if(a==='restore')void restore();if(a==='previous')void loadPrevious();if(a==='save')void save();if(a==='apply')void applyMode();if(a==='cancel')endTool();
   if(['rotateL','rotateR','flipH','flipV'].includes(a))rotate(a);
   if(a==='resetHsl'){makeUndo();settings.hsl[color]={h:0,s:0,l:0};changed();renderPanel();draw();}
   if(a==='variants')void generateVariants();
