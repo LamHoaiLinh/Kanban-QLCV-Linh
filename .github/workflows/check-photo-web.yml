@@ -5,6 +5,7 @@ on:
       - 'office-tools/photo-studio.js'
       - 'office-tools/photo-preview.js'
       - 'office-tools/photo-preview.css'
+      - 'tests/photo-web-smoke.mjs'
       - 'office-tools/photo-studio.css'
       - 'office-tools/office-tools.js'
       - '.github/workflows/check-photo-web.yml'
@@ -33,3 +34,20 @@ jobs:
           grep -q 'openPhotoPreview' office-tools/photo-studio.js
           grep -q 'correctPerspective' office-tools/photo-preview.js
           grep -q 'kpe-modal' office-tools/photo-preview.css
+
+  browser-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install headless Chromium runner
+        run: |
+          npm install --no-save playwright@1.57.0
+          npx playwright install --with-deps chromium
+      - name: Test actual web UI
+        run: |
+          python3 -m http.server 8766 --bind 127.0.0.1 > /tmp/kanphoto-http.log 2>&1 &
+          sleep 2
+          node tests/photo-web-smoke.mjs
