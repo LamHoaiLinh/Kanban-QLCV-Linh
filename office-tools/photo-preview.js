@@ -116,7 +116,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
  const queueDraft=()=>{if(!mobile||!onAutoDraft||closed)return;clearTimeout(draftTimer);draftTimer=setTimeout(()=>{void draftNow();},1800);};
  const changed=()=>{renderDirty=true;previewDirty=true;dirty=true;queueDraft();};
  const takeState=()=>({image:toCanvas(working),settings:structuredClone(settings),scope:editScope,mask:toCanvas(localMask)});
- const makeUndo=()=>{undo.push(takeState());if(undo.length>(mobile?3:6))undo.shift();redo.length=0;};
+ const makeUndo=()=>{undo.push(takeState());if(undo.length>(mobile?(working.width*working.height>4500000?1:3):6))undo.shift();redo.length=0;};
  const useState=state=>{working=state.image;settings=state.settings;editScope=state.scope;localMask=state.mask;changed();renderPanel();endTool();fit();};
  const fitSide=i=>{const c=canvases[i],img=i?working:original;return Math.min(c.clientWidth/img.width,c.clientHeight/img.height);};
  const point=(e,i)=>{const c=canvases[i],rect=c.getBoundingClientRect(),im=i?working:original,f=fitSide(i)*zoom;return {x:(e.clientX-rect.left-c.clientWidth/2-panX)/f+im.width/2,y:(e.clientY-rect.top-c.clientHeight/2-panY)/f+im.height/2};};
@@ -154,7 +154,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
     loupe.hidden=false;
   }else loupe.hidden=true;
  }
- const slider=(key,label,value,min=-100,max=100)=>'<label class="kpe-slider"><span>'+label+'</span><input data-adjust="'+key+'" type="range" min="'+min+'" max="'+max+'" value="'+value+'"><output data-value="'+key+'">'+value+'</output></label>';
+ const slider=(key,label,value,min=-100,max=100)=>'<label class="kpe-slider"><span>'+label+'</span><input data-adjust="'+key+'" type="range" min="'+min+'" max="'+max+'" value="'+value+'"><output data-value="'+key+'" tabindex="0" role="button" title="Chạm để nhập số">'+value+'</output><button type="button" class="kpe-reset-slider" data-reset="'+key+'" title="Đặt lại">↺</button></label>';
  const buttons=(list,attr='data-click')=>'<div class="kpe-button-group">'+list.map(([text,id])=>'<button type="button" '+attr+'="'+id+'">'+text+'</button>').join('')+'</div>';
  const maskControls=()=>'<div class="kpe-local"><strong>Phạm vi chỉnh</strong><div class="kpe-button-group"><button data-scope="global" class="'+(editScope==='global'?'active':'')+'">Toàn ảnh</button><button data-scope="local" class="'+(editScope==='local'?'active':'')+'">Tô vùng</button></div>'+
  (editScope==='local'?'<div class="kpe-button-group"><button data-paint="add" class="'+(paintMode==='add'?'active':'')+'">Cọ chọn vùng</button><button data-paint="erase" class="'+(paintMode==='erase'?'active':'')+'">Xóa vùng tô</button></div>'+
@@ -288,6 +288,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
        if(old){working=old.image;localMask=old.mask;settings=old.settings;editScope=old.scope;renderDirty=true;previewDirty=true;}
      }
      drag=null;loupePoint=null;suppressTouches=true;
+     try{canvases[i].setPointerCapture(e.pointerId);}catch{}
      const pts=[...activeTouches.values()],cx=(pts[0].x+pts[1].x)/2,cy=(pts[0].y+pts[1].y)/2;
      const canvas=canvases[i],box=canvas.getBoundingClientRect();
      pinch={distance:Math.max(1,Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y)),
@@ -416,6 +417,20 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
   if(a==='variants')void generateVariants();
   if(a==='ai-scunet'||a==='ai-realesrgan')void applyAI(a.slice(3));
   if(a==='applyBatch')void batchColor();
+ });
+ panel.addEventListener('click',e=>{
+   const target=e.target.closest('[data-reset],[data-value]');
+   if(!target||!mobile)return;
+   e.stopPropagation();e.preventDefault();
+   const key=target.dataset.reset||target.dataset.value;
+   const input=panel.querySelector('[data-adjust="'+key+'"]');if(!input)return;
+   const defaults={brushRadius:130,brushPower:68,paintRadius:90,brushOpacity:90};
+   const value=target.dataset.reset!==undefined?(defaults[key]??0):window.prompt('Nhập '+input.closest('label').querySelector('span').textContent+' ('+input.min+' đến '+input.max+'):',input.value);
+   if(value===null||String(value).trim()==='')return;
+   const n=Number(value);if(!Number.isFinite(n))return;
+   if(!key.startsWith('brush')&&key!=='paintRadius')makeUndo();
+   input.value=String(limit(n,Number(input.min),Number(input.max)));
+   input.dispatchEvent(new Event('input',{bubbles:true}));
  });
  panel.addEventListener('pointerdown',e=>{if(e.target.matches('[data-adjust]')&&!busy)makeUndo();});
  panel.addEventListener('input',e=>{
