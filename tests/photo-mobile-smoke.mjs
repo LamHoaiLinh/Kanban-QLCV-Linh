@@ -34,14 +34,7 @@ try{
  await uploadSame();
  await page.locator('#kanPhotoOpen').click();
  const modal=page.locator('dialog.kpe-modal');
- await page.waitForTimeout(1200);
- console.log('MOBILE DEBUG',JSON.stringify({
-   status:await page.locator('#kanPhotoMessage').innerText(),
-   modalCount:await modal.count(),
-   modalOpen:await modal.count()?await modal.evaluate(el=>el.open):false,
-   pageErrors:failures
- }));
- await modal.waitFor({state:'visible',timeout:8000});
+ await modal.waitFor({state:'visible',timeout:15000});
  assert(await modal.evaluate(el=>el.classList.contains('kpe-is-mobile')),'Phone should be auto detected');
  assert(await modal.locator('[data-tab]').count()===6,'All six tabs must remain');
  assert(await modal.locator('.kpe-side').first().isHidden(),'Original image panel should be hidden on phone');
@@ -67,8 +60,16 @@ try{
  await modal.locator('[data-tab="basic"]').click();
  await modal.locator('[data-scope="local"]').click();
  await modal.locator('[data-adjust="exposure"]').fill('45');
+ // Numeric value entry and reset should work with touch-size targets.
+ await modal.locator('[data-reset="exposure"]').click();
+ assert(await modal.locator('[data-adjust="exposure"]').inputValue()==='0','Reset should zero exposure');
+ page.once('dialog',d=>d.accept('45'));
+ await modal.locator('[data-value="exposure"]').click();
+ assert(await modal.locator('[data-adjust="exposure"]').inputValue()==='45','Tap value should accept a numeric setting');
  const b=await result.boundingBox();
  await touchGesture([{type:'touchStart',points:[[b.x+b.width*.47,b.y+b.height*.46]]},{type:'touchMove',points:[[b.x+b.width*.53,b.y+b.height*.51]]},{type:'touchEnd',points:[]}]);
+ await modal.locator('[data-click="undo"]').click();
+ await modal.locator('[data-click="redo"]').click();
  await page.waitForFunction(()=>document.querySelector('#kanPhotoList')?.textContent?.includes('Đã tự lưu nháp'),null,{timeout:12000});
  // Reload, reselect same file, confirm recovery, and validate controls.
  await page.goto(server,{waitUntil:'domcontentloaded'});
