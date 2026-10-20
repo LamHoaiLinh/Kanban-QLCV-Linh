@@ -57,3 +57,54 @@
 .kpe-variants strong{font-size:11px}
 .kpe-variants small{display:block;font-size:9px;line-height:1.3;white-space:normal;color:#bad8c3}
 @media(max-width:1050px){.kpe-variants{grid-template-columns:repeat(3,minmax(0,1fr))}.kpe-variants strong{font-size:10px}}
+
+/* KAN PHOTO MOBILE V1: activated by JS only on touch phones (including landscape). */
+.kpe-loupe{position:absolute;top:46px;right:10px;width:144px;height:144px;border:3px solid #a3f1ac;border-radius:50%;background:#1b2e23;z-index:8;overflow:hidden;pointer-events:none;box-shadow:0 8px 28px #0008}
+.kpe-loupe[hidden]{display:none!important}
+.kpe-loupe canvas{display:block;width:100%;height:100%}
+.kpe-mobile-compare,.kpe-sheet-handle{display:none!important}
+.kpe-is-mobile{width:100vw!important;height:100dvh!important;max-height:100dvh!important;max-width:none!important;border-radius:0!important;inset:0!important;margin:0!important;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)!important;box-sizing:border-box;font-size:13px}
+.kpe-is-mobile .kpe-shell{min-height:0}
+.kpe-is-mobile .kpe-top{gap:4px;padding:6px 8px;min-height:50px}
+.kpe-is-mobile .kpe-top strong{font-size:12px}
+.kpe-is-mobile .kpe-top small{display:none}
+.kpe-is-mobile .kpe-top>span{font-size:10px;white-space:nowrap}
+.kpe-is-mobile .kpe-top button{min-width:42px;min-height:42px;padding:6px;border-radius:10px;font-size:11px}
+.kpe-is-mobile .kpe-top button[data-click="pixel"],
+.kpe-is-mobile .kpe-top button[data-click="previous"],
+.kpe-is-mobile .kpe-top button[data-click="restore"]{display:none}
+.kpe-is-mobile .kpe-top button[data-click="undo"],
+.kpe-is-mobile .kpe-top button[data-click="redo"]{font-size:0}
+.kpe-is-mobile .kpe-top button[data-click="undo"]::before{content:"↩";font-size:23px}
+.kpe-is-mobile .kpe-top button[data-click="redo"]::before{content:"↪";font-size:23px}
+.kpe-is-mobile .kpe-top button[data-click="close"]{font-size:23px}
+.kpe-is-mobile .kpe-workspace{display:flex;flex-direction:column;min-height:0;flex:1;gap:0;padding:0;overflow:hidden}
+.kpe-is-mobile .kpe-panes{position:relative;display:flex;flex:1;min-height:120px;padding:0;gap:0}
+.kpe-is-mobile .kpe-side:first-child{display:none}
+.kpe-is-mobile .kpe-side:last-of-type{display:flex;flex:1;min-width:0;min-height:0;border:0;border-radius:0}
+.kpe-is-mobile .kpe-side b{font-size:10px;padding:4px;letter-spacing:.02em}
+.kpe-is-mobile .kpe-side canvas{height:calc(100% - 24px);width:100%;min-height:0;touch-action:none}
+.kpe-is-mobile .kpe-sidebar{display:flex;flex:0 0 auto;height:var(--kpe-sheet-height,34dvh);max-height:78dvh;min-height:165px;min-width:0;border:0;border-top:1px solid #648b6b;border-radius:18px 18px 0 0;box-shadow:0 -8px 25px #0003;overflow:hidden}
+.kpe-is-mobile .kpe-sheet-handle{display:flex!important;flex:0 0 24px;align-items:center;justify-content:center;touch-action:none;cursor:ns-resize;background:#203b2b}
+.kpe-is-mobile .kpe-sheet-handle span{width:43px;height:5px;background:#7fad89;border-radius:9px}
+.kpe-is-mobile .kpe-tabs{display:flex;flex:0 0 auto;gap:3px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;padding:5px 6px;scrollbar-width:none;overscroll-behavior-x:contain}
+.kpe-is-mobile .kpe-tabs::-webkit-scrollbar{display:none}
+.kpe-is-mobile .kpe-tabs button{min-width:69px;min-height:42px;padding:6px 4px;flex:1 0 auto;font-size:11px}
+.kpe-is-mobile .kpe-controls{padding:11px 12px 20px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.kpe-is-mobile .kpe-controls h3{margin:0 0 8px;font-size:14px}
+.kpe-is-mobile .kpe-controls p{font-size:12px;margin:6px 0 10px}
+.kpe-is-mobile .kpe-button-group button,.kpe-is-mobile .kpe-brushes button{min-height:45px;font-size:12px}
+.kpe-is-mobile .kpe-slider{margin-bottom:13px}
+.kpe-is-mobile .kpe-slider input{height:35px;min-height:35px;touch-action:pan-y}
+.kpe-is-mobile .kpe-slider input::-webkit-slider-thumb{width:25px;height:25px}
+.kpe-is-mobile .kpe-mobile-compare{display:block!important;min-height:45px;touch-action:none;background:#45684c;border-color:#7db692}
+.kpe-is-mobile .kpe-bottom{flex:0 0 auto;display:grid;grid-template-columns:1fr 1fr auto;grid-template-areas:"compare save close" "action action action";gap:6px;padding:7px 8px;background:#223c2d}
+.kpe-is-mobile .kpe-bottom .kpe-mobile-compare{grid-area:compare;white-space:nowrap}
+.kpe-is-mobile .kpe-bottom [data-click="save"]{grid-area:save;min-height:45px;padding:6px}
+.kpe-is-mobile .kpe-bottom [data-click="close"]{grid-area:close;min-height:45px}
+.kpe-is-mobile .kpe-bottom [data-click="apply"]{grid-area:action;min-height:44px}
+.kpe-is-mobile .kpe-bottom [data-click="cancel"]{grid-area:action;justify-self:start;margin-bottom:0}
+.kpe-is-mobile .kpe-bottom #kpeHint{display:none}
+.kpe-is-mobile .kpe-loupe{top:26px;right:10px;width:130px;height:130px}
+@media(max-width:375px){.kpe-is-mobile .kpe-top button[data-click="fit"]{display:none}.kpe-is-mobile .kpe-top button{min-width:40px;padding:4px}.kpe-is-mobile .kpe-tabs button{min-width:65px}}
+@media(max-height:560px){.kpe-is-mobile .kpe-sidebar{min-height:145px}.kpe-is-mobile .kpe-top{min-height:41px}.kpe-is-mobile .kpe-bottom{padding:3px 7px}}
