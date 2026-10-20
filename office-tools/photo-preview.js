@@ -183,7 +183,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
  buttons([['Tạo 3 bản thử','variants']])+ '<div id="kpeVariants" class="kpe-variants"></div>'+
  '<hr><h3>AI nâng ảnh (tùy chọn)</h3><p>Cần Chrome/Edge PC hỗ trợ WebGPU. Mô hình tải lần đầu khá lớn; ảnh không được gửi đi để xử lý.</p>'+
  buttons([['SCUNet – khử hạt','ai-scunet'],['Real-ESRGAN – nâng 2×','ai-realesrgan']])+
- '<p class="kpe-tip">AI chỉ chạy khi bạn bấm. Nếu máy không hỗ trợ hoặc tải mô hình lỗi, ảnh hiện tại được giữ nguyên.</p>';
+ '<p class="kpe-tip">'+(mobile?'AI chuyên sâu chỉ bật trên PC để tránh hết bộ nhớ trên điện thoại.':'AI chỉ chạy khi bạn bấm. Nếu máy không hỗ trợ hoặc tải mô hình lỗi, ảnh hiện tại được giữ nguyên.')+'</p>';
   else if(tab==='geometry')panel.innerHTML='<h3>Hình học</h3>'+buttons([['↶ Xoay trái','rotateL'],['↷ Xoay phải','rotateR'],['⇋ Lật ngang','flipH'],['⇅ Lật dọc','flipV']])+
     buttons([['▣ Crop','crop'],['◇ Phối cảnh','perspective']],'data-mode')+
     '<p class="kpe-tip">Kéo các góc của vùng Crop hoặc Phối cảnh trên ảnh phải, rồi nhấn Áp dụng.</p>';
@@ -463,6 +463,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
  }
  async function applyAI(kind){
   if(busy)return;
+  if(mobile){say('AI chuyên sâu dành cho PC có WebGPU để tránh điện thoại hết bộ nhớ. Các công cụ chỉnh khác vẫn hoạt động.');return;}
   if(!globalThis.navigator?.gpu){say('AI yêu cầu Chrome/Edge trên PC có WebGPU; ảnh gốc vẫn được giữ nguyên.');return;}
   if(!window.confirm('Mô hình AI cần tải dữ liệu lớn và dùng GPU. Bạn muốn tiếp tục?'))return;
   busy=true;
