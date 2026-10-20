@@ -279,15 +279,62 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
  }
  function escape(){if(busy)return;if(['crop','perspective','text'].includes(tool)){endTool();return;}if(!isFit()){fit();return;}void close();}
  let spaceDown=false;
+ function touchStart(e,i){
+   if(!mobile||e.pointerType!=='touch')return false;
+   activeTouches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+   if(activeTouches.size===2){
+     if(drag&&(drag.type==='warp'||drag.type==='mask')){
+       const old=undo.pop();
+       if(old){working=old.image;localMask=old.mask;settings=old.settings;editScope=old.scope;renderDirty=true;previewDirty=true;}
+     }
+     drag=null;loupePoint=null;suppressTouches=true;
+     const pts=[...activeTouches.values()],cx=(pts[0].x+pts[1].x)/2,cy=(pts[0].y+pts[1].y)/2;
+     const canvas=canvases[i],box=canvas.getBoundingClientRect();
+     pinch={distance:Math.max(1,Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y)),
+       zoom,panX,panY,mx:cx-box.left-canvas.clientWidth/2,my:cy-box.top-canvas.clientHeight/2,canvas:i};
+     draw();
+   }
+   return suppressTouches;
+ }
+ function touchMove(e){
+   if(!mobile||e.pointerType!=='touch')return false;
+   if(!activeTouches.has(e.pointerId))return true;
+   activeTouches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+   if(activeTouches.size===2&&pinch){
+     const pts=[...activeTouches.values()],dx=pts[0].x-pts[1].x,dy=pts[0].y-pts[1].y;
+     const centerX=(pts[0].x+pts[1].x)/2,centerY=(pts[0].y+pts[1].y)/2;
+     const canvas=canvases[pinch.canvas],rect=canvas.getBoundingClientRect();
+     const mx=centerX-rect.left-canvas.clientWidth/2,my=centerY-rect.top-canvas.clientHeight/2;
+     zoom=limit(pinch.zoom*Math.hypot(dx,dy)/pinch.distance,.15,128);
+     const ratio=zoom/pinch.zoom;
+     panX=mx-(pinch.mx-pinch.panX)*ratio;panY=my-(pinch.my-pinch.panY)*ratio;
+     draw();return true;
+   }
+   return suppressTouches;
+ }
+ function touchEnd(e){
+   if(!mobile||e.pointerType!=='touch')return;
+   activeTouches.delete(e.pointerId);
+   if(activeTouches.size<2)pinch=null;
+   if(activeTouches.size===0)suppressTouches=false;
+ }
  function pointerDown(e,i){
   if(e.button!==0||busy)return;
+  if(touchStart(e,i))return;
   const c=canvases[i],pt=point(e,i),m={x:e.offsetX,y:e.offsetY};
   if(i===1&&tool==='mask'&&!spaceDown){
    makeUndo();drag={type:'mask',from:pt,last:pt,moved:false};c.setPointerCapture(e.pointerId);
    stamp(localMask,pt,pt,paintRadius,brushOpacity/100,paintMode==='erase');changed();draw();return;
   }
   if(i===1&&tool==='warp'&&!spaceDown){
-   makeUndo();drag={type:'warp',from:pt,source:toCanvas(working),moved:false};c.setPointerCapture(e.pointerId);return;
+   makeUndo();drag={type:'warp',from:pt,source:toCanvas(working),moved:false,end:pt};
+    if(mobile){
+      const r=Math.min(1,950/Math.max(working.width,working.height));
+      const thumb=make(Math.max(1,Math.round(working.width*r)),Math.max(1,Math.round(working.height*r)));
+      thumb.getContext('2d').drawImage(working,0,0,thumb.width,thumb.height);
+      drag.previewSrc=thumb;drag.factor=r;
+    }
+    c.setPointerCapture(e.pointerId);return;
   }
   if(i===1&&tool==='text'){textPoint={x:limit(pt.x,0,working.width),y:limit(pt.y,0,working.height)};draw();return;}
   if(i===1&&tool==='perspective'){
@@ -301,14 +348,21 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
   c.setPointerCapture(e.pointerId);
  }
  function pointerMove(e,i){
+  if(touchMove(e))return;
   if(i===1&&(tool==='warp'||tool==='mask'))brushPoint=point(e,i);
   if(!drag){if(i===1&&(tool==='warp'||tool==='mask'))draw();return;}
   const pt=point(e,i);
   if(drag.type==='pan'){panX+=e.clientX-drag.x;panY+=e.clientY-drag.y;drag.x=e.clientX;drag.y=e.clientY;}
   if(drag.type==='warp'){
-   if(Math.hypot(pt.x-drag.from.x,pt.y-drag.from.y)>1){working=deformAt(drag.source,drag.from,pt,brushRadius,brushPower,brush);drag.moved=true;changed();}
+   if(Math.hypot(pt.x-drag.from.x,pt.y-drag.from.y)>1){
+     if(mobile&&drag.previewSrc){
+       const r=drag.factor;drag.live=deformAt(drag.previewSrc,{x:drag.from.x*r,y:drag.from.y*r},{x:pt.x*r,y:pt.y*r},Math.max(6,brushRadius*r),brushPower,brush);
+       drag.end=pt;previewDirty=true;dirty=true;
+     }else{working=deformAt(drag.source,drag.from,pt,brushRadius,brushPower,brush);changed();}
+     drag.moved=true;loupePoint=pt;
+   }
   }
-  if(drag.type==='mask'){stamp(localMask,drag.last,pt,paintRadius,brushOpacity/100,paintMode==='erase');drag.last=pt;drag.moved=true;changed();}
+  if(drag.type==='mask'){stamp(localMask,drag.last,pt,paintRadius,brushOpacity/100,paintMode==='erase');drag.last=pt;drag.moved=true;loupePoint=pt;changed();}
   if(drag.type==='perspective')quad[drag.index]=[limit(pt.x,0,working.width),limit(pt.y,0,working.height)];
   if(drag.type==='cropMove'){crop.x=limit(drag.start.x+pt.x-drag.from.x,0,working.width-crop.w);crop.y=limit(drag.start.y+pt.y-drag.from.y,0,working.height-crop.h);}
   if(drag.type==='cropCorner'){
@@ -319,7 +373,16 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
   }
   draw();
  }
- function pointerUp(e,i){if(drag?.type==='warp'&&!drag.moved)undo.pop();drag=null;try{canvases[i].releasePointerCapture(e.pointerId);}catch{}}
+ function pointerUp(e,i){
+  touchEnd(e);
+  if(drag?.type==='warp'){
+    if(!drag.moved)undo.pop();
+    else if(mobile&&drag.previewSrc){working=deformAt(drag.source,drag.from,drag.end,brushRadius,brushPower,brush);changed();}
+  }
+  if(drag?.type==='mask'&&mobile)queueDraft();
+  drag=null;loupePoint=null;previewDirty=true;draw();
+  try{canvases[i].releasePointerCapture(e.pointerId);}catch{}
+ }
  function wheel(e,i){
   e.preventDefault();if(busy)return;
   const c=canvases[i],bounds=c.getBoundingClientRect(),x=e.clientX-bounds.left-c.clientWidth/2,y=e.clientY-bounds.top-c.clientHeight/2;
@@ -332,7 +395,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
   c.addEventListener('pointermove',e=>pointerMove(e,i));
   c.addEventListener('pointerup',e=>pointerUp(e,i));
   c.addEventListener('pointercancel',e=>pointerUp(e,i));
-  c.addEventListener('dblclick',()=>{if(tool!=='view'&&tool!=='warp')return;if(zoom>1.1)fit();else{zoom=2;draw();}});
+  c.addEventListener('dblclick',()=>{if(!['view','warp','mask'].includes(tool))return;if(zoom>1.1)fit();else{zoom=2;draw();}});
  });
  modal.querySelectorAll('[data-tab]').forEach(btn=>btn.onclick=()=>switchTab(btn.dataset.tab));
  modal.addEventListener('click',event=>{
