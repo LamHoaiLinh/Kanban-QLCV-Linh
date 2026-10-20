@@ -9,6 +9,7 @@ import {renderPdfSigningTool} from './pdf-signing.js?v=1.5.1';
 import {openWorksheetEditor,isWorksheetEditorOpen,closeWorksheetEditor} from './worksheet-editor.js?v=1.2.0';
 import {extractVbaProject,vbaRawByteLength} from './vba-extractor.mjs?v=2.0.0';
 import {renderKanMediaTool} from './kanmedia/kanmedia.js?v=1.5.3';
+import {renderPhotoStudioTool} from './photo-studio.js?v=1.0.0';
 import {renderGoogleSheetExporter} from './google-sheet-export.js?v=1.0.1';
 const OFFICE_SETTINGS_KEY = 'linh_kanban_office_settings_v1';
 const KANPAINT_URL = 'https://lamhoailinh.github.io/KanPaint/';
@@ -70,6 +71,7 @@ function injectDialog(){
       <nav class="office-nav">
         ${navButton('pdf','PDF','Tách, ghép, xoay PDF')}
         ${navButton('image','IMG','Xử lý hình ảnh')}
+        ${navButton('photo','PHOTO','Tự động cải thiện ảnh hàng loạt','Chỉnh ảnh nhanh')}
         ${navButton('worksheet','PDF/IMG','Nhập đề và làm bài trực tiếp','Nhập liệu PDF/IMG')}
         ${navButton('rename','Rename','Đổi tên hàng loạt')}
         ${navButton('excel','Excel','Đọc và gộp Excel')}
@@ -98,7 +100,7 @@ function injectDialog(){
 function navButton(id,label,title,displayLabel=label){return `<button type="button" data-office-nav="${id}" title="${escapeHtml(title)}"><span class="office-btn-mark">${label}</span><span>${displayLabel}</span></button>`;}
 
 function openOffice(tool='pdf'){
-  state.tool=['pdf','image','rename','excel','backup','kanpass','kanpaint','kanmedia'].includes(tool)?tool:'pdf';
+  state.tool=['pdf','image','photo','rename','excel','backup','kanpass','kanpaint','kanmedia'].includes(tool)?tool:'pdf';
   if(!dialog.open) dialog.showModal();
   renderTool();
 }
@@ -110,6 +112,7 @@ function renderTool(){
   const meta={
     pdf:['Công cụ PDF','Gộp, chuẩn hóa kích thước, sắp xếp, xoay, tách và chuyển trang PDF.'],
     image:['Công cụ hình ảnh','Chuyển đổi, crop, ghép, đóng dấu và tạo ảnh dài từ nội dung dán.'],
+    photo:['KAN PHOTO – Chỉnh ảnh nhanh','Tự động chỉnh sáng, khử hạt, làm nét và chỉnh dáng; chạy trong trình duyệt.'],
     rename:['Đổi tên hàng loạt','Xem trước tên mới trước khi tạo bản sao hoặc đổi tên tại chỗ.'],
     excel:['Công cụ Excel','Đọc giá trị/công thức, xuất JSON và gộp sheet hoặc workbook.'],
     backup:['Backup','Backup tăng dần bằng Kopia, chạy lịch nền và khôi phục theo snapshot.'],
@@ -120,6 +123,7 @@ function renderTool(){
   dialog.querySelector('#officeDialogTitle').textContent=meta[0];dialog.querySelector('#officeDialogDesc').textContent=meta[1];
   if(state.tool==='pdf')renderPdfTool();
   if(state.tool==='image')renderImageTool();
+  if(state.tool==='photo')renderPhotoStudioTool(mainHost,{setStatus,startBusy,endBusy,assertNotAborted,downloadZip});
   if(state.tool==='rename')renderRenameTool();
   if(state.tool==='excel')renderExcelTool();
   if(state.tool==='backup')void renderBackupTool();
