@@ -1,3 +1,5 @@
+import {DEFAULT_EDITS,applyAdjustments,hasAdjustments} from './photo-filters.js?v=1.0.0';
+import {deformAt} from './photo-warp.js?v=1.0.0';
 /*
  KAN PHOTO preview/editor — all pixels modified in-browser, original never edited.
  Zoom and pan shared by both canvases; edit tools apply to processed image only.
@@ -40,182 +42,227 @@ async function correctPerspective(src,q,progress){
  }
  ctx.putImageData(im,0,0);progress(100);return out;
 }
+
 export async function openPhotoPreview({file,blob,type,onSaved,onReset}){
- if(!blob)throw Error('Cần xử lý ảnh trước.');
  if(!document.getElementById('kan-photo-preview-style')){
-  const st=document.createElement('link');st.id='kan-photo-preview-style';st.rel='stylesheet';st.href=new URL('./photo-preview.css?v=1.0.0',import.meta.url).href;document.head.appendChild(st);
+  const st=document.createElement('link');st.id='kan-photo-preview-style';st.rel='stylesheet';
+  st.href=new URL('./photo-preview.css?v=2.0.0',import.meta.url).href;document.head.appendChild(st);
  }
- const [original,result]=await Promise.all([createImageBitmap(file),createImageBitmap(blob)]);
- let working=toCanvas(result),scale=1,panX=0,panY=0,mode='view',rect=null,quad=null,textPoint=null,drag=null,dirty=false,busy=false,undo=[];
+ const original=await createImageBitmap(file),result=await createImageBitmap(blob||file);
+ let working=toCanvas(result),settings=DEFAULT_EDITS(),rendered=null,renderDirty=true;
+ let zoom=1,panX=0,panY=0,tab='shape',tool='warp',crop=null,quad=null,textPoint=null;
+ let drag=null,dirty=false,busy=false,space=false,brushRadius=130,brushPower=68,brush='waist',brushPoint=null;
+ let undo=[],color='orange',repaintTimer=null;
+ const channels=['red','orange','yellow','green','aqua','blue','purple','magenta'];
+ const labels=['Đỏ','Cam','Vàng','Lục','Lam ngọc','Lam','Tím','Hồng'];
+ const pigments=['#e85050','#ed9652','#d9c64c','#53b35c','#55c1be','#537ac7','#9c72cc','#cd69aa'];
  const modal=document.createElement('dialog');modal.className='kpe-modal';
  modal.innerHTML='<div class="kpe-shell">'+
- '<header class="kpe-top"><div><strong>PREVIEW SO SÁNH</strong><small id="kpeFilename"></small></div><span id="kpeZoom">100%</span><button data-click="fit">Vừa khung</button><button data-click="pixel">100% gốc</button><button data-click="close" aria-label="Đóng">×</button></header>'+
- '<nav class="kpe-tools"><button data-click="rotateL">↶ Xoay trái</button><button data-click="rotateR">↷ Xoay phải</button><button data-click="flipH">⇋ Lật ngang</button><button data-click="flipV">⇅ Lật dọc</button><button data-mode="crop">▣ Cắt ảnh</button><button data-mode="perspective">◇ Phối cảnh</button><button data-mode="text">T Viết chữ</button><button data-click="undo">↩ Hoàn tác</button><button data-click="restore">Khôi phục bản xử lý</button></nav>'+
- '<div id="kpeFields" class="kpe-fields" hidden></div>'+
- '<div class="kpe-panes"><section class="kpe-side"><b>ẢNH GỐC</b><canvas data-pane="0"></canvas></section><section class="kpe-side"><b>ẢNH KẾT QUẢ</b><canvas data-pane="1"></canvas></section></div>'+
- '<footer class="kpe-bottom"><span id="kpeHint">Cuộn để zoom tại con trỏ; giữ chuột trái kéo để di chuyển đồng bộ.</span><button data-click="cancel" hidden>Hủy công cụ</button><button data-click="apply" hidden>Áp dụng</button><button data-click="save" class="kpe-green">Lưu chỉnh sửa</button><button data-click="close">Đóng</button></footer></div>';
+  '<header class="kpe-top"><div><strong>KAN PHOTO · CHỈNH ẢNH</strong><small id="kpeFilename"></small></div><span id="kpeZoom">100%</span><button data-click="fit">Vừa khung</button><button data-click="pixel">100%</button><button data-click="undo">↩ Hoàn tác</button><button data-click="restore">Đặt lại</button><button data-click="close">×</button></header>'+
+  '<div class="kpe-workspace"><div class="kpe-panes"><section class="kpe-side"><b>ẢNH GỐC</b><canvas data-pane="0"></canvas></section><section class="kpe-side"><b>ẢNH ĐANG CHỈNH</b><canvas data-pane="1"></canvas></section></div>'+
+  '<aside class="kpe-sidebar"><nav class="kpe-tabs" aria-label="Nhóm công cụ"><button data-tab="shape">Vóc dáng</button><button data-tab="basic">Ánh sáng</button><button data-tab="hsl">HSL</button><button data-tab="detail">Chi tiết</button><button data-tab="geometry">Hình học</button><button data-tab="text">Chữ</button></nav><div class="kpe-controls" id="kpeControls"></div></aside></div>'+
+  '<footer class="kpe-bottom"><span id="kpeHint">Vóc dáng: kéo mép eo hoặc cánh tay vào trong trên ảnh phải. Giữ Space + kéo để di chuyển ảnh.</span><button data-click="cancel" hidden>Hủy chỉnh</button><button data-click="apply" hidden>Áp dụng</button><button data-click="save" class="kpe-green">Lưu chỉnh sửa</button><button data-click="close">Đóng</button></footer></div>';
  document.body.appendChild(modal);
- const canvases=[...modal.querySelectorAll('.kpe-side canvas')],by=id=>modal.querySelector(id),button=n=>modal.querySelector('[data-click="'+n+'"]');
- const fields=by('#kpeFields'),message=s=>by('#kpeHint').textContent=s;
- const fitting=(idx)=>{const cv=canvases[idx],img=idx?working:original;return Math.min(cv.clientWidth/img.width,cv.clientHeight/img.height);};
- const imagePoint=(event,side)=>{
-  const canvas=canvases[side],bounds=canvas.getBoundingClientRect(),img=side?working:original,f=fitting(side)*scale;
-  return {x:(event.clientX-bounds.left-canvas.clientWidth/2-panX)/f+img.width/2,y:(event.clientY-bounds.top-canvas.clientHeight/2-panY)/f+img.height/2};
- };
- const displayPoint=(x,y)=>{
-  const canvas=canvases[1],f=fitting(1)*scale;
-  return {x:canvas.clientWidth/2+panX+(x-working.width/2)*f,y:canvas.clientHeight/2+panY+(y-working.height/2)*f};
- };
- const reset=()=>{scale=1;panX=0;panY=0;paint();};
- const isFit=()=>Math.abs(scale-1)<.00001&&Math.abs(panX)<1&&Math.abs(panY)<1;
- function paint(){
-  const ratio=Math.min(2,window.devicePixelRatio||1);
-  for(let side=0;side<2;side++){
-   const c=canvases[side],width=Math.max(1,c.clientWidth),height=Math.max(1,c.clientHeight);
-   if(c.width!==Math.round(width*ratio)||c.height!==Math.round(height*ratio)){c.width=Math.round(width*ratio);c.height=Math.round(height*ratio);}
-   const ctx=c.getContext('2d');ctx.setTransform(ratio,0,0,ratio,0,0);ctx.clearRect(0,0,width,height);ctx.fillStyle='#17211d';ctx.fillRect(0,0,width,height);
-   const img=side?working:original,s=fitting(side)*scale;
-   ctx.save();ctx.translate(width/2+panX,height/2+panY);ctx.scale(s,s);ctx.imageSmoothingEnabled=scale<18;ctx.drawImage(img,-img.width/2,-img.height/2);ctx.restore();
-   if(side!==1)continue;
-   ctx.strokeStyle='#8df7aa';ctx.lineWidth=2;ctx.fillStyle='#f6fff4';
-   if(mode==='crop'&&rect){
-    const tl=displayPoint(rect.x,rect.y),br=displayPoint(rect.x+rect.w,rect.y+rect.h);
-    ctx.strokeRect(tl.x,tl.y,br.x-tl.x,br.y-tl.y);
-    for(const [x,y] of [[tl.x,tl.y],[br.x,tl.y],[br.x,br.y],[tl.x,br.y]]){ctx.fillRect(x-6,y-6,12,12);ctx.strokeRect(x-6,y-6,12,12);}
-   }
-   if(mode==='perspective'&&quad){
-    const p=quad.map(x=>displayPoint(x[0],x[1]));ctx.beginPath();ctx.moveTo(p[0].x,p[0].y);for(let k=1;k<4;k++)ctx.lineTo(p[k].x,p[k].y);ctx.closePath();ctx.stroke();
-    for(let k=0;k<4;k++){ctx.beginPath();ctx.arc(p[k].x,p[k].y,7,0,Math.PI*2);ctx.fill();ctx.fillStyle='#1c3225';ctx.font='11px sans-serif';ctx.textAlign='center';ctx.fillText(String(k+1),p[k].x,p[k].y+4);ctx.fillStyle='#fff';}
-   }
-   if(mode==='text'){
-    const input=by('#kpeText'),fontSize=+(by('#kpeFont')?.value||50),color=by('#kpeColor')?.value||'#ffffff';
-    if(input?.value){const p=textPoint||{x:working.width*.15,y:working.height*.28},point=displayPoint(p.x,p.y);
-     ctx.font='bold '+Math.max(1,s*fontSize)+'px Arial,sans-serif';ctx.lineWidth=Math.max(1,s*fontSize*.045);ctx.strokeStyle='#143b24';ctx.strokeText(input.value,point.x,point.y);ctx.fillStyle=color;ctx.fillText(input.value,point.x,point.y);}
-   }
+ const by=s=>modal.querySelector(s),action=name=>by('[data-click="'+name+'"]'),panel=by('#kpeControls');
+ const canvases=[...modal.querySelectorAll('.kpe-side canvas')],say=s=>by('#kpeHint').textContent=s;
+ const filtered=()=>{if(renderDirty){rendered=hasAdjustments(settings)?applyAdjustments(working,settings):working;renderDirty=false;}return rendered;};
+ const changed=()=>{renderDirty=true;dirty=true;};
+ const makeUndo=()=>{undo.push({image:toCanvas(working),settings:structuredClone(settings)});if(undo.length>10)undo.shift();};
+ const fitSide=i=>{const c=canvases[i],img=i?working:original;return Math.min(c.clientWidth/img.width,c.clientHeight/img.height);};
+ const point=(e,i)=>{const c=canvases[i],rect=c.getBoundingClientRect(),im=i?working:original,f=fitSide(i)*zoom;return {x:(e.clientX-rect.left-c.clientWidth/2-panX)/f+im.width/2,y:(e.clientY-rect.top-c.clientHeight/2-panY)/f+im.height/2};};
+ const screen=(x,y)=>{const c=canvases[1],f=fitSide(1)*zoom;return {x:c.clientWidth/2+panX+(x-working.width/2)*f,y:c.clientHeight/2+panY+(y-working.height/2)*f};};
+ const fit=()=>{zoom=1;panX=0;panY=0;draw();};
+ const isFit=()=>Math.abs(zoom-1)<.0001&&Math.abs(panX)<1&&Math.abs(panY)<1;
+ function draw(){
+  const dpi=Math.min(2,devicePixelRatio||1);
+  for(let i=0;i<2;i++){
+   const c=canvases[i],w=Math.max(1,c.clientWidth),h=Math.max(1,c.clientHeight);
+   if(c.width!==Math.round(w*dpi)||c.height!==Math.round(h*dpi)){c.width=Math.round(w*dpi);c.height=Math.round(h*dpi);}
+   const ctx=c.getContext('2d');ctx.setTransform(dpi,0,0,dpi,0,0);ctx.fillStyle='#15251c';ctx.fillRect(0,0,w,h);
+   const img=i?filtered():original,s=fitSide(i)*zoom;
+   ctx.save();ctx.translate(w/2+panX,h/2+panY);ctx.scale(s,s);ctx.imageSmoothingEnabled=zoom<18;ctx.drawImage(img,-img.width/2,-img.height/2);ctx.restore();
+   if(!i)continue;
+   ctx.lineWidth=2;ctx.strokeStyle='#a3f39e';ctx.fillStyle='#fcffed';
+   if(tool==='warp'&&brushPoint){const p=screen(brushPoint.x,brushPoint.y);ctx.beginPath();ctx.arc(p.x,p.y,brushRadius*fitSide(1)*zoom,0,Math.PI*2);ctx.stroke();}
+   if(tool==='crop'&&crop){const a=screen(crop.x,crop.y),b=screen(crop.x+crop.w,crop.y+crop.h);ctx.strokeRect(a.x,a.y,b.x-a.x,b.y-a.y);
+    for(const [x,y] of [[a.x,a.y],[b.x,a.y],[b.x,b.y],[a.x,b.y]]){ctx.fillRect(x-5,y-5,10,10);ctx.strokeRect(x-5,y-5,10,10);}}
+   if(tool==='perspective'&&quad){const pts=quad.map(p=>screen(p[0],p[1]));ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(let j=1;j<4;j++)ctx.lineTo(pts[j].x,pts[j].y);ctx.closePath();ctx.stroke();
+    pts.forEach((p,j)=>{ctx.beginPath();ctx.arc(p.x,p.y,7,0,Math.PI*2);ctx.fill();ctx.fillStyle='#193323';ctx.font='11px Arial';ctx.textAlign='center';ctx.fillText(String(j+1),p.x,p.y+4);ctx.fillStyle='#fff';});}
+   if(tool==='text'){const inp=by('#kpeText'),value=inp?.value||'',size=Number(by('#kpeFont')?.value||45),color=by('#kpeColor')?.value||'#ffffff';
+    if(value){const p=textPoint||{x:working.width*.2,y:working.height*.25},t=screen(p.x,p.y);ctx.font='bold '+Math.max(1,size*s)+'px Arial,sans-serif';ctx.lineWidth=Math.max(1,2*s);ctx.strokeStyle='#18412c';ctx.strokeText(value,t.x,t.y);ctx.fillStyle=color;ctx.fillText(value,t.x,t.y);}}
   }
-  by('#kpeZoom').textContent=Math.round(scale*100)+'% · đồng bộ';
+  by('#kpeZoom').textContent=Math.round(zoom*100)+'% · đồng bộ';
  }
- const pushUndo=()=>{undo.push(toCanvas(working));if(undo.length>8)undo.shift();};
- const leaveTool=()=>{
-  mode='view';rect=null;quad=null;textPoint=null;fields.hidden=true;fields.innerHTML='';
-  button('apply').hidden=true;button('cancel').hidden=true;
-  modal.querySelectorAll('[data-mode]').forEach(b=>b.classList.remove('active'));paint();
- };
- function setMode(next){
-  if(busy)return;mode=next;
-  rect=next==='crop'?{x:working.width*.08,y:working.height*.08,w:working.width*.84,h:working.height*.84}:null;
-  quad=next==='perspective'?[[.07,.07],[.93,.07],[.93,.93],[.07,.93]].map(v=>[v[0]*working.width,v[1]*working.height]):null;
-  textPoint={x:working.width*.15,y:working.height*.25};
-  fields.hidden=next!=='text';
-  fields.innerHTML=next==='text'?'<label>Chữ tiếng Việt <input id="kpeText" maxlength="200" value="Chúc mừng" type="text"></label><label>Cỡ chữ <input id="kpeFont" type="number" min="8" max="500" value="50"></label><label>Màu <input id="kpeColor" type="color" value="#ffffff"></label><span>Bấm vào ảnh bên phải để đặt chữ.</span>':'';
-  fields.querySelectorAll('input').forEach(x=>x.oninput=paint);
-  button('apply').hidden=false;button('cancel').hidden=false;
-  button('apply').textContent=next==='crop'?'Cắt ảnh':next==='perspective'?'Sửa phối cảnh':'Đặt chữ';
-  modal.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===next));
-  message(next==='crop'?'Kéo góc vùng cắt trên ảnh bên phải.':next==='perspective'?'Kéo bốn điểm để chọn vùng cần nắn thẳng.':'Nhập chữ có dấu rồi bấm chọn vị trí trên ảnh.');
-  paint();
+ const slider=(key,label,value,min=-100,max=100)=>'<label class="kpe-slider"><span>'+label+'</span><input data-adjust="'+key+'" type="range" min="'+min+'" max="'+max+'" value="'+value+'"><output data-value="'+key+'">'+value+'</output></label>';
+ const buttons=(list,attr='data-click')=>'<div class="kpe-button-group">'+list.map(([text,id])=>'<button type="button" '+attr+'="'+id+'">'+text+'</button>').join('')+'</div>';
+ function renderPanel(){
+  modal.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+  if(tab==='shape')panel.innerHTML='<h3>Chỉnh vóc dáng</h3><p>Phóng to và <b>kéo trực tiếp</b> vùng muốn thu gọn trên ảnh bên phải.</p>'+
+   '<div class="kpe-brushes">'+[['waist','Thon eo'],['arm','Thon tay'],['head','Thu đầu'],['free','Kéo tự do']].map(([id,name])=>'<button data-brush="'+id+'" class="'+(brush===id?'active':'')+'">'+name+'</button>').join('')+'</div>'+
+   slider('brushPower','Lực kéo',brushPower,0,100)+slider('brushRadius','Bán kính tác động',brushRadius,20,450)+
+   '<p class="kpe-tip">Kéo mép eo về tâm người, kéo mép tay vào trong; muốn thu đầu thì kéo từ đường viền tóc vào tâm. Space + chuột trái để di chuyển ảnh.</p>';
+  else if(tab==='basic')panel.innerHTML='<h3>Ánh sáng & màu</h3>'+[
+   ['exposure','Phơi sáng'],['contrast','Tương phản'],['highlights','Vùng sáng'],['shadows','Vùng tối'],['whites','Điểm trắng'],['blacks','Điểm đen'],['temperature','Nhiệt màu'],['tint','Ám màu'],['vibrance','Màu tươi'],['saturation','Bão hòa']].map(([k,v])=>slider(k,v,settings[k])).join('');
+  else if(tab==='hsl')panel.innerHTML='<h3>Trộn màu HSL</h3><p>Chọn một màu rồi chỉnh ba thanh bên dưới.</p>'+
+    '<div class="kpe-swatches">'+channels.map((ch,i)=>'<button data-color="'+ch+'" class="'+(color===ch?'active':'')+'" title="'+labels[i]+'" style="--swatch:'+pigments[i]+'"><span></span></button>').join('')+'</div>'+
+    '<p class="kpe-color-name">'+labels[channels.indexOf(color)]+'</p>'+
+    slider('hsl.h','Sắc độ',settings.hsl[color].h)+slider('hsl.s','Bão hòa',settings.hsl[color].s)+slider('hsl.l','Độ sáng',settings.hsl[color].l)+
+    buttons([['Đặt lại màu đang chọn','resetHsl']]);
+  else if(tab==='detail')panel.innerHTML='<h3>Chi tiết</h3>'+
+    slider('sharpness','Làm nét',settings.sharpness,0,100)+slider('noise','Giảm hạt',settings.noise,0,100)+slider('clarity','Độ rõ',settings.clarity)+slider('texture','Bề mặt',settings.texture)+
+    '<p class="kpe-tip">Nên xem ở Zoom 100% khi tăng nét và giảm hạt để tránh ảnh giả.</p>';
+  else if(tab==='geometry')panel.innerHTML='<h3>Hình học</h3>'+buttons([['↶ Xoay trái','rotateL'],['↷ Xoay phải','rotateR'],['⇋ Lật ngang','flipH'],['⇅ Lật dọc','flipV']])+
+    buttons([['▣ Crop','crop'],['◇ Phối cảnh','perspective']],'data-mode')+
+    '<p class="kpe-tip">Kéo các góc của vùng Crop hoặc Phối cảnh trên ảnh phải, rồi nhấn Áp dụng.</p>';
+  else if(tab==='text')panel.innerHTML='<h3>Viết chữ</h3>'+buttons([['T + Chèn chữ','text']],'data-mode')+
+    '<div id="kpeTextFields"></div><p class="kpe-tip">Nhập chữ có dấu, chọn màu và cỡ chữ, bấm trực tiếp lên ảnh để đặt vị trí.</p>';
  }
- function transform(action){
-  if(busy)return;pushUndo();const w=working.width,h=working.height,rot=action==='rotateL'||action==='rotateR';
-  const out=make(rot?h:w,rot?w:h),ctx=out.getContext('2d');
-  if(action==='rotateR'){ctx.translate(h,0);ctx.rotate(Math.PI/2);}
-  if(action==='rotateL'){ctx.translate(0,w);ctx.rotate(-Math.PI/2);}
-  if(action==='flipH'){ctx.translate(w,0);ctx.scale(-1,1);}
-  if(action==='flipV'){ctx.translate(0,h);ctx.scale(1,-1);}
-  ctx.drawImage(working,0,0);working=out;dirty=true;leaveTool();reset();message('Đã sửa ảnh kết quả. Bấm Lưu chỉnh sửa để giữ bản này.');
+ function endTool(){
+  tool=tab==='shape'?'warp':'view';crop=null;quad=null;textPoint=null;brushPoint=null;
+  action('apply').hidden=true;action('cancel').hidden=true;draw();
  }
- async function apply(){
+ function switchTab(name){
+  if(busy)return;tab=name;endTool();renderPanel();
+  say(tab==='shape'?'Kéo trên ảnh bên phải để chỉnh dáng; giữ Space + chuột trái để kéo ảnh.':'Hai ảnh zoom và kéo đồng bộ; chỉ ảnh bên phải được chỉnh.');
+ }
+ function chooseMode(m){
+  if(busy)return;tool=m;
+  if(m==='crop')crop={x:working.width*.08,y:working.height*.08,w:working.width*.84,h:working.height*.84};
+  if(m==='perspective')quad=[[.07,.07],[.93,.07],[.93,.93],[.07,.93]].map(([x,y])=>[x*working.width,y*working.height]);
+  if(m==='text'){
+   textPoint={x:working.width*.18,y:working.height*.28};
+   const slot=by('#kpeTextFields');slot.innerHTML='<label>Chữ tiếng Việt <input type="text" id="kpeText" maxlength="200" value="Chúc mừng"></label><label>Cỡ chữ <input type="number" id="kpeFont" min="8" max="500" value="45"></label><label>Màu <input type="color" id="kpeColor" value="#ffffff"></label>';
+   slot.querySelectorAll('input').forEach(i=>i.oninput=draw);
+  }
+  action('apply').hidden=false;action('cancel').hidden=false;
+  action('apply').textContent=m==='crop'?'Cắt ảnh':m==='perspective'?'Nắn phối cảnh':'Đặt chữ';
+  draw();
+ }
+ function rotate(which){
+  makeUndo();const w=working.width,h=working.height,isRotate=which.startsWith('rotate'),out=make(isRotate?h:w,isRotate?w:h),ctx=out.getContext('2d');
+  if(which==='rotateR'){ctx.translate(h,0);ctx.rotate(Math.PI/2);}
+  if(which==='rotateL'){ctx.translate(0,w);ctx.rotate(-Math.PI/2);}
+  if(which==='flipH'){ctx.translate(w,0);ctx.scale(-1,1);}
+  if(which==='flipV'){ctx.translate(0,h);ctx.scale(1,-1);}
+  ctx.drawImage(working,0,0);working=out;changed();endTool();fit();
+ }
+ async function applyMode(){
   if(busy)return;busy=true;
   try{
-   if(mode==='crop'){
-    const x=limit(Math.round(rect.x),0,working.width-2),y=limit(Math.round(rect.y),0,working.height-2),w=limit(Math.round(rect.w),0,working.width-x),h=limit(Math.round(rect.h),0,working.height-y);
-    if(w<12||h<12)throw Error('Vùng cắt quá nhỏ.');
-    const out=make(w,h);out.getContext('2d').drawImage(working,x,y,w,h,0,0,w,h);pushUndo();working=out;
-   }else if(mode==='perspective'){
-    message('Đang nắn phối cảnh…');const out=await correctPerspective(working,quad,p=>message('Đang nắn phối cảnh… '+p+'%'));pushUndo();working=out;
-   }else if(mode==='text'){
-    const text=by('#kpeText')?.value?.trim();if(!text)throw Error('Chưa nhập chữ.');
-    const size=limit(Number(by('#kpeFont').value)||50,8,500),color=by('#kpeColor').value;
-    pushUndo();const ctx=working.getContext('2d');ctx.font='bold '+size+'px Arial,sans-serif';ctx.lineWidth=Math.max(1,size*.045);ctx.lineJoin='round';ctx.strokeStyle='#143b24';ctx.strokeText(text,textPoint.x,textPoint.y);ctx.fillStyle=color;ctx.fillText(text,textPoint.x,textPoint.y);
+   if(tool==='crop'){
+    const x=limit(Math.round(crop.x),0,working.width-2),y=limit(Math.round(crop.y),0,working.height-2),
+      w=limit(Math.round(crop.w),0,working.width-x),h=limit(Math.round(crop.h),0,working.height-y);
+    if(w<12||h<12)throw Error('Vùng cắt quá nhỏ');
+    const out=make(w,h);out.getContext('2d').drawImage(working,x,y,w,h,0,0,w,h);makeUndo();working=out;
+   }else if(tool==='perspective'){
+    const out=await correctPerspective(working,quad,n=>say('Đang sửa phối cảnh '+n+'%'));makeUndo();working=out;
+   }else if(tool==='text'){
+    const str=by('#kpeText')?.value.trim();if(!str)throw Error('Chưa nhập chữ');
+    makeUndo();const ctx=working.getContext('2d'),size=limit(+by('#kpeFont').value||45,8,500);
+    ctx.font='bold '+size+'px Arial,sans-serif';ctx.lineWidth=Math.max(1,size*.045);ctx.lineJoin='round';
+    ctx.strokeStyle='#173f23';ctx.strokeText(str,textPoint.x,textPoint.y);ctx.fillStyle=by('#kpeColor').value;ctx.fillText(str,textPoint.x,textPoint.y);
    }
-   dirty=true;leaveTool();reset();message('Đã áp dụng. Bấm Lưu chỉnh sửa trước khi tải.');
-  }catch(e){message('Lỗi: '+e.message);}finally{busy=false;}
+   changed();endTool();fit();say('Đã áp dụng. Bấm Lưu chỉnh sửa để dùng bản này khi tải.');
+  }catch(e){say('Không áp dụng được: '+e.message);}
+  finally{busy=false;}
  }
  async function save(){
   if(busy)return;busy=true;
-  try{message('Đang lưu bản chỉnh sửa…');const output=await snapshot(working,type);await onSaved(output);dirty=false;undo=[];message('Đã lưu. Đóng Preview để tải ảnh, không cần xử lý lại.');}
-  catch(e){message('Không lưu được: '+e.message);}finally{busy=false;}
+  try{say('Đang lưu ảnh…');const output=await snapshot(filtered(),type);await onSaved(output);dirty=false;undo=[];say('Đã lưu. Đóng Preview rồi bấm Tải tất cả.');}
+  catch(e){say('Không lưu được: '+e.message);}finally{busy=false;}
  }
  async function restore(){
   if(busy)return;busy=true;
-  try{working=toCanvas(result);await onReset?.();dirty=false;undo=[];leaveTool();reset();message('Đã khôi phục ảnh sau xử lý.');}
-  catch(e){message('Không khôi phục được: '+e.message);}finally{busy=false;}
+  try{working=toCanvas(original);settings=DEFAULT_EDITS();renderDirty=true;await onReset?.();dirty=false;undo=[];endTool();renderPanel();fit();say('Đã khôi phục về ảnh gốc.');}
+  catch(e){say('Lỗi khôi phục: '+e.message);}finally{busy=false;}
  }
- function close(){
-  if(busy)return;if(dirty&&!window.confirm('Ảnh đang có thay đổi chưa lưu. Đóng và bỏ thay đổi?'))return;modal.close();
+ function close(){if(busy)return;if(dirty&&!window.confirm('Bạn có thay đổi chưa lưu. Bỏ những thay đổi này?'))return;modal.close();}
+ function escape(){if(busy)return;if(['crop','perspective','text'].includes(tool)){endTool();return;}if(!isFit()){fit();return;}close();}
+ let spaceDown=false;
+ function pointerDown(e,i){
+  if(e.button!==0||busy)return;
+  const c=canvases[i],pt=point(e,i),m={x:e.offsetX,y:e.offsetY};
+  if(i===1&&tool==='warp'&&!spaceDown){
+   makeUndo();drag={type:'warp',from:pt,source:toCanvas(working),moved:false};c.setPointerCapture(e.pointerId);return;
+  }
+  if(i===1&&tool==='text'){textPoint={x:limit(pt.x,0,working.width),y:limit(pt.y,0,working.height)};draw();return;}
+  if(i===1&&tool==='perspective'){
+   let index=-1,d=20;quad.forEach((v,j)=>{const p=screen(v[0],v[1]),vDist=Math.hypot(p.x-m.x,p.y-m.y);if(vDist<d){d=vDist;index=j;}});
+   if(index<0)return;drag={type:'perspective',index};
+  }else if(i===1&&tool==='crop'){
+   const corners=[[crop.x,crop.y],[crop.x+crop.w,crop.y],[crop.x+crop.w,crop.y+crop.h],[crop.x,crop.y+crop.h]];
+   let index=-1,d=20;corners.forEach((v,j)=>{const p=screen(v[0],v[1]),vDist=Math.hypot(p.x-m.x,p.y-m.y);if(vDist<d){d=vDist;index=j;}});
+   drag=index>=0?{type:'cropCorner',index,start:{...crop}}:{type:'cropMove',from:pt,start:{...crop}};
+  }else drag={type:'pan',x:e.clientX,y:e.clientY};
+  c.setPointerCapture(e.pointerId);
  }
- function escape(){
-  if(busy)return;if(mode!=='view'){leaveTool();message('Đã thoát công cụ.');return;}
-  if(!isFit()){reset();message('Đã đặt lại vị trí và zoom. Nhấn ESC lần nữa để đóng Preview.');return;}
-  close();
+ function pointerMove(e,i){
+  if(i===1&&tool==='warp')brushPoint=point(e,i);
+  if(!drag){if(i===1&&tool==='warp')draw();return;}
+  const pt=point(e,i);
+  if(drag.type==='pan'){panX+=e.clientX-drag.x;panY+=e.clientY-drag.y;drag.x=e.clientX;drag.y=e.clientY;}
+  if(drag.type==='warp'){
+   if(Math.hypot(pt.x-drag.from.x,pt.y-drag.from.y)>1){working=deformAt(drag.source,drag.from,pt,brushRadius,brushPower,brush);drag.moved=true;changed();}
+  }
+  if(drag.type==='perspective')quad[drag.index]=[limit(pt.x,0,working.width),limit(pt.y,0,working.height)];
+  if(drag.type==='cropMove'){crop.x=limit(drag.start.x+pt.x-drag.from.x,0,working.width-crop.w);crop.y=limit(drag.start.y+pt.y-drag.from.y,0,working.height-crop.h);}
+  if(drag.type==='cropCorner'){
+   const s=drag.start;let x=s.x,y=s.y,x2=s.x+s.w,y2=s.y+s.h;
+   if(drag.index===0||drag.index===3)x=limit(pt.x,0,x2-12);else x2=limit(pt.x,x+12,working.width);
+   if(drag.index===0||drag.index===1)y=limit(pt.y,0,y2-12);else y2=limit(pt.y,y+12,working.height);
+   crop={x,y,w:x2-x,h:y2-y};
+  }
+  draw();
  }
- function down(event,index){
-  if(event.button!==0||busy)return;
-  const c=canvases[index],pt=imagePoint(event,index),xy={x:event.offsetX,y:event.offsetY};
-  if(index===1&&mode==='text'){textPoint={x:limit(pt.x,0,working.width),y:limit(pt.y,0,working.height)};paint();return;}
-  if(index===1&&mode==='perspective'){
-   let ix=-1,dist=20;quad.forEach((p,i)=>{const q=displayPoint(p[0],p[1]),d=Math.hypot(xy.x-q.x,xy.y-q.y);if(d<dist){dist=d;ix=i;}});
-   if(ix<0)return;drag={type:'quad',ix};
-  }else if(index===1&&mode==='crop'){
-   const p=[[rect.x,rect.y],[rect.x+rect.w,rect.y],[rect.x+rect.w,rect.y+rect.h],[rect.x,rect.y+rect.h]];
-   let ix=-1,dist=20;p.forEach((q,i)=>{const v=displayPoint(q[0],q[1]),d=Math.hypot(xy.x-v.x,xy.y-v.y);if(d<dist){dist=d;ix=i;}});
-   drag=ix>=0?{type:'cropHandle',ix,start:{...rect}}:{type:'cropMove',start:{...rect},at:pt};
-  }else if(mode==='view')drag={type:'pan',x:event.clientX,y:event.clientY};
-  if(drag)c.setPointerCapture(event.pointerId);
- }
- function move(event,index){
-  if(!drag||busy)return;const pt=imagePoint(event,index);
-  if(drag.type==='pan'){panX+=event.clientX-drag.x;panY+=event.clientY-drag.y;drag.x=event.clientX;drag.y=event.clientY;}
-  if(drag.type==='quad')quad[drag.ix]=[limit(pt.x,0,working.width-1),limit(pt.y,0,working.height-1)];
-  if(drag.type==='cropMove'){rect.x=limit(drag.start.x+pt.x-drag.at.x,0,working.width-rect.w);rect.y=limit(drag.start.y+pt.y-drag.at.y,0,working.height-rect.h);}
-  if(drag.type==='cropHandle'){
-   const s=drag.start;let a=s.x,b=s.y,c=s.x+s.w,d=s.y+s.h;
-   if(drag.ix===0||drag.ix===3)a=limit(pt.x,0,c-12);else c=limit(pt.x,a+12,working.width);
-   if(drag.ix===0||drag.ix===1)b=limit(pt.y,0,d-12);else d=limit(pt.y,b+12,working.height);
-   rect={x:a,y:b,w:c-a,h:d-b};
-  }paint();
- }
- function wheel(e,index){
+ function pointerUp(e,i){if(drag?.type==='warp'&&!drag.moved)undo.pop();drag=null;try{canvases[i].releasePointerCapture(e.pointerId);}catch{}}
+ function wheel(e,i){
   e.preventDefault();if(busy)return;
-  const c=canvases[index],bounds=c.getBoundingClientRect(),x=e.clientX-bounds.left-c.clientWidth/2,y=e.clientY-bounds.top-c.clientHeight/2;
-  const prev=scale;scale=limit(scale*Math.exp(-e.deltaY*.0018),.1,256);
-  const ratio=scale/prev;panX=x-(x-panX)*ratio;panY=y-(y-panY)*ratio;paint();
+  const c=canvases[i],bounds=c.getBoundingClientRect(),x=e.clientX-bounds.left-c.clientWidth/2,y=e.clientY-bounds.top-c.clientHeight/2;
+  const prev=zoom;zoom=limit(zoom*Math.exp(-e.deltaY*.0018),.1,256);const f=zoom/prev;
+  panX=x-(x-panX)*f;panY=y-(y-panY)*f;draw();
  }
  canvases.forEach((c,i)=>{
   c.addEventListener('wheel',e=>wheel(e,i),{passive:false});
-  c.addEventListener('pointerdown',e=>down(e,i));
-  c.addEventListener('pointermove',e=>move(e,i));
-  c.addEventListener('pointerup',e=>{drag=null;try{c.releasePointerCapture(e.pointerId);}catch{}});
-  c.addEventListener('pointercancel',()=>drag=null);
-  c.addEventListener('dblclick',()=>{if(mode!=='view')return;if(scale>1.1)reset();else{scale=2;paint();}});
+  c.addEventListener('pointerdown',e=>pointerDown(e,i));
+  c.addEventListener('pointermove',e=>pointerMove(e,i));
+  c.addEventListener('pointerup',e=>pointerUp(e,i));
+  c.addEventListener('pointercancel',e=>pointerUp(e,i));
+  c.addEventListener('dblclick',()=>{if(tool!=='view'&&tool!=='warp')return;if(zoom>1.1)fit();else{zoom=2;draw();}});
  });
- modal.querySelectorAll('[data-click]').forEach(b=>b.onclick=()=>{
-  const action=b.dataset.click;
-  if(action==='close')close();
-  if(action==='fit')reset();
-  if(action==='pixel'){scale=limit(1/Math.min(fitting(0),fitting(1)),.1,256);panX=panY=0;paint();}
-  if(['rotateL','rotateR','flipH','flipV'].includes(action))transform(action);
-  if(action==='apply')void apply();
-  if(action==='save')void save();
-  if(action==='restore')void restore();
-  if(action==='cancel')leaveTool();
-  if(action==='undo'){if(!undo.length)return message('Không có bước để hoàn tác.');working=undo.pop();dirty=true;leaveTool();reset();message('Đã hoàn tác.');}
+ modal.querySelectorAll('[data-tab]').forEach(btn=>btn.onclick=()=>switchTab(btn.dataset.tab));
+ modal.addEventListener('click',event=>{
+  const btn=event.target.closest('[data-click],[data-mode],[data-color],[data-brush]');if(!btn)return;
+  if(btn.dataset.color){color=btn.dataset.color;renderPanel();return;}
+  if(btn.dataset.brush){brush=btn.dataset.brush;renderPanel();return;}
+  if(btn.dataset.mode){chooseMode(btn.dataset.mode);return;}
+  const a=btn.dataset.click;
+  if(a==='close')close();if(a==='fit')fit();
+  if(a==='pixel'){zoom=limit(1/Math.min(fitSide(0),fitSide(1)),.1,256);panX=panY=0;draw();}
+  if(a==='undo'){if(!undo.length){say('Không có thao tác để hoàn tác');return;}const old=undo.pop();working=old.image;settings=old.settings;changed();renderPanel();endTool();fit();}
+  if(a==='restore')void restore();if(a==='save')void save();if(a==='apply')void applyMode();if(a==='cancel')endTool();
+  if(['rotateL','rotateR','flipH','flipV'].includes(a))rotate(a);
+  if(a==='resetHsl'){makeUndo();settings.hsl[color]={h:0,s:0,l:0};changed();renderPanel();draw();}
  });
- modal.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
- modal.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();escape();}},true);
+ panel.addEventListener('pointerdown',e=>{if(e.target.matches('[data-adjust]')&&!busy)makeUndo();});
+ panel.addEventListener('input',e=>{
+  const el=e.target.closest('[data-adjust]');if(!el)return;
+  const key=el.dataset.adjust,value=Number(el.value);
+  if(key==='brushPower')brushPower=value;
+  else if(key==='brushRadius')brushRadius=value;
+  else if(key.startsWith('hsl.'))settings.hsl[color][key.slice(4)]=value;
+  else settings[key]=value;
+  const out=panel.querySelector('[data-value="'+key+'"]');if(out)out.textContent=value;
+  if(key.startsWith('brush')){draw();return;}
+  changed();clearTimeout(repaintTimer);repaintTimer=setTimeout(draw,65);
+ });
+ modal.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();escape();}
+  if(e.code==='Space'&&!['INPUT','TEXTAREA'].includes(e.target.tagName)){spaceDown=true;e.preventDefault();}
+ },true);
+ modal.addEventListener('keyup',e=>{if(e.code==='Space')spaceDown=false;},true);
  modal.addEventListener('cancel',e=>{e.preventDefault();escape();});
- const observer=new ResizeObserver(paint);observer.observe(modal.querySelector('.kpe-panes'));
- by('#kpeFilename').textContent=file.name+' · Ảnh bên trái luôn được giữ nguyên';
- modal.addEventListener('close',()=>{observer.disconnect();original.close?.();result.close?.();modal.remove();});
- modal.showModal();requestAnimationFrame(paint);
+ const observer=new ResizeObserver(draw);observer.observe(by('.kpe-panes'));
+ by('#kpeFilename').textContent=file.name+' · chỉnh trực tiếp trên ảnh kết quả';
+ modal.addEventListener('close',()=>{observer.disconnect();clearTimeout(repaintTimer);original.close?.();result.close?.();modal.remove();});
+ renderPanel();modal.showModal();requestAnimationFrame(draw);
 }
