@@ -1,29 +1,46 @@
-/* Kan Photo full-screen comparison and photo editing. Self-contained. */
-.kpe-modal{border:0;padding:0;margin:auto;width:98vw;max-width:none;height:96vh;max-height:none;border-radius:14px;color:#dcece1;background:#182622;box-shadow:0 20px 90px #0008;font:14px system-ui,'Segoe UI',sans-serif}
-.kpe-modal::backdrop{background:rgba(7,19,13,.85)}
-.kpe-shell{height:100%;min-height:0;display:flex;flex-direction:column;overflow:hidden}
-.kpe-top{background:#263d31;display:flex;align-items:center;gap:10px;padding:10px 15px;flex-shrink:0}
-.kpe-top>div{display:flex;flex:1;flex-direction:column;gap:2px;min-width:0}
-.kpe-top strong{color:#e5f9e9;letter-spacing:.03em}
-.kpe-top small{font-size:11px;color:#b2d3bf;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.kpe-top span{font-variant-numeric:tabular-nums;font-size:12px;color:#d0efd5}
-.kpe-modal button{border:1px solid #557969;border-radius:8px;background:#31513f;color:#e8f6ee;padding:8px 11px;font:inherit;cursor:pointer;white-space:nowrap}
-.kpe-modal button:hover{background:#47785b}
-.kpe-modal button.active{background:#75b99a;color:#173b24;border-color:#a3deb0}
-.kpe-top button[data-click=close]{font-size:22px;line-height:1;padding:4px 11px}
-.kpe-tools{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:9px 12px;background:#203429;border-bottom:1px solid #405447;flex-shrink:0}
-.kpe-tools button{font-size:12px;padding:7px 9px}
-.kpe-fields{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:10px;background:#31543e;flex-shrink:0}
-.kpe-fields[hidden]{display:none}
-.kpe-fields label{display:flex;align-items:center;gap:5px}
-.kpe-fields input{min-width:80px;max-width:240px;padding:6px 8px;border:1px solid #bed6c2;border-radius:6px;background:#fafffb;color:#153521}
-.kpe-fields input[type=color]{width:38px;min-width:38px;padding:1px;height:34px}
-.kpe-panes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));flex:1;gap:5px;padding:8px;overflow:hidden;min-height:0}
-.kpe-side{display:flex;flex-direction:column;overflow:hidden;min-width:0;min-height:0;border:1px solid #41624d;background:#18241d;border-radius:8px}
-.kpe-side b{text-align:center;font-size:12px;letter-spacing:.06em;padding:7px 4px;background:#243d2d;color:#b3e7c1}
-.kpe-side canvas{display:block;width:100%;height:calc(100% - 32px);touch-action:none;cursor:grab;min-height:0;min-width:0}
+/* Compact six-tab Kan Photo editor, all controls remain inside Preview */
+.kpe-modal{border:0;padding:0;margin:auto;width:99vw;max-width:none;height:98vh;max-height:none;border-radius:13px;color:#e5f0e7;background:#172820;box-shadow:0 20px 80px #0008;font:13px system-ui,'Segoe UI',sans-serif}
+.kpe-modal::backdrop{background:rgba(5,18,9,.87)}
+.kpe-shell{display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidden}
+.kpe-modal button{font:inherit;background:#2f503c;color:#e8faed;border:1px solid #567965;border-radius:7px;padding:7px 10px;cursor:pointer}
+.kpe-modal button:hover{background:#456c50}
+.kpe-modal button.active{background:#79c398;color:#183d29;border-color:#a4dfb3;font-weight:700}
+.kpe-top{flex:none;display:flex;align-items:center;gap:9px;background:#223c2d;border-bottom:1px solid #466a51;padding:8px 12px}
+.kpe-top>div{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.kpe-top strong{color:#cbebd1;font-size:14px}
+.kpe-top small{color:#a7c7ac;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpe-top>span{font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.kpe-top button{padding:6px 9px}
+.kpe-workspace{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 292px;gap:6px;min-height:0;overflow:hidden;padding:7px}
+.kpe-panes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;min-width:0;min-height:0}
+.kpe-side{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;border:1px solid #4a7358;background:#14221a;border-radius:8px}
+.kpe-side b{font-size:11px;letter-spacing:.07em;text-align:center;padding:7px 3px;color:#c2e9cc;background:#294a32}
+.kpe-side canvas{display:block;width:100%;height:calc(100% - 30px);min-width:0;min-height:0;touch-action:none;cursor:grab}
 .kpe-side canvas:active{cursor:grabbing}
-.kpe-bottom{display:flex;align-items:center;gap:7px;padding:10px 12px;border-top:1px solid #50755b;background:#263d31;flex-shrink:0}
-.kpe-bottom span{flex:1;min-width:140px;font-size:12px;color:#d2ebd4}
-.kpe-bottom .kpe-green{background:#72c18c;border-color:#a9deba;color:#102e1d;font-weight:700}
-@media(max-width:900px){.kpe-modal{width:100vw;height:100dvh;border-radius:0}.kpe-top{padding:6px}.kpe-tools{gap:3px;padding:5px}.kpe-tools button{font-size:10px;padding:5px}.kpe-panes{gap:2px;padding:3px}.kpe-bottom{flex-wrap:wrap}.kpe-bottom span{flex:1 0 100%}}
+.kpe-sidebar{display:flex;flex-direction:column;min-height:0;overflow:hidden;border:1px solid #496a51;background:#213c2c;border-radius:8px}
+.kpe-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:8px;border-bottom:1px solid #42634c;flex:none}
+.kpe-tabs button{padding:9px 3px;font-size:11px;min-width:0;border-color:#557763;white-space:nowrap}
+.kpe-controls{overflow-y:auto;padding:12px;min-height:0;overscroll-behavior:contain;scrollbar-width:thin;flex:1}
+.kpe-controls h3{font-size:14px;color:#c8f3d1;margin:0 0 9px}
+.kpe-controls p{margin:5px 0 13px;font-size:12px;color:#bedac6;line-height:1.5}
+.kpe-slider{display:grid;grid-template-columns:1fr 42px;gap:3px 7px;align-items:center;margin:0 0 13px}
+.kpe-slider span{grid-column:1;font-size:12px}
+.kpe-slider output{grid-column:2;grid-row:1;text-align:right;font-variant-numeric:tabular-nums;color:#c5f0cc}
+.kpe-slider input{grid-column:1/3;width:100%;accent-color:#7dd1a0;cursor:pointer}
+.kpe-brushes,.kpe-button-group{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:10px 0 14px}
+.kpe-brushes button,.kpe-button-group button{min-width:0;padding:9px 5px;font-size:12px}
+.kpe-tip{background:#2a4b34;padding:10px;border-radius:8px;border:1px solid #5a8067}
+.kpe-swatches{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
+.kpe-swatches button{display:grid;place-items:center;min-height:32px;padding:4px}
+.kpe-swatches button span{width:20px;height:20px;border-radius:50%;background:var(--swatch);border:1px solid #fff5}
+.kpe-color-name{text-align:center;font-weight:700}
+.kpe-bottom{flex:none;display:flex;align-items:center;gap:7px;background:#223c2d;border-top:1px solid #4c7355;padding:8px 10px}
+.kpe-bottom span{flex:1;color:#bedac4;font-size:11px}
+.kpe-bottom .kpe-green{background:#79c896;color:#163c25;border-color:#a8e2b8;font-weight:750}
+.kpe-modal [hidden]{display:none!important}
+#kpeTextFields{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+#kpeTextFields label{display:flex;flex-direction:column;gap:4px}
+#kpeTextFields input{width:100%;max-width:100%;background:#f5fcf6;color:#183923;border-radius:6px;border:1px solid #8fbd9d;padding:7px}
+#kpeTextFields input[type=color]{height:35px;padding:1px}
+@media(max-width:1050px){.kpe-workspace{grid-template-columns:minmax(0,1fr) 235px}.kpe-tabs button{font-size:10px}.kpe-controls{padding:8px}}
+@media(max-width:750px){.kpe-modal{width:100vw;height:100dvh;border-radius:0}.kpe-workspace{grid-template-columns:1fr;grid-template-rows:minmax(240px,1fr) minmax(180px,40%)}.kpe-sidebar{min-height:180px}.kpe-tabs{grid-template-columns:repeat(6,minmax(0,1fr))}.kpe-tabs button{font-size:9px}.kpe-bottom{flex-wrap:wrap}.kpe-bottom span{flex:1 0 100%}}
