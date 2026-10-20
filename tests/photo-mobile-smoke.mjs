@@ -34,7 +34,15 @@ try{
  await openPhotoTool();
  await uploadSame();
  await page.locator('#kanPhotoOpen').click();
- const modal=page.locator('dialog.kpe-modal');await modal.waitFor({state:'visible',timeout:15000});
+ const modal=page.locator('dialog.kpe-modal');
+ await page.waitForTimeout(1200);
+ console.log('MOBILE DEBUG',JSON.stringify({
+   status:await page.locator('#kanPhotoMessage').innerText(),
+   modalCount:await modal.count(),
+   modalOpen:await modal.count()?await modal.evaluate(el=>el.open):false,
+   pageErrors:failures
+ }));
+ await modal.waitFor({state:'visible',timeout:8000});
  assert(await modal.evaluate(el=>el.classList.contains('kpe-is-mobile')),'Phone should be auto detected');
  assert(await modal.locator('[data-tab]').count()===6,'All six tabs must remain');
  assert(await modal.locator('.kpe-side').first().isHidden(),'Original image panel should be hidden on phone');
