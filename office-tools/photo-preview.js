@@ -51,7 +51,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
   st.href=new URL('./photo-preview.css?v=4.0.0',import.meta.url).href;document.head.appendChild(st);
  }
  const original=await createImageBitmap(file),result=await createImageBitmap(editState?.baseBlob||blob||file);
- const phoneScreen=()=>globalThis.matchMedia?.('(pointer: coarse)').matches && Math.min(screen.width,screen.height)<=680;
+ const phoneScreen=()=>globalThis.matchMedia?.('(pointer: coarse)').matches && Math.min(globalThis.screen.width,globalThis.screen.height)<=680;
  const mobile=Boolean(phoneScreen()||(window.innerWidth<=650&&navigator.maxTouchPoints>0));
  let compareHeld=false,closed=false,activeTouches=new Map(),pinch=null,suppressTouches=false;
  let sheetHeight=0,sheetDrag=null,redo=[],previewCache=null,previewDirty=true;
