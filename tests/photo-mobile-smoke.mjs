@@ -24,10 +24,9 @@ async function uploadSame(){
  });
 }
 function percent(value){const number=parseInt(String(value));return Number.isFinite(number)?number:0;}
+const cdp=await context.newCDPSession(page);
 async function touchGesture(touches){
- const cdp=await context.newCDPSession(page);
  for(const step of touches){await cdp.send('Input.dispatchTouchEvent',{type:step.type,touchPoints:step.points.map(([x,y],i)=>({x:Math.round(x),y:Math.round(y),id:i+1}))});await page.waitForTimeout(80);}
- await cdp.detach();
 }
 try{
  await page.goto(server,{waitUntil:'domcontentloaded'});
@@ -90,4 +89,4 @@ try{
  assert(file.suggestedFilename()==='mobile_photo_KAN.png','Mobile saved PNG must download');
  assert(failures.length===0,'Unexpected JavaScript errors: '+failures.join('; '));
  console.log('KAN PHOTO MOBILE E2E PASS: auto mobile UI, pinch, compare-hold, sheet, local brush, offline draft recovery, full-res export.');
-}finally{await browser.close();}
+}finally{await cdp.detach();await browser.close();}
