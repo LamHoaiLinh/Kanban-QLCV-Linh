@@ -33,6 +33,22 @@ try{
  await page.mouse.down();await page.mouse.move(rect.x+rect.width*.42,rect.y+rect.height*.48,{steps:6});await page.mouse.up();
  const afterWarp=await result.evaluate(canvas=>canvas.toDataURL());
  assert(beforeWarp!==afterWarp,'Dragging shape brush must visibly modify pixels');
+ // Save the shape edit alone and verify that actual exported pixels differ from the source.
+ await modal.locator('[data-click="save"]').click();
+ await page.waitForFunction(()=>document.querySelector('.kpe-modal #kpeHint')?.textContent?.includes('Đã lưu'),null,{timeout:30000});
+ const shapeDifference=await page.evaluate(async()=>{
+   const left=document.querySelector('#kanPhotoBefore'),right=document.querySelector('#kanPhotoAfter');
+   await Promise.all([left.decode(),right.decode()]);
+   const cv=document.createElement('canvas');cv.width=320;cv.height=450;
+   const ctx=cv.getContext('2d');ctx.drawImage(left,0,0,320,450);
+   const a=ctx.getImageData(0,0,320,450).data;
+   ctx.clearRect(0,0,320,450);ctx.drawImage(right,0,0,320,450);
+   const b=ctx.getImageData(0,0,320,450).data;
+   let sum=0;for(let i=0;i<a.length;i+=4)sum+=Math.abs(a[i]-b[i])+Math.abs(a[i+1]-b[i+1])+Math.abs(a[i+2]-b[i+2]);
+   return sum/(320*450*3);
+ });
+ assert(shapeDifference>.01,'Manual body edit must change exported image pixels, not only brush overlay');
+
  await modal.locator('[data-tab="basic"]').click();
  await modal.locator('[data-adjust="exposure"]').fill('35');
  await modal.locator('[data-tab="hsl"]').click();
