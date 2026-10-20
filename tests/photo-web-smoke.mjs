@@ -28,8 +28,11 @@ try{
  await result.waitFor();
  // Direct manual body warp: drag a point 24px across the visible canvas.
  const rect=await result.boundingBox();assert(rect,'Canvas not visible');
+ const beforeWarp=await result.evaluate(canvas=>canvas.toDataURL());
  await page.mouse.move(rect.x+rect.width*.48,rect.y+rect.height*.48);
  await page.mouse.down();await page.mouse.move(rect.x+rect.width*.42,rect.y+rect.height*.48,{steps:6});await page.mouse.up();
+ const afterWarp=await result.evaluate(canvas=>canvas.toDataURL());
+ assert(beforeWarp!==afterWarp,'Dragging shape brush must visibly modify pixels');
  await modal.locator('[data-tab="basic"]').click();
  await modal.locator('[data-adjust="exposure"]').fill('35');
  await modal.locator('[data-tab="hsl"]').click();
