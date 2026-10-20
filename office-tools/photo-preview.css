@@ -115,3 +115,7 @@
 .kpe-is-mobile .kpe-slider input{grid-column:1/4}
 .kpe-is-mobile .kpe-slider output{grid-column:2;grid-row:1;cursor:pointer;padding:4px;border-radius:5px;background:#375e44}
 .kpe-is-mobile .kpe-slider .kpe-reset-slider{display:block;grid-column:3;grid-row:1;min-width:34px;min-height:34px;padding:3px;font-size:20px}
+
+/* Keep Apply and Cancel independently tappable when a mobile edit tool is open. */
+.kpe-is-mobile .kpe-bottom [data-click="apply"]{grid-area:action;justify-self:end;width:calc(50% - 4px)}
+.kpe-is-mobile .kpe-bottom [data-click="cancel"]{grid-area:action;justify-self:start;width:calc(50% - 4px)}
