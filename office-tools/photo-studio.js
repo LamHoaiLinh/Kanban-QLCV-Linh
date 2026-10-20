@@ -1,5 +1,5 @@
 /* KAN PHOTO Studio: simple local image library. All editing lives in Preview. */
-import {openPhotoPreview} from './photo-preview.js?v=3.0.0';
+import {openPhotoPreview} from './photo-preview.js?v=3.0.1';
 import {applyAdjustments} from './photo-filters.js?v=1.0.0';
 const ITEMS=[];
 let selected=0,host=null,api=null,opening=false,downloading=false;
