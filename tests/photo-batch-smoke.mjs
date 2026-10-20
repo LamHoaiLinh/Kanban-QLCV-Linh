@@ -2,6 +2,8 @@ import {chromium} from 'playwright';
 
 const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
 const page=await browser.newPage({viewport:{width:1440,height:900},acceptDownloads:true});
+// Test the standard download branch rather than Chromium's native Save File picker.
+await page.addInitScript(()=>{try{delete window.showSaveFilePicker;}catch{}});
 const errors=[];page.on('pageerror',e=>errors.push(String(e)));
 function check(condition,message){if(!condition)throw Error(message);}
 const wait=()=>page.waitForTimeout(120);
