@@ -44,3 +44,16 @@
 #kpeTextFields input[type=color]{height:35px;padding:1px}
 @media(max-width:1050px){.kpe-workspace{grid-template-columns:minmax(0,1fr) 235px}.kpe-tabs button{font-size:10px}.kpe-controls{padding:8px}}
 @media(max-width:750px){.kpe-modal{width:100vw;height:100dvh;border-radius:0}.kpe-workspace{grid-template-columns:1fr;grid-template-rows:minmax(240px,1fr) minmax(180px,40%)}.kpe-sidebar{min-height:180px}.kpe-tabs{grid-template-columns:repeat(6,minmax(0,1fr))}.kpe-tabs button{font-size:9px}.kpe-bottom{flex-wrap:wrap}.kpe-bottom span{flex:1 0 100%}}
+
+/* Mask painting, selectable rescue versions and AI section. */
+.kpe-controls hr{border:0;border-top:1px solid #64836b;margin:16px 0}
+.kpe-local{border:1px solid #638972;background:#274932;padding:9px;border-radius:9px;margin:8px 0 14px}
+.kpe-local strong{display:block;font-size:12px;margin-bottom:5px;color:#d8f7df}
+.kpe-local .kpe-button-group{margin:7px 0 9px}
+.kpe-local .kpe-tip{background:#32533d}
+.kpe-variants{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:9px 0}
+.kpe-variants button{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;padding:5px}
+.kpe-variants img{display:block;width:100%;aspect-ratio:1;object-fit:contain;border-radius:5px;background:#203c2b}
+.kpe-variants strong{font-size:11px}
+.kpe-variants small{display:block;font-size:9px;line-height:1.3;white-space:normal;color:#bad8c3}
+@media(max-width:1050px){.kpe-variants{grid-template-columns:repeat(3,minmax(0,1fr))}.kpe-variants strong{font-size:10px}}
