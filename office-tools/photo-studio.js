@@ -132,13 +132,13 @@ function bodyWarp(canvas,landmarks,mask){
  const mx=(points[11][0]+points[12][0]+points[23][0]+points[24][0])/4;
  const waistY=sy+(hy-sy)*.59;
  const regions=[];
- if(cfg.waist)regions.push({kind:'waist',cx:mx,cy:waistY,rx:shoulder*.70,ry:(hy-sy)*.43,intensity:.13*cfg.waistLevel/100});
+ if(cfg.waist)regions.push({kind:'waist',cx:mx,cy:waistY,rx:shoulder*.70,ry:(hy-sy)*.43,intensity:.32*cfg.waistLevel/100});
  if(cfg.arms)for(const triplet of [[11,13,15],[12,14,16]])if(triplet.every(ok)){
    const [a,b,c]=triplet.map(i=>points[i]);if(Math.hypot(a[0]-c[0],a[1]-c[1])<shoulder*.22)continue;
    for(const pair of [[a,b],[b,c]]){
      const x=(pair[0][0]+pair[1][0])/2,y=(pair[0][1]+pair[1][1])/2;
      const len=Math.hypot(pair[0][0]-pair[1][0],pair[0][1]-pair[1][1]);
-     regions.push({kind:'arm',cx:x,cy:y,rx:Math.max(shoulder*.19,16),ry:len*.57,intensity:.13*cfg.armLevel/100});
+     regions.push({kind:'arm',cx:x,cy:y,rx:Math.max(shoulder*.19,16),ry:len*.57,intensity:.36*cfg.armLevel/100});
    }
  }
  if(!regions.length)return {canvas,note:'Tay bị che hoặc tư thế không rõ, giữ nguyên dáng.'};
@@ -155,8 +155,8 @@ function bodyWarp(canvas,landmarks,mask){
      if(d2>=1)continue;
      const regionStrength=(1-d2)*(1-d2)*r.intensity;
      const px=clamp(Math.round(x+(x-r.cx)*regionStrength),0,w-1),py=y;
-     if(maskAt(x,y)<.52||maskAt(px,py)<.45)continue;
-     const dest=(y*w+x)*4,from=(py*w+px)*4,weight=clamp((maskAt(x,y)-.52)*4,0,1);
+     const atDst=maskAt(x,y),atSrc=maskAt(px,py);if(atDst<.34&&atSrc<.34)continue;
+     const dest=(y*w+x)*4,from=(py*w+px)*4,weight=clamp((Math.max(atDst,atSrc)-.34)*2.8,0,1);
      for(let c=0;c<3;c++)out.data[dest+c]=original.data[dest+c]*(1-weight)+original.data[from+c]*weight;
    }
  }
@@ -185,13 +185,13 @@ async function processImage(item,step){
    const needed=cfg.rescue&&(dark||grain||soft||m.small);
    let canvas=image;step(1,'Đã phân tích');
    // Efficient ordering: denoise before contrast/clarity; extra strength is bounded.
-   if(cfg.denoise||(needed&&grain)){denoise(canvas,clamp(50+(grain?26:0)+cfg.extraNoise*.4,0,100));notes.push('giảm hạt');}
+   if((cfg.denoise&&m.noise>2.7)||(needed&&grain)||cfg.extraNoise){denoise(canvas,clamp(43+(grain?27:0)+cfg.extraNoise*.46,0,100));notes.push('giảm hạt');}
    step(2,'Đã giảm hạt');await pause();
-   if(cfg.deblock&&item.file.type==='image/jpeg'){denoise(canvas,24);notes.push('giảm vỡ ảnh');}
+   if(cfg.deblock&&item.file.type==='image/jpeg'&&m.noise>3.3){denoise(canvas,24);notes.push('giảm vỡ ảnh');}
    if(cfg.lighting||(needed&&dark)||cfg.extraLight){light(canvas,m,cfg.extraLight+(needed&&dark?18:0));notes.push('tăng sáng');}
    if(cfg.color)color(canvas);
    step(3,'Đã chỉnh sáng và màu');await pause();
-   if(cfg.clarity||cfg.extraSharp||(needed&&soft)){sharpen(canvas,clamp(30+(needed&&soft?18:0)+cfg.extraSharp*.52,0,84),m.noise);notes.push('làm rõ nét');}
+   if((cfg.clarity&&(soft||m.edges<.16))||cfg.extraSharp||(needed&&soft)){sharpen(canvas,clamp(30+(needed&&soft?18:0)+cfg.extraSharp*.52,0,84),m.noise);notes.push('làm rõ nét');}
    step(4,'Đã tăng nét');await pause();
    const bodyNote=await applyBody(canvas);if(bodyNote)notes.push(bodyNote);
    step(5,'Đã kiểm tra vóc dáng');await pause();
@@ -209,13 +209,13 @@ async function run(){
  if(processing||!ITEMS.length)return;
  processing=true;renderList();const runBtn=host.querySelector('#kanPhotoRun'),clearBtn=host.querySelector('#kanPhotoClear');
  runBtn.disabled=true;clearBtn.disabled=true;
- api.startBusy('Đang xử lý ảnh…');let done=0,failed=0;const outputs=[];
+ api.startBusy('Đang xử lý ảnh…');let done=0,failed=0;const outputs=[];const usedNames=new Map();
  try{
    for(let i=0;i<ITEMS.length;i++){
      api.assertNotAborted();const item=ITEMS[i];item.status='Đang xử lý';selected=i;renderList();
      try{
        const result=await processImage(item,(s,note)=>{show('Ảnh '+(i+1)+'/'+ITEMS.length+': '+note,Math.round(((i+s/7)/ITEMS.length)*85));});
-       item.blob=result.blob;item.note=result.note;item.status='Hoàn thành';outputs.push({blob:item.blob,name:filename(item.file.name)});
+       item.blob=result.blob;item.note=result.note;item.status='Hoàn thành';const baseName=filename(item.file.name),n=(usedNames.get(baseName)||0)+1;usedNames.set(baseName,n);const uniqueName=n===1?baseName:baseName.replace(/(\.[^.]+)$/, '_'+n+'$1');outputs.push({blob:item.blob,name:uniqueName});
        done++;renderPreview(i);
      }catch(e){item.status='Lỗi: '+(e.message||e);item.note=item.status;failed++;}
      renderList();await pause();
