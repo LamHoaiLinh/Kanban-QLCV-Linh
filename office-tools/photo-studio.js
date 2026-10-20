@@ -1,5 +1,6 @@
 /* KAN PHOTO Studio: simple local image library. All editing lives in Preview. */
-import {openPhotoPreview} from './photo-preview.js?v=2.0.0';
+import {openPhotoPreview} from './photo-preview.js?v=3.0.0';
+import {applyAdjustments} from './photo-filters.js?v=1.0.0';
 const ITEMS=[];
 let selected=0,host=null,api=null,opening=false,downloading=false;
 const matches=name=>/\.(jpe?g|png|webp)$/i.test(name);
@@ -15,7 +16,7 @@ function addFiles(files){
   if(!matches(file.name))continue;
   const key=file.name+'|'+file.size+'|'+file.lastModified;
   if(seen.has(key))continue;
-  seen.add(key);ITEMS.push({file,blob:null,status:'Chưa chỉnh'});added++;
+  seen.add(key);ITEMS.push({file,blob:null,editState:null,status:'Chưa chỉnh'});added++;
  }
  renderList();renderImages();
  show('Đã nạp '+added+' ảnh mới. Chọn ảnh rồi bấm MỞ PREVIEW để chỉnh.');
@@ -49,12 +50,35 @@ async function preview(){
  opening=true;renderList();
  try{
   await openPhotoPreview({
-   file:item.file,blob:item.blob||item.file,type:typeFor(item.file.name),
-   onSaved:async blob=>{
-    item.blob=blob;item.status='Đã lưu chỉnh sửa';renderList();renderImages();
+   file:item.file,blob:item.blob||item.file,type:typeFor(item.file.name),editState:item.editState,
+   onApplyBatch:async (recipe,progress)=>{
+    let done=0,failed=0;
+    for(let i=0;i<ITEMS.length;i++){
+     if(ITEMS[i]===item)continue;
+     const target=ITEMS[i];
+     try{
+      progress?.('Đang áp màu '+(i+1)+'/'+ITEMS.length+': '+target.file.name);
+      const bitmap=await createImageBitmap(target.file);
+      try{
+       if(bitmap.width*bitmap.height>18000000)throw Error('Ảnh quá lớn, bỏ qua để tránh hết bộ nhớ.');
+       const base=document.createElement('canvas');base.width=bitmap.width;base.height=bitmap.height;
+       base.getContext('2d').drawImage(bitmap,0,0);
+       const adjusted=applyAdjustments(base,recipe);
+       const mime=typeFor(target.file.name);
+       const result=await new Promise((ok,no)=>adjusted.toBlob(b=>b&&b.type===mime?ok(b):no(Error('Không xuất được định dạng này')),mime,.96));
+       target.blob=result;target.editState={baseBlob:target.file,settings:structuredClone(recipe),scope:'global',maskBlob:null};
+       target.status='Đã áp màu hàng loạt';done++;
+      }finally{bitmap.close();}
+     }catch(error){target.status='Bỏ qua: '+error.message;failed++;}
+     if(i%2===0)await new Promise(resolve=>setTimeout(resolve,0));
+    }
+    renderList();renderImages();show('Đã áp màu '+done+' ảnh'+(failed?' · bỏ qua '+failed+' ảnh':'')+'.');return {done,failed};
+   },
+   onSaved:async (blob,state)=>{
+    item.blob=blob;item.editState=state;item.status='Đã lưu chỉnh sửa';renderList();renderImages();
     show('Đã lưu '+item.file.name+'. Có thể bấm TẢI TẤT CẢ hoặc tiếp tục chỉnh ảnh khác.');
    },
-   onReset:async ()=>{item.blob=null;item.status='Đã khôi phục ảnh gốc';renderList();renderImages();}
+   onReset:async ()=>{item.blob=null;item.editState=null;item.status='Đã khôi phục ảnh gốc';renderList();renderImages();}
   });
  }catch(error){show('Không mở được Preview: '+(error.message||error));}
  finally{opening=false;renderList();}
