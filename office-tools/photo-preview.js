@@ -1,5 +1,7 @@
 import {DEFAULT_EDITS,applyAdjustments,hasAdjustments} from './photo-filters.js?v=1.0.0';
 import {deformAt} from './photo-warp.js?v=1.0.0';
+import {applyMasked,createMask,stamp,variantsFrom,recipeFrom} from './photo-local.js?v=1.0.0';
+import {runPhotoModel} from './photo-ai.js?v=1.0.0';
 /*
  KAN PHOTO preview/editor — all pixels modified in-browser, original never edited.
  Zoom and pan shared by both canvases; edit tools apply to processed image only.
@@ -43,16 +45,21 @@ async function correctPerspective(src,q,progress){
  ctx.putImageData(im,0,0);progress(100);return out;
 }
 
-export async function openPhotoPreview({file,blob,type,onSaved,onReset}){
+export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBatch,editState=null}){
  if(!document.getElementById('kan-photo-preview-style')){
   const st=document.createElement('link');st.id='kan-photo-preview-style';st.rel='stylesheet';
   st.href=new URL('./photo-preview.css?v=2.0.0',import.meta.url).href;document.head.appendChild(st);
  }
- const original=await createImageBitmap(file),result=await createImageBitmap(blob||file);
- let working=toCanvas(result),settings=DEFAULT_EDITS(),rendered=null,renderDirty=true;
+ const original=await createImageBitmap(file),result=await createImageBitmap(editState?.baseBlob||blob||file);
+ let working=toCanvas(result),settings=editState?.settings?structuredClone(editState.settings):DEFAULT_EDITS(),rendered=null,renderDirty=true;
+ let editScope=editState?.scope||'global',localMask=createMask(working.width,working.height),paintMode='add',paintRadius=90,brushOpacity=90;
+ let variantsCache=null,AIbusy=false;
  let zoom=1,panX=0,panY=0,tab='shape',tool='warp',crop=null,quad=null,textPoint=null;
  let drag=null,dirty=false,busy=false,space=false,brushRadius=130,brushPower=68,brush='waist',brushPoint=null;
  let undo=[],color='orange',repaintTimer=null;
+ if(editState?.maskBlob){
+   try{const bitmap=await createImageBitmap(editState.maskBlob);localMask.getContext('2d').drawImage(bitmap,0,0);bitmap.close();}catch{editScope='global';}
+ }
  const channels=['red','orange','yellow','green','aqua','blue','purple','magenta'];
  const labels=['Đỏ','Cam','Vàng','Lục','Lam ngọc','Lam','Tím','Hồng'];
  const pigments=['#e85050','#ed9652','#d9c64c','#53b35c','#55c1be','#537ac7','#9c72cc','#cd69aa'];
@@ -65,9 +72,9 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset}){
  document.body.appendChild(modal);
  const by=s=>modal.querySelector(s),action=name=>by('[data-click="'+name+'"]'),panel=by('#kpeControls');
  const canvases=[...modal.querySelectorAll('.kpe-side canvas')],say=s=>by('#kpeHint').textContent=s;
- const filtered=()=>{if(renderDirty){rendered=hasAdjustments(settings)?applyAdjustments(working,settings):working;renderDirty=false;}return rendered;};
+ const filtered=()=>{if(renderDirty){rendered=hasAdjustments(settings)?applyMasked(working,settings,localMask,editScope==='local'):working;renderDirty=false;}return rendered;};
  const changed=()=>{renderDirty=true;dirty=true;};
- const makeUndo=()=>{undo.push({image:toCanvas(working),settings:structuredClone(settings)});if(undo.length>10)undo.shift();};
+ const makeUndo=()=>{undo.push({image:toCanvas(working),settings:structuredClone(settings),scope:editScope,mask:toCanvas(localMask)});if(undo.length>6)undo.shift();};
  const fitSide=i=>{const c=canvases[i],img=i?working:original;return Math.min(c.clientWidth/img.width,c.clientHeight/img.height);};
  const point=(e,i)=>{const c=canvases[i],rect=c.getBoundingClientRect(),im=i?working:original,f=fitSide(i)*zoom;return {x:(e.clientX-rect.left-c.clientWidth/2-panX)/f+im.width/2,y:(e.clientY-rect.top-c.clientHeight/2-panY)/f+im.height/2};};
  const screen=(x,y)=>{const c=canvases[1],f=fitSide(1)*zoom;return {x:c.clientWidth/2+panX+(x-working.width/2)*f,y:c.clientHeight/2+panY+(y-working.height/2)*f};};
@@ -83,7 +90,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset}){
    ctx.save();ctx.translate(w/2+panX,h/2+panY);ctx.scale(s,s);ctx.imageSmoothingEnabled=zoom<18;ctx.drawImage(img,-img.width/2,-img.height/2);ctx.restore();
    if(!i)continue;
    ctx.lineWidth=2;ctx.strokeStyle='#a3f39e';ctx.fillStyle='#fcffed';
-   if(tool==='warp'&&brushPoint){const p=screen(brushPoint.x,brushPoint.y);ctx.beginPath();ctx.arc(p.x,p.y,brushRadius*fitSide(1)*zoom,0,Math.PI*2);ctx.stroke();}
+   if((tool==='warp'||tool==='mask')&&brushPoint){const p=screen(brushPoint.x,brushPoint.y);ctx.beginPath();ctx.arc(p.x,p.y,(tool==='mask'?paintRadius:brushRadius)*fitSide(1)*zoom,0,Math.PI*2);ctx.stroke();}
    if(tool==='crop'&&crop){const a=screen(crop.x,crop.y),b=screen(crop.x+crop.w,crop.y+crop.h);ctx.strokeRect(a.x,a.y,b.x-a.x,b.y-a.y);
     for(const [x,y] of [[a.x,a.y],[b.x,a.y],[b.x,b.y],[a.x,b.y]]){ctx.fillRect(x-5,y-5,10,10);ctx.strokeRect(x-5,y-5,10,10);}}
    if(tool==='perspective'&&quad){const pts=quad.map(p=>screen(p[0],p[1]));ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(let j=1;j<4;j++)ctx.lineTo(pts[j].x,pts[j].y);ctx.closePath();ctx.stroke();
@@ -95,22 +102,34 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset}){
  }
  const slider=(key,label,value,min=-100,max=100)=>'<label class="kpe-slider"><span>'+label+'</span><input data-adjust="'+key+'" type="range" min="'+min+'" max="'+max+'" value="'+value+'"><output data-value="'+key+'">'+value+'</output></label>';
  const buttons=(list,attr='data-click')=>'<div class="kpe-button-group">'+list.map(([text,id])=>'<button type="button" '+attr+'="'+id+'">'+text+'</button>').join('')+'</div>';
+ const maskControls=()=>'<div class="kpe-local"><strong>Phạm vi chỉnh</strong><div class="kpe-button-group"><button data-scope="global" class="'+(editScope==='global'?'active':'')+'">Toàn ảnh</button><button data-scope="local" class="'+(editScope==='local'?'active':'')+'">Tô vùng</button></div>'+
+ (editScope==='local'?'<div class="kpe-button-group"><button data-paint="add" class="'+(paintMode==='add'?'active':'')+'">Cọ chọn vùng</button><button data-paint="erase" class="'+(paintMode==='erase'?'active':'')+'">Xóa vùng tô</button></div>'+
+ slider('paintRadius','Cỡ cọ',paintRadius,10,350)+slider('brushOpacity','Độ phủ',brushOpacity,5,100)+
+ '<p class="kpe-tip">Tô trên ảnh bên phải để đánh dấu phần được chỉnh. Space + kéo để di chuyển ảnh.</p>':'')+'</div>';
+ const resetMask=()=>{localMask=createMask(working.width,working.height);variantsCache=null;changed();};
+
  function renderPanel(){
   modal.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
   if(tab==='shape')panel.innerHTML='<h3>Chỉnh vóc dáng</h3><p>Phóng to và <b>kéo trực tiếp</b> vùng muốn thu gọn trên ảnh bên phải.</p>'+
    '<div class="kpe-brushes">'+[['waist','Thon eo'],['arm','Thon tay'],['head','Thu đầu'],['free','Kéo tự do']].map(([id,name])=>'<button data-brush="'+id+'" class="'+(brush===id?'active':'')+'">'+name+'</button>').join('')+'</div>'+
    slider('brushPower','Lực kéo',brushPower,0,100)+slider('brushRadius','Bán kính tác động',brushRadius,20,450)+
    '<p class="kpe-tip">Kéo mép eo về tâm người, kéo mép tay vào trong; muốn thu đầu thì kéo từ đường viền tóc vào tâm. Space + chuột trái để di chuyển ảnh.</p>';
-  else if(tab==='basic')panel.innerHTML='<h3>Ánh sáng & màu</h3>'+[
-   ['exposure','Phơi sáng'],['contrast','Tương phản'],['highlights','Vùng sáng'],['shadows','Vùng tối'],['whites','Điểm trắng'],['blacks','Điểm đen'],['temperature','Nhiệt màu'],['tint','Ám màu'],['vibrance','Màu tươi'],['saturation','Bão hòa']].map(([k,v])=>slider(k,v,settings[k])).join('');
-  else if(tab==='hsl')panel.innerHTML='<h3>Trộn màu HSL</h3><p>Chọn một màu rồi chỉnh ba thanh bên dưới.</p>'+
+  else if(tab==='basic')panel.innerHTML='<h3>Ánh sáng & màu</h3>'+maskControls()+[
+   ['exposure','Phơi sáng'],['contrast','Tương phản'],['highlights','Vùng sáng'],['shadows','Vùng tối'],['whites','Điểm trắng'],['blacks','Điểm đen'],['temperature','Nhiệt màu'],['tint','Ám màu'],['vibrance','Màu tươi'],['saturation','Bão hòa']].map(([k,v])=>slider(k,v,settings[k])).join('')+
+ (onApplyBatch?buttons([['Áp màu cho các ảnh khác','applyBatch']]):'');
+  else if(tab==='hsl')panel.innerHTML='<h3>Trộn màu HSL</h3><p>Chọn một màu rồi chỉnh ba thanh bên dưới.</p>'+maskControls()+
     '<div class="kpe-swatches">'+channels.map((ch,i)=>'<button data-color="'+ch+'" class="'+(color===ch?'active':'')+'" title="'+labels[i]+'" style="--swatch:'+pigments[i]+'"><span></span></button>').join('')+'</div>'+
     '<p class="kpe-color-name">'+labels[channels.indexOf(color)]+'</p>'+
     slider('hsl.h','Sắc độ',settings.hsl[color].h)+slider('hsl.s','Bão hòa',settings.hsl[color].s)+slider('hsl.l','Độ sáng',settings.hsl[color].l)+
     buttons([['Đặt lại màu đang chọn','resetHsl']]);
-  else if(tab==='detail')panel.innerHTML='<h3>Chi tiết</h3>'+
+  else if(tab==='detail')panel.innerHTML='<h3>Chi tiết</h3>'+maskControls()+
     slider('sharpness','Làm nét',settings.sharpness,0,100)+slider('noise','Giảm hạt',settings.noise,0,100)+slider('clarity','Độ rõ',settings.clarity)+slider('texture','Bề mặt',settings.texture)+
-    '<p class="kpe-tip">Nên xem ở Zoom 100% khi tăng nét và giảm hạt để tránh ảnh giả.</p>';
+    '<p class="kpe-tip">Nên xem ở Zoom 100% để tránh làm ảnh bị quá nét.</p>'+
+ '<hr><h3>Cứu ảnh yếu: 3 lựa chọn</h3><p>Tạo ba bản thử trên chính ảnh này, chọn một bản rồi chỉnh thêm.</p>'+
+ buttons([['Tạo 3 bản thử','variants']])+ '<div id="kpeVariants" class="kpe-variants"></div>'+
+ '<hr><h3>AI nâng ảnh (tùy chọn)</h3><p>Cần Chrome/Edge PC hỗ trợ WebGPU. Mô hình tải lần đầu khá lớn; ảnh không được gửi đi để xử lý.</p>'+
+ buttons([['SCUNet – khử hạt','ai-scunet'],['Real-ESRGAN – nâng 2×','ai-realesrgan']])+
+ '<p class="kpe-tip">AI chỉ chạy khi bạn bấm. Nếu máy không hỗ trợ hoặc tải mô hình lỗi, ảnh hiện tại được giữ nguyên.</p>';
   else if(tab==='geometry')panel.innerHTML='<h3>Hình học</h3>'+buttons([['↶ Xoay trái','rotateL'],['↷ Xoay phải','rotateR'],['⇋ Lật ngang','flipH'],['⇅ Lật dọc','flipV']])+
     buttons([['▣ Crop','crop'],['◇ Phối cảnh','perspective']],'data-mode')+
     '<p class="kpe-tip">Kéo các góc của vùng Crop hoặc Phối cảnh trên ảnh phải, rồi nhấn Áp dụng.</p>';
@@ -118,7 +137,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset}){
     '<div id="kpeTextFields"></div><p class="kpe-tip">Nhập chữ có dấu, chọn màu và cỡ chữ, bấm trực tiếp lên ảnh để đặt vị trí.</p>';
  }
  function endTool(){
-  tool=tab==='shape'?'warp':'view';crop=null;quad=null;textPoint=null;brushPoint=null;
+  tool=tab==='shape'?'warp':(editScope==='local'&&['basic','hsl','detail'].includes(tab)?'mask':'view');crop=null;quad=null;textPoint=null;brushPoint=null;
   action('apply').hidden=true;action('cancel').hidden=true;draw();
  }
  function switchTab(name){
@@ -144,7 +163,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset}){
   if(which==='rotateL'){ctx.translate(0,w);ctx.rotate(-Math.PI/2);}
   if(which==='flipH'){ctx.translate(w,0);ctx.scale(-1,1);}
   if(which==='flipV'){ctx.translate(0,h);ctx.scale(1,-1);}
-  ctx.drawImage(working,0,0);working=out;changed();endTool();fit();
+  ctx.drawImage(working,0,0);working=out;resetMask();endTool();fit();
  }
  async function applyMode(){
   if(busy)return;busy=true;
@@ -162,18 +181,24 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset}){
     ctx.font='bold '+size+'px Arial,sans-serif';ctx.lineWidth=Math.max(1,size*.045);ctx.lineJoin='round';
     ctx.strokeStyle='#173f23';ctx.strokeText(str,textPoint.x,textPoint.y);ctx.fillStyle=by('#kpeColor').value;ctx.fillText(str,textPoint.x,textPoint.y);
    }
-   changed();endTool();fit();say('Đã áp dụng. Bấm Lưu chỉnh sửa để dùng bản này khi tải.');
+   resetMask();endTool();fit();say('Đã áp dụng. Bấm Lưu chỉnh sửa để dùng bản này khi tải.');
   }catch(e){say('Không áp dụng được: '+e.message);}
   finally{busy=false;}
  }
  async function save(){
   if(busy)return;busy=true;
-  try{say('Đang lưu ảnh…');const output=await snapshot(filtered(),type);await onSaved(output);dirty=false;undo=[];say('Đã lưu. Đóng Preview rồi bấm Tải tất cả.');}
+  try{say('Đang lưu ảnh…');
+   const output=await snapshot(filtered(),type);
+   // Keep a lossless working image + slider recipe to avoid repeated lossy recompression.
+   const baseBlob=await snapshot(working,'image/png');
+   const maskBlob=editScope==='local'?await snapshot(localMask,'image/png'):null;
+   await onSaved(output,{baseBlob,maskBlob,settings:structuredClone(settings),scope:editScope});
+   dirty=false;undo=[];say('Đã lưu. Đóng Preview rồi bấm Tải tất cả.');}
   catch(e){say('Không lưu được: '+e.message);}finally{busy=false;}
  }
  async function restore(){
   if(busy)return;busy=true;
-  try{working=toCanvas(original);settings=DEFAULT_EDITS();renderDirty=true;await onReset?.();dirty=false;undo=[];endTool();renderPanel();fit();say('Đã khôi phục về ảnh gốc.');}
+  try{working=toCanvas(original);settings=DEFAULT_EDITS();editScope='global';localMask=createMask(working.width,working.height);renderDirty=true;await onReset?.();dirty=false;undo=[];endTool();renderPanel();fit();say('Đã khôi phục về ảnh gốc.');}
   catch(e){say('Lỗi khôi phục: '+e.message);}finally{busy=false;}
  }
  function close(){if(busy)return;if(dirty&&!window.confirm('Bạn có thay đổi chưa lưu. Bỏ những thay đổi này?'))return;modal.close();}
@@ -182,6 +207,10 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset}){
  function pointerDown(e,i){
   if(e.button!==0||busy)return;
   const c=canvases[i],pt=point(e,i),m={x:e.offsetX,y:e.offsetY};
+  if(i===1&&tool==='mask'&&!spaceDown){
+   makeUndo();drag={type:'mask',from:pt,last:pt,moved:false};c.setPointerCapture(e.pointerId);
+   stamp(localMask,pt,pt,paintRadius,brushOpacity/100,paintMode==='erase');changed();draw();return;
+  }
   if(i===1&&tool==='warp'&&!spaceDown){
    makeUndo();drag={type:'warp',from:pt,source:toCanvas(working),moved:false};c.setPointerCapture(e.pointerId);return;
   }
@@ -197,13 +226,14 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset}){
   c.setPointerCapture(e.pointerId);
  }
  function pointerMove(e,i){
-  if(i===1&&tool==='warp')brushPoint=point(e,i);
-  if(!drag){if(i===1&&tool==='warp')draw();return;}
+  if(i===1&&(tool==='warp'||tool==='mask'))brushPoint=point(e,i);
+  if(!drag){if(i===1&&(tool==='warp'||tool==='mask'))draw();return;}
   const pt=point(e,i);
   if(drag.type==='pan'){panX+=e.clientX-drag.x;panY+=e.clientY-drag.y;drag.x=e.clientX;drag.y=e.clientY;}
   if(drag.type==='warp'){
    if(Math.hypot(pt.x-drag.from.x,pt.y-drag.from.y)>1){working=deformAt(drag.source,drag.from,pt,brushRadius,brushPower,brush);drag.moved=true;changed();}
   }
+  if(drag.type==='mask'){stamp(localMask,drag.last,pt,paintRadius,brushOpacity/100,paintMode==='erase');drag.last=pt;drag.moved=true;changed();}
   if(drag.type==='perspective')quad[drag.index]=[limit(pt.x,0,working.width),limit(pt.y,0,working.height)];
   if(drag.type==='cropMove'){crop.x=limit(drag.start.x+pt.x-drag.from.x,0,working.width-crop.w);crop.y=limit(drag.start.y+pt.y-drag.from.y,0,working.height-crop.h);}
   if(drag.type==='cropCorner'){
@@ -231,29 +261,78 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset}){
  });
  modal.querySelectorAll('[data-tab]').forEach(btn=>btn.onclick=()=>switchTab(btn.dataset.tab));
  modal.addEventListener('click',event=>{
-  const btn=event.target.closest('[data-click],[data-mode],[data-color],[data-brush]');if(!btn)return;
+  const btn=event.target.closest('[data-click],[data-mode],[data-color],[data-brush],[data-scope],[data-paint]');if(!btn)return;
   if(btn.dataset.color){color=btn.dataset.color;renderPanel();return;}
   if(btn.dataset.brush){brush=btn.dataset.brush;renderPanel();return;}
+  if(btn.dataset.scope){editScope=btn.dataset.scope;changed();endTool();renderPanel();draw();return;}
+  if(btn.dataset.paint){paintMode=btn.dataset.paint;renderPanel();return;}
   if(btn.dataset.mode){chooseMode(btn.dataset.mode);return;}
   const a=btn.dataset.click;
   if(a==='close')close();if(a==='fit')fit();
   if(a==='pixel'){zoom=limit(1/Math.min(fitSide(0),fitSide(1)),.1,256);panX=panY=0;draw();}
-  if(a==='undo'){if(!undo.length){say('Không có thao tác để hoàn tác');return;}const old=undo.pop();working=old.image;settings=old.settings;changed();renderPanel();endTool();fit();}
+  if(a==='undo'){if(!undo.length){say('Không có thao tác để hoàn tác');return;}const old=undo.pop();working=old.image;settings=old.settings;editScope=old.scope;localMask=old.mask;changed();renderPanel();endTool();fit();}
   if(a==='restore')void restore();if(a==='save')void save();if(a==='apply')void applyMode();if(a==='cancel')endTool();
   if(['rotateL','rotateR','flipH','flipV'].includes(a))rotate(a);
   if(a==='resetHsl'){makeUndo();settings.hsl[color]={h:0,s:0,l:0};changed();renderPanel();draw();}
+  if(a==='variants')void generateVariants();
+  if(a==='ai-scunet'||a==='ai-realesrgan')void applyAI(a.slice(3));
+  if(a==='applyBatch')void batchColor();
  });
  panel.addEventListener('pointerdown',e=>{if(e.target.matches('[data-adjust]')&&!busy)makeUndo();});
  panel.addEventListener('input',e=>{
   const el=e.target.closest('[data-adjust]');if(!el)return;
   const key=el.dataset.adjust,value=Number(el.value);
-  if(key==='brushPower')brushPower=value;
+  if(key==='paintRadius')paintRadius=value;
+  else if(key==='brushOpacity')brushOpacity=value;
+  else if(key==='brushPower')brushPower=value;
   else if(key==='brushRadius')brushRadius=value;
   else if(key.startsWith('hsl.'))settings.hsl[color][key.slice(4)]=value;
   else settings[key]=value;
   const out=panel.querySelector('[data-value="'+key+'"]');if(out)out.textContent=value;
-  if(key.startsWith('brush')){draw();return;}
+  if(key.startsWith('brush')||key==='paintRadius'){draw();return;}
   changed();clearTimeout(repaintTimer);repaintTimer=setTimeout(draw,65);
+ });
+ // Variant and AI controls are defined below and called only on explicit clicks.
+ async function generateVariants(){
+  if(busy)return;busy=true;
+  try{
+   say('Đang tạo 3 bản thử…');
+   await new Promise(resolve=>setTimeout(resolve,0));
+   variantsCache=variantsFrom(working);
+   const group=by('#kpeVariants');if(!group){say('Hãy mở tab Chi tiết để xem 3 bản thử.');return;}
+   group.innerHTML=variantsCache.map(v=>{
+    const preview=make(130,92),ctx=preview.getContext('2d');ctx.drawImage(v.canvas,0,0,130,92);
+    return '<button type="button" data-variant="'+v.id+'"><img alt="" src="'+preview.toDataURL('image/jpeg',.7)+'"><strong>'+v.title+'</strong><small>'+v.summary+'</small></button>';
+   }).join('');
+   say('Đã có 3 bản thử. Bấm một bản để áp dụng.');
+  }catch(error){say('Không tạo được 3 bản: '+error.message);}finally{busy=false;}
+ }
+ async function applyAI(kind){
+  if(busy)return;
+  if(!globalThis.navigator?.gpu){say('AI yêu cầu Chrome/Edge trên PC có WebGPU; ảnh gốc vẫn được giữ nguyên.');return;}
+  if(!window.confirm('Mô hình AI cần tải dữ liệu lớn và dùng GPU. Bạn muốn tiếp tục?'))return;
+  busy=true;
+  try{
+   const current=filtered();
+   const output=await runPhotoModel(current,kind,msg=>say(msg));
+   makeUndo();working=output;settings=DEFAULT_EDITS();localMask=createMask(output.width,output.height);editScope='global';renderDirty=true;dirty=true;
+   endTool();renderPanel();fit();say('Đã chạy '+kind+' thành công. Kiểm tra ảnh trước/sau rồi bấm Lưu.');
+  }catch(error){say('AI không hoàn thành: '+error.message+' Ảnh hiện tại được giữ nguyên.');}
+  finally{busy=false;}
+ }
+ async function batchColor(){
+  if(!onApplyBatch||busy)return;
+  if(!window.confirm('Áp dụng màu đang chỉnh cho các ảnh khác? Những ảnh đã chỉnh riêng sẽ bị thay thế.'))return;
+  busy=true;
+  try{await onApplyBatch(recipeFrom(settings),msg=>say(msg));say('Đã áp dụng màu cho các ảnh khác.');}
+  catch(error){say('Không áp màu hàng loạt được: '+error.message);}
+  finally{busy=false;}
+ }
+ panel.addEventListener('click',event=>{
+  const el=event.target.closest('[data-variant]');if(!el||!variantsCache)return;
+  const chosen=variantsCache.find(v=>v.id===el.dataset.variant);if(!chosen)return;
+  makeUndo();settings=structuredClone(chosen.settings);editScope='global';changed();renderPanel();draw();
+  say('Đã chọn bản '+chosen.title+'. Có thể chỉnh thêm rồi lưu.');
  });
  modal.addEventListener('keydown',e=>{
   if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();escape();}
