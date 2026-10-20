@@ -34,6 +34,10 @@ export function recipeFrom(settings){
  return copy;
 }
 export function variantsFrom(source){
+ // Generate quick candidate thumbnails only; choosing a preset renders from the full-resolution source.
+ const scale=Math.min(1,640/Math.max(source.width,source.height));
+ const sample=document.createElement('canvas');sample.width=Math.max(1,Math.round(source.width*scale));sample.height=Math.max(1,Math.round(source.height*scale));
+ sample.getContext('2d').drawImage(source,0,0,sample.width,sample.height);
  const presets=[
   {id:'natural',title:'Tự nhiên',summary:'Tăng sáng và màu nhẹ',values:{exposure:10,shadows:10,vibrance:8,sharpness:8,noise:12}},
   {id:'balanced',title:'Cân bằng',summary:'Sáng, trong và rõ hơn',values:{exposure:20,shadows:18,contrast:7,vibrance:12,sharpness:22,noise:24}},
@@ -41,7 +45,7 @@ export function variantsFrom(source){
  ];
  return presets.map(p=>{
   const settings=Object.assign(DEFAULT_EDITS(),p.values);
-  const output=applyAdjustments(source,settings);
+  const output=applyAdjustments(sample,settings);
   return {...p,settings,canvas:output};
  });
 }
