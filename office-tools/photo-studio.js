@@ -16,7 +16,7 @@ function addFiles(files){
   if(!matches(file.name))continue;
   const key=file.name+'|'+file.size+'|'+file.lastModified;
   if(seen.has(key))continue;
-  seen.add(key);ITEMS.push({file,blob:null,editState:null,status:'Chưa chỉnh'});added++;
+  seen.add(key);ITEMS.push({file,blob:null,editState:null,history:[],status:'Chưa chỉnh'});added++;
  }
  renderList();renderImages();
  show('Đã nạp '+added+' ảnh mới. Chọn ảnh rồi bấm MỞ PREVIEW để chỉnh.');
@@ -51,6 +51,11 @@ async function preview(){
  try{
   await openPhotoPreview({
    file:item.file,blob:item.blob||item.file,type:typeFor(item.file.name),editState:item.editState,
+   onLoadPrevious:async ()=>{
+    const old=item.history.pop();if(!old)return null;
+    item.blob=old.blob;item.editState=old.state;item.status='Đã khôi phục bản lưu trước';renderList();renderImages();
+    return old;
+   },
    onApplyBatch:async (recipe,progress)=>{
     let done=0,failed=0;
     for(let i=0;i<ITEMS.length;i++){
@@ -66,6 +71,7 @@ async function preview(){
        const adjusted=applyAdjustments(base,recipe);
        const mime=typeFor(target.file.name);
        const result=await new Promise((ok,no)=>adjusted.toBlob(b=>b&&b.type===mime?ok(b):no(Error('Không xuất được định dạng này')),mime,.96));
+       if(target.blob){target.history.push({blob:target.blob,state:target.editState});if(target.history.length>3)target.history.shift();}
        target.blob=result;target.editState={baseBlob:target.file,settings:structuredClone(recipe),scope:'global',maskBlob:null};
        target.status='Đã áp màu hàng loạt';done++;
       }finally{bitmap.close();}
@@ -75,10 +81,11 @@ async function preview(){
     renderList();renderImages();show('Đã áp màu '+done+' ảnh'+(failed?' · bỏ qua '+failed+' ảnh':'')+'.');return {done,failed};
    },
    onSaved:async (blob,state)=>{
+    if(item.blob){item.history.push({blob:item.blob,state:item.editState});if(item.history.length>3)item.history.shift();}
     item.blob=blob;item.editState=state;item.status='Đã lưu chỉnh sửa';renderList();renderImages();
     show('Đã lưu '+item.file.name+'. Có thể bấm TẢI TẤT CẢ hoặc tiếp tục chỉnh ảnh khác.');
    },
-   onReset:async ()=>{item.blob=null;item.editState=null;item.status='Đã khôi phục ảnh gốc';renderList();renderImages();}
+   onReset:async ()=>{if(item.blob){item.history.push({blob:item.blob,state:item.editState});if(item.history.length>3)item.history.shift();}item.blob=null;item.editState=null;item.status='Đã khôi phục ảnh gốc';renderList();renderImages();}
   });
  }catch(error){show('Không mở được Preview: '+(error.message||error));}
  finally{opening=false;renderList();}
