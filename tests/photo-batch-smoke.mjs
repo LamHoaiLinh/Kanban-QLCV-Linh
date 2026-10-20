@@ -71,7 +71,7 @@ try{
  await page.waitForFunction(()=>document.querySelector('.kpe-modal #kpeHint')?.textContent?.includes('Đã áp dụng màu'),null,{timeout:30000});
  await dialog.locator('[data-click="save"]').click();
  await page.waitForFunction(()=>document.querySelector('.kpe-modal #kpeHint')?.textContent?.includes('Đã lưu'),null,{timeout:30000});
- await dialog.locator('[data-click="close"]').click();
+ await dialog.locator('[data-click="close"]').last().click();
  await dialog.waitFor({state:'hidden'});
  check(!await page.locator('#kanPhotoDownload').isDisabled(),'Batch results ready for download');
  const downloadPromise=page.waitForEvent('download');
