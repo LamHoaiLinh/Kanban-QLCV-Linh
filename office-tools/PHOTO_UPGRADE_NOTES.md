@@ -25,3 +25,16 @@
 - Kiểm thử cú pháp tất cả mô-đun qua Node.js.
 - Kiểm thử tương tác Chromium: tải ảnh, kéo dáng, chuyển các tab, chèn chữ tiếng Việt, sửa phối cảnh, HSL, lưu và tải; cọ vùng, ba biến thể, hoàn nguyên, sao chép màu và xuất ZIP.
 - Các bài kiểm thử WebGPU thực tế, tốc độ xử lý ảnh nhiều megapixel và trình duyệt di động phải được thực hiện trên thiết bị đích.
+
+
+## KAN PHOTO MOBILE V1 — 2026-10-20
+
+Tự chuyển sang giao diện điện thoại khi thiết bị có cảm ứng và kích thước màn hình tương ứng; giữ nguyên bố cục desktop.
+
+**Giai đoạn 1:** Một ảnh lớn (ảnh kết quả), giữ nút "Giữ xem gốc" để so sánh; một ngón kéo chỉnh hoặc tô vùng, hai ngón zoom và pan đúng điểm tiếp xúc; bảng sáu tab trượt dưới màn hình, kéo tay nắm để mở rộng; nút có vùng chạm lớn. Khi hai ngón chạm trong lúc chỉnh dáng, thao tác chỉnh dang dở được hủy để không vô tình làm méo ảnh.
+
+**Giai đoạn 2:** Kính lúp khi chỉnh vùng/dáng, undo/redo, các thanh kéo lớn, chạm giá trị số để nhập số và nút ↺ để đặt lại; nhấn đúp ảnh để đưa về khung nhìn vừa màn hình.
+
+**Giai đoạn 3:** Khi kéo biến dạng, tính trên ảnh mẫu kích thước nhỏ và chỉ áp biến dạng vào ảnh độ phân giải đầy đủ lúc nhấc ngón; các thanh HSL/ánh sáng tạo preview nhẹ, khi Lưu ảnh sẽ xử lý lại pixel ở độ phân giải đầy đủ. Bản nháp giữ cục bộ trong IndexedDB, có thể khôi phục khi **chọn lại cùng file ảnh** sau khi Safari tải lại trang, nếu dữ liệu chưa bị trình duyệt dọn. Nháp bị giới hạn 30 MB tổng dữ liệu và ảnh trên 13 triệu điểm ảnh sẽ không tự lưu để tránh cạn bộ nhớ; với ảnh quá lớn cần chủ động nhấn Lưu. Khi nhấn Đặt lại sẽ xóa bản nháp của ảnh hiện tại.
+
+Cần lưu ý: Trình duyệt iPhone ở chế độ riêng tư, thiết bị sắp hết dung lượng hay cơ chế xóa dữ liệu trang có thể làm mất bản nháp. Tính năng lưu nháp không đồng bộ lên iCloud/máy chủ. Các mô hình AI ONNX khối lượng lớn chỉ được phép kích hoạt trên PC. Kiểm thử tự động dùng Chromium giả lập điện thoại; hành vi Safari iPhone thực cần kiểm tra riêng trên thiết bị.
