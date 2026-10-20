@@ -33,3 +33,14 @@
 .kphoto-actions .office-btn.primary{padding:13px;font-weight:700;background:#67b785}
 .kphoto-actions .office-btn.primary:disabled{opacity:.55;cursor:wait}
 @media(max-width:800px){.kphoto-checks,.kphoto-pair{grid-template-columns:1fr}.kphoto-view{gap:6px}.kphoto-view>div{padding:6px;min-height:140px}.kphoto-view img{max-height:180px}}
+
+/* Preview launch and separated process/download controls. */
+.kphoto-view-title{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.kphoto-view-title .office-btn{padding:5px 9px;font-size:11px;border-radius:8px;background:#e6f6ea;color:#225e42;border:1px solid #9fceb0;white-space:nowrap}
+.kphoto-view-title .office-btn:hover{background:#c9ebd3}
+.kphoto-view-title .office-btn:disabled{opacity:.5;cursor:not-allowed}
+.kphoto-main-buttons{display:grid;grid-template-columns:1.3fr 1fr;gap:10px}
+.kphoto-main-buttons .office-btn{min-height:42px;font-weight:700}
+.kphoto-main-buttons #kanPhotoDownload{border:1px solid #67b785;color:#246342;background:#e6f6e9}
+.kphoto-main-buttons #kanPhotoDownload:disabled{opacity:.45;cursor:not-allowed}
+@media(max-width:520px){.kphoto-main-buttons{grid-template-columns:1fr 1fr;gap:5px}.kphoto-main-buttons .office-btn{font-size:11px;padding:8px}}
