@@ -1,6 +1,6 @@
 /* Kanban PWA: cache lõi nhỏ, game chỉ lưu sau khi người dùng mở. */
-const APP_CACHE = 'linh-kanban-app-v826-aquarium-music';
-const GAME_CACHE = 'linh-kanban-games-v826';
+const APP_CACHE = 'linh-kanban-app-v827-photo-web';
+const GAME_CACHE = 'linh-kanban-games-v827';
 const CORE_ASSETS = [
   "./index.html",
   "./styles.css?v=6.46",
