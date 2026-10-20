@@ -4,6 +4,7 @@ on:
     paths:
       - 'office-tools/photo-studio.js'
       - 'office-tools/photo-preview.js'
+      - 'office-tools/photo-drafts.js'
       - 'office-tools/photo-local.js'
       - 'office-tools/photo-ai.js'
       - 'office-tools/photo-filters.js'
@@ -11,6 +12,7 @@ on:
       - 'office-tools/photo-preview.css'
       - 'tests/photo-web-smoke.mjs'
       - 'tests/photo-batch-smoke.mjs'
+      - 'tests/photo-mobile-smoke.mjs'
       - 'office-tools/photo-studio.css'
       - 'office-tools/office-tools.js'
       - '.github/workflows/check-photo-web.yml'
@@ -29,6 +31,7 @@ jobs:
         run: |
           node --check office-tools/photo-studio.js
           node --check office-tools/photo-preview.js
+          node --check office-tools/photo-drafts.js
           node --check office-tools/photo-local.js
           node --check office-tools/photo-ai.js
           node --check office-tools/photo-filters.js
@@ -61,3 +64,4 @@ jobs:
           sleep 2
           node tests/photo-web-smoke.mjs
           node tests/photo-batch-smoke.mjs
+          node tests/photo-mobile-smoke.mjs
