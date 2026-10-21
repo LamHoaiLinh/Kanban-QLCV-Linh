@@ -8,6 +8,7 @@ const games=[
  {id:'thuonglo',title:'Thương Lộ Việt',sub:'Chiến thuật kinh tế · Qua ngày · thế giới tự vận hành',icon:'🚚',url:'thuong-lo-viet/index.html?v=7.1.1',close:'thuong-lo-viet-close'},
  {id:'doilapnghiep',title:'Đời Lập Nghiệp',sub:'24 giờ mỗi ngày · mưu sinh · tình yêu · gia đình · doanh nghiệp',icon:'💼',url:'doi-lap-nghiep/index.html?v=1.8.1',close:'doi-lap-nghiep-close'},
  {id:'vuongquoc',title:'Vương Quốc Số Liệu',sub:'Chiến thuật · kinh tế · chinh phục',icon:'♜',url:'vuong-quoc-so-lieu/index.html?v=1.0.0',close:'vuong-quoc-so-lieu-close'},
+ {id:'kiemanh',title:'Kiếm Ảnh Tranh Hùng',sub:'Kiếm hiệp · Chiến thuật theo lượt · 5 ải · Việt hóa',icon:'⚔',url:'kiem-anh-tranh-hung/index.html?v=1.0.0',close:'kiem-anh-close'},
  {id:'bachchieu',title:'Bách Chiêu',sub:'Tu tiên roguelite · Cửu Trùng Thiên · combo đạo thức',icon:'☯',url:'bach-chieu-game/index.html?v=1.0.0',close:'bach-chieu-close'},
  {id:'dailucnghe',title:'Đại Lục Nghề Nghiệp',sub:'Idle nghề nghiệp · chế tạo · chiến đấu · 3 Slot',icon:'◆',url:'dai-luc-nghe-nghiep/index.html?v=1.0.4',close:'dai-luc-nghe-nghiep-close'},
  {id:'tinhnhanh',title:'Tính Nhanh',sub:'72 kỹ năng · cá nhân hóa · cửu chương · Nhìn Che Tính',icon:'🧮',url:'tinh-nhanh-game/index.html?v=3.3.0',close:'tinh-nhanh-game-close'},
