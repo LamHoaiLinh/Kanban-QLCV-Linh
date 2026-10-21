@@ -67,7 +67,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
  let color='orange',repaintTimer=null;
  const history=makePhotoHistory(mobile);
  let bodySettings={...DEFAULT_BODY(),...(editState?.bodySettings||{})};
- let people=editState?.people||[],chosenPerson=editState?.chosenPerson||0,poseStatus='Đang nhận diện…',showBodyGuides=false;
+ let people=editState?.people||[],chosenPerson=editState?.chosenPerson||0,poseStatus=editState?.people?.length?'Đã nhận diện '+editState.people.length+' người':'Đang nhận diện…',showBodyGuides=false;
  let bodyCache=null,bodyPreviewCache=null,bodyDirty=true,poseRequest=null,sliderGesture=false;
  const hasBody=()=>people.length>0&&people[chosenPerson]&&bodyRegions(people[chosenPerson],working.width,working.height);
  if(editState?.maskBlob){
@@ -299,7 +299,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
     const out=await correctPerspective(working,quad,n=>say('Đang sửa phối cảnh '+n+'%'));makeUndo();working=out;
    }else if(tool==='text'){
     const str=by('#kpeText')?.value.trim();if(!str)throw Error('Chưa nhập chữ');
-    makeUndo();const ctx=working.getContext('2d'),size=limit(+by('#kpeFont').value||45,8,500);
+    makeUndo();working=toCanvas(working);const ctx=working.getContext('2d'),size=limit(+by('#kpeFont').value||45,8,500);
     ctx.font='bold '+size+'px Arial,sans-serif';ctx.lineWidth=Math.max(1,size*.045);ctx.lineJoin='round';
     ctx.strokeStyle='#173f23';ctx.strokeText(str,textPoint.x,textPoint.y);ctx.fillStyle=by('#kpeColor').value;ctx.fillText(str,textPoint.x,textPoint.y);
    }
@@ -391,7 +391,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
   if(touchStart(e,i))return;
   const c=canvases[i],pt=point(e,i),m={x:e.offsetX,y:e.offsetY};
   if(i===1&&tool==='mask'&&!spaceDown){
-   makeUndo();drag={type:'mask',from:pt,last:pt,moved:false};c.setPointerCapture(e.pointerId);
+   makeUndo('mask');localMask=toCanvas(localMask);drag={type:'mask',from:pt,last:pt,moved:false};c.setPointerCapture(e.pointerId);
    stamp(localMask,pt,pt,paintRadius,brushOpacity/100,paintMode==='erase');changed();draw();return;
   }
   if(i===1&&tool==='warp'&&!spaceDown){
@@ -484,7 +484,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
   if(a==='variants')void generateVariants();
   if(a==='ai-scunet'||a==='ai-realesrgan')void applyAI(a.slice(3));
   if(a==='applyBatch')void batchColor();
-  if(a==='poseRetry')void queuePose();
+  if(a==='poseRetry'){people=[];poseStatus='Đang nhận diện…';changed();void queuePose();}
   if(a==='poseGuides'){showBodyGuides=!showBodyGuides;renderPanel();draw();}
  });
  panel.addEventListener('change',e=>{if(e.target?.id==='kpePerson'){makeUndo('params');chosenPerson=Number(e.target.value);changed();renderPanel();draw();}});
@@ -590,5 +590,5 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
  modal.addEventListener('close',()=>{closed=true;observer.disconnect();clearTimeout(repaintTimer);clearTimeout(draftTimer);document.removeEventListener('visibilitychange',saveOnHide);original.close?.();result.close?.();modal.remove();});
  const saveOnHide=()=>{if(mobile&&document.visibilityState==='hidden'&&dirty)void draftNow();};
  if(mobile)document.addEventListener('visibilitychange',saveOnHide);
- renderPanel();modal.showModal();requestAnimationFrame(draw);
+ renderPanel();modal.showModal();requestAnimationFrame(()=>{draw();if(!people.length)setTimeout(()=>{if(!closed)void queuePose();},100);});
 }
