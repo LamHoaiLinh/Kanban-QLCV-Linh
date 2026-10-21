@@ -67,7 +67,7 @@ export function renderAutoBody(input,landmarks,amounts,quality='preview'){
  const legs=cap(((amounts.legs||0)+.2*(amounts.overall||0))*factor,0,100);
  const head=cap((amounts.head||0)*factor,0,100);
  // Impact is localized to each near-outline landmark region.
- const pull=cap(shoulderWidth*.13,3,65);
+ const pull=cap(shoulderWidth*.34,5,115);
  const cx=midHip.x;
  if(waist>0){
   for(const side of [leftWaist,rightWaist]){
@@ -78,7 +78,7 @@ export function renderAutoBody(input,landmarks,amounts,quality='preview'){
  if(shoulder>0){
   for(const shoulderPt of [regions.ls,regions.rs]){
    const sign=shoulderPt.x<midShoulder.x?1:-1;
-   out=warpToward(out,shoulderPt,{x:shoulderPt.x+sign*shoulderWidth*.075*shoulder/100,y:shoulderPt.y},Math.max(24,shoulderWidth*.35),shoulder);
+   out=warpToward(out,shoulderPt,{x:shoulderPt.x+sign*shoulderWidth*.11*shoulder/100,y:shoulderPt.y},Math.max(24,shoulderWidth*.35),shoulder);
   }
  }
  if(arms>0){
@@ -86,14 +86,14 @@ export function renderAutoBody(input,landmarks,amounts,quality='preview'){
    const from=pos(landmarks,a,input.width,input.height),to=pos(landmarks,b,input.width,input.height);
    const mid={x:(from.x+to.x)/2,y:(from.y+to.y)/2},toward=mid.x<midShoulder.x?1:-1;
    const limb=Math.max(18,Math.hypot(to.x-from.x,to.y-from.y));
-   out=warpToward(out,mid,{x:mid.x+toward*limb*.08*arms/100,y:mid.y},Math.max(17,limb*.48),arms);
+   out=warpToward(out,mid,{x:mid.x+toward*limb*.19*arms/100,y:mid.y},Math.max(17,limb*.48),arms);
   }
  }
  if(legs>0){
   for(const [a,b] of [[23,25],[25,27],[24,26],[26,28]]){
    const from=pos(landmarks,a,input.width,input.height),to=pos(landmarks,b,input.width,input.height);
    const mid={x:(from.x+to.x)/2,y:(from.y+to.y)/2},sgn=mid.x<midHip.x?1:-1,limb=Math.hypot(to.x-from.x,to.y-from.y);
-   out=warpToward(out,mid,{x:mid.x+sgn*limb*.045*legs/100,y:mid.y},Math.max(20,limb*.4),legs);
+   out=warpToward(out,mid,{x:mid.x+sgn*limb*.09*legs/100,y:mid.y},Math.max(20,limb*.4),legs);
   }
  }
  if(head>0){
