@@ -140,7 +140,7 @@ export function renderPhotoStudioTool(container,helpers){
   link.href=new URL('./photo-studio.css?v=2.1.0',import.meta.url).href;document.head.appendChild(link);
  }
  host.innerHTML='<section class="office-tool-panel active kphoto">'+
-  '<div class="office-tool-head"><div><h3>KAN PHOTO – Chỉnh ảnh trực tiếp</h3><p>Nạp ảnh → Mở Preview → Chỉnh trong 6 tab → Lưu → Tải.</p></div></div>'+
+  '<div class="office-tool-head"><div><h3>KAN PHOTO – Chỉnh ảnh trực tiếp</h3><p>Chỉnh ảnh trên thiết bị</p></div></div>'+
   '<div id="kanPhotoDrop" class="kphoto-drop" tabindex="0" role="button"><strong>＋ Kéo thả nhiều ảnh hoặc bấm chọn</strong><span>JPG · PNG · WebP · Không tải ảnh lên máy chủ</span><input type="file" accept="image/jpeg,image/png,image/webp" multiple hidden></div>'+
   '<div class="kphoto-head"><strong id="kanPhotoCount">0 ảnh</strong><button id="kanPhotoClear" class="office-btn" type="button">Xóa danh sách</button></div><div id="kanPhotoList" class="kphoto-list"></div>'+
   '<div class="kphoto-view"><div><div class="kphoto-view-title"><b>Ảnh gốc</b><button class="office-btn kphoto-preview-launch" type="button">XEM LỚN ↗</button></div><img id="kanPhotoBefore" alt="Ảnh gốc"></div>'+
