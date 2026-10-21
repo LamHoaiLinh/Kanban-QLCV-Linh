@@ -457,7 +457,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
     else{manualOps.push({from:drag.from,to:drag.end||drag.from,radius:brushRadius,power:brushPower,kind:brush});changed();}
   }
   if(drag?.type==='mask'&&mobile)queueDraft();
-  drag=null;loupePoint=null;previewDirty=true;draw();
+  drag=null;loupePoint=null;brushPoint=null;previewDirty=true;draw();
   try{canvases[i].releasePointerCapture(e.pointerId);}catch{}
  }
  function wheel(e,i){
