@@ -1,7 +1,7 @@
 /* KAN PHOTO Studio: simple local image library. All editing lives in Preview. */
-import {openPhotoPreview} from './photo-preview.js?v=4.0.0';
+import {openPhotoPreview} from './photo-preview.js?v=5.0.0';
 import {applyAdjustments} from './photo-filters.js?v=1.0.0';
-import {loadPhotoDraft,savePhotoDraft,removePhotoDraft} from './photo-drafts.js?v=1.0.0';
+import {loadPhotoDraft,savePhotoDraft,removePhotoDraft} from './photo-drafts.js?v=2.0.0';
 const onPhone=()=>globalThis.matchMedia?.('(pointer: coarse)').matches && Math.min(screen.width,screen.height)<=680;
 const ITEMS=[];
 let selected=0,host=null,api=null,opening=false,downloading=false;
