@@ -56,14 +56,14 @@ try{
  await modal.locator('[data-adjust="hsl.s"]').fill('40');
  await modal.locator('[data-tab="detail"]').click();
  await modal.locator('[data-adjust="sharpness"]').fill('25');
- await modal.locator('[data-tab="geometry"]').click();
+ await modal.locator('[data-tab="tools"]').click();
  await modal.locator('[data-click="rotateR"]').click();
  await modal.locator('[data-click="flipH"]').click();
  await modal.locator('[data-mode="crop"]').click();
  await modal.locator('[data-click="apply"]').click();
  await modal.locator('[data-mode="perspective"]').click();
  await modal.locator('[data-click="apply"]').click();
- await modal.locator('[data-tab="text"]').click();
+ await modal.locator('[data-tab="tools"]').click();
  await modal.locator('[data-mode="text"]').click();
  await modal.locator('#kpeText').fill('Chữ tiếng Việt có dấu');
  await modal.locator('[data-click="apply"]').click();
