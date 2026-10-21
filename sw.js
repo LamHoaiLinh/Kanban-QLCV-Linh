@@ -1,6 +1,6 @@
 /* Kanban PWA: cache lõi nhỏ, game chỉ lưu sau khi người dùng mở. */
-const APP_CACHE = 'linh-kanban-app-v832-photo-mobile';
-const GAME_CACHE = 'linh-kanban-games-v827';
+const APP_CACHE = 'linh-kanban-app-v833-photo-mobile-kiemanh';
+const GAME_CACHE = 'linh-kanban-games-v828';
 const CORE_ASSETS = [
   "./index.html",
   "./styles.css?v=6.46",
@@ -15,7 +15,8 @@ const gameRoots = [
   '/dice-game/','/tarot-game/','/tetris-game/','/farm-game/',
   '/thuong-lo-viet/','/doi-lap-nghiep/','/vuong-quoc-so-lieu/',
   '/bach-chieu-game/','/dai-luc-nghe-nghiep/','/tinh-nhanh-game/',
-  '/drift1k-game/','/stock-sim-vn/','/aquarium-game/','/open-poker-game/'
+  '/drift1k-game/','/stock-sim-vn/','/aquarium-game/','/open-poker-game/',
+  '/kiem-anh-tranh-hung/'
 ];
 const dynamicLaunchers = [
   '/aquarium-launcher.js','/game-launcher.js','/tarot-launcher.js','/tetris-launcher.js'
