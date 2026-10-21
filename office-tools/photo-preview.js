@@ -499,13 +499,14 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
  panel.addEventListener('change',e=>{if(e.target?.id==='kpePerson'){makeUndo('params');chosenPerson=Number(e.target.value);changed();renderPanel();draw();}});
  function applyUndo(){const old=history.popUndo(takeState('params'));if(!old){say('Không còn bước hoàn tác.');return;}useState(old);}
  function applyRedo(){const next=history.popRedo(takeState('params'));if(!next){say('Không còn bước làm lại.');return;}useState(next);}
- modal.addEventListener('keydown',e=>{
-  if(e.defaultPrevented||!((e.ctrlKey||e.metaKey)&&!e.altKey))return;
-  if(e.target.closest('input[type=text],input[type=number],textarea,[contenteditable=true]'))return;
+ const handleUndoKey=e=>{
+  if(!modal.open||!((e.ctrlKey||e.metaKey)&&!e.altKey))return;
+  if(e.target.closest?.('input[type=text],input[type=number],textarea,[contenteditable=true]'))return;
   const key=e.key.toLowerCase();
-  if(key==='z'){e.preventDefault();e.stopPropagation();if(e.shiftKey)applyRedo();else applyUndo();}
-  else if(key==='y'){e.preventDefault();e.stopPropagation();applyRedo();}
- },true);
+  if(key==='z'){e.preventDefault();e.stopImmediatePropagation();if(e.shiftKey)applyRedo();else applyUndo();}
+  else if(key==='y'){e.preventDefault();e.stopImmediatePropagation();applyRedo();}
+ };
+ document.addEventListener('keydown',handleUndoKey,true);
  panel.addEventListener('click',e=>{
    const target=e.target.closest('[data-reset],[data-value]');
    if(!target||!mobile)return;
@@ -601,7 +602,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
  modal.addEventListener('cancel',e=>{e.preventDefault();escape();});
  const observer=new ResizeObserver(draw);observer.observe(by('.kpe-panes'));
  by('#kpeFilename').textContent=file.name+' · chỉnh trực tiếp trên ảnh kết quả';
- modal.addEventListener('close',()=>{closed=true;observer.disconnect();clearTimeout(repaintTimer);clearTimeout(draftTimer);document.removeEventListener('visibilitychange',saveOnHide);original.close?.();result.close?.();modal.remove();});
+ modal.addEventListener('close',()=>{closed=true;observer.disconnect();clearTimeout(repaintTimer);clearTimeout(draftTimer);document.removeEventListener('visibilitychange',saveOnHide);document.removeEventListener('keydown',handleUndoKey,true);original.close?.();result.close?.();modal.remove();});
  const saveOnHide=()=>{if(mobile&&document.visibilityState==='hidden'&&dirty)void draftNow();};
  if(mobile)document.addEventListener('visibilitychange',saveOnHide);
  renderPanel();modal.showModal();requestAnimationFrame(()=>{draw();if(!people.length)setTimeout(()=>{if(!closed)void queuePose();},100);});
