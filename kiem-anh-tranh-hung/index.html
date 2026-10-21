@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1,viewport-fit=cover">
+<title>Kiếm Ảnh Tranh Hùng — Chiến thuật kiếm hiệp</title>
+<style>
+:root{color-scheme:dark;--bg:#101827;--panel:#192537;--edge:#3c5063;--ink:#f2eee0;--muted:#b5bdbd;--gold:#f2c778;--red:#e66b6b;--green:#9fdbad}
+*{box-sizing:border-box}body{margin:0;min-height:100dvh;background:radial-gradient(ellipse at 50% -15%,#324054,#101827 75%);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+button{font:inherit;cursor:pointer;touch-action:manipulation}button:disabled{opacity:.35;cursor:not-allowed}.shell{max-width:1040px;margin:auto;padding:14px 14px 85px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px}h1{font:700 clamp(21px,4vw,34px)/1.2 Georgia,serif;letter-spacing:.04em;margin:0;color:var(--gold)}
+.kicker{font-size:11px;letter-spacing:.13em;color:var(--muted)}h2{margin:0 0 10px;color:var(--gold);font-size:21px}
+.btn{border:1px solid #65768a;background:#27364a;color:#f3e9d4;padding:10px 14px;border-radius:9px;min-height:42px}
+.btn:hover:not(:disabled){border-color:var(--gold);background:#34435a}.btn.primary{background:#665038;border-color:#d0a461;color:#fff7df}
+.btn.danger{border-color:#8d5656}.panel{border:1px solid var(--edge);background:#182334ed;border-radius:14px;padding:15px;margin-top:13px;box-shadow:0 8px 23px #090e1966}
+.muted{color:var(--muted)}.hud{display:flex;gap:9px;justify-content:space-between;flex-wrap:wrap;font-weight:650}.hud span{color:var(--gold)}
+.arena{background:linear-gradient(#24354a,#17202b 72%,#30281f 72%,#1c1920);border-radius:12px;padding:48px 10px 12px;position:relative;overflow:hidden}
+.arena:before{content:"";position:absolute;inset:5px;background:repeating-linear-gradient(90deg,transparent 0 9.8%,#a6b9c010 10% 10.1%);pointer-events:none}
+.arena:after{content:"☽  VÕ LÂM  ☾";position:absolute;top:9px;left:0;right:0;text-align:center;letter-spacing:.42em;font-size:12px;color:#e4c69555;pointer-events:none}
+.track{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:3px;position:relative;z-index:1}
+.tile{min-height:clamp(57px,9vw,92px);position:relative;border:1px solid #8b8a7045;border-radius:6px;background:linear-gradient(180deg,#ffffff08,#00000018);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:3px;text-align:center}
+.tile.threat{box-shadow:inset 0 0 0 2px #c75a5377;background:#a9423029}.tile.hero{background:#5b98502f;border-color:#95d69a77}
+.avatar{font-size:clamp(23px,4vw,39px);line-height:1.1;text-shadow:0 2px 4px #0007}.foe .avatar{filter:sepia(.3)}.unit-name{font-size:clamp(7px,1.25vw,11px);font-weight:750;line-height:1.1}.unit-life{font-size:11px;font-weight:700;color:#f2af9e}.tile.hero .unit-life{color:#b6f0bc}
+.index{position:absolute;bottom:3px;right:5px;color:#e6d6b344;font-size:10px}.tag{font-size:10px;color:#f9d188}.arrows{font-size:18px}
+.hint{font-size:12px;color:#c5cccb;margin-top:9px;min-height:18px}
+.controls{display:flex;flex-wrap:wrap;justify-content:center;gap:7px;margin:10px 0}.controls .btn{min-width:74px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:8px}
+.card{display:flex;flex-direction:column;gap:6px;min-height:136px;text-align:left;border:1px solid #7d725f;background:linear-gradient(142deg,#3c3a3c,#212c3b);color:var(--ink);border-radius:12px;padding:11px}
+.card strong{color:#ffdc9c;font-size:15px}.card small{color:#becbc9}.card p{margin:0;flex:1;font-size:12px}.card.active{border-color:#f3d087;box-shadow:0 0 0 2px #f3d08755}.card.cooldown{opacity:.52}
+.ribbon{display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-height:42px;margin:8px 0}.pill{display:inline-flex;padding:5px 8px;border:1px solid #8e805e;border-radius:6px;background:#36362f;color:#f4d397;font-size:12px}
+.log{background:#101925;border-radius:10px;padding:9px 12px;font-size:12px;line-height:1.7;color:#cdd4d1;max-height:105px;overflow:auto}
+.menu{max-width:800px;margin:26px auto}.intro{font-size:15px;color:#c6d2d2}.schools,.rewards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.school{border:1px solid #806f53;border-radius:12px;padding:17px;background:#273040;text-align:left;min-height:167px;color:var(--ink)}
+.school b{display:block;font:700 20px Georgia,serif;color:var(--gold);margin:7px 0}
+.school span{display:block;color:#cad2d0;font-size:13px}
+.summary{margin:auto;max-width:650px;text-align:center;padding:38px 20px}.summary h2{font:700 34px Georgia,serif}
+.row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.footer{font-size:11px;color:#aab8b9;margin-top:18px}.footer a{color:#dec58d}
+[hidden]{display:none!important}
+@media(max-width:580px){.shell{padding:10px 8px 74px}.panel{padding:10px;margin-top:8px}.arena{padding:39px 4px 7px}.track{gap:2px}.tile{min-height:57px;padding:1px}.avatar{font-size:25px}.unit-name{font-size:8px;letter-spacing:-.3px}.controls .btn{min-width:57px;padding:7px 5px;font-size:12px}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.card{min-height:128px;padding:9px}h1{font-size:23px}}
+</style>
+</head>
+<body>
+<main class="shell">
+<header><div><div class="kicker">GIANG HỒ KỲ TRẬN · BẢN WEB ĐỘC LẬP</div><h1>Kiếm Ảnh Tranh Hùng</h1></div><button class="btn" id="exit">Về Hub Game ✕</button></header>
+<section id="screen" aria-live="polite"></section>
+<footer class="footer">Trò chơi chiến thuật kiếm hiệp độc lập, sử dụng đồ họa và mã do KanBan tạo; không phải bản dịch hay bản chuyển đổi của Shogun Showdown. <a href="https://roboatino.itch.io/shogunshowdown" target="_blank" rel="noopener noreferrer">Chơi Shogun Showdown Alpha chính chủ ↗</a>.</footer>
+</main>
+<script>
+(function(){
+"use strict";
+var KEY="kanban_kiem_anh_v1";
+var D={
+  kiem:{name:"Kiếm Khí Trảm",icon:"⚔",desc:"Đánh 2 điểm khí huyết mục tiêu trước mặt, tầm 1 ô.",power:2,range:1,cd:1,kind:"hit"},
+  phi:{name:"Phi Kiếm Truy Hồn",icon:"➶",desc:"Phi kiếm xuyên khoảng cách 3 ô, gây 2 sát thương.",power:2,range:3,cd:2,kind:"hit"},
+  tram:{name:"Bát Hoang Liên Trảm",icon:"✴",desc:"Chém tất cả đối thủ trong 2 ô trước mặt, mỗi tên mất 2 khí huyết.",power:2,range:2,cd:3,kind:"all"},
+  cuoc:{name:"Phong Lôi Cước",icon:"✧",desc:"Đá mục tiêu sát cạnh, gây 1 sát thương và đẩy lùi 1 ô.",power:1,range:1,cd:2,kind:"push"},
+  ho:{name:"Hộ Thể Cương Khí",icon:"◈",desc:"Tụ khí tạo 2 điểm hộ thuẫn, chặn sát thương nhận vào.",power:2,range:0,cd:3,kind:"shield"},
+  hoi:{name:"Cửu Chuyển Hồi Nguyên",icon:"✿",desc:"Hồi phục 3 khí huyết, không vượt giới hạn.",power:3,range:0,cd:3,kind:"heal"},
+  anh:{name:"Vô Ảnh Bộ",icon:"◇",desc:"Lướt 2 ô theo hướng đang nhìn, không đi xuyên đối thủ.",power:2,range:0,cd:2,kind:"dash"},
+  phach:{name:"Phá Thiên Nhất Kiếm",icon:"☄",desc:"Gây 4 sát thương đơn mục tiêu trong 2 ô, hồi chiêu lâu.",power:4,range:2,cd:4,kind:"hit"},
+  phong:{name:"Phong Vân Tảo Diệp",icon:"❋",desc:"Quét tất cả địch trước mặt trong 3 ô, mỗi tên nhận 1 sát thương.",power:1,range:3,cd:3,kind:"all"}
+};
+var S=null,screen=document.getElementById("screen");
+var roles={
+  thien:{name:"Thiên Sơn Kiếm Khách",mark:"⚔",intro:"Kiếm khí công thủ cân bằng · 16 khí huyết",hp:16,hand:["kiem","phi","ho"]},
+  vo:{name:"Vô Ảnh Du Hiệp",mark:"✧",intro:"Đổi vị trí linh hoạt · 14 khí huyết",hp:14,hand:["kiem","anh","cuoc"]},
+  huyen:{name:"Huyền Môn Đạo Sĩ",mark:"☯",intro:"Hồi phục bền bỉ · 17 khí huyết",hp:17,hand:["kiem","hoi","phong"]}
+};
+var foeTypes=[
+  {name:"Sơn Trại Đao Khách",icon:"🥷",hp:3,dmg:1,range:1},
+  {name:"Hắc Y Sát Thủ",icon:"👤",hp:4,dmg:2,range:1},
+  {name:"Xích Diệm Hộ Pháp",icon:"👹",hp:6,dmg:2,range:2},
+  {name:"Huyết Ảnh Ma Quân",icon:"👺",hp:14,dmg:3,range:2}
+];
+function load(){try{var x=JSON.parse(localStorage.getItem(KEY)||"null");if(x&&typeof x==="object"&&["fight","reward","over","victory"].includes(x.mode)&&Array.isArray(x.hand)&&Array.isArray(x.enemies)&&x.hero&&Number.isFinite(x.hp)&&Number.isFinite(x.room)){S=x;S.queue=[];S.log=Array.isArray(S.log)?S.log.slice(0,6):[];return}}catch(e){}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function esc(x){return String(x).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
+function button(t,fn,cl){return '<button class="btn '+(cl||"")+'" data-act="'+fn+'">'+t+'</button>'}
+function note(t){S.log.unshift(t);S.log=S.log.slice(0,6)}
+function setup(id){
+ var r=roles[id];S={mode:"fight",role:id,room:1,turn:0,hp:r.hp,maxhp:r.hp,shield:0,hero:{pos:3,dir:1},enemies:[],hand:r.hand.map(function(k){return {id:k,wait:0}}),queue:[],log:[],bonus:0,cleared:0};
+ spawn();note("Nhập giang hồ! Chọn chiêu thức rồi nhấn Thi triển.");save();render()
+}
+function spawn(){
+ S.hero.pos=3;S.hero.dir=1;S.shield=0;S.queue=[];
+ var positions=S.room===5?[7]:S.room===1?[7]:S.room===2?[1,7]:S.room===3?[0,7]:[0,6,8];
+ S.enemies=positions.map(function(p,i){
+   var n=S.room===5?3:(S.room<=2?(i%2):(i===2?2:i%3));
+   var f=foeTypes[n];return {id:S.room*10+i,pos:p,name:f.name,icon:f.icon,hp:f.hp+(S.room===5?2:0),max:f.hp+(S.room===5?2:0),dmg:f.dmg,range:f.range}
+ });
+}
+function enemyAt(pos){return S.enemies.find(function(e){return e.hp>0&&e.pos===pos})}
+function living(){return S.enemies.filter(function(e){return e.hp>0})}
+function targets(id){
+ var d=D[id],dir=S.hero.dir,p=S.hero.pos,res=[];
+ if(d.range===0)return res;
+ for(var n=1;n<=d.range;n++){var e=enemyAt(p+dir*n);if(e){res.push(e);if(d.kind!=="all")break}}
+ return res
+}
+function useSkill(id){
+ var d=D[id],tar=targets(id);
+ if(d.kind==="shield"){S.shield+=d.power;note("Vận "+d.name+"! Hộ thuẫn +"+d.power)}
+ else if(d.kind==="heal"){var h=Math.min(S.maxhp-S.hp,d.power);S.hp+=h;note("Thi triển "+d.name+": hồi "+h+" khí huyết")}
+ else if(d.kind==="dash"){var count=0;for(var j=0;j<d.power;j++){var n=S.hero.pos+S.hero.dir;if(n<0||n>8||enemyAt(n))break;S.hero.pos=n;count++}note(d.name+": di chuyển "+count+" ô")}
+ else if(!tar.length)note(d.name+" không trúng mục tiêu.")
+ else tar.forEach(function(e){var dam=d.power+S.bonus;e.hp-=dam;note(d.name+" đánh "+e.name+" −"+dam+" khí huyết");if(d.kind==="push"&&e.hp>0){var p=e.pos+S.hero.dir;if(p>=0&&p<=8&&!enemyAt(p)){e.pos=p;note("Đẩy lùi đối thủ 1 ô")}}});
+}
+function processEnemies(){
+ if(S.mode!=="fight")return;
+ if(!living().length){clearRoom();return}
+ living().forEach(function(e){
+  if(S.hp<=0)return;
+  var dist=Math.abs(e.pos-S.hero.pos);
+  if(dist<=e.range){
+   var hurt=e.dmg,block=Math.min(S.shield,hurt);S.shield-=block;hurt-=block;S.hp-=hurt;
+   note(e.name+" xuất chiêu: −"+hurt+" khí huyết"+(block?" (đỡ "+block+")":""));
+  }else{
+   var next=e.pos+(S.hero.pos>e.pos?1:-1);
+   if(!enemyAt(next)&&next!==S.hero.pos){e.pos=next;note(e.name+" áp sát")}
+  }
+ });
+ S.turn++;
+ S.hand.forEach(function(c){if(c.wait>0)c.wait--});
+ if(S.hp<=0){S.hp=0;S.mode="over";note("Hiệp khách trọng thương, hành trình khép lại.")}
+ else if(!living().length)clearRoom();
+ save();render();
+}
+function clearRoom(){
+ S.cleared++;
+ S.queue=[];
+ if(S.room>=5){S.mode="victory";note("Huyết Ảnh Ma Quân bại trận!");save();render();return}
+ S.mode="reward";note("Thắng trận thứ "+S.room+". Chọn một cơ duyên.");save();render();
+}
+function act(name,value){
+ if(name==="exit"){window.parent.postMessage({type:"kiem-anh-close"},"*");return}
+ if(name==="again"){S=null;try{localStorage.removeItem(KEY)}catch(e){}render();return}
+ if(name==="role"){setup(value);return}
+ if(!S)return;
+ if(name==="next"){S.room++;S.mode="fight";spawn();note("Bước vào ải "+S.room);save();render();return}
+ if(name==="reward"){
+  if(value==="health"){S.maxhp+=3;S.hp=Math.min(S.maxhp,S.hp+5);note("Cơ duyên: Cường Thân Quyết (+3 tối đa, hồi 5)")}
+  else if(value==="power"){S.bonus++;note("Cơ duyên: Kiếm Tâm Thông Minh (+1 sát thương mọi chiêu)")}
+  else if(value==="hand"){var unlocked=Object.keys(D).filter(function(id){return !S.hand.some(function(c){return c.id===id})});if(unlocked.length){var pick=unlocked[Math.floor(Math.random()*unlocked.length)];S.hand.push({id:pick,wait:0});note("Học bí kíp "+D[pick].name)}else{S.maxhp+=2;S.hp+=2;note("Được tăng 2 khí huyết")}}
+  else if(value==="heal"){S.hp=Math.min(S.maxhp,S.hp+7);note("Dùng linh đan: hồi 7 khí huyết")}
+  act("next");return
+ }
+ if(S.mode!=="fight")return;
+ if(name==="queue"){
+  var card=S.hand.find(function(c){return c.id===value});
+  if(!card||card.wait>0||S.queue.includes(value)||S.queue.length>=3)return;
+  S.queue.push(value);save();render();return
+ }
+ if(name==="undo"){S.queue.pop();save();render();return}
+ if(name==="left"||name==="right"){
+  var step=name==="left"?-1:1,pos=S.hero.pos+step;
+  if(pos<0||pos>8||enemyAt(pos)){note("Đường đi bị chắn.");render();return}
+  S.hero.pos=pos;note("Di chuyển "+(step<0?"sang trái":"sang phải"));processEnemies();return
+ }
+ if(name==="face"){S.hero.dir*=-1;note("Đổi hướng xuất chiêu");processEnemies();return}
+ if(name==="wait"){note("Tĩnh tâm quan sát");processEnemies();return}
+ if(name==="cast"){
+  if(!S.queue.length){note("Hãy chọn ít nhất một chiêu thức.");render();return}
+  var q=S.queue.slice();S.queue=[];
+  q.forEach(function(id){var c=S.hand.find(function(x){return x.id===id});if(!c)return;useSkill(id);c.wait=D[id].cd+1});
+  if(!living().length)clearRoom();else processEnemies();save();render();return
+ }
+}
+function hud(){
+ return '<div class="hud"><div>Hiệp khách: <span>'+esc(roles[S.role].name)+'</span></div><div>Khí huyết: <span>'+S.hp+'/'+S.maxhp+'</span> · Hộ thuẫn: <span>'+S.shield+'</span></div><div>Ải <span>'+S.room+'/5</span> · Lượt <span>'+S.turn+'</span></div></div>'
+}
+function battle(){
+ var threats=new Set();living().forEach(function(e){if(Math.abs(e.pos-S.hero.pos)<=e.range)threats.add(S.hero.pos)});
+ var a='<div class="panel">'+hud()+'</div><div class="panel"><div class="arena"><div class="track">';
+ for(var p=0;p<9;p++){
+  var e=enemyAt(p),isHero=p===S.hero.pos;var c="tile"+(isHero?" hero":"")+(isHero&&threats.has(p)?" threat":"");
+  a+='<div class="'+c+'">';
+  if(isHero)a+='<span class="avatar">🧙</span><span class="unit-name">'+(S.hero.dir>0?'Kiếm →':'← Kiếm')+'</span><span class="unit-life">♥ '+S.hp+'</span>';
+  else if(e)a+='<span class="avatar foe">'+e.icon+'</span><span class="unit-name">'+esc(e.name)+'</span><span class="unit-life">♥ '+Math.max(0,e.hp)+'</span>';
+  a+='<span class="index">'+(p+1)+'</span></div>'
+ }
+ a+='</div></div><div class="hint">Viền đỏ: đối thủ đang ở tầm tấn công. Mỗi lần di chuyển, đổi hướng hoặc thi triển, kẻ địch được hành động.</div><div class="controls">';
+ a+=button('◀ Trái','left')+button('Đổi hướng ↺','face')+button('Phải ▶','right')+button('Tĩnh tâm','wait');
+ a+='</div></div><div class="panel"><h2>Võ học & chiêu thức</h2><div class="muted" style="font-size:12px">Chạm các chiêu để xếp chuỗi (tối đa 3) rồi thi triển cùng một lượt. Chiêu sẽ cần hồi lực trước khi dùng lại.</div><div class="cards">';
+ S.hand.forEach(function(c,i){var d=D[c.id];a+='<button class="card '+(c.wait?'cooldown ':'')+(S.queue.includes(c.id)?"active":"")+'" data-act="queue" data-val="'+c.id+'" '+(c.wait||S.queue.includes(c.id)?'disabled':'')+'><strong>'+d.icon+' '+d.name+'</strong><small>'+(c.wait?'Hồi lực: '+c.wait+' lượt':'Phím '+(i+1)+' · Sẵn sàng')+'</small><p>'+d.desc+'</p></button>'});
+ a+='</div><div class="ribbon"><b>Chuỗi chiêu:</b> '+(S.queue.length?S.queue.map(function(id){return '<span class="pill">'+D[id].name+'</span>'}).join(''):'<span class="muted">Chưa chọn chiêu</span>')+'</div><div class="row">';
+ a+=button('Bỏ chiêu cuối','undo')+button('Thi triển ('+S.queue.length+'/3) ↵','cast','primary');
+ a+='</div></div><div class="panel"><h2>Chiến báo</h2><div class="log">'+S.log.map(esc).join('<br>')+'</div><p class="muted" style="font-size:12px;margin-bottom:0">Phím: A / D di chuyển · W đổi hướng · 1–9 chọn chiêu · Enter thi triển · Space tĩnh tâm.</p></div>';
+ return a
+}
+function reward(){
+ return '<div class="panel">'+hud()+'</div><section class="panel summary"><h2>Thắng trận · Ải '+S.room+'</h2><p>Giang hồ mở ra bốn cơ duyên. Chọn một trước khi tiếp tục.</p><div class="rewards">'+
+ '<button class="school" data-act="reward" data-val="health"><b>Đại Lực Kim Cang</b><span>Khí huyết tối đa +3, hồi tối đa 5.</span></button>'+
+ '<button class="school" data-act="reward" data-val="power"><b>Kiếm Tâm Minh Ngộ</b><span>Mọi tuyệt kỹ tăng 1 sát thương vĩnh viễn.</span></button>'+
+ '<button class="school" data-act="reward" data-val="hand"><b>Bí Kíp Thất Truyền</b><span>Học ngẫu nhiên một chiêu thức chưa biết.</span></button>'+
+ '<button class="school" data-act="reward" data-val="heal"><b>Cửu Hoa Ngọc Lộ</b><span>Hồi ngay tối đa 7 khí huyết.</span></button>'+
+ '</div></section>'
+}
+function landing(){
+ return '<div class="panel menu"><h2>Chọn môn phái, nhập giang hồ</h2><p class="intro">Trận pháp chín ô · ra đòn theo hướng · phối hợp tối đa ba chiêu · đoán hành động địch · vượt 5 ải. Mỗi động tác đều có giá: kẻ địch sẽ phản công.</p><div class="schools">'+Object.keys(roles).map(function(id){var r=roles[id];return '<button class="school" data-act="role" data-val="'+id+'"><div style="font-size:31px">'+r.mark+'</div><b>'+r.name+'</b><span>'+r.intro+'</span><span style="color:#e4c997;margin-top:9px">'+r.hand.map(function(x){return D[x].name}).join(' · ')+'</span></button>'}).join('')+'</div><p class="muted">Tiến độ hành trình được lưu tự động trên trình duyệt hiện tại. Game có thể chơi bằng chuột, bàn phím và cảm ứng.</p></div>'
+}
+function finished(){
+ var win=S.mode==="victory";
+ return '<section class="panel summary"><div style="font-size:65px">'+(win?'🏆':'⚔')+'</div><h2>'+(win?'Nhất Kiếm Định Giang Sơn':'Thân Bại Danh Liệt')+'</h2><p>'+(win?'Anh hùng đã vượt ngũ quan, đánh bại Huyết Ảnh Ma Quân.':'Đại hiệp đã dừng bước ở ải '+S.room+'. Hãy rèn lại kiếm ý để tái chiến.')+'</p><p>Chiến công: '+S.cleared+'/5 ải · '+S.turn+' lượt · '+esc(roles[S.role].name)+'</p>'+button('Tái xuất giang hồ','again','primary')+'</section>'
+}
+function render(){
+ screen.innerHTML=!S?landing():S.mode==="fight"?battle():S.mode==="reward"?reward():finished()
+}
+screen.addEventListener("click",function(e){var b=e.target.closest("[data-act]");if(b)act(b.dataset.act,b.dataset.val)});
+document.getElementById("exit").addEventListener("click",function(){act("exit")});
+window.addEventListener("keydown",function(e){
+ if(!S||S.mode!=="fight"||e.altKey||e.ctrlKey||e.metaKey)return;
+ var a=({"a":"left","ArrowLeft":"left","d":"right","ArrowRight":"right","w":"face","ArrowUp":"face"," ":"wait","Enter":"cast","Backspace":"undo"})[e.key];
+ if(/^[1-9]$/.test(e.key)){var c=S.hand[Number(e.key)-1];if(c)a="queue",e.preventDefault(),act(a,c.id);return}
+ if(a){e.preventDefault();act(a)}
+});
+load();render();
+})();
+</script></body></html>
