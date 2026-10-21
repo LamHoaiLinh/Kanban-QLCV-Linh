@@ -64,7 +64,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
  let variantsCache=null,AIbusy=false;
  let zoom=1,panX=0,panY=0,tab='shape',tool='warp',crop=null,quad=null,textPoint=null;
  let drag=null,dirty=false,busy=false,space=false,brushRadius=130,brushPower=68,brush='waist',brushPoint=null;
- let color='orange',repaintTimer=null;
+ let color='orange',repaintTimer=null,manualOpen=false;
  const history=makePhotoHistory(mobile);
  let bodySettings={...DEFAULT_BODY(),...(editState?.bodySettings||{})};
  let people=editState?.people||[],chosenPerson=editState?.chosenPerson||0,poseStatus=editState?.people?.length?'Đã nhận diện '+editState.people.length+' người':'Đang nhận diện…',showBodyGuides=false;
@@ -232,7 +232,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
    slider('body.head','Đầu nhỏ',bodySettings.head,0,100)+
    slider('body.overall','Thon tổng thể',bodySettings.overall,0,100)+
    slider('body.natural','Tự nhiên',bodySettings.natural,0,100)+
-   '<details class="kpe-manual" id="kpeManual"><summary>Chỉnh thủ công</summary>'+
+   '<details class="kpe-manual" id="kpeManual" '+(manualOpen?'open':'')+'><summary>Chỉnh thủ công</summary>'+
    '<div class="kpe-brushes">'+[['waist','Bóp eo'],['arm','Bóp tay'],['head','Thu đầu'],['free','Kéo tự do']].map(([id,name])=>'<button data-brush="'+id+'" class="'+(brush===id?'active':'')+'">'+name+'</button>').join('')+'</div>'+
    slider('brushPower','Lực kéo',brushPower,0,100)+slider('brushRadius','Bán kính',brushRadius,20,450)+'</details>';
   else if(tab==='skin')panel.innerHTML='<h3>Chỉnh da</h3>'+maskControls()+
@@ -478,7 +478,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
  modal.addEventListener('click',event=>{
   const btn=event.target.closest('[data-click],[data-mode],[data-color],[data-brush],[data-scope],[data-paint]');if(!btn)return;
   if(btn.dataset.color){color=btn.dataset.color;renderPanel();return;}
-  if(btn.dataset.brush){brush=btn.dataset.brush;renderPanel();return;}
+  if(btn.dataset.brush){manualOpen=Boolean(panel.querySelector('#kpeManual')?.open);brush=btn.dataset.brush;renderPanel();return;}
   if(btn.dataset.scope){editScope=btn.dataset.scope;changed();endTool();renderPanel();draw();return;}
   if(btn.dataset.paint){paintMode=btn.dataset.paint;renderPanel();return;}
   if(btn.dataset.mode){chooseMode(btn.dataset.mode);return;}
@@ -496,6 +496,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
   if(a==='poseRetry'){people=[];poseStatus='Đang nhận diện…';changed();void queuePose();}
   if(a==='poseGuides'){showBodyGuides=!showBodyGuides;renderPanel();draw();}
  });
+ panel.addEventListener('toggle',e=>{if(e.target?.id==='kpeManual')manualOpen=e.target.open;},true);
  panel.addEventListener('change',e=>{if(e.target?.id==='kpePerson'){makeUndo('params');chosenPerson=Number(e.target.value);changed();renderPanel();draw();}});
  function applyUndo(){const old=history.popUndo(takeState('params'));if(!old){say('Không còn bước hoàn tác.');return;}useState(old);}
  function applyRedo(){const next=history.popRedo(takeState('params'));if(!next){say('Không còn bước làm lại.');return;}useState(next);}
