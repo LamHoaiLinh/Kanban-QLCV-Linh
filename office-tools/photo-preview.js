@@ -282,8 +282,14 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
   action('apply').textContent=m==='crop'?'Cắt ảnh':m==='perspective'?'Nắn phối cảnh':'Đặt chữ';
   draw();
  }
+ function flattenForGeometry(){
+  if(!manualOps.length&&!hasBody())return;
+  working=toCanvas(bodyImage(false));manualOps=[];people=[];
+  bodySettings={...DEFAULT_BODY(),waist:0,arms:0};
+  poseStatus='Nhận diện lại để chỉnh dáng';changed();
+ }
  function rotate(which){
-  makeUndo();const w=working.width,h=working.height,isRotate=which.startsWith('rotate'),out=make(isRotate?h:w,isRotate?w:h),ctx=out.getContext('2d');
+  makeUndo('params');flattenForGeometry();const w=working.width,h=working.height,isRotate=which.startsWith('rotate'),out=make(isRotate?h:w,isRotate?w:h),ctx=out.getContext('2d');
   if(which==='rotateR'){ctx.translate(h,0);ctx.rotate(Math.PI/2);}
   if(which==='rotateL'){ctx.translate(0,w);ctx.rotate(-Math.PI/2);}
   if(which==='flipH'){ctx.translate(w,0);ctx.scale(-1,1);}
@@ -297,12 +303,12 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
     const x=limit(Math.round(crop.x),0,working.width-2),y=limit(Math.round(crop.y),0,working.height-2),
       w=limit(Math.round(crop.w),0,working.width-x),h=limit(Math.round(crop.h),0,working.height-y);
     if(w<12||h<12)throw Error('Vùng cắt quá nhỏ');
-    const out=make(w,h);out.getContext('2d').drawImage(working,x,y,w,h,0,0,w,h);makeUndo();working=out;
+    makeUndo('params');flattenForGeometry();const out=make(w,h);out.getContext('2d').drawImage(working,x,y,w,h,0,0,w,h);working=out;
    }else if(tool==='perspective'){
-    const out=await correctPerspective(working,quad,n=>say('Đang sửa phối cảnh '+n+'%'));makeUndo();working=out;
+    makeUndo('params');flattenForGeometry();const out=await correctPerspective(working,quad,n=>say('Đang sửa phối cảnh '+n+'%'));working=out;
    }else if(tool==='text'){
     const str=by('#kpeText')?.value.trim();if(!str)throw Error('Chưa nhập chữ');
-    makeUndo();working=toCanvas(working);const ctx=working.getContext('2d'),size=limit(+by('#kpeFont').value||45,8,500);
+    makeUndo('params');flattenForGeometry();working=toCanvas(working);const ctx=working.getContext('2d'),size=limit(+by('#kpeFont').value||45,8,500);
     ctx.font='bold '+size+'px Arial,sans-serif';ctx.lineWidth=Math.max(1,size*.045);ctx.lineJoin='round';
     ctx.strokeStyle='#173f23';ctx.strokeText(str,textPoint.x,textPoint.y);ctx.fillStyle=by('#kpeColor').value;ctx.fillText(str,textPoint.x,textPoint.y);
    }
@@ -398,11 +404,11 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
    stamp(localMask,pt,pt,paintRadius,brushOpacity/100,paintMode==='erase');changed();draw();return;
   }
   if(i===1&&tool==='warp'&&!spaceDown){
-   makeUndo();drag={type:'warp',from:pt,source:toCanvas(working),moved:false,end:pt};
+   makeUndo('params');drag={type:'warp',from:pt,source:bodyImage(false),moved:false,end:pt};
     if(mobile){
       const r=Math.min(1,950/Math.max(working.width,working.height));
       const thumb=make(Math.max(1,Math.round(working.width*r)),Math.max(1,Math.round(working.height*r)));
-      thumb.getContext('2d').drawImage(working,0,0,thumb.width,thumb.height);
+      thumb.getContext('2d').drawImage(bodyImage(true),0,0,thumb.width,thumb.height);
       drag.previewSrc=thumb;drag.factor=r;
     }
     c.setPointerCapture(e.pointerId);return;
@@ -429,8 +435,8 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
      if(mobile&&drag.previewSrc){
        const r=drag.factor;drag.live=deformAt(drag.previewSrc,{x:drag.from.x*r,y:drag.from.y*r},{x:pt.x*r,y:pt.y*r},Math.max(6,brushRadius*r),brushPower,brush);
        drag.end=pt;previewDirty=true;dirty=true;
-     }else{working=deformAt(drag.source,drag.from,pt,brushRadius,brushPower,brush);changed();}
-     drag.moved=true;loupePoint=pt;
+     }else{drag.live=deformAt(drag.source,drag.from,pt,brushRadius,brushPower,brush);renderDirty=true;previewDirty=true;}
+     drag.end=pt;drag.moved=true;loupePoint=pt;
    }
   }
   if(drag.type==='mask'){stamp(localMask,drag.last,pt,paintRadius,brushOpacity/100,paintMode==='erase');drag.last=pt;drag.moved=true;loupePoint=pt;changed();}
@@ -448,7 +454,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
   touchEnd(e);
   if(drag?.type==='warp'){
     if(!drag.moved)history.cancelLast();
-    else if(mobile&&drag.previewSrc){working=deformAt(drag.source,drag.from,drag.end,brushRadius,brushPower,brush);changed();}
+    else{manualOps.push({from:drag.from,to:drag.end||drag.from,radius:brushRadius,power:brushPower,kind:brush});changed();}
   }
   if(drag?.type==='mask'&&mobile)queueDraft();
   drag=null;loupePoint=null;previewDirty=true;draw();
