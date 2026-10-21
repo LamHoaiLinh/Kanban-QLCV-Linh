@@ -472,7 +472,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
   c.addEventListener('pointermove',e=>pointerMove(e,i));
   c.addEventListener('pointerup',e=>pointerUp(e,i));
   c.addEventListener('pointercancel',e=>pointerUp(e,i));
-  c.addEventListener('dblclick',()=>{if(!['view','warp','mask'].includes(tool))return;if(zoom>1.1)fit();else{zoom=2;draw();}});
+  c.addEventListener('dblclick',()=>{if(tool!=='view')return;if(zoom>1.1)fit();else{zoom=2;draw();}});
  });
  modal.querySelectorAll('[data-tab]').forEach(btn=>btn.onclick=()=>switchTab(btn.dataset.tab));
  modal.addEventListener('click',event=>{
