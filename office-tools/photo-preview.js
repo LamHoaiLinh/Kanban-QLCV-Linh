@@ -68,7 +68,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
  const history=makePhotoHistory(mobile);
  let bodySettings={...DEFAULT_BODY(),...(editState?.bodySettings||{})};
  let people=editState?.people||[],chosenPerson=editState?.chosenPerson||0,poseStatus=editState?.people?.length?'Đã nhận diện '+editState.people.length+' người':'Đang nhận diện…',showBodyGuides=false;
- let bodyCache=null,bodyPreviewCache=null,bodyDirty=true,poseRequest=null,sliderGesture=false;
+ let bodyCache=null,bodyPreviewCache=null,bodyDirty=true,poseRequest=null,sliderGesture=false,manualOps=editState?.manualOps?.map(op=>({...op}))||[];
  const hasBody=()=>people.length>0&&people[chosenPerson]&&bodyRegions(people[chosenPerson],working.width,working.height);
  if(editState?.maskBlob){
    try{const bitmap=await createImageBitmap(editState.maskBlob);localMask.getContext('2d').drawImage(bitmap,0,0);bitmap.close();}catch{editScope='global';}
@@ -98,19 +98,22 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
  handle.addEventListener('pointermove',e=>{if(!sheetDrag||e.pointerId!==sheetDrag.id)return;const height=limit(sheetDrag.height+sheetDrag.y-e.clientY,165,Math.round(window.innerHeight*.78));modal.style.setProperty('--kpe-sheet-height',height+'px');});
  for(const name of ['pointerup','pointercancel'])handle.addEventListener(name,e=>{if(sheetDrag?.id===e.pointerId)sheetDrag=null;});
  const bodyImage=(preview=false)=>{
-   const landmarks=people[chosenPerson];if(!landmarks||!bodyRegions(landmarks,working.width,working.height))return working;
-   if(preview){
-     if(bodyPreviewCache&&!bodyDirty)return bodyPreviewCache;
-     const scale=Math.min(1,900/Math.max(working.width,working.height));
-     const small=make(Math.max(1,Math.round(working.width*scale)),Math.max(1,Math.round(working.height*scale)));
-     small.getContext('2d').drawImage(working,0,0,small.width,small.height);
-     bodyPreviewCache=renderAutoBody(small,landmarks,bodySettings,'preview');return bodyPreviewCache;
+   if(preview&&bodyPreviewCache)return bodyPreviewCache;
+   if(!preview&&bodyCache&&!bodyDirty)return bodyCache;
+   const scale=preview?Math.min(1,900/Math.max(working.width,working.height)):1;
+   const base=scale===1?working:make(Math.max(1,Math.round(working.width*scale)),Math.max(1,Math.round(working.height*scale)));
+   if(scale!==1)base.getContext('2d').drawImage(working,0,0,base.width,base.height);
+   let output=hasBody()?renderAutoBody(base,people[chosenPerson],bodySettings,preview?'preview':'full'):base;
+   for(const op of manualOps){
+     output=deformAt(output,{x:op.from.x*scale,y:op.from.y*scale},{x:op.to.x*scale,y:op.to.y*scale},
+       Math.max(5,op.radius*scale),op.power,op.kind);
    }
-   if(bodyCache&&!bodyDirty)return bodyCache;
-   bodyCache=renderAutoBody(working,landmarks,bodySettings,'full');bodyDirty=false;return bodyCache;
+   if(preview)bodyPreviewCache=output;
+   else {bodyCache=output;bodyDirty=false;}
+   return output;
  };
  const filtered=()=>{
-   if(renderDirty){const image=bodyImage(false);
+   if(renderDirty){const image=drag?.type==='warp'&&drag.live?drag.live:bodyImage(false);
      rendered=hasAdjustments(settings)?applyMasked(image,settings,localMask,editScope==='local'):image;
      renderDirty=false;
    }return rendered;
@@ -118,7 +121,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
  const previewFiltered=()=>{
    if(!mobile)return filtered();
    if(!previewDirty&&previewCache)return previewCache;
-   const source=drag?.type==='warp'&&drag.live?drag.live:(hasBody()?bodyImage(true):working);
+   const source=drag?.type==='warp'&&drag.live?drag.live:bodyImage(true);
    const ratio=Math.min(1,1100/Math.max(source.width,source.height));
    const small=ratio===1?source:make(Math.max(1,Math.round(source.width*ratio)),Math.max(1,Math.round(source.height*ratio)));
    if(small!==source)small.getContext('2d').drawImage(source,0,0,small.width,small.height);
@@ -151,7 +154,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
      if(working.width*working.height>13000000)throw Error('Ảnh quá lớn để tự giữ nháp trên điện thoại.');
      const baseBlob=await snapshot(working,'image/png');
      const maskBlob=editScope==='local'?await snapshot(localMask,'image/png'):null;
-     await onAutoDraft({baseBlob,maskBlob,settings:structuredClone(settings),scope:editScope,bodySettings:{...bodySettings},people,chosenPerson,dirty:true});
+     await onAutoDraft({baseBlob,maskBlob,settings:structuredClone(settings),scope:editScope,bodySettings:{...bodySettings},manualOps:manualOps.map(op=>({...op})),people,chosenPerson,dirty:true});
      draftWarning=false;
    }catch(e){if(!draftWarning){say('Chưa tự lưu được nháp: '+e.message+' Hãy bấm Lưu chỉnh sửa.');draftWarning=true;}}
    finally{draftRunning=false;}
@@ -161,13 +164,13 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
  const takeState=(type='params')=>({
    image:type==='pixels'?toCanvas(working):working,imageCopied:type==='pixels',
    mask:type==='mask'?toCanvas(localMask):localMask,maskCopied:type==='mask',
-   settings:structuredClone(settings),bodySettings:{...bodySettings},
+   settings:structuredClone(settings),bodySettings:{...bodySettings},manualOps:manualOps.map(op=>({...op})),
    scope:editScope,people,chosenPerson
  });
  const makeUndo=(type='pixels')=>history.push(takeState(type));
  const useState=state=>{
    working=state.image;settings=state.settings;editScope=state.scope;localMask=state.mask;
-   bodySettings={...state.bodySettings};people=state.people;chosenPerson=state.chosenPerson;
+   bodySettings={...state.bodySettings};manualOps=state.manualOps?.map(op=>({...op}))||[];people=state.people;chosenPerson=state.chosenPerson;
    bodyCache=null;bodyPreviewCache=null;bodyDirty=true;changed();renderPanel();endTool();draw();
  };
  const clearHistory=()=>history.clear();
@@ -314,7 +317,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
    // Keep a lossless working image + slider recipe to avoid repeated lossy recompression.
    const baseBlob=await snapshot(working,'image/png');
    const maskBlob=editScope==='local'?await snapshot(localMask,'image/png'):null;
-   await onSaved(output,{baseBlob,maskBlob,settings:structuredClone(settings),scope:editScope,bodySettings:{...bodySettings},people,chosenPerson});
+   await onSaved(output,{baseBlob,maskBlob,settings:structuredClone(settings),scope:editScope,bodySettings:{...bodySettings},manualOps:manualOps.map(op=>({...op})),people,chosenPerson});
    dirty=false;clearTimeout(draftTimer);say('Đã lưu. Đóng Preview rồi bấm Tải tất cả.');}
   catch(e){say('Không lưu được: '+e.message);}finally{busy=false;}
  }
@@ -328,12 +331,12 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
    working=toCanvas(bitmap);bitmap.close();settings=old.state?.settings?structuredClone(old.state.settings):DEFAULT_EDITS();
    editScope=old.state?.scope||'global';localMask=createMask(working.width,working.height);
    if(old.state?.maskBlob){const image=await createImageBitmap(old.state.maskBlob);localMask.getContext('2d').drawImage(image,0,0);image.close();}
-   clearHistory();bodySettings={...DEFAULT_BODY(),...(old.state?.bodySettings||{})};people=old.state?.people||[];chosenPerson=old.state?.chosenPerson||0;bodyDirty=true;bodyCache=null;bodyPreviewCache=null;renderDirty=true;previewDirty=true;dirty=false;endTool();renderPanel();fit();say('Đã khôi phục bản lưu trước.');
+   clearHistory();bodySettings={...DEFAULT_BODY(),...(old.state?.bodySettings||{})};manualOps=old.state?.manualOps||[];people=old.state?.people||[];chosenPerson=old.state?.chosenPerson||0;bodyDirty=true;bodyCache=null;bodyPreviewCache=null;renderDirty=true;previewDirty=true;dirty=false;endTool();renderPanel();fit();say('Đã khôi phục bản lưu trước.');
   }catch(error){say('Không khôi phục được bản lưu trước: '+error.message);}finally{busy=false;}
  }
  async function restore(){
   if(busy)return;busy=true;
-  try{working=toCanvas(original);settings=DEFAULT_EDITS();editScope='global';localMask=createMask(working.width,working.height);renderDirty=true;previewDirty=true;await onReset?.();dirty=false;clearHistory();people=[];bodySettings=DEFAULT_BODY();poseStatus='Chưa nhận diện';bodyDirty=true;bodyCache=null;bodyPreviewCache=null;clearTimeout(draftTimer);endTool();renderPanel();fit();say('Đã khôi phục về ảnh gốc.');}
+  try{working=toCanvas(original);settings=DEFAULT_EDITS();editScope='global';localMask=createMask(working.width,working.height);renderDirty=true;previewDirty=true;await onReset?.();dirty=false;clearHistory();people=[];bodySettings=DEFAULT_BODY();manualOps=[];poseStatus='Chưa nhận diện';bodyDirty=true;bodyCache=null;bodyPreviewCache=null;clearTimeout(draftTimer);endTool();renderPanel();fit();say('Đã khôi phục về ảnh gốc.');}
   catch(e){say('Lỗi khôi phục: '+e.message);}finally{busy=false;}
  }
  async function close(){
