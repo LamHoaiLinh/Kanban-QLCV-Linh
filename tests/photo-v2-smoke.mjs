@@ -60,6 +60,7 @@ try{
  requireTrue(second!==first,'Second manual stroke must alter pixels');
  await page.keyboard.press('Control+z');
  const afterUndo1=await image.evaluate(c=>c.toDataURL());
+ if(afterUndo1!==first)console.log('UNDO DEBUG',{undoMatchesBefore:afterUndo1===before,undoMatchesSecond:afterUndo1===second,firstLength:first.length,afterLength:afterUndo1.length,tool:await modal.locator('#kpeHint').textContent()});
  requireTrue(afterUndo1===first,'One undo must revert exactly one brush stroke');
  await page.keyboard.press('Control+z');
  const afterUndo2=await image.evaluate(c=>c.toDataURL());
