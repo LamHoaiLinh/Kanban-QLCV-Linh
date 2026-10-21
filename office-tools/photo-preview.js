@@ -518,19 +518,24 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
    setSliderValue(key,n);
  });
  function sliderDefault(key){const defaults={brushRadius:130,brushPower:68,paintRadius:90,brushOpacity:90};return key.startsWith('body.')?DEFAULT_BODY()[key.slice(5)]:defaults[key]??0;}
- function setSliderValue(key,value){
+ function setSliderValue(key,value,record=true){
   const input=panel.querySelector('[data-adjust="'+key+'"]');if(!input)return;
   const v=limit(Number(value),Number(input.min),Number(input.max));
   if(!Number.isFinite(v)||Number(input.value)===v)return;
-  makeUndo('params');input.value=String(v);input.dispatchEvent(new Event('input',{bubbles:true}));
+  if(record)makeUndo('params');input.value=String(v);input.dispatchEvent(new Event('input',{bubbles:true}));
  }
  panel.addEventListener('dblclick',e=>{
   const target=e.target.closest('[data-adjust],[data-value],[data-reset]');if(!target)return;
   e.preventDefault();e.stopPropagation();
   const key=target.dataset.adjust||target.dataset.value||target.dataset.reset;
-  setSliderValue(key,sliderDefault(key));
+  setSliderValue(key,sliderDefault(key),!(sliderGesture?.key===key&&performance.now()-sliderGesture.when<600));
  });
- panel.addEventListener('pointerdown',e=>{if(e.target.matches('[data-adjust]')&&!busy)makeUndo('params');});
+ panel.addEventListener('pointerdown',e=>{
+  if(!e.target.matches('[data-adjust]')||busy)return;
+  const key=e.target.dataset.adjust,time=performance.now();
+  if(sliderGesture?.key===key&&time-sliderGesture.when<450)return;
+  sliderGesture={key,when:time};makeUndo('params');
+ });
  panel.addEventListener('input',e=>{
   const el=e.target.closest('[data-adjust]');if(!el)return;
   const key=el.dataset.adjust,value=Number(el.value);
