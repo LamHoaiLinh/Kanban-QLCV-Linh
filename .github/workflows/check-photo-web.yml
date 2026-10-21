@@ -9,10 +9,14 @@ on:
       - 'office-tools/photo-ai.js'
       - 'office-tools/photo-filters.js'
       - 'office-tools/photo-warp.js'
+      - 'office-tools/photo-pose.js'
+      - 'office-tools/photo-auto-body.js'
+      - 'office-tools/photo-history.js'
       - 'office-tools/photo-preview.css'
       - 'tests/photo-web-smoke.mjs'
       - 'tests/photo-batch-smoke.mjs'
       - 'tests/photo-mobile-smoke.mjs'
+      - 'tests/photo-body-auto.mjs'
       - 'office-tools/photo-studio.css'
       - 'office-tools/office-tools.js'
       - '.github/workflows/check-photo-web.yml'
@@ -36,6 +40,9 @@ jobs:
           node --check office-tools/photo-ai.js
           node --check office-tools/photo-filters.js
           node --check office-tools/photo-warp.js
+          node --check office-tools/photo-pose.js
+          node --check office-tools/photo-auto-body.js
+          node --check office-tools/photo-history.js
           node --check office-tools/office-tools.js
       - name: Assert menu integration
         run: |
@@ -65,3 +72,4 @@ jobs:
           node tests/photo-web-smoke.mjs
           node tests/photo-batch-smoke.mjs
           node tests/photo-mobile-smoke.mjs
+          node tests/photo-body-auto.mjs
