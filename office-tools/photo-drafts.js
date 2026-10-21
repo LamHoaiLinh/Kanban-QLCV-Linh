@@ -29,7 +29,7 @@ async function transact(mode,callback){
 export async function savePhotoDraft(file,entry){
  if(!entry?.baseBlob)throw Error('Chưa có dữ liệu ảnh để giữ nháp');
  if(sizeOf(entry)>LIMIT)throw Error('Bản nháp quá lớn (>30 MB); hãy bấm Lưu ảnh để tránh đầy bộ nhớ');
- const record={id:keyOf(file),baseBlob:entry.baseBlob,maskBlob:entry.maskBlob||null,outputBlob:entry.outputBlob||null,scope:entry.scope||'global',settings:entry.settings||null,dirty:Boolean(entry.dirty),updatedAt:Date.now()};
+ const record={id:keyOf(file),baseBlob:entry.baseBlob,maskBlob:entry.maskBlob||null,outputBlob:entry.outputBlob||null,scope:entry.scope||'global',settings:entry.settings||null,bodySettings:entry.bodySettings||null,manualOps:entry.manualOps||[],people:entry.people||[],chosenPerson:entry.chosenPerson||0,dirty:Boolean(entry.dirty),updatedAt:Date.now()};
  await transact('readwrite',store=>store.put(record));
  return record;
 }
