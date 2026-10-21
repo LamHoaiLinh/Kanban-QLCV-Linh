@@ -17,6 +17,7 @@ on:
       - 'tests/photo-batch-smoke.mjs'
       - 'tests/photo-mobile-smoke.mjs'
       - 'tests/photo-body-auto.mjs'
+      - 'tests/photo-v2-smoke.mjs'
       - 'office-tools/photo-studio.css'
       - 'office-tools/office-tools.js'
       - '.github/workflows/check-photo-web.yml'
@@ -73,3 +74,4 @@ jobs:
           node tests/photo-batch-smoke.mjs
           node tests/photo-mobile-smoke.mjs
           node tests/photo-body-auto.mjs
+          node tests/photo-v2-smoke.mjs
