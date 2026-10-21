@@ -80,7 +80,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
  modal.innerHTML='<div class="kpe-shell">'+
   '<header class="kpe-top"><div><strong>KAN PHOTO · CHỈNH ẢNH</strong><small id="kpeFilename"></small></div><span id="kpeZoom">100%</span><button data-click="fit">Vừa khung</button><button data-click="pixel">100%</button><button data-click="undo" title="Hoàn tác">↩ Hoàn tác</button><button data-click="redo" title="Làm lại">↪ Làm lại</button><button data-click="previous">Bản lưu trước</button><button data-click="restore">Đặt lại</button><button data-click="close">×</button></header>'+
   '<div class="kpe-workspace"><div class="kpe-panes"><section class="kpe-side"><b>ẢNH GỐC</b><canvas data-pane="0"></canvas></section><section class="kpe-side"><b>ẢNH ĐANG CHỈNH</b><canvas data-pane="1"></canvas></section></div>'+
-  '<aside class="kpe-sidebar"><div id="kpeSheetHandle" class="kpe-sheet-handle" aria-label="Kéo lên hoặc xuống để thay đổi bảng công cụ"><span></span></div><nav class="kpe-tabs" aria-label="Nhóm công cụ"><button data-tab="shape">Vóc dáng</button><button data-tab="basic">Ánh sáng</button><button data-tab="hsl">HSL</button><button data-tab="detail">Chi tiết</button><button data-tab="geometry">Hình học</button><button data-tab="text">Chữ</button></nav><div class="kpe-controls" id="kpeControls"></div></aside></div>'+
+  '<aside class="kpe-sidebar"><div id="kpeSheetHandle" class="kpe-sheet-handle" aria-label="Kéo lên hoặc xuống để thay đổi bảng công cụ"><span></span></div><nav class="kpe-tabs" aria-label="Nhóm công cụ"><button data-tab="shape">Vóc dáng</button><button data-tab="skin">Da</button><button data-tab="basic">Ánh sáng</button><button data-tab="hsl">Màu sắc</button><button data-tab="detail">Chi tiết</button><button data-tab="tools">Công cụ</button></nav><div class="kpe-controls" id="kpeControls"></div></aside></div>'+
   '<footer class="kpe-bottom"><button type="button" data-click="compare" class="kpe-mobile-compare" aria-label="Giữ để xem ảnh gốc">Giữ xem gốc</button><span id="kpeHint">Vóc dáng: kéo mép eo hoặc cánh tay vào trong trên ảnh phải. Giữ Space + kéo để di chuyển ảnh.</span><button data-click="cancel" hidden>Hủy chỉnh</button><button data-click="apply" hidden>Áp dụng</button><button data-click="save" class="kpe-green">Lưu chỉnh sửa</button><button data-click="close">Đóng</button></footer></div>';
  if(mobile){modal.classList.add('kpe-is-mobile');modal.style.setProperty('--kpe-sheet-height','34dvh');}
  document.body.appendChild(modal);
@@ -218,10 +218,22 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
 
  function renderPanel(){
   modal.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
-  if(tab==='shape')panel.innerHTML='<h3>Chỉnh vóc dáng</h3><p>Phóng to và <b>kéo trực tiếp</b> vùng muốn thu gọn trên ảnh bên phải.</p>'+
-   '<div class="kpe-brushes">'+[['waist','Thon eo'],['arm','Thon tay'],['head','Thu đầu'],['free','Kéo tự do']].map(([id,name])=>'<button data-brush="'+id+'" class="'+(brush===id?'active':'')+'">'+name+'</button>').join('')+'</div>'+
-   slider('brushPower','Lực kéo',brushPower,0,100)+slider('brushRadius','Bán kính tác động',brushRadius,20,450)+
-   '<p class="kpe-tip">Kéo mép eo về tâm người, kéo mép tay vào trong; muốn thu đầu thì kéo từ đường viền tóc vào tâm. Space + chuột trái để di chuyển ảnh.</p>';
+  if(tab==='shape')panel.innerHTML='<h3>Vóc dáng thông minh</h3>'+
+   '<div class="kpe-pose-status"><span id="kpePoseStatus">'+poseStatus+'</span>'+
+   buttons([['Nhận diện lại','poseRetry'],[showBodyGuides?'Ẩn vùng':'Hiện vùng','poseGuides']])+'</div>'+
+   (people.length>1?'<label class="kpe-person-label">Người <select id="kpePerson">'+people.map((_,i)=>'<option value="'+i+'" '+(i===chosenPerson?'selected':'')+'>'+(i+1)+'</option>').join('')+'</select></label>':'')+
+   slider('body.waist','Eo thon',bodySettings.waist,0,100)+
+   slider('body.arms','Tay thon',bodySettings.arms,0,100)+
+   slider('body.legs','Chân thon',bodySettings.legs,0,100)+
+   slider('body.shoulders','Vai gọn',bodySettings.shoulders,0,100)+
+   slider('body.head','Đầu nhỏ',bodySettings.head,0,100)+
+   slider('body.overall','Thon tổng thể',bodySettings.overall,0,100)+
+   slider('body.natural','Tự nhiên',bodySettings.natural,0,100)+
+   '<details class="kpe-manual" id="kpeManual"><summary>Chỉnh thủ công</summary>'+
+   '<div class="kpe-brushes">'+[['waist','Bóp eo'],['arm','Bóp tay'],['head','Thu đầu'],['free','Kéo tự do']].map(([id,name])=>'<button data-brush="'+id+'" class="'+(brush===id?'active':'')+'">'+name+'</button>').join('')+'</div>'+
+   slider('brushPower','Lực kéo',brushPower,0,100)+slider('brushRadius','Bán kính',brushRadius,20,450)+'</details>';
+  else if(tab==='skin')panel.innerHTML='<h3>Chỉnh da</h3>'+maskControls()+
+   slider('noise','Mịn da',settings.noise,0,100)+slider('shadows','Sáng da',settings.shadows)+slider('temperature','Sắc da',settings.temperature);
   else if(tab==='basic')panel.innerHTML='<h3>Ánh sáng & màu</h3>'+maskControls()+[
    ['exposure','Phơi sáng'],['contrast','Tương phản'],['highlights','Vùng sáng'],['shadows','Vùng tối'],['whites','Điểm trắng'],['blacks','Điểm đen'],['temperature','Nhiệt màu'],['tint','Ám màu'],['vibrance','Màu tươi'],['saturation','Bão hòa']].map(([k,v])=>slider(k,v,settings[k])).join('')+
  (onApplyBatch?buttons([['Áp màu cho các ảnh khác','applyBatch']]):'');
@@ -238,20 +250,21 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
  '<hr><h3>AI nâng ảnh (tùy chọn)</h3><p>Cần Chrome/Edge PC hỗ trợ WebGPU. Mô hình tải lần đầu khá lớn; ảnh không được gửi đi để xử lý.</p>'+
  buttons([['SCUNet – khử hạt','ai-scunet'],['Real-ESRGAN – nâng 2×','ai-realesrgan']])+
  '<p class="kpe-tip">'+(mobile?'AI chuyên sâu chỉ bật trên PC để tránh hết bộ nhớ trên điện thoại.':'AI chỉ chạy khi bạn bấm. Nếu máy không hỗ trợ hoặc tải mô hình lỗi, ảnh hiện tại được giữ nguyên.')+'</p>';
-  else if(tab==='geometry')panel.innerHTML='<h3>Hình học</h3>'+buttons([['↶ Xoay trái','rotateL'],['↷ Xoay phải','rotateR'],['⇋ Lật ngang','flipH'],['⇅ Lật dọc','flipV']])+
-    buttons([['▣ Crop','crop'],['◇ Phối cảnh','perspective']],'data-mode')+
-    '<p class="kpe-tip">Kéo các góc của vùng Crop hoặc Phối cảnh trên ảnh phải, rồi nhấn Áp dụng.</p>';
-  else if(tab==='text')panel.innerHTML='<h3>Viết chữ</h3>'+buttons([['T + Chèn chữ','text']],'data-mode')+
-    '<div id="kpeTextFields"></div><p class="kpe-tip">Nhập chữ có dấu, chọn màu và cỡ chữ, bấm trực tiếp lên ảnh để đặt vị trí.</p>';
+  else if(tab==='tools')panel.innerHTML='<h3>Công cụ</h3>'+
+   buttons([['↶ Xoay trái','rotateL'],['↷ Xoay phải','rotateR'],['⇋ Lật ngang','flipH'],['⇅ Lật dọc','flipV']])+
+   buttons([['▣ Crop','crop'],['◇ Phối cảnh','perspective']],'data-mode')+
+   '<hr><h3>Chữ</h3>'+buttons([['T + Chèn chữ','text']],'data-mode')+
+   '<div id="kpeTextFields"></div>';
+
  }
  function endTool(){
   loupePoint=null;
-  tool=tab==='shape'?'warp':(editScope==='local'&&['basic','hsl','detail'].includes(tab)?'mask':'view');crop=null;quad=null;textPoint=null;brushPoint=null;
+  tool=tab==='shape'?'warp':(editScope==='local'&&['skin','basic','hsl','detail'].includes(tab)?'mask':'view');crop=null;quad=null;textPoint=null;brushPoint=null;
   action('apply').hidden=true;action('cancel').hidden=true;draw();
  }
  function switchTab(name){
   if(busy)return;tab=name;endTool();renderPanel();previewDirty=true;
-  say(tab==='shape'?'Kéo trên ảnh bên phải để chỉnh dáng; giữ Space + chuột trái để kéo ảnh.':'Hai ảnh zoom và kéo đồng bộ; chỉ ảnh bên phải được chỉnh.');
+  say('Sẵn sàng.');
  }
  function chooseMode(m){
   if(busy)return;tool=m;
@@ -471,7 +484,10 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
   if(a==='variants')void generateVariants();
   if(a==='ai-scunet'||a==='ai-realesrgan')void applyAI(a.slice(3));
   if(a==='applyBatch')void batchColor();
+  if(a==='poseRetry')void queuePose();
+  if(a==='poseGuides'){showBodyGuides=!showBodyGuides;renderPanel();draw();}
  });
+ panel.addEventListener('change',e=>{if(e.target?.id==='kpePerson'){makeUndo('params');chosenPerson=Number(e.target.value);changed();renderPanel();draw();}});
  panel.addEventListener('click',e=>{
    const target=e.target.closest('[data-reset],[data-value]');
    if(!target||!mobile)return;
