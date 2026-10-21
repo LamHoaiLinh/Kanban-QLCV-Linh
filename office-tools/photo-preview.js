@@ -314,8 +314,8 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
    // Keep a lossless working image + slider recipe to avoid repeated lossy recompression.
    const baseBlob=await snapshot(working,'image/png');
    const maskBlob=editScope==='local'?await snapshot(localMask,'image/png'):null;
-   await onSaved(output,{baseBlob,maskBlob,settings:structuredClone(settings),scope:editScope});
-   dirty=false;undo=[];redo=[];clearTimeout(draftTimer);say('Đã lưu. Đóng Preview rồi bấm Tải tất cả.');}
+   await onSaved(output,{baseBlob,maskBlob,settings:structuredClone(settings),scope:editScope,bodySettings:{...bodySettings},people,chosenPerson});
+   dirty=false;clearTimeout(draftTimer);say('Đã lưu. Đóng Preview rồi bấm Tải tất cả.');}
   catch(e){say('Không lưu được: '+e.message);}finally{busy=false;}
  }
  async function loadPrevious(){
@@ -328,12 +328,12 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
    working=toCanvas(bitmap);bitmap.close();settings=old.state?.settings?structuredClone(old.state.settings):DEFAULT_EDITS();
    editScope=old.state?.scope||'global';localMask=createMask(working.width,working.height);
    if(old.state?.maskBlob){const image=await createImageBitmap(old.state.maskBlob);localMask.getContext('2d').drawImage(image,0,0);image.close();}
-   undo=[];redo=[];renderDirty=true;previewDirty=true;dirty=false;endTool();renderPanel();fit();say('Đã khôi phục bản lưu trước.');
+   clearHistory();bodySettings={...DEFAULT_BODY(),...(old.state?.bodySettings||{})};people=old.state?.people||[];chosenPerson=old.state?.chosenPerson||0;bodyDirty=true;bodyCache=null;bodyPreviewCache=null;renderDirty=true;previewDirty=true;dirty=false;endTool();renderPanel();fit();say('Đã khôi phục bản lưu trước.');
   }catch(error){say('Không khôi phục được bản lưu trước: '+error.message);}finally{busy=false;}
  }
  async function restore(){
   if(busy)return;busy=true;
-  try{working=toCanvas(original);settings=DEFAULT_EDITS();editScope='global';localMask=createMask(working.width,working.height);renderDirty=true;previewDirty=true;await onReset?.();dirty=false;undo=[];redo=[];clearTimeout(draftTimer);endTool();renderPanel();fit();say('Đã khôi phục về ảnh gốc.');}
+  try{working=toCanvas(original);settings=DEFAULT_EDITS();editScope='global';localMask=createMask(working.width,working.height);renderDirty=true;previewDirty=true;await onReset?.();dirty=false;clearHistory();people=[];bodySettings=DEFAULT_BODY();poseStatus='Chưa nhận diện';bodyDirty=true;bodyCache=null;bodyPreviewCache=null;clearTimeout(draftTimer);endTool();renderPanel();fit();say('Đã khôi phục về ảnh gốc.');}
   catch(e){say('Lỗi khôi phục: '+e.message);}finally{busy=false;}
  }
  async function close(){
@@ -351,8 +351,8 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
    activeTouches.set(e.pointerId,{x:e.clientX,y:e.clientY});
    if(activeTouches.size===2){
      if(drag&&(drag.type==='warp'||drag.type==='mask')){
-       const old=undo.pop();
-       if(old){working=old.image;localMask=old.mask;settings=old.settings;editScope=old.scope;renderDirty=true;previewDirty=true;}
+       const old=history.popUndo(takeState('params'));
+       if(old)useState(old);
      }
      drag=null;loupePoint=null;suppressTouches=true;
      try{canvases[i].setPointerCapture(e.pointerId);}catch{}
@@ -444,7 +444,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
  function pointerUp(e,i){
   touchEnd(e);
   if(drag?.type==='warp'){
-    if(!drag.moved)undo.pop();
+    if(!drag.moved)history.cancelLast();
     else if(mobile&&drag.previewSrc){working=deformAt(drag.source,drag.from,drag.end,brushRadius,brushPower,brush);changed();}
   }
   if(drag?.type==='mask'&&mobile)queueDraft();
@@ -476,11 +476,11 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
   const a=btn.dataset.click;
   if(a==='close')void close();if(a==='fit')fit();
   if(a==='pixel'){zoom=limit(1/Math.min(fitSide(0),fitSide(1)),.1,256);panX=panY=0;draw();}
-  if(a==='undo'){if(!undo.length){say('Không có thao tác để hoàn tác');return;}redo.push(takeState());const old=undo.pop();useState(old);}
-  if(a==='redo'){if(!redo.length){say('Không có thao tác để làm lại');return;}undo.push(takeState());const next=redo.pop();useState(next);}
+  if(a==='undo')applyUndo();
+  if(a==='redo')applyRedo();
   if(a==='restore')void restore();if(a==='previous')void loadPrevious();if(a==='save')void save();if(a==='apply')void applyMode();if(a==='cancel')endTool();
   if(['rotateL','rotateR','flipH','flipV'].includes(a))rotate(a);
-  if(a==='resetHsl'){makeUndo();settings.hsl[color]={h:0,s:0,l:0};changed();renderPanel();draw();}
+  if(a==='resetHsl'){makeUndo('params');settings.hsl[color]={h:0,s:0,l:0};changed();renderPanel();draw();}
   if(a==='variants')void generateVariants();
   if(a==='ai-scunet'||a==='ai-realesrgan')void applyAI(a.slice(3));
   if(a==='applyBatch')void batchColor();
@@ -488,21 +488,40 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
   if(a==='poseGuides'){showBodyGuides=!showBodyGuides;renderPanel();draw();}
  });
  panel.addEventListener('change',e=>{if(e.target?.id==='kpePerson'){makeUndo('params');chosenPerson=Number(e.target.value);changed();renderPanel();draw();}});
+ function applyUndo(){const old=history.popUndo(takeState('params'));if(!old){say('Không còn bước hoàn tác.');return;}useState(old);}
+ function applyRedo(){const next=history.popRedo(takeState('params'));if(!next){say('Không còn bước làm lại.');return;}useState(next);}
+ modal.addEventListener('keydown',e=>{
+  if(e.defaultPrevented||!((e.ctrlKey||e.metaKey)&&!e.altKey))return;
+  if(e.target.closest('input[type=text],input[type=number],textarea,[contenteditable=true]'))return;
+  const key=e.key.toLowerCase();
+  if(key==='z'){e.preventDefault();e.stopPropagation();if(e.shiftKey)applyRedo();else applyUndo();}
+  else if(key==='y'){e.preventDefault();e.stopPropagation();applyRedo();}
+ },true);
  panel.addEventListener('click',e=>{
    const target=e.target.closest('[data-reset],[data-value]');
    if(!target||!mobile)return;
    e.stopPropagation();e.preventDefault();
    const key=target.dataset.reset||target.dataset.value;
    const input=panel.querySelector('[data-adjust="'+key+'"]');if(!input)return;
-   const defaults={brushRadius:130,brushPower:68,paintRadius:90,brushOpacity:90};
-   const value=target.dataset.reset!==undefined?(defaults[key]??0):window.prompt('Nhập '+input.closest('label').querySelector('span').textContent+' ('+input.min+' đến '+input.max+'):',input.value);
+   const value=target.dataset.reset!==undefined?sliderDefault(key):window.prompt('Nhập '+input.closest('label').querySelector('span').textContent+' ('+input.min+' đến '+input.max+'):',input.value);
    if(value===null||String(value).trim()==='')return;
    const n=Number(value);if(!Number.isFinite(n))return;
-   if(!key.startsWith('brush')&&key!=='paintRadius')makeUndo();
-   input.value=String(limit(n,Number(input.min),Number(input.max)));
-   input.dispatchEvent(new Event('input',{bubbles:true}));
+   setSliderValue(key,n);
  });
- panel.addEventListener('pointerdown',e=>{if(e.target.matches('[data-adjust]')&&!busy)makeUndo();});
+ function sliderDefault(key){const defaults={brushRadius:130,brushPower:68,paintRadius:90,brushOpacity:90};return key.startsWith('body.')?DEFAULT_BODY()[key.slice(5)]:defaults[key]??0;}
+ function setSliderValue(key,value){
+  const input=panel.querySelector('[data-adjust="'+key+'"]');if(!input)return;
+  const v=limit(Number(value),Number(input.min),Number(input.max));
+  if(!Number.isFinite(v)||Number(input.value)===v)return;
+  makeUndo('params');input.value=String(v);input.dispatchEvent(new Event('input',{bubbles:true}));
+ }
+ panel.addEventListener('dblclick',e=>{
+  const target=e.target.closest('[data-adjust],[data-value],[data-reset]');if(!target)return;
+  e.preventDefault();e.stopPropagation();
+  const key=target.dataset.adjust||target.dataset.value||target.dataset.reset;
+  setSliderValue(key,sliderDefault(key));
+ });
+ panel.addEventListener('pointerdown',e=>{if(e.target.matches('[data-adjust]')&&!busy)makeUndo('params');});
  panel.addEventListener('input',e=>{
   const el=e.target.closest('[data-adjust]');if(!el)return;
   const key=el.dataset.adjust,value=Number(el.value);
@@ -510,6 +529,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
   else if(key==='brushOpacity')brushOpacity=value;
   else if(key==='brushPower')brushPower=value;
   else if(key==='brushRadius')brushRadius=value;
+  else if(key.startsWith('body.'))bodySettings[key.slice(5)]=value;
   else if(key.startsWith('hsl.'))settings.hsl[color][key.slice(4)]=value;
   else settings[key]=value;
   const out=panel.querySelector('[data-value="'+key+'"]');if(out)out.textContent=value;
