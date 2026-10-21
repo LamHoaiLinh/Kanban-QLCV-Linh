@@ -57,7 +57,7 @@ async function preview(){
    item.draftChecked=true;
    const saved=await loadPhotoDraft(item.file).catch(()=>null);
    if(saved&&window.confirm('Tìm thấy bản chỉnh sửa lưu trên máy. Bạn muốn tiếp tục chỉnh bản này?')){
-     item.editState={baseBlob:saved.baseBlob,maskBlob:saved.maskBlob,settings:saved.settings,scope:saved.scope};
+     item.editState={baseBlob:saved.baseBlob,maskBlob:saved.maskBlob,settings:saved.settings,scope:saved.scope,bodySettings:saved.bodySettings,manualOps:saved.manualOps,people:saved.people,chosenPerson:saved.chosenPerson};
      item.blob=saved.outputBlob||null;item.status=saved.dirty?'Đang tiếp tục bản nháp':'Đã phục hồi ảnh đã lưu';
      renderList();renderImages();
    }
@@ -66,7 +66,7 @@ async function preview(){
    file:item.file,blob:item.blob||item.file,type:typeFor(item.file.name),editState:item.editState,
    onAutoDraft:async draft=>{
      await savePhotoDraft(item.file,draft);
-     item.editState={baseBlob:draft.baseBlob,maskBlob:draft.maskBlob,settings:draft.settings,scope:draft.scope};
+     item.editState={baseBlob:draft.baseBlob,maskBlob:draft.maskBlob,settings:draft.settings,scope:draft.scope,bodySettings:draft.bodySettings,manualOps:draft.manualOps,people:draft.people,chosenPerson:draft.chosenPerson};
      item.hasDraft=true;item.status='Đã tự lưu nháp (chưa xuất)';
      renderList();
    },
