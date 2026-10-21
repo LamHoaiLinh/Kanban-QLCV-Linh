@@ -81,7 +81,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
   '<header class="kpe-top"><div><strong>KAN PHOTO · CHỈNH ẢNH</strong><small id="kpeFilename"></small></div><span id="kpeZoom">100%</span><button data-click="fit">Vừa khung</button><button data-click="pixel">100%</button><button data-click="undo" title="Hoàn tác">↩ Hoàn tác</button><button data-click="redo" title="Làm lại">↪ Làm lại</button><button data-click="previous">Bản lưu trước</button><button data-click="restore">Đặt lại</button><button data-click="close">×</button></header>'+
   '<div class="kpe-workspace"><div class="kpe-panes"><section class="kpe-side"><b>ẢNH GỐC</b><canvas data-pane="0"></canvas></section><section class="kpe-side"><b>ẢNH ĐANG CHỈNH</b><canvas data-pane="1"></canvas></section></div>'+
   '<aside class="kpe-sidebar"><div id="kpeSheetHandle" class="kpe-sheet-handle" aria-label="Kéo lên hoặc xuống để thay đổi bảng công cụ"><span></span></div><nav class="kpe-tabs" aria-label="Nhóm công cụ"><button data-tab="shape">Vóc dáng</button><button data-tab="skin">Da</button><button data-tab="basic">Ánh sáng</button><button data-tab="hsl">Màu sắc</button><button data-tab="detail">Chi tiết</button><button data-tab="tools">Công cụ</button></nav><div class="kpe-controls" id="kpeControls"></div></aside></div>'+
-  '<footer class="kpe-bottom"><button type="button" data-click="compare" class="kpe-mobile-compare" aria-label="Giữ để xem ảnh gốc">Giữ xem gốc</button><span id="kpeHint">Vóc dáng: kéo mép eo hoặc cánh tay vào trong trên ảnh phải. Giữ Space + kéo để di chuyển ảnh.</span><button data-click="cancel" hidden>Hủy chỉnh</button><button data-click="apply" hidden>Áp dụng</button><button data-click="save" class="kpe-green">Lưu chỉnh sửa</button><button data-click="close">Đóng</button></footer></div>';
+  '<footer class="kpe-bottom"><button type="button" data-click="compare" class="kpe-mobile-compare" aria-label="Giữ để xem ảnh gốc">Giữ xem gốc</button><span id="kpeHint">Sẵn sàng.</span><button data-click="cancel" hidden>Hủy chỉnh</button><button data-click="apply" hidden>Áp dụng</button><button data-click="save" class="kpe-green">Lưu chỉnh sửa</button><button data-click="close">Đóng</button></footer></div>';
  if(mobile){modal.classList.add('kpe-is-mobile');modal.style.setProperty('--kpe-sheet-height','34dvh');}
  document.body.appendChild(modal);
  const by=s=>modal.querySelector(s),action=name=>by('[data-click="'+name+'"]'),panel=by('#kpeControls');
@@ -216,7 +216,7 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
  const maskControls=()=>'<div class="kpe-local"><strong>Phạm vi chỉnh</strong><div class="kpe-button-group"><button data-scope="global" class="'+(editScope==='global'?'active':'')+'">Toàn ảnh</button><button data-scope="local" class="'+(editScope==='local'?'active':'')+'">Tô vùng</button></div>'+
  (editScope==='local'?'<div class="kpe-button-group"><button data-paint="add" class="'+(paintMode==='add'?'active':'')+'">Cọ chọn vùng</button><button data-paint="erase" class="'+(paintMode==='erase'?'active':'')+'">Xóa vùng tô</button></div>'+
  slider('paintRadius','Cỡ cọ',paintRadius,10,350)+slider('brushOpacity','Độ phủ',brushOpacity,5,100)+
- '<p class="kpe-tip">Tô trên ảnh bên phải để đánh dấu phần được chỉnh. Space + kéo để di chuyển ảnh.</p>':'')+'</div>';
+ '':'')+'</div>';
  const resetMask=()=>{localMask=createMask(working.width,working.height);variantsCache=null;changed();};
 
  function renderPanel(){
@@ -240,15 +240,15 @@ export async function openPhotoPreview({file,blob,type,onSaved,onReset,onApplyBa
   else if(tab==='basic')panel.innerHTML='<h3>Ánh sáng & màu</h3>'+maskControls()+[
    ['exposure','Phơi sáng'],['contrast','Tương phản'],['highlights','Vùng sáng'],['shadows','Vùng tối'],['whites','Điểm trắng'],['blacks','Điểm đen'],['temperature','Nhiệt màu'],['tint','Ám màu'],['vibrance','Màu tươi'],['saturation','Bão hòa']].map(([k,v])=>slider(k,v,settings[k])).join('')+
  (onApplyBatch?buttons([['Áp màu cho các ảnh khác','applyBatch']]):'');
-  else if(tab==='hsl')panel.innerHTML='<h3>Trộn màu HSL</h3><p>Chọn một màu rồi chỉnh ba thanh bên dưới.</p>'+maskControls()+
+  else if(tab==='hsl')panel.innerHTML='<h3>Trộn màu HSL</h3>'+maskControls()+
     '<div class="kpe-swatches">'+channels.map((ch,i)=>'<button data-color="'+ch+'" class="'+(color===ch?'active':'')+'" title="'+labels[i]+'" style="--swatch:'+pigments[i]+'"><span></span></button>').join('')+'</div>'+
     '<p class="kpe-color-name">'+labels[channels.indexOf(color)]+'</p>'+
     slider('hsl.h','Sắc độ',settings.hsl[color].h)+slider('hsl.s','Bão hòa',settings.hsl[color].s)+slider('hsl.l','Độ sáng',settings.hsl[color].l)+
     buttons([['Đặt lại màu đang chọn','resetHsl']]);
   else if(tab==='detail')panel.innerHTML='<h3>Chi tiết</h3>'+maskControls()+
     slider('sharpness','Làm nét',settings.sharpness,0,100)+slider('noise','Giảm hạt',settings.noise,0,100)+slider('clarity','Độ rõ',settings.clarity)+slider('texture','Bề mặt',settings.texture)+
-    '<p class="kpe-tip">Nên xem ở Zoom 100% để tránh làm ảnh bị quá nét.</p>'+
- '<hr><h3>Cứu ảnh yếu: 3 lựa chọn</h3><p>Tạo ba bản thử trên chính ảnh này, chọn một bản rồi chỉnh thêm.</p>'+
+    
+ '<hr><h3>Cứu ảnh yếu</h3>'+
  buttons([['Tạo 3 bản thử','variants']])+ '<div id="kpeVariants" class="kpe-variants"></div>'+
  '<hr><h3>AI nâng ảnh (tùy chọn)</h3><p>Cần Chrome/Edge PC hỗ trợ WebGPU. Mô hình tải lần đầu khá lớn; ảnh không được gửi đi để xử lý.</p>'+
  buttons([['SCUNet – khử hạt','ai-scunet'],['Real-ESRGAN – nâng 2×','ai-realesrgan']])+
