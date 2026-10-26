@@ -1,0 +1,41 @@
+name: KanScan optional addon checks
+on:
+  pull_request:
+    paths:
+      - 'kan-tools/install.ps1'
+      - 'kan-tools/manifest.json'
+      - 'kan-tools/kanscan/**'
+      - 'office-tools/kanscan-integration.js'
+      - '.github/workflows/kanscan-addon-check.yml'
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check PowerShell syntax and optional skip behavior
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          foreach($path in @('kan-tools/install.ps1','kan-tools/kanscan/install-kanscan.ps1')){
+            $tokens=$null
+            $errors=$null
+            [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $path),[ref]$tokens,[ref]$errors)
+            if($errors.Count -ne 0){throw "PowerShell syntax invalid in $path : $errors"}
+          }
+          $manifest=Get-Content kan-tools/manifest.json -Raw | ConvertFrom-Json
+          if($manifest.components.kanscan.version -ne '1.4.0'){throw 'Wrong component version'}
+          if($manifest.components.kanscan.archiveSha256 -notmatch '^[a-f0-9]{64}$'){throw 'SHA-256 is missing'}
+          $tmp=Join-Path $env:RUNNER_TEMP 'kanscan-safe-skip'
+          New-Item -ItemType Directory -Force $tmp | Out-Null
+          & ./kan-tools/kanscan/install-kanscan.ps1 -Root $tmp -MainPython 'C:\not-installed\python.exe' -ArchiveSha256 $manifest.components.kanscan.archiveSha256
+          if(Test-Path (Join-Path $tmp 'kanscan\installed.json')){throw 'Addon must skip when ZIP unavailable'}
+          Write-Host 'PASS: parser, manifest, no-ZIP-safe skip'
+      - name: Check browser launcher syntax
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $script=Get-Content office-tools/kanscan-integration.js -Raw
+          if($script -notmatch 'kanbanscan://open'){throw 'Missing protocol launcher'}
+          if($script -notmatch 'ksOpen'){throw 'Missing fallback launcher'}
+          Write-Host 'PASS: browser launcher markers'
