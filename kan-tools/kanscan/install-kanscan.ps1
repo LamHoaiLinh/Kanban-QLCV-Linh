@@ -1,0 +1,129 @@
+# KanScan v1.4 - optional isolated Windows addon for KanBan Tools.
+param(
+  [Parameter(Mandatory=$true)][string]$Root,
+  [Parameter(Mandatory=$true)][string]$MainPython,
+  [Parameter(Mandatory=$true)][string]$ArchiveSha256
+)
+$ErrorActionPreference = 'Stop'
+$addon = Join-Path $Root 'kanscan'
+$appDir = Join-Path $addon 'app'
+$venvDir = Join-Path $addon '.venv'
+$python = Join-Path $venvDir 'Scripts\python.exe'
+$pythonw = Join-Path $venvDir 'Scripts\pythonw.exe'
+$marker = Join-Path $addon 'installed.json'
+$launch = Join-Path $addon 'launch.vbs'
+$registry = 'HKCU:\Software\Classes\kanbanscan'
+New-Item -ItemType Directory -Path $addon -Force | Out-Null
+
+function Register-KanScan {
+  if(-not (Test-Path -LiteralPath $pythonw) -or -not (Test-Path -LiteralPath (Join-Path $appDir 'KanScan.py'))) {
+    throw 'KanScan Pythonw/source is missing.'
+  }
+  $script = Join-Path $appDir 'KanScan.py'
+  # pythonw does not open a console. Browser protocol arguments are ignored.
+  $vb = @(
+    'On Error Resume Next',
+    'Set wmi = GetObject("winmgmts:\\.\root\cimv2")',
+    'For Each p In wmi.ExecQuery("SELECT Name, CommandLine FROM Win32_Process WHERE Name = ''pythonw.exe''")',
+    '  If InStr(1, p.CommandLine, "\kanscan\app\KanScan.py", 1) > 0 Then WScript.Quit 0',
+    'Next',
+    'Set sh = CreateObject("WScript.Shell")',
+    ('sh.Run Chr(34) & "' + $pythonw.Replace('"','""') + '" & Chr(34) & " " & Chr(34) & "' + $script.Replace('"','""') + '" & Chr(34), 0, False')
+  ) -join [Environment]::NewLine
+  [IO.File]::WriteAllText($launch, $vb, (New-Object System.Text.UTF8Encoding($false)))
+  New-Item -Path $registry -Force | Out-Null
+  Set-Item -Path $registry -Value 'URL:KanScan'
+  New-ItemProperty -Path $registry -Name 'URL Protocol' -PropertyType String -Value '' -Force | Out-Null
+  $cmdKey=Join-Path $registry 'shell\open\command'
+  New-Item -Path $cmdKey -Force | Out-Null
+  Set-Item -Path $cmdKey -Value ('"' + (Join-Path $env:WINDIR 'System32\wscript.exe') + '" "' + $launch + '" "%1"')
+}
+
+# Idempotent: existing v1.4 remains untouched on /install, /update and /repair.
+if((Test-Path -LiteralPath $marker) -and (Test-Path -LiteralPath $pythonw) -and (Test-Path -LiteralPath (Join-Path $appDir 'templates\index.html'))) {
+  try {
+    $stored=Get-Content -LiteralPath $marker -Raw -Encoding UTF8 | ConvertFrom-Json
+    if($stored.version -eq '1.4' -and $stored.archiveSha256 -eq $ArchiveSha256.ToLowerInvariant()) {
+      Register-KanScan
+      Write-Host '  KanScan v1.4: da cai, giu nguyen; cap nhat lenh mo KanScan.' -ForegroundColor DarkGray
+      return
+    }
+  } catch { Write-Host ('  KanScan: thu cai lai: ' + $_.Exception.Message) -ForegroundColor Yellow }
+}
+
+$locations = @(
+  (Join-Path $env:USERPROFILE 'Downloads'),
+  (Join-Path $env:USERPROFILE 'Desktop'),
+  (Join-Path $env:USERPROFILE 'Documents')
+)
+try {
+  $shell=New-Object -ComObject Shell.Application
+  $downloads=$shell.NameSpace('shell:Downloads')
+  if($downloads -and $downloads.Self -and $downloads.Self.Path) {
+    $locations=@($downloads.Self.Path)+$locations
+  }
+} catch {}
+$zip = $null
+foreach($folder in ($locations | Select-Object -Unique)) {
+  if(-not (Test-Path -LiteralPath $folder)){continue}
+  foreach($item in (Get-ChildItem -LiteralPath $folder -File -Filter 'KanScan_v1.4_Chinh_Rieng_Tung_Anh*.zip' -ErrorAction SilentlyContinue)) {
+    try {
+      $digest=(Get-FileHash -LiteralPath $item.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+      if($digest -eq $ArchiveSha256.ToLowerInvariant()) { $zip=$item.FullName; break }
+    } catch {}
+  }
+  if($zip){break}
+}
+if(-not $zip){
+  Write-Host '  KanScan v1.4: khong thay ZIP chinh xac trong Downloads/Desktop/Documents - bo qua.' -ForegroundColor Yellow
+  Write-Host '  Luu KanScan_v1.4_Chinh_Rieng_Tung_Anh.zip vao Downloads, sau do chay Cap nhat/Sua KanBan Tools.' -ForegroundColor Yellow
+  return
+}
+
+$staging=Join-Path $addon ('stage-' + [guid]::NewGuid().ToString('N'))
+$old=Join-Path $addon ('app-backup-' + [guid]::NewGuid().ToString('N'))
+$swapped=$false
+try {
+  New-Item -ItemType Directory -Path $staging -Force | Out-Null
+  Expand-Archive -LiteralPath $zip -DestinationPath $staging -Force
+  $source=Join-Path $staging 'KanScan_v1.4'
+  foreach($rel in @('KanScan.py','app.py','requirements.txt','templates\index.html')) {
+    if(-not (Test-Path -LiteralPath (Join-Path $source $rel))) { throw ('ZIP thieu: ' + $rel) }
+  }
+  if(-not (Test-Path -LiteralPath $python)) {
+    & $MainPython -m venv $venvDir
+    if($LASTEXITCODE -ne 0) { throw 'Khong tao duoc venv rieng cho KanScan.' }
+  }
+  # Dependencies only inside KanScan .venv; never the KanBan shared .venv.
+  & $python -m pip --disable-pip-version-check --retries 3 --timeout 40 install -r (Join-Path $source 'requirements.txt')
+  if($LASTEXITCODE -ne 0) { throw 'Khong cai duoc thu vien KanScan.' }
+  & $python -c 'import flask, cv2, PIL, waitress, qrcode, psutil; import tkinter'
+  if($LASTEXITCODE -ne 0) { throw 'Thieu thu vien hoac tkinter cho KanScan.' }
+  & $python -m py_compile (Join-Path $source 'KanScan.py') (Join-Path $source 'app.py')
+  if($LASTEXITCODE -ne 0) { throw 'Source KanScan khong qua kiem tra cu phap.' }
+
+  if(Test-Path -LiteralPath $appDir){Move-Item -LiteralPath $appDir -Destination $old}
+  try { Move-Item -LiteralPath $source -Destination $appDir; $swapped=$true }
+  catch {
+    if(Test-Path -LiteralPath $old){Move-Item -LiteralPath $old -Destination $appDir}
+    throw
+  }
+  Register-KanScan
+  $saved=@{
+    version='1.4'
+    archiveSha256=$ArchiveSha256.ToLowerInvariant()
+    installedAt=(Get-Date).ToString('o')
+    mode='on-demand'
+  }
+  [IO.File]::WriteAllText($marker,($saved | ConvertTo-Json -Depth 4),[Text.UTF8Encoding]::new($false))
+  Write-Host '  KanScan v1.4 da cai rieng. Mo KanBan > CONG CU > KanScan.' -ForegroundColor Green
+  if(Test-Path -LiteralPath $old){Remove-Item -LiteralPath $old -Recurse -Force -ErrorAction SilentlyContinue}
+} catch {
+  if($swapped -and (Test-Path -LiteralPath $old)){
+    Remove-Item -LiteralPath $appDir -Force -Recurse -ErrorAction SilentlyContinue
+    Move-Item -LiteralPath $old -Destination $appDir -ErrorAction SilentlyContinue
+  }
+  throw
+} finally {
+  Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue
+}

@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "kanToolVersion": "2.8.5",
-  "installerVersion": "2.4.5",
+  "kanToolVersion": "2.8.6",
+  "installerVersion": "2.4.6",
   "pythonFallback": {
     "version": "3.13.16",
     "url": "https://www.python.org/ftp/python/3.13.16/python-3.13.16-amd64.exe"
@@ -47,6 +47,12 @@
       "version": "0.23.1",
       "url": "https://github.com/kopia/kopia/releases/download/v0.23.1/kopia-0.23.1-windows-x64.zip",
       "sha256": "f0369d9657dbe47a1b8b6ff4e308c5958a4813b405d4e32ae9d81b3f2b3d8251"
+    },
+    "kanscan": {
+      "version": "1.4.0",
+      "installer": "kan-tools/kanscan/install-kanscan.ps1",
+      "archiveSha256": "911faf44a23833210ebec0130ff4a7e5b20076cf894331a5699ac0bf7a2b78ae",
+      "installMode": "optional-local-zip"
     }
   },
   "bootstrapVersion": "2.3.0"

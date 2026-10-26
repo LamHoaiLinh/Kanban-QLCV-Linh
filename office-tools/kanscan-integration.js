@@ -13,21 +13,22 @@
       '<div class="ks-card"><h3>▧ KanScan v1.4 · Chụp chứng từ</h3>'+
       '<p>Chụp iPhone/Android, nối dọc khổ A4/A5, chỉnh thủ công bốn góc, xóa hoặc chụp lại riêng từng ảnh, xuất JPEG về Windows.</p>'+
       '<div class="ks-note">Giữ nguyên KanScan v1.4 trên PC. KanBan chỉ mở công cụ; ảnh chứng từ không được tải lên GitHub.</div>'+
-      '<div class="ks-actions"><button type="button" id="ksOpen">Mở KanScan trên PC</button><button type="button" id="ksSave">Lưu địa chỉ</button></div>'+
+      '<div class="ks-actions"><button type="button" id="ksLaunch">Khởi động KanScan</button><button type="button" id="ksOpen">Mở giao diện PC</button><button type="button" id="ksSave">Lưu địa chỉ</button></div>'+
       '<label>Địa chỉ KanScan trên PC<input id="ksEndpoint" type="url" autocomplete="off" spellcheck="false" placeholder="http://127.0.0.1:18765/"></label>'+
       '<p id="ksMessage" class="ks-muted">Cổng mặc định 18765; nếu ứng dụng PC dùng cổng khác thì đổi tại đây.</p></div>'+
       '<div class="ks-card"><h4>Quy trình chụp</h4><ol>'+
-      '<li>Chạy KanScan_v1_4.exe hoặc KHOI_DONG_KHONG_CMD.vbs trên Windows.</li>'+
+      '<li>Lưu file ZIP KanScan v1.4 vào Downloads và chạy Cập nhật / sửa KanBan Tools để cài lần đầu.</li><li>Bấm Khởi động KanScan và xác nhận mở ứng dụng nếu trình duyệt hỏi.</li>'+
       '<li>iPhone/Android và PC cùng mạng Wi-Fi/LAN; quét mã QR trên cửa sổ KanScan của PC.</li>'+
       '<li>Chụp đơn hoặc nối nhiều tờ; chọn A4/A5, chỉnh từng trang và bấm Xong.</li>'+
       '<li>Ảnh JPEG xuất hiện trong thư mục đã chọn trên PC.</li></ol>'+
-      '<p class="ks-muted">Nếu chưa cài, dùng gói ZIP KanScan v1.4 và bộ lệnh build EXE đã cung cấp. GitHub Pages không thể tự chạy Python hoặc ghi ảnh vào ổ cứng Windows.</p></div></section>';
+      '<p class="ks-muted">Nếu chưa có ZIP KanScan v1.4 chính xác, KanTool bỏ qua KanScan mà không ảnh hưởng các công cụ khác. GitHub Pages không thể chạy Python hoặc ghi ảnh trực tiếp lên Windows.</p></div></section>';
     const input=host.querySelector('#ksEndpoint');
     const message=host.querySelector('#ksMessage');
     try{input.value=localStorage.getItem(STORAGE)||DEFAULT;}catch(e){input.value=DEFAULT;}
     const get=()=>{const u=endpoint(input.value);if(!u)message.textContent='Địa chỉ sai. Ví dụ http://127.0.0.1:18765/';return u;};
     const save=(url)=>{try{localStorage.setItem(STORAGE,url);}catch(e){}input.value=url;};
     host.querySelector('#ksSave').addEventListener('click',()=>{const u=get();if(u){save(u);message.textContent='Đã lưu địa chỉ trên trình duyệt này.';}});
+    host.querySelector('#ksLaunch').addEventListener('click',()=>{window.location.href='kanbanscan://open';message.textContent='Nếu chưa mở KanScan, kiểm tra bộ cài KanTool và gói ZIP v1.4 trong Downloads.';});
     host.querySelector('#ksOpen').addEventListener('click',()=>{const u=get();if(!u)return;save(u);window.open(u,'_blank','noopener,noreferrer');message.textContent='Nếu trang không mở, hãy khởi động KanScan trên PC và kiểm tra cổng.';});
   }
   const style=document.createElement('style');style.textContent=css;document.head.appendChild(style);
