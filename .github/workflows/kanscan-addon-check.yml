@@ -39,3 +39,14 @@ jobs:
           if($script -notmatch 'kanbanscan://open'){throw 'Missing protocol launcher'}
           if($script -notmatch 'ksOpen'){throw 'Missing fallback launcher'}
           Write-Host 'PASS: browser launcher markers'
+
+      - name: Validate KanScan rotation patch and frontend JavaScript
+        shell: pwsh
+        run: |
+          python -m py_compile kan-tools/kanscan/upgrade_rotate_v15.py
+          node --check office-tools/kanscan-integration.js
+          $patch=Get-Content kan-tools/kanscan/upgrade_rotate_v15.py -Raw -Encoding UTF8
+          foreach($required in @('rotate_page','rotateLeft','rotateRight','manual_perspective_crop','remove_join_previews')){
+            if(-not $patch.Contains($required)){throw "Missing rotation feature anchor: $required"}
+          }
+          Write-Host 'PASS: rotation source, syntax and required operations'
