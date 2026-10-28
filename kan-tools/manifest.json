@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "kanToolVersion": "2.8.6",
-  "installerVersion": "2.4.6",
+  "kanToolVersion": "2.8.7",
+  "installerVersion": "2.4.7",
   "pythonFallback": {
     "version": "3.13.16",
     "url": "https://www.python.org/ftp/python/3.13.16/python-3.13.16-amd64.exe"
@@ -49,10 +49,11 @@
       "sha256": "f0369d9657dbe47a1b8b6ff4e308c5958a4813b405d4e32ae9d81b3f2b3d8251"
     },
     "kanscan": {
-      "version": "1.4.0",
+      "version": "1.5.0",
       "installer": "kan-tools/kanscan/install-kanscan.ps1",
       "archiveSha256": "911faf44a23833210ebec0130ff4a7e5b20076cf894331a5699ac0bf7a2b78ae",
-      "installMode": "optional-local-zip"
+      "installMode": "optional-v14-zip-plus-v15-github-patch",
+      "updater": "kan-tools/kanscan/upgrade_rotate_v15.py"
     }
   },
   "bootstrapVersion": "2.3.0"
