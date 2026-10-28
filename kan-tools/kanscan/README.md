@@ -1,34 +1,36 @@
-# KanScan v1.4 – thành phần tùy chọn trong KanBan Tools
+# KanScan v1.5 – xoay trái/phải từng trang, tích hợp KanBan Tools
 
-KanBan hiện có tab **CÔNG CỤ → KanScan**. Trên Windows, KanTool có thể cài phần mềm KanScan v1.4 qua `kan-tools/kanscan/install-kanscan.ps1`, nhưng chỉ từ bản ZIP v1.4 do người dùng tải về.
+KanScan giữ nguyên v1.4: camera hệ thống iOS/Android, chụp đơn/chụp nối, A4/A5 tự xác định ngang/dọc, chỉnh 4 góc thủ công, sửa/xóa riêng từng ảnh, ảnh JPEG lưu trên PC. Bản v1.5 chỉ bổ sung hai nút **↶ Xoay trái 90°** và **↷ Xoay phải 90°** trong menu nhấn giữ/chạm vào trang.
 
-## Cài đặt
+## Nâng cấp qua GitHub – không làm ảnh hưởng KanBan
 
-1. Tải đúng file **KanScan_v1.4_Chinh_Rieng_Tung_Anh.zip** đã nhận từ cuộc trò chuyện ChatGPT, giữ nguyên tệp và đặt trong **Downloads** (hoặc Desktop/Documents).
-2. Trong KanBan, chuột phải nút **CÔNG CỤ** → **Cập nhật / sửa KanBan Tools**. KanTool chạy kiểm tra/cài các thành phần chính như hiện tại.
-3. Sau khi thành phần chính đã qua kiểm tra, KanTool thử tìm file ZIP, xác minh SHA-256 đã ghim và cài KanScan trong `%LOCALAPPDATA%\KanBanTools\kanscan\`.
-4. Mở **CÔNG CỤ → KanScan → Khởi động KanScan**. Xác nhận mở ứng dụng bên ngoài nếu trình duyệt hỏi. Giao diện Windows của KanScan mở không hiện CMD.
-5. Quét QR bằng iPhone/Android cùng mạng và sử dụng toàn bộ chức năng v1.4 như trước; ảnh lưu trực tiếp trên PC.
+- GitHub patch nguồn: `kan-tools/kanscan/upgrade_rotate_v15.py`; installer: `kan-tools/kanscan/install-kanscan.ps1`.
+- **Máy đã cài KanScan v1.4 qua KanTool:** chuột phải **CÔNG CỤ** → **Cập nhật/sửa KanBan Tools**. Installer tải bản vá v1.5 từ GitHub, sao lưu ba tệp cần sửa, áp dụng và kiểm tra, tự khôi phục nếu lỗi. Không cần ZIP lại.
+- **Máy cài KanScan lần đầu:** đặt nguyên ZIP v1.4 `KanScan_v1.4_Chinh_Rieng_Tung_Anh.zip` trong Downloads, Desktop hoặc Documents, sau đó cập nhật KanTool. Installer kiểm tra SHA-256 chính xác của ZIP gốc và tự nâng lên v1.5.
+- **Máy chạy KanScan v1.4 độc lập ngoài KanTool:** có thể sử dụng ZIP v1.5 hoàn chỉnh do ChatGPT cung cấp; hoặc cài bản v1.4 vào KanTool theo cách ở trên.
+- Đóng cửa sổ KanScan cũ và **khởi động lại KanScan** sau cập nhật để Python tải mã mới.
 
-## Bảo toàn chức năng
+## Các trường hợp đã thiết kế
 
-- **Không thay đổi** app.py, KanScan.py, templates hay thuật toán xử lý ảnh v1.4 trong ZIP.
-- Không sửa các cổng KanMedia, Capture, KanPass, ký PDF, KanBackup/Kopia; KanScan ưu tiên cổng **18765** và tự chọn cổng khác nếu bận.
-- KanScan dùng **.venv riêng**, không cài thư viện vào Python dùng chung của KanBan Tools.
-- Không tự khởi động KanScan mỗi khi bật Windows; chỉ bật khi người dùng nhấn **Khởi động KanScan**.
-- Không xóa dữ liệu KanScan người dùng trong `%LOCALAPPDATA%\KanScan` và thư mục ảnh đã chọn.
-- Không upload ảnh chứng từ lên GitHub; chỉ lưu về PC thông qua Wi-Fi/LAN.
-- Nếu ZIP chưa tồn tại hoặc cài addon lỗi, KanTool bỏ qua addon và **không dừng/cập nhật lại các công cụ chính vì lỗi này**.
-- Cài lại KanTool không ghi đè KanScan v1.4 đã cài đúng phiên bản.
+1. Chạm ảnh thu nhỏ số 3 hoặc nhấn giữ trang số 3 trong ảnh ghép → **Xoay trái 90°** hoặc **Xoay phải 90°**.
+2. Ảnh số 3 xoay ngay, ảnh 1 và 2 giữ nguyên; thumbnail, ảnh ghép, bản xuất JPEG được dựng lại.
+3. Hướng xoay được lưu trong metadata của bộ ảnh chưa hoàn tất. Khi chỉnh lại bốn góc trên ảnh gốc, hướng xoay đã chọn vẫn được áp dụng.
+4. Chụp lại riêng trang sẽ đặt hướng xoay về 0; xóa trang sẽ dồn thông tin xoay theo đúng trang còn lại.
+5. Xoay không sửa ảnh gốc `raw_*`; hình gốc luôn giữ để đối chiếu.
 
-## Ranh giới kỹ thuật
+## Cơ chế cách ly
 
-GitHub Pages không chạy được Python và không thể trực tiếp lưu ảnh chứng từ vào máy của người dùng. Vì vậy ứng dụng nhận ảnh Windows là bắt buộc. Trong repository chỉ có mã tích hợp và bộ cài tùy chọn; **bộ mã nguồn gốc của KanScan v1.4 vẫn giữ trong ZIP người dùng có**, chưa được đưa toàn bộ lên GitHub.
+- KanScan dùng `%LOCALAPPDATA%\KanBanTools\kanscan\.venv`, không thay đổi môi trường Python chung.
+- Chạy khi người dùng mở **CÔNG CỤ → KanScan → Khởi động KanScan**, không tự động chạy nền cùng Windows, không hiện CMD.
+- Không chiếm các cổng 47631, 47632, 47634, 8765 của KanBan Tools. KanScan ưu tiên 18765 và tự chọn cổng kế tiếp nếu bị chiếm.
+- Bộ cài tiếp tục kiểm tra KanMedia, KanPass, Capture Agent, PDF và Backup như cũ; thiếu ZIP, thiếu mạng hoặc nâng cấp KanScan lỗi sẽ **không làm hỏng hoặc dừng bộ cài chính**.
+- Ảnh chứng từ chỉ lưu trên PC; GitHub Pages không lưu chứng từ.
+- Lưu ý: quá trình áp dụng bản vá vào app hiện có chưa được nghiệm thu trên máy Windows của người dùng. GitHub CI xác thực cú pháp và cơ chế bỏ qua an toàn, không thay thế kiểm thử iPhone thực tế.
 
-## Kiểm tra khi có lỗi
+## Gỡ riêng tính năng
 
-- Đảm bảo ZIP còn nguyên (không giải nén hay chỉnh sửa), đúng bản v1.4; bộ cài đối chiếu SHA-256: `911faf44a23833210ebec0130ff4a7e5b20076cf894331a5699ac0bf7a2b78ae`.
-- Xem `%LOCALAPPDATA%\KanBanTools\logs\install-latest.log` nếu KanTool cài thất bại.
-- Kiểm tra `%LOCALAPPDATA%\KanBanTools\kanscan\installed.json` để biết KanScan đã cài.
-- Nếu hệ thống đã có KanScan phiên bản cũ chạy, hãy đóng bản cũ trước khi mở bản tích hợp để tránh hai cửa sổ nhận ảnh.
-- Chỉ bật chia sẻ trên mạng nội bộ đáng tin cậy và không chuyển tiếp cổng ra Internet.
+KanScan là thành phần riêng, không cần xóa KanBan. Không xóa thư mục `%LOCALAPPDATA%\KanScan` hoặc thư mục JPEG nếu còn chứng từ cần lưu.
+
+## Hạn chế
+
+Repository đang lưu **bản vá nguồn v1.5 và bộ tích hợp**, không phải toàn bộ mã nguồn gốc v1.4. Để cài trên máy mới vẫn cần bản ZIP v1.4 đã ghim hash. Muốn phát hành hoàn toàn độc lập từ GitHub, cần xuất bản toàn bộ nguồn gốc và/hoặc gói cài Windows.
