@@ -15,6 +15,45 @@ $launch = Join-Path $addon 'launch.vbs'
 $registry = 'HKCU:\Software\Classes\kanbanscan'
 New-Item -ItemType Directory -Path $addon -Force | Out-Null
 
+function Upgrade-KanScan {
+  # Download and apply only the v1.5 rotate patch. The base source stays intact.
+  $patch=Join-Path $addon 'upgrade_rotate_v15.py'
+  $url='https://raw.githubusercontent.com/LamHoaiLinh/Kanban-QLCV-Linh/main/kan-tools/kanscan/upgrade_rotate_v15.py?ts='+([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())
+  Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $patch -TimeoutSec 45
+  if((Get-Item -LiteralPath $patch).Length -lt 5000){throw 'KanScan rotate update incomplete.'}
+  & $python -m py_compile $patch
+  if($LASTEXITCODE -ne 0){throw 'KanScan rotate patch has invalid Python syntax.'}
+  $paths=@(
+    (Join-Path $appDir 'app.py'),
+    (Join-Path $appDir 'templates\index.html'),
+    (Join-Path $appDir 'KanScan.py')
+  )
+  foreach($path in $paths){if(-not (Test-Path -LiteralPath $path)){throw ('Missing KanScan file: ' + $path)}}
+  $backup=Join-Path $addon ('rotate-backup-'+[guid]::NewGuid().ToString('N'))
+  New-Item -ItemType Directory -Path $backup -Force|Out-Null
+  try {
+    for($i=0;$i -lt $paths.Count;$i++){
+      Copy-Item -LiteralPath $paths[$i] -Destination (Join-Path $backup ($i.ToString()+'.backup')) -Force
+    }
+    & $python $patch $appDir
+    if($LASTEXITCODE -ne 0){throw 'KanScan v1.5 source patch failed.'}
+    & $python -m py_compile (Join-Path $appDir 'app.py') (Join-Path $appDir 'KanScan.py')
+    if($LASTEXITCODE -ne 0){throw 'KanScan v1.5 source invalid.'}
+    $body=Get-Content -LiteralPath (Join-Path $appDir 'app.py') -Raw -Encoding UTF8
+    $mobile=Get-Content -LiteralPath (Join-Path $appDir 'templates\index.html') -Raw -Encoding UTF8
+    if($body -notmatch 'def rotate_page' -or $mobile -notmatch 'rotateLeft'){throw 'KanScan rotate actions not found.'}
+  } catch {
+    for($i=0;$i -lt $paths.Count;$i++){
+      $from=Join-Path $backup ($i.ToString()+'.backup')
+      if(Test-Path -LiteralPath $from){Copy-Item -LiteralPath $from -Destination $paths[$i] -Force}
+    }
+    throw
+  } finally {
+    Remove-Item -LiteralPath $backup -Recurse -Force -ErrorAction SilentlyContinue
+  }
+  Write-Host '  KanScan v1.5: xoay trang trai/phai 90 do da san sang.' -ForegroundColor Green
+}
+
 function Register-KanScan {
   if(-not (Test-Path -LiteralPath $pythonw) -or -not (Test-Path -LiteralPath (Join-Path $appDir 'KanScan.py'))) {
     throw 'KanScan Pythonw/source is missing.'
@@ -43,12 +82,23 @@ function Register-KanScan {
 if((Test-Path -LiteralPath $marker) -and (Test-Path -LiteralPath $pythonw) -and (Test-Path -LiteralPath (Join-Path $appDir 'templates\index.html'))) {
   try {
     $stored=Get-Content -LiteralPath $marker -Raw -Encoding UTF8 | ConvertFrom-Json
-    if($stored.version -eq '1.4' -and $stored.archiveSha256 -eq $ArchiveSha256.ToLowerInvariant()) {
-      Register-KanScan
-      Write-Host '  KanScan v1.4: da cai, giu nguyen; cap nhat lenh mo KanScan.' -ForegroundColor DarkGray
-      return
+    if($stored.archiveSha256 -eq $ArchiveSha256.ToLowerInvariant()) {
+      if($stored.version -eq '1.4') {
+        Upgrade-KanScan
+        $stored.version='1.5'
+        [IO.File]::WriteAllText($marker,($stored | ConvertTo-Json -Depth 4),[Text.UTF8Encoding]::new($false))
+      }
+      if($stored.version -eq '1.5') {
+        Register-KanScan
+        Write-Host '  KanScan v1.5: da cai, giu nguyen; lam moi lenh mo.' -ForegroundColor DarkGray
+        return
+      }
     }
-  } catch { Write-Host ('  KanScan: thu cai lai: ' + $_.Exception.Message) -ForegroundColor Yellow }
+  } catch {
+    # Upgrade errors must not re-install from ZIP over a working v1.4 copy.
+    Write-Host ('  KanScan upgrade failed; keeping current installation: ' + $_.Exception.Message) -ForegroundColor Yellow
+    return
+  }
 }
 
 $locations = @(
@@ -108,15 +158,16 @@ try {
     if(Test-Path -LiteralPath $old){Move-Item -LiteralPath $old -Destination $appDir}
     throw
   }
+  Upgrade-KanScan
   Register-KanScan
   $saved=@{
-    version='1.4'
+    version='1.5'
     archiveSha256=$ArchiveSha256.ToLowerInvariant()
     installedAt=(Get-Date).ToString('o')
     mode='on-demand'
   }
   [IO.File]::WriteAllText($marker,($saved | ConvertTo-Json -Depth 4),[Text.UTF8Encoding]::new($false))
-  Write-Host '  KanScan v1.4 da cai rieng. Mo KanBan > CONG CU > KanScan.' -ForegroundColor Green
+  Write-Host '  KanScan v1.5 da cai rieng. Mo KanBan > CONG CU > KanScan.' -ForegroundColor Green
   if(Test-Path -LiteralPath $old){Remove-Item -LiteralPath $old -Recurse -Force -ErrorAction SilentlyContinue}
 } catch {
   if($swapped -and (Test-Path -LiteralPath $old)){
