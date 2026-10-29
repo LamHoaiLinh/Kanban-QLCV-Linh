@@ -27,13 +27,13 @@ Tài liệu này ưu tiên tra cứu theo chức năng. Phần lịch sử cập
 
 ## CÔNG CỤ và Windows Agent
 - Alt+C: chụp nhanh. Alt+X: chụp dài. Alt+A / Alt+P: KanPass.
-- PDF, IMG, Nhập liệu PDF/IMG, Rename, Excel, KanPass, KanPaint và KanMedia nằm trong CÔNG CỤ.
-- Chuột phải CÔNG CỤ → **Cập nhật / sửa KanBan Tools**. Người dùng chỉ cần tải và mở `CAI_KANTOOL_1_LAN_BAM.bat` một lần; installer tự kiểm tra Python/runtime/thư viện và đăng ký Agent chạy cùng Windows.
+- PDF, IMG, Nhập liệu PDF/IMG, Rename, Excel, KanPass, KanPaint, KanMedia, KanRecorder nằm trong CÔNG CỤ.
+- Chuột phải **CÔNG CỤ → Cài đặt / Cập nhật KanTool (EXE)**. Tải `KanTool-Setup.exe`, mở lên và bấm **Cài đặt / Cập nhật**. Giao diện có thanh tiến độ, nhật ký và không mở CMD. Tệp EXE tự chọn cài mới nếu máy chưa có và cập nhật các phần cần thiết nếu đã cài.
 - Không cần cài riêng KanPass hoặc PyKeePass bằng tay.
 
 ## KanRecorder – quay màn hình vùng chọn (Windows)
 - Vào **CÔNG CỤ → KanRecorder**, mặc định chọn **region, chuột ON, click ON, phím tắt ON, mic + âm thanh máy tính, 30 FPS**.
-- Lần đầu: chuột phải **CÔNG CỤ → Cập nhật / sửa KanBan Tools** để cài module Python recorder riêng. Nếu trình duyệt hỏi mở `kanbanrecorder://`, chọn cho phép.
+- Lần đầu: chuột phải **CÔNG CỤ → Cài đặt / Cập nhật KanTool (EXE)** để cài module Python recorder riêng. Nếu trình duyệt hỏi mở `kanbanrecorder://`, chọn cho phép.
 - Trong cửa sổ KanRecorder: **Chọn vùng và bắt đầu quay** → kéo vùng trên desktop; **Ctrl+Alt+F9** tạm dừng/tiếp tục; **Ctrl+Alt+F10** dừng/lưu.
 - Video lưu tại **Videos/KanRecorder** của tài khoản Windows, định dạng MP4. Video không tự tải lên KanBan hoặc GitHub.
 - Để bảo mật, chỉ phím tắt và phím điều hướng được hiển thị trong video, không phát lại văn bản/mật khẩu đang gõ.
@@ -47,8 +47,8 @@ Tài liệu này ưu tiên tra cứu theo chức năng. Phần lịch sử cập
 
 ## Cài đặt, cập nhật và xử lý lỗi
 - Bộ cài dùng chung thư mục KanBan Tools và chỉ cập nhật thành phần thay đổi; dữ liệu KanPass nằm ngoài thư mục runtime nên không bị ghi đè khi update.
-- Nếu Alt+A/Alt+P hoặc một công cụ chưa hoạt động: chuột phải **CÔNG CỤ** → **Cập nhật / sửa KanBan Tools** → chạy file cài nếu KanBan tải xuống.
-- Màn chẩn đoán hiển thị riêng trạng thái Chụp màn hình, KanPass, KanMedia và Ký số PDF.
+- Nếu Alt+A/Alt+P hoặc một công cụ chưa hoạt động: chuột phải **CÔNG CỤ → Cài đặt / Cập nhật KanTool (EXE)** → mở file `KanTool-Setup.exe` đã tải → chọn **Sửa lỗi / Cài lại**. Nhật ký nằm ở `%LOCALAPPDATA%\\KanBanTools\\logs`.
+- Màn chẩn đoán hiển thị riêng trạng thái Chụp màn hình, KanPass, KanMedia và Ký số PDF. **KanScan** là tiện ích tùy chọn cần ZIP gốc đúng phiên bản; **KanPaint** hoạt động qua web, không được cài thành EXE ngoại tuyến.
 
 # LỊCH SỬ CẬP NHẬT
 
