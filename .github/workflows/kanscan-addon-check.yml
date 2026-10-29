@@ -32,7 +32,7 @@ jobs:
             if($errors.Count -ne 0){throw "PowerShell syntax invalid in $path : $errors"}
           }
           $manifest=Get-Content kan-tools/manifest.json -Raw | ConvertFrom-Json
-          if($manifest.components.kanscan.version -ne '1.5.0'){throw 'Wrong component version'}
+          if($manifest.components.kanscan.version -ne '1.5.1'){throw 'Wrong component version'}
           if($manifest.components.kanscan.archiveSha256 -notmatch '^[a-f0-9]{64}$'){throw 'SHA-256 is missing'}
           $tmp=Join-Path $env:RUNNER_TEMP 'kanscan-safe-skip'
           New-Item -ItemType Directory -Force $tmp | Out-Null
@@ -52,6 +52,8 @@ jobs:
         shell: pwsh
         run: |
           python -m py_compile kan-tools/kanscan/upgrade_rotate_v15.py
+          python -m py_compile kan-tools/kanscan/fix_windows_preview_v151.py
+          python -m unittest discover -s kan-tools/kanscan/tests -p 'test_*.py' -v
           node --check office-tools/kanscan-integration.js
           $patch=Get-Content kan-tools/kanscan/upgrade_rotate_v15.py -Raw -Encoding UTF8
           foreach($required in @('rotate_page','rotateLeft','rotateRight','manual_perspective_crop','remove_join_previews')){
