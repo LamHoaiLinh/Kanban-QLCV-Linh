@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "kanToolVersion": "2.9.1",
+  "kanToolVersion": "2.9.2",
   "installerVersion": "2.5.0",
   "pythonFallback": {
     "version": "3.13.16",
@@ -15,7 +15,7 @@
       ]
     },
     "capture": {
-      "version": "6.2.4",
+      "version": "6.2.5",
       "source": "capture-agent/capture_agent.py",
       "kanpassSource": "capture-agent/kanpass.py",
       "webBridgeSource": "capture-agent/kanpass_webbridge.py"
@@ -56,7 +56,7 @@
       "updater": "kan-tools/kanscan/upgrade_rotate_v15.py"
     },
     "recorder": {
-      "version": "1.1.0",
+      "version": "1.2.0",
       "source": "kan-tools/recorder/kanrecorder.py",
       "audioPackages": [
         "soundcard>=0.4,<0.5",
