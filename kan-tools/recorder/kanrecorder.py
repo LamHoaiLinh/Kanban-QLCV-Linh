@@ -24,7 +24,6 @@ from tkinter import messagebox, ttk
 APP = "KanRecorder"
 ROOT = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "KanBanTools"
 FFMPEG = ROOT / "media" / "bin" / "ffmpeg.exe"
-KEY_COLOR = "#010203"
 VK_LBUTTON, VK_RBUTTON, VK_CONTROL, VK_MENU = 0x01, 0x02, 0x11, 0x12
 VK_LWIN, VK_RWIN, VK_SHIFT, VK_F9, VK_F10 = 0x5B, 0x5C, 0x10, 0x78, 0x79
 SPECIAL = {0x08: "Backspace", 0x09: "Tab", 0x0D: "Enter", 0x1B: "Esc",
@@ -171,8 +170,11 @@ class App:
         self.status = tk.StringVar(value="Sẵn sàng. Nhấn Chọn vùng để bắt đầu.")
         self.state = "idle"
         self.region = None
-        self.overlay = None
-        self.canvas = None
+        # No fullscreen overlay during recording: that layer caused black-screen
+        # capture on some Windows/DPI/GPU combinations. Effects are burned into MP4.
+        self.segment_events = []
+        self.segment_start = 0.0
+        self.region_armed_at = 0.0
         self.session = None
         self.segments = []
         self.process = None
@@ -206,16 +208,16 @@ class App:
         self.fps_box = ttk.Combobox(settings, width=4, state="readonly", textvariable=self.fps,
                                     values=("15", "30", "60"))
         self.fps_box.grid(row=0, column=3, sticky="w")
-        self.start_button = ttk.Button(box, text="Chọn vùng và bắt đầu quay", command=self.choose_region)
+        self.start_button = ttk.Button(box, text="Chọn vùng quay (chưa bắt đầu)", command=self.choose_region)
         self.start_button.pack(fill="x")
         controls = ttk.Frame(box)
         controls.pack(fill="x", pady=7)
-        self.pause_button = ttk.Button(controls, text="Tạm dừng", command=self.pause_resume, state="disabled")
+        self.pause_button = ttk.Button(controls, text="Bắt đầu (Ctrl+Alt+F9)", command=self.pause_resume, state="disabled")
         self.pause_button.pack(side="left", expand=True, fill="x", padx=(0, 5))
         self.stop_button = ttk.Button(controls, text="Dừng và lưu MP4", command=self.stop, state="disabled")
         self.stop_button.pack(side="left", expand=True, fill="x")
         ttk.Label(box, textvariable=self.status, wraplength=350, foreground="#195c84").pack(anchor="w", pady=(7, 4))
-        ttk.Label(box, text="Ctrl+Alt+F9: Tạm dừng / Tiếp tục\nCtrl+Alt+F10: Dừng và lưu\nChỉ hiện phím tắt/phím điều hướng; không hiện chữ đang gõ.",
+        ttk.Label(box, text="Ctrl+Alt+F9: Bắt đầu / Tạm dừng / Tiếp tục\nCtrl+Alt+F10: Chỉ khi nhấn mới xuất MP4\nChỉ hiện phím tắt/phím điều hướng; không hiện chữ đang gõ.",
                   wraplength=350, foreground="#606974").pack(anchor="w")
 
     def choose_region(self) -> None:
@@ -223,11 +225,6 @@ class App:
             return
         if os.name != "nt" or not FFMPEG.is_file():
             messagebox.showerror(APP, "Chỉ hỗ trợ Windows có FFmpeg từ KanTool. Hãy cập nhật / sửa KanBan Tools.")
-            return
-        try:
-            self.selected_devices = devices_for(self.audio.get())
-        except Exception as exc:
-            messagebox.showerror(APP, str(exc))
             return
         vx, vy, vw, vh = native_metrics()
         # Keep the Tk owner alive so the selection Toplevel remains visible on Windows.
@@ -264,7 +261,7 @@ class App:
                 self.status.set("Vùng chọn quá nhỏ. Chọn ít nhất 80 × 80 pixel.")
                 return
             self.region = (x, y, w - w % 2, h - h % 2)
-            self.root.after(350, self.begin)
+            self.root.after(120, self.arm)
         def cancel(_e=None):
             overlay.destroy()
             self.root.attributes("-alpha", 1.0)
@@ -275,39 +272,31 @@ class App:
         overlay.bind("<Escape>", cancel)
         overlay.focus_force()
 
-    def make_overlay(self) -> None:
-        vx, vy, vw, vh = native_metrics()
-        self.virtual_origin = (vx, vy)
-        overlay = tk.Toplevel(self.root)
-        overlay.overrideredirect(True)
-        overlay.geometry(f"{vw}x{vh}{vx:+d}{vy:+d}")
-        overlay.attributes("-topmost", True)
-        overlay.configure(bg=KEY_COLOR)
-        overlay.wm_attributes("-transparentcolor", KEY_COLOR)
-        canvas = tk.Canvas(overlay, bg=KEY_COLOR, highlightthickness=0)
-        canvas.pack(fill="both", expand=True)
-        overlay.update_idletasks()
-        # Extended transparent style makes the drawing window mouse-click-through.
-        u = ctypes.windll.user32
-        hwnd = overlay.winfo_id()
-        GWL_EXSTYLE, WS_EX_TRANSPARENT, WS_EX_LAYERED, WS_EX_TOOLWINDOW = -20, 0x20, 0x80000, 0x80
-        u.GetWindowLongW.argtypes = (wintypes.HWND, ctypes.c_int)
-        u.SetWindowLongW.argtypes = (wintypes.HWND, ctypes.c_int, ctypes.c_long)
-        styles = u.GetWindowLongW(hwnd, GWL_EXSTYLE)
-        u.SetWindowLongW(hwnd, GWL_EXSTYLE, styles | WS_EX_TRANSPARENT | WS_EX_LAYERED | WS_EX_TOOLWINDOW)
-        self.overlay, self.canvas = overlay, canvas
-
-    def begin(self) -> None:
+    def arm(self) -> None:
+        """Selection alone never starts FFmpeg or accesses the microphone."""
         if self.state != "idle" or not self.region:
             return
+        self.state = "armed"
+        self.region_armed_at = time.monotonic()
+        self.last_hotkeys = set()
+        self.start_button.configure(state="disabled")
+        self.pause_button.configure(state="normal", text="Bắt đầu (Ctrl+Alt+F9)")
+        self.stop_button.configure(state="normal", text="Hủy vùng chọn (chưa quay)")
+        self.status.set("Đã chọn vùng. Ctrl+Alt+F9 để BẮT ĐẦU, chưa quay hay thu âm.")
+        self.position_toolbar()
+
+    def begin(self) -> None:
+        if self.state != "armed" or not self.region:
+            return
         try:
-            self.make_overlay()
+            self.selected_devices = devices_for(self.audio.get())
             self.session = Path(tempfile.mkdtemp(prefix="KanRecorder_"))
             self.segments = []
-            self.state = "recording"
+            self.segment_events = []
+            self.audio_warnings = []
             self.start_segment()
         except Exception as exc:
-            # On partial startup failure, stop FFmpeg before returning to idle.
+            # Always terminate partially started encoders and audio threads.
             try:
                 if self.process is not None or self.writers:
                     self.finish_segment()
@@ -316,15 +305,13 @@ class App:
                     self.fflog = None
             except Exception:
                 pass
-            self.state = "idle"
-            self.destroy_overlay()
+            self.state = "armed"
             messagebox.showerror(APP, f"Không bắt đầu được quay: {exc}")
             return
-        self.start_button.configure(state="disabled")
-        self.pause_button.configure(state="normal", text="Tạm dừng")
-        self.stop_button.configure(state="normal")
-        self.status.set("Đang quay vùng chọn. Ctrl+Alt+F10 để dừng.")
-        self.position_toolbar()
+        self.state = "recording"
+        self.pause_button.configure(state="normal", text="Tạm dừng (Ctrl+Alt+F9)")
+        self.stop_button.configure(state="normal", text="Dừng và lưu MP4 (F10)")
+        self.status.set("Đang quay vùng chọn; Ctrl+Alt+F9 tạm dừng, Ctrl+Alt+F10 xuất MP4.")
 
     def position_toolbar(self) -> None:
         x, y, w, h = self.region
@@ -367,8 +354,9 @@ class App:
             self.writers.append(writer)
             audio_files[name] = dest
         self.segments.append((video, audio_files))
+        self.segment_events.append([])
+        self.segment_start = time.monotonic()
         self.last_down.clear()
-        self.last_hotkeys.clear()
 
     def finish_segment(self) -> None:
         for writer in self.writers:
@@ -394,35 +382,46 @@ class App:
             self.fflog = None
 
     def pause_resume(self) -> None:
-        if self.state == "recording":
+        if self.state == "armed":
+            self.begin()
+        elif self.state == "recording":
             self.state = "paused"
             self.finish_segment()
-            self.destroy_overlay()
-            self.pause_button.configure(text="Tiếp tục")
-            self.status.set("Đã tạm dừng. Ctrl+Alt+F9 để tiếp tục.")
+            self.pause_button.configure(text="Tiếp tục (Ctrl+Alt+F9)")
+            self.status.set("Đã tạm dừng. Ctrl+Alt+F9 để tiếp tục, F10 để xuất.")
         elif self.state == "paused":
             try:
-                self.make_overlay()
                 self.start_segment()
             except Exception as exc:
-                self.destroy_overlay()
+                try:
+                    if self.process is not None or self.writers:
+                        self.finish_segment()
+                except Exception:
+                    pass
                 messagebox.showerror(APP, f"Không tiếp tục được: {exc}")
                 return
             self.state = "recording"
-            self.pause_button.configure(text="Tạm dừng")
-            self.status.set("Đang quay tiếp.")
+            self.pause_button.configure(text="Tạm dừng (Ctrl+Alt+F9)")
+            self.status.set("Đang quay tiếp. Ctrl+Alt+F10 để kết thúc và xuất MP4.")
 
     def stop(self) -> None:
+        if self.state == "armed":
+            self.state = "idle"
+            self.region = None
+            self.start_button.configure(state="normal")
+            self.pause_button.configure(state="disabled", text="Bắt đầu (Ctrl+Alt+F9)")
+            self.stop_button.configure(state="disabled", text="Dừng và lưu MP4")
+            self.status.set("Đã hủy vùng chọn. Chưa ghi hình hay âm thanh.")
+            return
         if self.state not in ("recording", "paused"):
             return
         was_recording = self.state == "recording"
         self.state = "exporting"
         self.pause_button.configure(state="disabled")
         self.stop_button.configure(state="disabled")
-        self.destroy_overlay()
         if was_recording:
             self.finish_segment()
-        self.status.set("Đang ghép hình và âm thanh. Không đóng cửa sổ…")
+        self.status.set("Đang ghép video, vòng click, phím tắt và âm thanh…")
         threading.Thread(target=self.export, daemon=True, name="KanRecorder-Export").start()
 
     def export(self) -> None:
