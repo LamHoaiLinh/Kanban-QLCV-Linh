@@ -47,7 +47,7 @@ class KanRecorderSmoke(unittest.TestCase):
         manifest = json.loads((ROOT / "kan-tools" / "manifest.json").read_text(encoding="utf-8"))
         self.assertIn("Join-Path $recDir '.venv'", installer)
         self.assertIn("kanbanrecorder", installer)
-        self.assertNotIn("KanbanRecorder\" -Value", installer)
+        self.assertNotIn('New-ItemProperty $run -Name "KanRecorder"', installer)
         self.assertEqual(manifest["components"]["recorder"]["version"], "1.0.0")
 
 
