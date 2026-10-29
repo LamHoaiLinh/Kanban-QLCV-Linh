@@ -469,74 +469,139 @@ class App:
         self.status.set("Đang ghép video, vòng click, phím tắt và âm thanh…")
         threading.Thread(target=self.export, daemon=True, name="KanRecorder-Export").start()
 
+    @staticmethod
+    def probe_duration(video: Path) -> float:
+        """Read the real MP4 duration: never let an audio filter set output length."""
+        import math
+        if not FFPROBE.is_file():
+            raise RuntimeError("Thiếu ffprobe.exe; hãy cập nhật FFmpeg trong KanTool.")
+        cmd = [str(FFPROBE), "-v", "error", "-show_entries", "format=duration",
+               "-of", "default=noprint_wrappers=1:nokey=1", str(video)]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=20,
+                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        if result.returncode:
+            raise RuntimeError("FFprobe không đọc được thời lượng video: " + result.stderr[-500:])
+        try:
+            seconds = float(result.stdout.strip())
+        except ValueError as exc:
+            raise RuntimeError("FFprobe trả về thời lượng không hợp lệ.") from exc
+        if not math.isfinite(seconds) or seconds <= 0:
+            raise RuntimeError("Video không có thời lượng hợp lệ.")
+        return seconds
+
+    def mux_segment(self, index: int, video: Path, audio_files: dict, output: Path) -> bool:
+        """Return True if an audio/effects failure required safe fallback.
+
+        Explicit -t VIDEO_DURATION bounds the mux even if mic/system WAV lengths
+        are mismatched. The old apad + shortest produced a 600s timeout.
+        """
+        duration = self.probe_duration(video)
+        inputs = [(kind, path) for kind, path in audio_files.items()
+                  if path.is_file() and path.stat().st_size > 128]
+        if len(inputs) < len(audio_files):
+            self.audio_warnings.append(f"Đoạn {index}: không đọc được đầy đủ microphone hoặc âm thanh máy tính.")
+        subtitle = self.write_effect_subtitles(index)
+        if not inputs and subtitle is None:
+            shutil.copy2(video, output)
+            return False
+
+        def command(with_audio: bool, with_effects: bool) -> list[str]:
+            cmd = [str(FFMPEG), "-hide_banner", "-nostdin", "-loglevel", "error",
+                   "-y", "-i", str(video)]
+            if with_audio:
+                for _, path in inputs:
+                    cmd.extend(["-i", str(path)])
+            if with_effects and subtitle is not None:
+                cmd.extend(["-vf", f"ass={subtitle.name}"])
+            cmd.extend(["-map", "0:v:0"])
+            if with_audio and len(inputs) == 2:
+                # Both sources are finite WAV. NO infinite apad, NO -shortest.
+                cmd.extend(["-filter_complex",
+                            "[1:a][2:a]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0[a]",
+                            "-map", "[a]"])
+            elif with_audio and len(inputs) == 1:
+                cmd.extend(["-map", "1:a:0"])
+            else:
+                cmd.append("-an")
+            if with_effects and subtitle is not None:
+                cmd.extend(["-c:v", "libx264", "-preset", "ultrafast",
+                            "-crf", "23", "-pix_fmt", "yuv420p"])
+            else:
+                cmd.extend(["-c:v", "copy"])
+            if with_audio:
+                cmd.extend(["-c:a", "aac", "-b:a", "160k"])
+            # Video is the sole clock for start/stop; avoid audio-induced hangs.
+            cmd.extend(["-t", f"{duration:.3f}", "-movflags", "+faststart", str(output)])
+            return cmd
+
+        try:
+            self.run_ffmpeg(command(True, True), duration)
+            return False
+        except (subprocess.TimeoutExpired, RuntimeError, OSError) as exc:
+            self.audio_warnings.append(f"Đoạn {index}: lỗi ghép âm thanh/hiệu ứng ({exc}); thử xuất video không âm thanh.")
+            try:
+                # Preserve click/key effects even when WASAPI audio is problematic.
+                self.run_ffmpeg(command(False, True), duration)
+                return True
+            except (subprocess.TimeoutExpired, RuntimeError, OSError) as subexc:
+                self.audio_warnings.append(f"Đoạn {index}: không chèn được hiệu ứng ({subexc}); giữ video gốc.")
+                shutil.copy2(video, output)
+                return True
+
     def export(self) -> None:
         try:
             output_dir = Path.home() / "Videos" / "KanRecorder"
             output_dir.mkdir(parents=True, exist_ok=True)
             target = output_dir / f"KanRecorder_{dt.datetime.now():%Y%m%d_%H%M%S}.mp4"
             assembled = []
+            preserve_raw = False
             for idx, (video, audio_files) in enumerate(self.segments, 1):
                 if not video.is_file() or video.stat().st_size < 1024:
-                    raise RuntimeError(f"Video đoạn {idx} rỗng. Kiểm tra log FFmpeg trong {self.session}")
-                inputs = [(key, path) for key, path in audio_files.items() if path.is_file() and path.stat().st_size > 128]
-                if len(inputs) < len(audio_files):
-                    self.audio_warnings.append(f"Đoạn {idx}: thiếu âm thanh từ một thiết bị.")
+                    raise RuntimeError(f"Đoạn {idx} không có video gốc. Dữ liệu tạm tại {self.session}")
                 result = self.session / f"mux_{idx:03d}.mp4"
-                subtitle = self.write_effect_subtitles(idx)
-                if not inputs and subtitle is None:
-                    shutil.copy2(video, result)
-                else:
-                    cmd = [str(FFMPEG), "-hide_banner", "-loglevel", "error", "-y", "-i", str(video)]
-                    for _, path in inputs:
-                        cmd += ["-i", str(path)]
-                    if subtitle is not None:
-                        # This ASS file is generated locally with a fixed filename.
-                        # Effects are burned directly into the exported video.
-                        cmd += ["-vf", f"ass={subtitle.name}"]
-                    if len(inputs) == 2:
-                        cmd += ["-filter_complex", "[1:a][2:a]amix=inputs=2:duration=longest:normalize=0,apad[a]",
-                                "-map", "0:v:0", "-map", "[a]"]
-                    elif len(inputs) == 1:
-                        cmd += ["-map", "0:v:0", "-map", "1:a:0", "-af", "apad"]
-                    else:
-                        cmd += ["-map", "0:v:0", "-an"]
-                    if subtitle is not None:
-                        cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
-                                "-pix_fmt", "yuv420p"]
-                    else:
-                        cmd += ["-c:v", "copy"]
-                    if inputs:
-                        cmd += ["-c:a", "aac", "-b:a", "160k", "-shortest"]
-                    cmd.append(str(result))
-                    self.run_ffmpeg(cmd)
+                preserve_raw |= self.mux_segment(idx, video, audio_files, result)
                 assembled.append(result)
             if not assembled:
-                raise RuntimeError("Không có đoạn video nào.")
+                raise RuntimeError("Chưa có đoạn quay nào.")
             if len(assembled) == 1:
                 shutil.copy2(assembled[0], target)
             else:
-                # Concat re-encodes video to tolerate differing audio/missing microphone segments.
                 listing = self.session / "segments.txt"
-                listing.write_text("".join("file '" + str(p).replace("\\", "/").replace("'", "'\\''") + "'\n"
+                listing.write_text("".join("file '" + str(p).replace("\\", "/").replace("'", "'\\''") + "'\\n"
                                            for p in assembled), encoding="utf-8")
-                self.run_ffmpeg([str(FFMPEG), "-hide_banner", "-loglevel", "error", "-y",
-                                 "-f", "concat", "-safe", "0", "-i", str(listing),
-                                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
-                                 "-c:a", "aac", str(target)])
+                total = sum(self.probe_duration(p) for p in assembled)
+                try:
+                    self.run_ffmpeg([str(FFMPEG), "-hide_banner", "-nostdin", "-loglevel", "error", "-y",
+                                     "-f", "concat", "-safe", "0", "-i", str(listing),
+                                     "-c", "copy", "-movflags", "+faststart", str(target)], total)
+                except (subprocess.TimeoutExpired, RuntimeError, OSError):
+                    # Different audio streams between segments may require a remux.
+                    self.run_ffmpeg([str(FFMPEG), "-hide_banner", "-nostdin", "-loglevel", "error", "-y",
+                                     "-f", "concat", "-safe", "0", "-i", str(listing),
+                                     "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+                                     "-c:a", "aac", "-t", f"{total:.3f}", str(target)], total)
             if target.stat().st_size < 1024:
-                raise RuntimeError("Tệp xuất MP4 không hợp lệ.")
-            warnings = "; ".join(self.audio_warnings)
-            shutil.rmtree(self.session, ignore_errors=True)
-            self.jobs.put(("done", str(target), warnings))
+                raise RuntimeError("MP4 xuất ra không hợp lệ.")
+            self.probe_duration(target)
+            if preserve_raw:
+                self.audio_warnings.append("Đã giữ video/WAV gốc để anh phục hồi tại: " + str(self.session))
+            else:
+                shutil.rmtree(self.session, ignore_errors=True)
+            self.jobs.put(("done", str(target), "; ".join(self.audio_warnings)))
         except Exception as exc:
             self.jobs.put(("error", str(exc), str(self.session)))
 
-    def run_ffmpeg(self, cmd: list[str]) -> None:
-        p = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
-                           timeout=600, cwd=str(self.session),
-                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    def run_ffmpeg(self, cmd: list[str], expected_seconds: float = 10.) -> None:
+        # For short clips, fail fast instead of hanging silently for 600 seconds.
+        timeout = max(45, min(1800, int(expected_seconds * 3 + 45)))
+        try:
+            p = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                               timeout=timeout, cwd=str(self.session),
+                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError(f"FFmpeg vượt {timeout} giây khi xuất video dài {expected_seconds:.1f}s.") from exc
         if p.returncode:
-            raise RuntimeError(p.stderr.decode("utf-8", "replace")[-1000:])
+            raise RuntimeError(p.stderr.decode("utf-8", "replace")[-1200:])
 
     def poll(self) -> None:
         try:
@@ -698,7 +763,7 @@ if __name__ == "__main__":
         def forward_existing() -> bool:
             try:
                 with socket.create_connection(("127.0.0.1", CONTROL_PORT), timeout=.3) as connection:
-                    connection.sendall(b"SHOW\\n")
+                    connection.sendall(b"SHOW\n")
                 return True
             except OSError:
                 return False
