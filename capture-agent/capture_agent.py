@@ -18,6 +18,7 @@ except Exception:
 
 APP='KanbanCapture'; PORT=47631
 HOTKEY_ID=0x4B43; HOTKEY_LONG_ID=0x4B58; HOTKEY_FILL_ID=0x4B41; HOTKEY_SAVE_ID=0x4B50
+HOTKEY_RECORDER_ID=0x4B52; RECORDER_PORT=47635
 DIR=Path(os.environ.get('LOCALAPPDATA',tempfile.gettempdir()))/APP; CFG=DIR/'settings.json'; CLIP=DIR/'Clipboard'
 KANPASS_HEADER='linh-kanpass-v1'
 KANPASS_ALLOWED_ORIGINS=('https://lamhoailinh.github.io','http://localhost','http://127.0.0.1')
@@ -1308,12 +1309,35 @@ class Agent:
                 except Exception:pass
                 continue
 
+    def recorder_hotkey(self):
+        """Ctrl+Alt+F9: open recorder -> select region -> start/pause/resume.
+        No recording is started from the background agent; the UI asks for a region.
+        """
+        try:
+            with socket.create_connection(('127.0.0.1',RECORDER_PORT),timeout=.3) as conn:
+                conn.sendall(b'F9\n')
+            return
+        except OSError:
+            pass
+        root=Path(os.environ.get('LOCALAPPDATA',tempfile.gettempdir()))/'KanBanTools'
+        script=root/'recorder'/'kanrecorder.py'
+        pythonw=root/'recorder'/'.venv'/'Scripts'/'pythonw.exe'
+        if not script.is_file() or not pythonw.is_file():
+            messagebox.showwarning('KanRecorder','KanRecorder chưa được cài. Vào CÔNG CỤ → Cài đặt / Cập nhật KanTool.')
+            return
+        try:
+            subprocess.Popen([str(pythonw),str(script)],close_fds=True,
+                             creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+        except OSError as exc:
+            messagebox.showerror('KanRecorder',f'Không mở được KanRecorder: {exc}')
+
     def hotkey(self):
         u=ctypes.windll.user32; mods=0x0001|0x4000
         ok_c=bool(u.RegisterHotKey(None,HOTKEY_ID,mods,0x43))
         ok_x=bool(u.RegisterHotKey(None,HOTKEY_LONG_ID,mods,0x58))
         ok_a=bool(u.RegisterHotKey(None,HOTKEY_FILL_ID,mods,0x41))
         ok_p=bool(u.RegisterHotKey(None,HOTKEY_SAVE_ID,mods,0x50))
+        ok_rec=bool(u.RegisterHotKey(None,HOTKEY_RECORDER_ID,mods|0x0002,0x78))
         if not ok_c:self.root.after(0,lambda:messagebox.showwarning('Kanban Capture','Không đăng ký được Alt+C. Có thể phím này đang bị ứng dụng khác chiếm. Nút CHỤP trong Kanban vẫn dùng được.'))
         if not ok_x:self.root.after(0,lambda:messagebox.showwarning('Kanban Capture','Không đăng ký được Alt+X cho chụp dài. Có thể phím này đang bị ứng dụng khác chiếm.'))
         m=wintypes.MSG()
@@ -1323,10 +1347,12 @@ class Agent:
             elif m.wParam==HOTKEY_LONG_ID:self.root.after(0,lambda:self.capture(True))
             elif m.wParam==HOTKEY_FILL_ID and ok_a and self.kanpass:self.root.after(0,self.kanpass.hotkey_autofill)
             elif m.wParam==HOTKEY_SAVE_ID and ok_p and self.kanpass:self.root.after(0,self.kanpass.hotkey_save_update)
+            elif m.wParam==HOTKEY_RECORDER_ID and ok_rec:self.root.after(0,self.recorder_hotkey)
         if ok_c:u.UnregisterHotKey(None,HOTKEY_ID)
         if ok_x:u.UnregisterHotKey(None,HOTKEY_LONG_ID)
         if ok_a:u.UnregisterHotKey(None,HOTKEY_FILL_ID)
         if ok_p:u.UnregisterHotKey(None,HOTKEY_SAVE_ID)
+        if ok_rec:u.UnregisterHotKey(None,HOTKEY_RECORDER_ID)
 
     def handle(self,q):
         q=q.split('?',1)[0].strip('/ ').lower()
