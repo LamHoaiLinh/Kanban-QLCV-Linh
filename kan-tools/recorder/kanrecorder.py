@@ -437,18 +437,32 @@ class App:
                 if len(inputs) < len(audio_files):
                     self.audio_warnings.append(f"Đoạn {idx}: thiếu âm thanh từ một thiết bị.")
                 result = self.session / f"mux_{idx:03d}.mp4"
-                if not inputs:
+                subtitle = self.write_effect_subtitles(idx)
+                if not inputs and subtitle is None:
                     shutil.copy2(video, result)
                 else:
                     cmd = [str(FFMPEG), "-hide_banner", "-loglevel", "error", "-y", "-i", str(video)]
                     for _, path in inputs:
                         cmd += ["-i", str(path)]
+                    if subtitle is not None:
+                        # This ASS file is generated locally with a fixed filename.
+                        # Effects are burned directly into the exported video.
+                        cmd += ["-vf", f"ass={subtitle.name}"]
                     if len(inputs) == 2:
                         cmd += ["-filter_complex", "[1:a][2:a]amix=inputs=2:duration=longest:normalize=0,apad[a]",
                                 "-map", "0:v:0", "-map", "[a]"]
-                    else:
+                    elif len(inputs) == 1:
                         cmd += ["-map", "0:v:0", "-map", "1:a:0", "-af", "apad"]
-                    cmd += ["-c:v", "copy", "-c:a", "aac", "-b:a", "160k", "-shortest", str(result)]
+                    else:
+                        cmd += ["-map", "0:v:0", "-an"]
+                    if subtitle is not None:
+                        cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+                                "-pix_fmt", "yuv420p"]
+                    else:
+                        cmd += ["-c:v", "copy"]
+                    if inputs:
+                        cmd += ["-c:a", "aac", "-b:a", "160k", "-shortest"]
+                    cmd.append(str(result))
                     self.run_ffmpeg(cmd)
                 assembled.append(result)
             if not assembled:
@@ -472,10 +486,10 @@ class App:
         except Exception as exc:
             self.jobs.put(("error", str(exc), str(self.session)))
 
-    @staticmethod
-    def run_ffmpeg(cmd: list[str]) -> None:
+    def run_ffmpeg(self, cmd: list[str]) -> None:
         p = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
-                           timeout=600, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                           timeout=600, cwd=str(self.session),
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         if p.returncode:
             raise RuntimeError(p.stderr.decode("utf-8", "replace")[-1000:])
 
@@ -615,7 +629,7 @@ class App:
 
     def close(self) -> None:
         if self.state in ("recording", "paused"):
-            messagebox.showwarning(APP, "Hãy bấm Dừng và lưu MP4 trước khi đóng KanRecorder.")
+            messagebox.showwarning(APP, "Hãy nhấn Ctrl+Alt+F10 để xuất MP4 trước khi đóng KanRecorder.")
             return
         if self.state == "exporting":
             messagebox.showwarning(APP, "Đang xuất video; không đóng cửa sổ.")
