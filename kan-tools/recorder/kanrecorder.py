@@ -219,7 +219,8 @@ class App:
             messagebox.showerror(APP, str(exc))
             return
         vx, vy, vw, vh = native_metrics()
-        self.root.withdraw()
+        # Keep the Tk owner alive so the selection Toplevel remains visible on Windows.
+        self.root.attributes("-alpha", 0.0)
         overlay = tk.Toplevel(self.root)
         overlay.overrideredirect(True)
         overlay.geometry(f"{vw}x{vh}{vx:+d}{vy:+d}")
@@ -246,7 +247,8 @@ class App:
             x, y = vx + min(start[0], e.x), vy + min(start[1], e.y)
             w, h = abs(e.x - start[0]), abs(e.y - start[1])
             overlay.destroy()
-            self.root.deiconify()
+            self.root.attributes("-alpha", 1.0)
+            self.root.lift()
             if w < 80 or h < 80:
                 self.status.set("Vùng chọn quá nhỏ. Chọn ít nhất 80 × 80 pixel.")
                 return
@@ -254,7 +256,8 @@ class App:
             self.root.after(350, self.begin)
         def cancel(_e=None):
             overlay.destroy()
-            self.root.deiconify()
+            self.root.attributes("-alpha", 1.0)
+            self.root.lift()
         canvas.bind("<ButtonPress-1>", press_event)
         canvas.bind("<B1-Motion>", move_event)
         canvas.bind("<ButtonRelease-1>", finish)
@@ -293,6 +296,15 @@ class App:
             self.state = "recording"
             self.start_segment()
         except Exception as exc:
+            # On partial startup failure, stop FFmpeg before returning to idle.
+            try:
+                if self.process is not None or self.writers:
+                    self.finish_segment()
+                elif self.fflog:
+                    self.fflog.close()
+                    self.fflog = None
+            except Exception:
+                pass
             self.state = "idle"
             self.destroy_overlay()
             messagebox.showerror(APP, f"Không bắt đầu được quay: {exc}")
