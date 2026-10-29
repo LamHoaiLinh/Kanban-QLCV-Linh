@@ -44,6 +44,7 @@ if(Test-Path $InstalledPath){
 }
 
 function Write-Step([string]$Text){ Write-Host ""; Write-Host "==> $Text" -ForegroundColor Cyan }
+function Report-InstallerProgress([int]$Percent,[string]$Text){ Write-Output ("@@KANTOOL_PROGRESS@@|" + $Percent + "|" + $Text) }
 function Get-Version([object]$Obj,[string]$Name){
   try{
     if($null -eq $Obj -or $null -eq $Obj.components){ return "" }
@@ -258,6 +259,7 @@ if(-not $Force){
   Get-LiveMediaJob | Out-Null
 }
 
+Report-InstallerProgress 21 "Chuẩn bị nâng cấp dịch vụ an toàn"
 Write-Step "Dung KanMedia cu"
 $head=@{"X-KanBan-Agent"="linh-kanban-v1"}
 try{Invoke-RestMethod -Method Post -Headers $head -ContentType "application/json" -Body "{}" -Uri "http://127.0.0.1:47632/shutdown" -TimeoutSec 1|Out-Null}catch{}
@@ -266,6 +268,7 @@ Stop-Matching "*kanmedia-server.py*"
 Stop-Matching "*kanmedia-worker.py*"
 
 $venvPy = Ensure-Python
+Report-InstallerProgress 32 "Đã kiểm tra Python"
 $venvPip = @($venvPy,"-m","pip")
 $pyw = Join-Path $Root ".venv\Scripts\pythonw.exe"
 
@@ -282,6 +285,7 @@ if($needPackages){
   Write-Host "  Thu vien Python: da dung phien ban." -ForegroundColor DarkGray
 }
 
+Report-InstallerProgress 39 "Đã kiểm tra thư viện chung"
 $needYt = Need-Component "ytDlp" @()
 $ytOk=$false
 try{ & $venvPy -m yt_dlp --version | Out-Null; if($LASTEXITCODE -eq 0){$ytOk=$true} }catch{}
@@ -292,6 +296,7 @@ if($needYt -or -not $ytOk){
   Write-Host "  yt-dlp: giu ban dang chay tot." -ForegroundColor DarkGray
 }
 
+Report-InstallerProgress 43 "Đã kiểm tra thư viện tải media"
 $runtimeFiles=@(
   (Join-Path $Runtime "kanmedia-server.py"),
   (Join-Path $Runtime "kanmedia-worker.py")
@@ -304,6 +309,7 @@ if(Need-Component "runtime" $runtimeFiles){
   Write-Host "  Runtime KanMedia: khong doi." -ForegroundColor DarkGray
 }
 
+Report-InstallerProgress 48 "Đã kiểm tra KanMedia runtime"
 $nodeExe=Join-Path $NodeDir "node.exe"
 $nodeNeed=Need-Component "node" @($nodeExe)
 if(-not $nodeNeed){
@@ -335,6 +341,7 @@ if($nodeNeed){
   Write-Host "  Node.js: khong doi." -ForegroundColor DarkGray
 }
 
+Report-InstallerProgress 56 "Đã kiểm tra Node.js"
 $ffmpeg=Join-Path $Media "ffmpeg.exe"
 $ffprobe=Join-Path $Media "ffprobe.exe"
 if(Need-Component "ffmpeg" @($ffmpeg,$ffprobe)){
@@ -366,6 +373,7 @@ if(Need-Component "ffmpeg" @($ffmpeg,$ffprobe)){
   Write-Host "  FFmpeg: khong doi." -ForegroundColor DarkGray
 }
 
+Report-InstallerProgress 66 "Đã kiểm tra FFmpeg"
 $capture=Join-Path $CaptureDir "capture_agent.py"
 $kanpass=Join-Path $CaptureDir "kanpass.py"
 $kanpassWeb=Join-Path $CaptureDir "kanpass_webbridge.py"
@@ -394,6 +402,7 @@ if($needSigning){
   Write-Host "  Ky so: khong doi." -ForegroundColor DarkGray
 }
 
+Report-InstallerProgress 73 "Đã kiểm tra Capture, KanPass và ký số"
 $backupAgent=Join-Path $BackupDir "kanbackup-server.py"
 $kopiaExe=Join-Path $BackupDir "kopia.exe"
 $needBackup=Need-Component "backup" @($backupAgent)
@@ -435,6 +444,7 @@ if($needKopia){
   Write-Host "  Kopia: khong doi." -ForegroundColor DarkGray
 }
 
+Report-InstallerProgress 81 "Đã kiểm tra Kopia và KanBackup"
 Write-Step "Dang ky chay cung Windows"
 $run="HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
 New-Item -Path $run -Force|Out-Null
@@ -463,6 +473,7 @@ if($needBackup -or $needKopia -or -not (Test-Url "http://127.0.0.1:47634/ping" @
   Start-Process -FilePath $pyw -ArgumentList ('"'+$backupAgent+'"') -WindowStyle Hidden
 }
 
+Report-InstallerProgress 87 "Đã đăng ký các dịch vụ Windows"
 Write-Step "Kiem tra sau cai dat"
 $serverOk=$false
 for($i=0;$i -lt 100;$i++){
@@ -500,6 +511,7 @@ if(-not $backupOk){
   throw "KanBackup / Kopia chua khoi dong duoc."
 }
 
+Report-InstallerProgress 93 "Đã kiểm tra dịch vụ lõi KanTool"
 # KanScan runs as an optional independent addon only AFTER all core service checks.
 # Errors cannot fail/rollback KanBan Tools, and its Python packages do not touch $venvPy.
 try {
@@ -571,6 +583,7 @@ try {
   Write-Host '  De cai lai: chuot phai CONG CU -> Cap nhat / sua KanBan Tools.' -ForegroundColor Yellow
 }
 
+Report-InstallerProgress 98 "Đã kiểm tra thành phần tùy chọn"
 # Ghi dung manifest da cai de lan sau chi cap nhat thanh phan thay doi.
 Copy-Item -LiteralPath $ManifestPath -Destination $InstalledPath -Force
 Stage-LatestBootstrapper
@@ -589,4 +602,5 @@ Write-Host "  - KanScan: tuy chon, cai rieng neu da tai ZIP v1.4 ve Downloads"
 Write-Host "  - KanRecorder: quay vung man hinh, click, phim tat, mic + am thanh he thong"
 Write-Host "  - Cap nhat theo tung thanh phan, khong tai lai neu khong can"
 Write-Host ""
+Report-InstallerProgress 100 "Cài đặt và kiểm tra hoàn tất"
 try { Stop-Transcript | Out-Null } catch {}
