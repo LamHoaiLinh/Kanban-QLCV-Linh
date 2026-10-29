@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "kanToolVersion": "2.8.7",
-  "installerVersion": "2.4.7",
+  "kanToolVersion": "2.8.8",
+  "installerVersion": "2.4.8",
   "pythonFallback": {
     "version": "3.13.16",
     "url": "https://www.python.org/ftp/python/3.13.16/python-3.13.16-amd64.exe"
@@ -54,6 +54,14 @@
       "archiveSha256": "911faf44a23833210ebec0130ff4a7e5b20076cf894331a5699ac0bf7a2b78ae",
       "installMode": "optional-v14-zip-plus-v15-github-patch",
       "updater": "kan-tools/kanscan/upgrade_rotate_v15.py"
+    },
+    "recorder": {
+      "version": "1.0.0",
+      "source": "kan-tools/recorder/kanrecorder.py",
+      "audioPackages": [
+        "soundcard>=0.4,<0.5",
+        "numpy>=1.26,<3"
+      ]
     }
   },
   "bootstrapVersion": "2.3.0"
