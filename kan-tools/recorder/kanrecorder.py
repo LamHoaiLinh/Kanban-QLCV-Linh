@@ -310,7 +310,7 @@ class App:
             return
         self.state = "recording"
         self.pause_button.configure(state="normal", text="Tạm dừng (Ctrl+Alt+F9)")
-        self.stop_button.configure(state="normal", text="Dừng và lưu MP4 (F10)")
+        self.stop_button.configure(state="disabled", text="Xuất bằng Ctrl+Alt+F10")
         self.status.set("Đang quay vùng chọn; Ctrl+Alt+F9 tạm dừng, Ctrl+Alt+F10 xuất MP4.")
 
     def position_toolbar(self) -> None:
@@ -479,81 +479,139 @@ class App:
         if p.returncode:
             raise RuntimeError(p.stderr.decode("utf-8", "replace")[-1000:])
 
-    def destroy_overlay(self) -> None:
-        if self.overlay is not None:
-            try:
-                self.overlay.destroy()
-            except tk.TclError:
-                pass
-        self.overlay = self.canvas = None
-        self.events.clear()
-
     def poll(self) -> None:
         try:
             while True:
                 job = self.jobs.get_nowait()
                 self.state = "idle"
+                self.region = None
                 self.start_button.configure(state="normal")
+                self.pause_button.configure(state="disabled", text="Bắt đầu (Ctrl+Alt+F9)")
+                self.stop_button.configure(state="disabled", text="Dừng và lưu MP4")
                 if job[0] == "done":
                     self.status.set(f"Đã lưu: {job[1]}")
-                    messagebox.showinfo(APP, f"Đã lưu MP4:\n{job[1]}" +
-                                        (f"\n\nCảnh báo âm thanh: {job[2]}" if job[2] else ""))
+                    messagebox.showinfo(APP, f"Đã lưu MP4:\\n{job[1]}" +
+                                        (f"\\n\\nCảnh báo âm thanh: {job[2]}" if job[2] else ""))
                 else:
                     self.status.set(f"Lỗi xuất video: {job[1]}")
-                    messagebox.showerror(APP, f"Không thể xuất MP4: {job[1]}\nDữ liệu tạm giữ tại:\n{job[2]}")
+                    messagebox.showerror(APP, f"Không thể xuất MP4: {job[1]}\\nDữ liệu tạm giữ tại:\\n{job[2]}")
         except queue.Empty:
             pass
-        if self.state in ("recording", "paused"):
+
+        if self.state in ("armed", "recording", "paused"):
             combo = pressed(VK_CONTROL) and pressed(VK_MENU)
             hot = {vk for vk in (VK_F9, VK_F10) if combo and pressed(vk)}
-            if VK_F10 in hot - self.last_hotkeys:
-                self.stop()
-            elif VK_F9 in hot - self.last_hotkeys:
-                self.pause_resume()
+            newly_pressed = hot - self.last_hotkeys
+            # Assign *before* action so F9 cannot immediately pause the new recording.
             self.last_hotkeys = hot
-        if self.state == "recording" and self.canvas is not None:
-            self.draw_effects()
+            if VK_F10 in newly_pressed:
+                self.stop()
+            elif VK_F9 in newly_pressed:
+                self.pause_resume()
+
+        if self.state == "recording":
+            self.track_events()
         self.root.after(40, self.poll)
 
-    def draw_effects(self) -> None:
+    def track_events(self) -> None:
+        """Collect only visual events while recording; never log typed text."""
+        if not self.segment_events or not self.region:
+            return
         x, y, w, h = self.region
-        vx, vy = self.virtual_origin
         px, py = cursor_position()
         inside = x <= px < x + w and y <= py < y + h
         now = time.monotonic()
+        elapsed = max(0.0, now - self.segment_start)
         if self.clicks.get():
-            for vk, color in ((VK_LBUTTON, "#28c8fa"), (VK_RBUTTON, "#fa9e42")):
+            for vk, button in ((VK_LBUTTON, "left"), (VK_RBUTTON, "right")):
                 current = pressed(vk)
                 if current and not self.last_down.get(vk) and inside:
-                    self.events.append((px - vx, py - vy, color, now))
+                    self.segment_events[-1].append({
+                        "kind": "click", "t": elapsed, "x": px - x, "y": py - y,
+                        "button": button
+                    })
+                    self.status.set(f"Đang quay — vừa click {button}. F9: tạm dừng; F10: xuất.")
                 self.last_down[vk] = current
+
         if self.keys.get():
-            modifiers = [name for vk, name in ((VK_CONTROL, "Ctrl"), (VK_MENU, "Alt"),
-                                                 (VK_SHIFT, "Shift"), (VK_LWIN, "Win"), (VK_RWIN, "Win"))
-                         if pressed(vk)]
+            ctrl = pressed(VK_CONTROL)
+            alt = pressed(VK_MENU)
+            shift = pressed(VK_SHIFT)
+            win = pressed(VK_LWIN) or pressed(VK_RWIN)
+            modifiers = [name for enabled, name in ((ctrl, "Ctrl"), (alt, "Alt"),
+                                                       (shift, "Shift"), (win, "Win")) if enabled]
             for vk, label in KEYS.items():
                 current = pressed(vk)
                 if current and not self.last_down.get(vk):
-                    safe_key = vk in SPECIAL and vk != 0x20 or 0x70 <= vk <= 0x7B or bool(modifiers)
-                    if safe_key and vk not in (VK_F9, VK_F10):
-                        self.badge = (" + ".join(dict.fromkeys(modifiers + [label])), now + 1.7)
+                    # Prevent password leaks: Shift+letter/number alone is NOT
+                    # a shortcut. Never record arbitrary character key presses.
+                    navigation = vk in SPECIAL and vk != 0x20
+                    function = 0x70 <= vk <= 0x7B
+                    shortcut = (ctrl or alt or win) and (0x30 <= vk <= 0x5A)
+                    if (navigation or function or shortcut) and vk not in (VK_F9, VK_F10):
+                        value = " + ".join(dict.fromkeys(modifiers + [label]))[:65]
+                        self.segment_events[-1].append({
+                            "kind": "key", "t": elapsed, "label": value
+                        })
                 self.last_down[vk] = current
-        self.canvas.delete("effect")
-        self.events = [e for e in self.events if now - e[3] < 0.55]
-        for ex, ey, color, created in self.events:
-            age = (now - created) / 0.55
-            radius = 10 + 25 * age
-            self.canvas.create_oval(ex - radius, ey - radius, ex + radius, ey + radius,
-                                    outline=color, width=max(1, int(4 * (1 - age))), tags="effect")
-        if self.keys.get() and self.badge[0] and self.badge[1] > now:
-            xx, yy = x - vx + 14, y - vy + h - 44
-            label = self.badge[0][:65]
-            text_id = self.canvas.create_text(xx + 9, yy + 16, anchor="w", text=label,
-                                               fill="#ffffff", font=("Segoe UI", 12, "bold"), tags="effect")
-            rect = self.canvas.bbox(text_id)
-            self.canvas.create_rectangle(xx, yy, rect[2] + 12, yy + 33, fill="#192334",
-                                         outline="#4b91c2", tags="effect")
-            self.canvas.tag_raise(text_id)
+
+    @staticmethod
+    def ass_timestamp(seconds: float) -> str:
+        hundredths = max(0, int(round(seconds * 100)))
+        h, remainder = divmod(hundredths, 360000)
+        m, remainder = divmod(remainder, 6000)
+        sec, centisec = divmod(remainder, 100)
+        return f"{h}:{m:02d}:{sec:02d}.{centisec:02d}"
+
+    def write_effect_subtitles(self, index: int) -> Path | None:
+        """ASS effects are composited in FFmpeg, never a fullscreen GUI overlay.
+
+        This avoids the Windows black-screen bug and guarantees the rings and
+        safe key labels are visible in the *saved video* even with DPI scaling.
+        """
+        events = self.segment_events[index - 1] if index <= len(self.segment_events) else []
+        if not events:
+            return None
+        _, _, w, h = self.region
+        header = (
+            "[Script Info]\\nScriptType: v4.00+\\n"
+            f"PlayResX: {w}\\nPlayResY: {h}\\n"
+            "WrapStyle: 2\\nScaledBorderAndShadow: yes\\n"
+            "\\n[V4+ Styles]\\n"
+            "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, "
+            "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
+            "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
+            "Alignment, MarginL, MarginR, MarginV, Encoding\\n"
+            "Style: Ring,Arial,26,&H00FFFFFF,&H00000000,&H00000000,&H00000000,"
+            "0,0,0,0,100,100,0,0,1,0,0,7,10,10,10,1\\n"
+            "Style: Key,Segoe UI,23,&H00FFFFFF,&H00000000,&H00182332,&HAA182332,"
+            "-1,0,0,0,100,100,0,0,3,5,0,1,16,16,16,1\\n"
+            "\\n[Events]\\n"
+            "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\\n"
+        )
+        lines = [header]
+        ring = ("m 0 -20 b 11 -20 20 -11 20 0 b 20 11 11 20 0 20 "
+                "b -11 20 -20 11 -20 0 b -20 -11 -11 -20 0 -20")
+        for event in events:
+            start = self.ass_timestamp(event["t"])
+            is_click = event["kind"] == "click"
+            end = self.ass_timestamp(event["t"] + (0.65 if is_click else 1.6))
+            if is_click:
+                # ASS colours are AABBGGRR: bright blue/cyan vs warm orange.
+                colour = ("&H00FAC828&" if event["button"] == "left" else "&H00429EFA&")
+                tags = (
+                    rf"{{\\an7\\pos({event['x']},{event['y']})\\p1\\1a&HFF&"
+                    rf"\\3c{colour}\\3a&H00&\\bord5\\blur2"
+                    rf"\\fad(30,260)\\t(0,650,\\fscx185\\fscy185)}}"
+                )
+                lines.append(f"Dialogue: 0,{start},{end},Ring,,0,0,0,,{tags}{ring}\\n")
+            else:
+                label = event["label"].replace("{", "").replace("}", "").replace("\\", "")
+                tags = rf"{{\\an1\\pos(16,{h-16})\\fad(40,300)}}"
+                lines.append(f"Dialogue: 1,{start},{end},Key,,0,0,0,,{tags}{label}\\n")
+        path = self.session / f"effects_{index:03d}.ass"
+        path.write_text("".join(lines), encoding="utf-8-sig")
+        return path
 
     def close(self) -> None:
         if self.state in ("recording", "paused"):
