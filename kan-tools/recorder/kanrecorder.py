@@ -162,7 +162,7 @@ class App:
         self.root = tk.Tk()
         self.root.title("KanRecorder · KanBan Tools")
         self.root.resizable(False, False)
-        self.root.geometry("390x365")
+        self.root.geometry("405x420")
         self.root.attributes("-topmost", True)
         self.root.protocol("WM_DELETE_WINDOW", self.close)
         self.cursor = tk.BooleanVar(value=config["cursor"])
@@ -180,6 +180,7 @@ class App:
         self.region_armed_at = 0.0
         self.session = None
         self.segments = []
+        self.recovering_raw = False
         self.process = None
         self.fflog = None
         self.writers = []
@@ -257,6 +258,9 @@ class App:
         self.pause_button.pack(side="left", expand=True, fill="x", padx=(0, 5))
         self.stop_button = ttk.Button(controls, text="Dừng và lưu MP4", command=self.stop, state="disabled")
         self.stop_button.pack(side="left", expand=True, fill="x")
+        self.recover_button = ttk.Button(box, text="Khôi phục video đã quay bị lỗi (từ thư mục Temp)",
+                                         command=self.recover_last)
+        self.recover_button.pack(fill="x", pady=(2, 3))
         ttk.Label(box, textvariable=self.status, wraplength=350, foreground="#195c84").pack(anchor="w", pady=(7, 4))
         ttk.Label(box, text="Ctrl+Alt+F9: Chọn vùng → Bắt đầu → Tạm dừng / Tiếp tục\nCtrl+Alt+F10: Kết thúc và xuất MP4\nChỉ hiện phím tắt/phím điều hướng; không hiện chữ đang gõ.",
                   wraplength=350, foreground="#606974").pack(anchor="w")
@@ -327,6 +331,7 @@ class App:
         self.start_button.configure(state="disabled")
         self.pause_button.configure(state="normal", text="Bắt đầu (Ctrl+Alt+F9)")
         self.stop_button.configure(state="normal", text="Hủy vùng chọn (chưa quay)")
+        self.recover_button.configure(state="disabled")
         self.status.set("Đã chọn vùng. Ctrl+Alt+F9 để BẮT ĐẦU, chưa quay hay thu âm.")
         self.position_toolbar()
 
@@ -355,6 +360,7 @@ class App:
             return
         self.state = "recording"
         self.pause_button.configure(state="normal", text="Tạm dừng (Ctrl+Alt+F9)")
+        self.recover_button.configure(state="disabled")
         self.stop_button.configure(state="disabled", text="Xuất bằng Ctrl+Alt+F10")
         self.status.set("Đang quay vùng chọn; Ctrl+Alt+F9 tạm dừng, Ctrl+Alt+F10 xuất MP4.")
 
@@ -457,6 +463,7 @@ class App:
             self.pause_button.configure(state="disabled", text="Bắt đầu (Ctrl+Alt+F9)")
             self.stop_button.configure(state="disabled", text="Dừng và lưu MP4")
             self.status.set("Đã hủy vùng chọn. Chưa ghi hình hay âm thanh.")
+            self.recover_button.configure(state="normal")
             return
         if self.state not in ("recording", "paused"):
             return
@@ -554,7 +561,7 @@ class App:
             output_dir.mkdir(parents=True, exist_ok=True)
             target = output_dir / f"KanRecorder_{dt.datetime.now():%Y%m%d_%H%M%S}.mp4"
             assembled = []
-            preserve_raw = False
+            preserve_raw = self.recovering_raw
             for idx, (video, audio_files) in enumerate(self.segments, 1):
                 if not video.is_file() or video.stat().st_size < 1024:
                     raise RuntimeError(f"Đoạn {idx} không có video gốc. Dữ liệu tạm tại {self.session}")
@@ -603,6 +610,43 @@ class App:
         if p.returncode:
             raise RuntimeError(p.stderr.decode("utf-8", "replace")[-1200:])
 
+    def recover_last(self) -> None:
+        """Recover a failed recording from Temp, preserving all raw MP4/WAV."""
+        if self.state != "idle":
+            return
+        folders = sorted(Path(tempfile.gettempdir()).glob("KanRecorder_*"),
+                         key=lambda f: f.stat().st_mtime if f.is_dir() else 0,
+                         reverse=True)
+        folder = next((f for f in folders if f.is_dir() and
+                       any(p.stat().st_size > 1024 for p in f.glob("video_*.mp4"))), None)
+        if folder is None:
+            messagebox.showinfo(APP, "Không tìm thấy video_*.mp4 trong thư mục Temp.")
+            return
+        videos = sorted(folder.glob("video_*.mp4"))
+        if not messagebox.askyesno(
+            APP, f"Tìm thấy {len(videos)} đoạn MP4 tại:\\n{folder}\\n\\n"
+            "Khôi phục thành video mới? File gốc sẽ được giữ nguyên."
+        ):
+            return
+        self.session = folder
+        self.segments = []
+        self.segment_events = []
+        self.audio_warnings = []
+        self.recovering_raw = True
+        for video in videos:
+            serial = video.stem.removeprefix("video_")
+            audios = {name: folder / f"{name}_{serial}.wav"
+                      for name in ("system", "mic")
+                      if (folder / f"{name}_{serial}.wav").is_file()}
+            self.segments.append((video, audios))
+            self.segment_events.append([])  # Old click/key metadata isn't recoverable.
+        self.region = (0, 0, 80, 80)
+        self.state = "exporting"
+        self.start_button.configure(state="disabled")
+        self.recover_button.configure(state="disabled")
+        self.status.set(f"Đang khôi phục {len(videos)} đoạn video đã quay trước đây…")
+        threading.Thread(target=self.export, daemon=True, name="KanRecorder-Recovery").start()
+
     def poll(self) -> None:
         try:
             while True:
@@ -610,6 +654,8 @@ class App:
                 self.state = "idle"
                 self.region = None
                 self.start_button.configure(state="normal")
+                self.recover_button.configure(state="normal")
+                self.recovering_raw = False
                 self.pause_button.configure(state="disabled", text="Bắt đầu (Ctrl+Alt+F9)")
                 self.stop_button.configure(state="disabled", text="Dừng và lưu MP4")
                 if job[0] == "done":
