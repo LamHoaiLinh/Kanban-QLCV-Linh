@@ -400,31 +400,54 @@ def version_status() -> dict:
     }
 
 def fetch_latest_kantool() -> Path:
-    target = ROOT / "KanTool.latest.bat"
-    stamp = int(time.time() * 1000)
-    req = urllib.request.Request(
-        f"{REMOTE_KANTOOL}?ts={stamp}",
-        headers={"User-Agent": "KanBanTools/1.0", "Cache-Control": "no-cache"},
-    )
-    with urllib.request.urlopen(req, timeout=15.0) as r:
-        raw = r.read(1024 * 1024)
-    if len(raw) < 700 or b"KANBAN TOOLS" not in raw.upper():
-        raise RuntimeError("KanTool.bat mới tải về không hợp lệ.")
-    tmp = target.with_suffix(".tmp")
-    tmp.write_bytes(raw)
-    tmp.replace(target)
-    return target
+    """Download the native Windows GUI installer, never a .bat or cmd shell."""
+    source = ("https://github.com/LamHoaiLinh/Kanban-QLCV-Linh/"
+              "releases/download/kantool-installer-latest/KanTool-Setup.exe")
+    install_dir = ROOT / "installer"
+    install_dir.mkdir(parents=True, exist_ok=True)
+    # Unique target avoids replacing a running executable on Windows.
+    target = install_dir / f"KanTool-Setup-{int(time.time() * 1000)}.exe"
+    request = urllib.request.Request(
+        source, headers={"User-Agent": "KanBanTools/2.9", "Cache-Control": "no-cache"})
+    temp = target.with_suffix(".tmp")
+    try:
+        with urllib.request.urlopen(request, timeout=60.0) as response, temp.open("wb") as dest:
+            total = 0
+            while True:
+                chunk = response.read(256 * 1024)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > 180_000_000:
+                    raise RuntimeError("Bộ cài EXE quá lớn, không tải tiếp.")
+                dest.write(chunk)
+        if total < 3_000_000 or temp.open("rb").read(2) != b"MZ":
+            raise RuntimeError("KanTool-Setup.exe tải về không hợp lệ.")
+        temp.replace(target)
+        # Best effort cleanup of older copies; never delete recently launched setup.
+        for other in install_dir.glob("KanTool-Setup-*.exe"):
+            if other != target and time.time() - other.stat().st_mtime > 14 * 86400:
+                try:
+                    other.unlink()
+                except OSError:
+                    pass
+        return target
+    finally:
+        try:
+            temp.unlink(missing_ok=True)
+        except OSError:
+            pass
+
 
 def launch_latest_kantool(mode: str) -> Path:
     if os.name != "nt":
         raise RuntimeError("Cập nhật KanBan Tools hiện chỉ hỗ trợ Windows.")
     latest = fetch_latest_kantool()
-    subprocess.Popen(
-        [os.environ.get("COMSPEC", "cmd.exe"), "/c", str(latest), mode],
-        cwd=str(ROOT),
-        creationflags=CREATE_NEW_CONSOLE,
-    )
+    # Native WinExe app opens its own GUI and asks for the user's explicit click.
+    subprocess.Popen([str(latest)], cwd=str(ROOT),
+                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     return latest
+
 
 def diagnostics() -> dict:
     checks = []
