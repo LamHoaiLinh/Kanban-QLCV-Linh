@@ -8,6 +8,7 @@ import ctypes
 import datetime as dt
 import os
 import queue
+import socket
 import shutil
 import subprocess
 import sys
@@ -24,6 +25,8 @@ from tkinter import messagebox, ttk
 APP = "KanRecorder"
 ROOT = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "KanBanTools"
 FFMPEG = ROOT / "media" / "bin" / "ffmpeg.exe"
+FFPROBE = ROOT / "media" / "bin" / "ffprobe.exe"
+CONTROL_PORT = 47635  # loopback only; do not expose screen/control over HTTP
 VK_LBUTTON, VK_RBUTTON, VK_CONTROL, VK_MENU = 0x01, 0x02, 0x11, 0x12
 VK_LWIN, VK_RWIN, VK_SHIFT, VK_F9, VK_F10 = 0x5B, 0x5C, 0x10, 0x78, 0x79
 SPECIAL = {0x08: "Backspace", 0x09: "Tab", 0x0D: "Enter", 0x1B: "Esc",
@@ -167,7 +170,7 @@ class App:
         self.keys = tk.BooleanVar(value=config["keys"])
         self.audio = tk.StringVar(value=config["audio"])
         self.fps = tk.StringVar(value=str(config["fps"]))
-        self.status = tk.StringVar(value="Sẵn sàng. Nhấn Chọn vùng để bắt đầu.")
+        self.status = tk.StringVar(value="Sẵn sàng. Ctrl+Alt+F9 để chọn vùng quay.")
         self.state = "idle"
         self.region = None
         # No fullscreen overlay during recording: that layer caused black-screen
@@ -185,8 +188,46 @@ class App:
         self.last_down = {}
         self.last_hotkeys = set()
         self.jobs = queue.Queue()
+        self.control_alive = True
         self.build()
+        # Single native UI instance with minimal local, non-HTTP control channel.
+        # Ctrl+Alt+F9 is registered by the existing Capture Agent (always resident).
+        self.control_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.control_socket.bind(("127.0.0.1", CONTROL_PORT))
+        self.control_socket.listen(3)
+        self.control_socket.settimeout(1.0)
+        threading.Thread(target=self.control_listener, daemon=True,
+                         name="KanRecorder-LocalHotkey").start()
         self.root.after(40, self.poll)
+
+    def control_listener(self) -> None:
+        while self.control_alive:
+            try:
+                client, address = self.control_socket.accept()
+                with client:
+                    client.settimeout(1)
+                    data = client.recv(32).strip()
+                    if data == b"F9":
+                        self.root.after(0, self.handle_f9)
+                    elif data == b"SHOW":
+                        self.root.after(0, self.show_window)
+            except (OSError, socket.timeout):
+                continue
+
+    def show_window(self) -> None:
+        try:
+            self.root.deiconify()
+            self.root.attributes("-alpha", 1.0)
+            self.root.lift()
+            self.root.focus_force()
+        except tk.TclError:
+            pass
+
+    def handle_f9(self) -> None:
+        if self.state == "idle":
+            self.choose_region()
+        elif self.state in ("armed", "recording", "paused"):
+            self.pause_resume()
 
     def build(self) -> None:
         box = ttk.Frame(self.root, padding=16)
@@ -217,7 +258,7 @@ class App:
         self.stop_button = ttk.Button(controls, text="Dừng và lưu MP4", command=self.stop, state="disabled")
         self.stop_button.pack(side="left", expand=True, fill="x")
         ttk.Label(box, textvariable=self.status, wraplength=350, foreground="#195c84").pack(anchor="w", pady=(7, 4))
-        ttk.Label(box, text="Ctrl+Alt+F9: Bắt đầu / Tạm dừng / Tiếp tục\nCtrl+Alt+F10: Chỉ khi nhấn mới xuất MP4\nChỉ hiện phím tắt/phím điều hướng; không hiện chữ đang gõ.",
+        ttk.Label(box, text="Ctrl+Alt+F9: Chọn vùng → Bắt đầu → Tạm dừng / Tiếp tục\nCtrl+Alt+F10: Kết thúc và xuất MP4\nChỉ hiện phím tắt/phím điều hướng; không hiện chữ đang gõ.",
                   wraplength=350, foreground="#606974").pack(anchor="w")
 
     def choose_region(self) -> None:
@@ -226,6 +267,7 @@ class App:
         if os.name != "nt" or not FFMPEG.is_file():
             messagebox.showerror(APP, "Chỉ hỗ trợ Windows có FFmpeg từ KanTool. Hãy cập nhật / sửa KanBan Tools.")
             return
+        self.state = "selecting"
         vx, vy, vw, vh = native_metrics()
         # Keep the Tk owner alive so the selection Toplevel remains visible on Windows.
         self.root.attributes("-alpha", 0.0)
@@ -258,14 +300,17 @@ class App:
             self.root.attributes("-alpha", 1.0)
             self.root.lift()
             if w < 80 or h < 80:
+                self.state = "idle"
                 self.status.set("Vùng chọn quá nhỏ. Chọn ít nhất 80 × 80 pixel.")
                 return
             self.region = (x, y, w - w % 2, h - h % 2)
             self.root.after(120, self.arm)
         def cancel(_e=None):
+            self.state = "idle"
             overlay.destroy()
             self.root.attributes("-alpha", 1.0)
             self.root.lift()
+            self.status.set("Đã hủy vùng chọn. Ctrl+Alt+F9 để chọn lại.")
         canvas.bind("<ButtonPress-1>", press_event)
         canvas.bind("<B1-Motion>", move_event)
         canvas.bind("<ButtonRelease-1>", finish)
@@ -274,7 +319,7 @@ class App:
 
     def arm(self) -> None:
         """Selection alone never starts FFmpeg or accesses the microphone."""
-        if self.state != "idle" or not self.region:
+        if self.state != "selecting" or not self.region:
             return
         self.state = "armed"
         self.region_armed_at = time.monotonic()
@@ -513,15 +558,12 @@ class App:
             pass
 
         if self.state in ("armed", "recording", "paused"):
-            combo = pressed(VK_CONTROL) and pressed(VK_MENU)
-            hot = {vk for vk in (VK_F9, VK_F10) if combo and pressed(vk)}
-            newly_pressed = hot - self.last_hotkeys
-            # Assign *before* action so F9 cannot immediately pause the new recording.
-            self.last_hotkeys = hot
-            if VK_F10 in newly_pressed:
+            # The background Capture Agent owns Ctrl+Alt+F9 via RegisterHotKey.
+            # Do not poll F9 here: that caused duplicate start/pause events.
+            active = pressed(VK_CONTROL) and pressed(VK_MENU) and pressed(VK_F10)
+            if active and VK_F10 not in self.last_hotkeys:
                 self.stop()
-            elif VK_F9 in newly_pressed:
-                self.pause_resume()
+            self.last_hotkeys = {VK_F10} if active else set()
 
         if self.state == "recording":
             self.track_events()
@@ -634,6 +676,11 @@ class App:
         if self.state == "exporting":
             messagebox.showwarning(APP, "Đang xuất video; không đóng cửa sổ.")
             return
+        self.control_alive = False
+        try:
+            self.control_socket.close()
+        except OSError:
+            pass
         self.root.destroy()
 
     def run(self) -> None:
@@ -648,4 +695,12 @@ if __name__ == "__main__":
         print("KanRecorder requires Windows", file=sys.stderr)
         raise SystemExit(1)
     else:
-        App(options(sys.argv[1:])).run()
+        def forward_existing() -> bool:
+            try:
+                with socket.create_connection(("127.0.0.1", CONTROL_PORT), timeout=.3) as connection:
+                    connection.sendall(b"SHOW\\n")
+                return True
+            except OSError:
+                return False
+        if not forward_existing():
+            App(options(sys.argv[1:])).run()
