@@ -48,7 +48,7 @@ class KanRecorderSmoke(unittest.TestCase):
         self.assertIn("Join-Path $recDir '.venv'", installer)
         self.assertIn("kanbanrecorder", installer)
         self.assertNotIn('New-ItemProperty $run -Name "KanRecorder"', installer)
-        self.assertEqual(manifest["components"]["recorder"]["version"], "1.0.0")
+        self.assertEqual(manifest["components"]["recorder"]["version"], "1.0.1")
 
 
 if __name__ == "__main__":
