@@ -9,6 +9,8 @@ on:
       - 'office-tools/office-tools.js'
       - 'office-tools/office-tools.css'
       - 'office-tools/kanmedia/**'
+      - 'office-tools/kanrecorder/**'
+      - 'tests/test_kanrecorder_smoke.py'
       - 'kantool-launcher.js'
       - 'kantool-extra.css'
       - 'app.js'
@@ -35,7 +37,11 @@ jobs:
 
       - name: Check Python syntax
         shell: pwsh
-        run: python -m py_compile kan-tools/runtime/kanmedia-server.py kan-tools/runtime/kanmedia-worker.py kan-tools/runtime/kanbackup-server.py capture-agent/capture_agent.py capture-agent/kanpass.py capture-agent/kanpass_webbridge.py office-tools/signing-agent/package/kanban_signing_agent.py
+        run: python -m py_compile kan-tools/runtime/kanmedia-server.py kan-tools/runtime/kanmedia-worker.py kan-tools/runtime/kanbackup-server.py kan-tools/recorder/kanrecorder.py capture-agent/capture_agent.py capture-agent/kanpass.py capture-agent/kanpass_webbridge.py office-tools/signing-agent/package/kanban_signing_agent.py
+
+      - name: Smoke test KanRecorder defaults and security contract
+        shell: pwsh
+        run: python -m unittest discover -s tests -p test_kanrecorder_smoke.py -v
 
       - name: Smoke test KanPass KDBX and Windows DPAPI
         shell: pwsh
@@ -133,3 +139,5 @@ jobs:
           Copy-Item office-tools/kanmedia/kanmedia.js "$env:RUNNER_TEMP\kanmedia-check.mjs"
           node --check "$env:RUNNER_TEMP\office-tools-check.mjs"
           node --check "$env:RUNNER_TEMP\kanmedia-check.mjs"
+          Copy-Item office-tools/kanrecorder/kanrecorder.js "$env:RUNNER_TEMP\kanrecorder-check.mjs"
+          node --check "$env:RUNNER_TEMP\kanrecorder-check.mjs"
