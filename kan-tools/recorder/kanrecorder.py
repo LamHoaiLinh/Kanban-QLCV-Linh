@@ -567,7 +567,7 @@ class App:
                 shutil.copy2(assembled[0], target)
             else:
                 listing = self.session / "segments.txt"
-                listing.write_text("".join("file '" + str(p).replace("\\", "/").replace("'", "'\\''") + "'\\n"
+                listing.write_text("".join("file '" + str(p).replace("\\", "/").replace("'", "'\\''") + "'\n"
                                            for p in assembled), encoding="utf-8")
                 total = sum(self.probe_duration(p) for p in assembled)
                 try:
