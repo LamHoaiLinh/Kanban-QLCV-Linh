@@ -1,4 +1,4 @@
-/* KanScan v1.5: add an independent launcher tab to KanBan Tools. */
+/* KanScan v1.5.1: add an independent launcher tab to KanBan Tools. */
 (() => {
   'use strict';
   const STORAGE='kanban_kanscan_endpoint_v1';
@@ -10,18 +10,18 @@
   }
   function pane(host){
     host.innerHTML='<section class="office-tool-panel active ks-panel" aria-label="KanScan">'+
-      '<div class="ks-card"><h3>▧ KanScan v1.5 · Chụp chứng từ</h3>'+
+      '<div class="ks-card"><h3>▧ KanScan v1.5.1 · Chụp chứng từ</h3>'+
       '<p>Chụp iPhone/Android, nối dọc A4/A5; nhấn giữ từng trang để xoay trái/phải 90°, chỉnh bốn góc, xóa hoặc chụp lại; xuất JPEG về Windows.</p>'+
-      '<div class="ks-note">Giữ nguyên KanScan v1.5 trên PC. KanBan chỉ mở công cụ; ảnh chứng từ không được tải lên GitHub.</div>'+
+      '<div class="ks-note">Giữ nguyên KanScan v1.5.1 trên PC. KanBan chỉ mở công cụ; ảnh chứng từ không được tải lên GitHub.</div>'+
       '<div class="ks-actions"><button type="button" id="ksLaunch">Khởi động KanScan</button><button type="button" id="ksOpen">Mở giao diện PC</button><button type="button" id="ksSave">Lưu địa chỉ</button></div>'+
       '<label>Địa chỉ KanScan trên PC<input id="ksEndpoint" type="url" autocomplete="off" spellcheck="false" placeholder="http://127.0.0.1:18765/"></label>'+
       '<p id="ksMessage" class="ks-muted">Cổng mặc định 18765; nếu ứng dụng PC dùng cổng khác thì đổi tại đây.</p></div>'+
       '<div class="ks-card"><h4>Quy trình chụp</h4><ol>'+
-      '<li>Lưu file ZIP KanScan v1.5 vào Downloads và chạy Cập nhật / sửa KanBan Tools để cài lần đầu.</li><li>Bấm Khởi động KanScan và xác nhận mở ứng dụng nếu trình duyệt hỏi.</li>'+
+      '<li>Nếu cài mới qua KanTool: đặt ZIP nền v1.4 đúng bản vào Downloads, rồi chạy Cập nhật / sửa KanBan Tools để tự nâng cấp lên v1.5.1.</li><li>Bấm Khởi động KanScan và xác nhận mở ứng dụng nếu trình duyệt hỏi.</li>'+
       '<li>iPhone/Android và PC cùng mạng Wi-Fi/LAN; quét mã QR trên cửa sổ KanScan của PC.</li>'+
       '<li>Chụp đơn hoặc nối nhiều tờ; chọn A4/A5, chỉnh từng trang và bấm Xong.</li>'+
       '<li>Ảnh JPEG xuất hiện trong thư mục đã chọn trên PC.</li></ol>'+
-      '<p class="ks-muted">Nếu chưa có ZIP KanScan v1.5 chính xác, KanTool bỏ qua KanScan mà không ảnh hưởng các công cụ khác. GitHub Pages không thể chạy Python hoặc ghi ảnh trực tiếp lên Windows.</p></div></section>';
+      '<p class="ks-muted">Máy đã cài KanScan qua KanTool chỉ cần cập nhật để sửa lỗi WinError 32; máy cài mới cần ZIP nền v1.4 chính xác. Nếu thiếu ZIP, KanTool bỏ qua KanScan mà không ảnh hưởng các công cụ khác. GitHub Pages không thể chạy Python hoặc ghi ảnh trực tiếp lên Windows.</p></div></section>';
     const input=host.querySelector('#ksEndpoint');
     const message=host.querySelector('#ksMessage');
     try{input.value=localStorage.getItem(STORAGE)||DEFAULT;}catch(e){input.value=DEFAULT;}
