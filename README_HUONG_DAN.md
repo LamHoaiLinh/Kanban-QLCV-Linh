@@ -34,8 +34,8 @@ Tài liệu này ưu tiên tra cứu theo chức năng. Phần lịch sử cập
 ## KanRecorder – quay màn hình vùng chọn (Windows)
 - Vào **CÔNG CỤ → KanRecorder**, mặc định chọn **region, chuột ON, click ON, phím tắt ON, mic + âm thanh máy tính, 30 FPS**.
 - Lần đầu: chuột phải **CÔNG CỤ → Cài đặt / Cập nhật KanTool (EXE)** để cài module Python recorder riêng. Nếu trình duyệt hỏi mở `kanbanrecorder://`, chọn cho phép.
-- Trong cửa sổ KanRecorder: **Chọn vùng và bắt đầu quay** → kéo vùng trên desktop; **Ctrl+Alt+F9** tạm dừng/tiếp tục; **Ctrl+Alt+F10** dừng/lưu.
-- Video lưu tại **Videos/KanRecorder** của tài khoản Windows, định dạng MP4. Video không tự tải lên KanBan hoặc GitHub.
+- Trong cửa sổ KanRecorder **1.1.0**: bấm **Chọn vùng quay** → kéo vùng trên desktop → phần mềm **chưa quay**. Bấm **Ctrl+Alt+F9** để bắt đầu; bấm lại để tạm dừng hoặc tiếp tục. Chỉ **Ctrl+Alt+F10** mới kết thúc và xuất MP4.
+- Video lưu tại **Videos/KanRecorder** của tài khoản Windows, định dạng MP4. Vòng click và phím tắt được chèn trực tiếp vào MP4 khi xuất; không còn lớp phủ toàn màn hình gây đen desktop. Video không tự tải lên KanBan hoặc GitHub.
 - Để bảo mật, chỉ phím tắt và phím điều hướng được hiển thị trong video, không phát lại văn bản/mật khẩu đang gõ.
 - Nếu mic/loopback không hoạt động: thử từng nguồn âm thanh hoặc xem hướng dẫn tại `kan-tools/recorder/README.md`. Không ảnh hưởng KanCapture/KanMedia.
 
