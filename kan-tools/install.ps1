@@ -516,6 +516,61 @@ try {
   Write-Host '  KanBan Tools van cai dat/hoat dong binh thuong.' -ForegroundColor Yellow
 }
 
+# KanRecorder is an independent, user-triggered Windows addon.
+# Its Python environment is isolated from KanMedia, Capture, KanPass and signing.
+# No background recorder service or auto-start is registered.
+try {
+  $recSpecProperty = $Manifest.components.PSObject.Properties['recorder']
+  if($recSpecProperty -and $recSpecProperty.Value){
+    $recSpec = $recSpecProperty.Value
+    $recDir = Join-Path $Root 'recorder'
+    $recScript = Join-Path $recDir 'kanrecorder.py'
+    $recEnv = Join-Path $recDir '.venv'
+    $recPython = Join-Path $recEnv 'Scripts\python.exe'
+    $recPythonW = Join-Path $recEnv 'Scripts\pythonw.exe'
+    New-Item -ItemType Directory -Force -Path $recDir | Out-Null
+    $needRecorder = Need-Component 'recorder' @($recScript,$recPythonW)
+    if(-not (Test-Path -LiteralPath $recPython)){
+      Write-Step 'KanRecorder: tao Python rieng, khong dung vao runtime hien tai'
+      & $venvPy -m venv $recEnv
+      if($LASTEXITCODE -ne 0){throw 'Khong tao duoc Python rieng cho KanRecorder.'}
+      $needRecorder=$true
+    }
+    if($needRecorder){
+      Write-Step 'KanRecorder: tai module quay man hinh'
+      Download-File ([string]$recSpec.source) $recScript
+      if((Get-Item -LiteralPath $recScript).Length -lt 15000){throw 'Source KanRecorder qua ngan.'}
+    }
+    & $recPython -m py_compile $recScript
+    if($LASTEXITCODE -ne 0){throw 'KanRecorder Python chua hop le.'}
+    $audioOk=$false
+    try{
+      & $recPython -c 'import numpy, soundcard' 2>$null
+      if($LASTEXITCODE -eq 0){$audioOk=$true}
+    }catch{}
+    if($needRecorder -or -not $audioOk){
+      Write-Step 'KanRecorder: cai audio WASAPI loopback + microphone trong moi truong rieng'
+      $recPackages=@($recSpec.audioPackages)
+      & $recPython -m pip install --disable-pip-version-check --retries 3 --timeout 45 --only-binary=:all: @recPackages
+      if($LASTEXITCODE -ne 0){throw 'Khong cai duoc thu vien audio rieng cua KanRecorder.'}
+    }
+    & $recPython -c 'import numpy, soundcard'
+    if($LASTEXITCODE -ne 0){throw 'Thu vien audio KanRecorder chua san sang.'}
+    # Register only a custom URL protocol. Never auto-record or run at Windows startup.
+    $recKey='HKCU:\Software\Classes\kanbanrecorder'
+    New-Item -Path $recKey -Force | Out-Null
+    Set-Item -Path $recKey -Value 'URL:KanRecorder'
+    New-ItemProperty -Path $recKey -Name 'URL Protocol' -Value '' -PropertyType String -Force | Out-Null
+    $recCmdKey=$recKey+'\shell\open\command'
+    New-Item -Path $recCmdKey -Force | Out-Null
+    Set-Item -Path $recCmdKey -Value ('"'+$recPythonW+'" "'+$recScript+'" "%1"')
+    Write-Host '  KanRecorder: da cai + dang ky kanbanrecorder://open' -ForegroundColor Green
+  }
+}catch{
+  Write-Host ('  KanRecorder chua cai duoc, cac cong cu khac khong anh huong: '+$_.Exception.Message) -ForegroundColor Yellow
+  Write-Host '  De cai lai: chuot phai CONG CU -> Cap nhat / sua KanBan Tools.' -ForegroundColor Yellow
+}
+
 # Ghi dung manifest da cai de lan sau chi cap nhat thanh phan thay doi.
 Copy-Item -LiteralPath $ManifestPath -Destination $InstalledPath -Force
 Stage-LatestBootstrapper
@@ -529,8 +584,9 @@ Write-Host "============================================================" -Foreg
 Write-Host "  - Alt+C / Alt+X: chup man hinh; Alt+A / Alt+P: KanPass; Web Bridge: tu Save/Update tren Web duoc KanPass mo"
 Write-Host "  - KanMedia: Tai / Chuyen doi / Edit Media"
 Write-Host "  - Ho tro ky PDF bang USB Token"
-Write-Host "  - KanBackup + Kopia: backup tang dan / dedup, lich Windows, restore rieng
-Write-Host "  - KanScan: tuy chon, cai rieng neu da tai ZIP v1.4 ve Downloads""
+Write-Host "  - KanBackup + Kopia: backup tang dan / dedup, lich Windows, restore rieng"
+Write-Host "  - KanScan: tuy chon, cai rieng neu da tai ZIP v1.4 ve Downloads"
+Write-Host "  - KanRecorder: quay vung man hinh, click, phim tat, mic + am thanh he thong"
 Write-Host "  - Cap nhat theo tung thanh phan, khong tai lai neu khong can"
 Write-Host ""
 try { Stop-Transcript | Out-Null } catch {}
