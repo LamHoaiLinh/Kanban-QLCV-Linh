@@ -2,7 +2,7 @@
 'use strict';
 const toolBtn=document.querySelector('.office-suite-launch-btn');if(!toolBtn)return;
 const MEDIA='http://127.0.0.1:47632',CAPTURE='http://127.0.0.1:47631',SIGN='http://127.0.0.1:8765',BACKUP='http://127.0.0.1:47634',HEAD={'X-KanBan-Agent':'linh-kanban-v1'},PASS_HEAD={'X-KanBan-Agent':'linh-kanpass-v1'},BACKUP_HEAD={'X-KanBan-Agent':'linh-kanbackup-v1'};
-const RAW_BAT='https://raw.githubusercontent.com/LamHoaiLinh/Kanban-QLCV-Linh/main/kan-tools/KanTool.bat';
+const SETUP_URL='https://github.com/LamHoaiLinh/Kanban-QLCV-Linh/releases/download/kantool-installer-latest/KanTool-Setup.exe';
 let panel=null,lastDiagnostics=null;
 
 async function probe(url,headers,timeout){
@@ -15,29 +15,21 @@ async function probe(url,headers,timeout){
 function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function row(name,ok){return '<div class="kantool-row"><span>'+esc(name)+'</span><strong class="'+(ok?'ok':'miss')+'">'+(ok?'✓ Sẵn sàng':'— Chưa sẵn sàng')+'</strong></div>';}
 
-async function downloadBat(manual){
+function downloadInstaller(manual){
   const status=panel&&panel.querySelector('[data-status]');
-  if(status)status.textContent='Đang lấy KanTool.bat mới nhất từ GitHub…';
-  try{
-    const r=await fetch(RAW_BAT+'?t='+Date.now(),{cache:'no-store'});
-    if(!r.ok)throw new Error('HTTP '+r.status);
-    const text=await r.text();
-    if(text.length<700||!text.toUpperCase().includes('KANBAN TOOLS'))throw new Error('File không hợp lệ');
-    const url=URL.createObjectURL(new Blob([text],{type:'application/octet-stream'}));
-    const a=document.createElement('a');a.href=url;a.download='CAI_KANTOOL_1_LAN_BAM.bat';document.body.appendChild(a);a.click();a.remove();
-    setTimeout(function(){URL.revokeObjectURL(url);},1500);
-    if(status)status.textContent=manual?'Đã tải CAI_KANTOOL_1_LAN_BAM.bat mới nhất.':'KanBan Tools chưa chạy. Đã tải bộ cài mới nhất — chỉ cần mở file CAI_KANTOOL_1_LAN_BAM.bat một lần, các bước còn lại tự động.';
-    return true;
-  }catch(e){
-    try{
-      const a=document.createElement('a');a.href='kan-tools/KanTool.bat?t='+Date.now();a.download='CAI_KANTOOL_1_LAN_BAM.bat';document.body.appendChild(a);a.click();a.remove();
-      if(status)status.textContent=manual?'Đã tải bộ cài dự phòng từ GitHub Pages.':'Đã tải bộ cài dự phòng — hãy mở KanTool.bat vừa tải.';
-      return true;
-    }catch(x){
-      if(status)status.textContent='Không tải được KanTool.bat. Hãy kiểm tra Internet.';
-      return false;
-    }
-  }
+  const a=document.createElement('a');
+  a.href=SETUP_URL;
+  a.download='KanTool-Setup.exe';
+  a.rel='noopener noreferrer';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  if(status)status.textContent='Đã yêu cầu trình duyệt tải KanTool-Setup.exe. Sau khi tải, mở file EXE để cài đặt/cập nhật bằng giao diện, không dùng cửa sổ CMD.';
+  return true;
+}
+function supportsGuiInstaller(version){
+  const values=String(version||'').split('.').map(Number);
+  return values.length>=2 && (values[0]>2 || (values[0]===2 && (values[1]>9 || (values[1]===9 && (values[2]||0)>=0))));
 }
 
 async function getDiagnostics(show){
@@ -58,7 +50,7 @@ async function getDiagnostics(show){
     lastDiagnostics=null;
     if(show){
       const box=panel.querySelector('[data-diagnostics]');
-      box.hidden=false;box.textContent='KanBan Tools chưa chạy nên chưa thể chẩn đoán. Nút chính sẽ tải bộ cài mới nhất; mở CAI_KANTOOL_1_LAN_BAM.bat một lần để tự cài.';
+      box.hidden=false;box.textContent='KanBan Tools chưa chạy nên chưa thể chẩn đoán. Nút chính sẽ tải bộ cài mới nhất; mở KanTool-Setup.exe vừa tải và bấm Cài đặt / Cập nhật.';
     }
     return null;
   }
@@ -67,28 +59,24 @@ async function getDiagnostics(show){
 async function smartUpdate(){
   ensurePanel();
   const status=panel.querySelector('[data-status]'),btn=panel.querySelector('[data-smart]');
-  btn.disabled=true;status.textContent='Đang kiểm tra và chọn cách xử lý phù hợp…';
+  btn.disabled=true;status.textContent='Đang kiểm tra trình cài đặt Windows…';
   try{
-    const media=await probe(MEDIA+'/health',HEAD,1800);
-    if(!media){
-      await downloadBat(false);
+    const media=await probe(MEDIA+'/health',HEAD,1400);
+    const version=media?await probe(MEDIA+'/system/version',HEAD,2200):null;
+    if(!media||!version||!supportsGuiInstaller(version.currentVersion)){
+      downloadInstaller(false);
       return;
     }
     const d=await getDiagnostics(false);
     const broken=d&&(d.checks||[]).some(function(x){return !x.ok&&x.key!=='version';});
-    const endpoint=broken?'/system/repair':'/system/update';
-    const r=await fetch(MEDIA+endpoint,{
-      method:'POST',
-      headers:Object.assign({'Content-Type':'application/json'},HEAD),
-      body:'{}',
-      targetAddressSpace:'loopback'
+    const r=await fetch(MEDIA+(broken?'/system/repair':'/system/update'),{
+      method:'POST',headers:Object.assign({'Content-Type':'application/json'},HEAD),
+      body:'{}',targetAddressSpace:'loopback'
     });
     if(!r.ok)throw new Error('HTTP '+r.status);
-    status.textContent=broken
-      ?'Đã mở KanTool mới nhất để tự sửa và cập nhật. Chờ cửa sổ cài đặt báo hoàn tất.'
-      :'Đã mở KanTool mới nhất để cập nhật. Chờ cửa sổ cài đặt báo hoàn tất.';
+    status.textContent='Đã yêu cầu mở KanTool-Setup.exe bằng giao diện Windows; bấm Cài đặt / Cập nhật trong cửa sổ mới.';
   }catch(e){
-    await downloadBat(false);
+    downloadInstaller(false);
   }finally{
     setTimeout(function(){btn.disabled=false;},1200);
   }
@@ -103,12 +91,12 @@ function ensurePanel(){
     '<div class="capture-agent-status" data-status>Đang kiểm tra…</div>'+
     '<p>Bạn chỉ cần dùng <strong>một nút</strong>. KanBan tự kiểm tra, cập nhật hoặc sửa thành phần cần thiết.</p>'+
     '<div class="kantool-list" data-list></div>'+
-    '<button type="button" data-smart class="kantool-smart-btn">↻ Cập nhật / sửa KanBan Tools</button>'+
-    '<div class="kantool-smart-note">Nếu chưa cài, nút này tải KanTool.bat mới nhất; mở file một lần là tự cài và tự sửa nếu lần đầu chưa xong. Nếu đã cài, KanBan tự cập nhật hoặc sửa lỗi bằng cùng một bộ cài.</div>'+
+    '<button type="button" data-smart class="kantool-smart-btn">↻ Cài đặt / Cập nhật KanTool (EXE)</button>'+
+    '<div class="kantool-smart-note">Nếu chưa cài, nút này tải KanTool-Setup.exe. Nếu đã cài bản mới, bộ cài mở trực tiếp. Mọi tác vụ được chạy qua giao diện Windows có tiến độ và nhật ký, không hiển thị CMD.</div>'+
     '<details class="kantool-advanced"><summary>Tùy chọn nâng cao</summary>'+
       '<div class="capture-control-actions kantool-secondary-actions">'+
         '<button type="button" data-retry>Kiểm tra lại</button>'+
-        '<button type="button" data-download>⬇ Tải bộ cài 1 lần bấm</button>'+
+        '<button type="button" data-download>⬇ Tải KanTool-Setup.exe</button>'+
         '<button type="button" data-copy-diag>Sao chép chẩn đoán</button>'+
       '</div>'+
       '<div class="kantool-diagnostics" data-diagnostics hidden></div>'+
@@ -118,7 +106,7 @@ function ensurePanel(){
   document.body.appendChild(panel);
   panel.addEventListener('click',function(e){if(e.target===panel||e.target.closest('.capture-setup-close'))panel.hidden=true;});
   panel.querySelector('[data-smart]').addEventListener('click',smartUpdate);
-  panel.querySelector('[data-download]').addEventListener('click',function(){downloadBat(true);});
+  panel.querySelector('[data-download]').addEventListener('click',function(){downloadInstaller(true);});
   panel.querySelector('[data-retry]').addEventListener('click',refresh);
   panel.querySelector('[data-copy-diag]').addEventListener('click',async function(){
     const d=lastDiagnostics||await getDiagnostics(true);if(!d)return;
@@ -148,7 +136,7 @@ async function refresh(){
   list.innerHTML=row('Chụp màn hình',!!cap)+row('KanPass',!!(pass&&pass.available))+row('KanPass Web',!!(passWeb&&passWeb.available))+row('KanMedia',!!(media&&media.mediaReady))+row('Ký số PDF',!!(sign&&sign.ok))+row('Backup · Kopia',!!(backup&&backup.available));
   const ready=!!cap&&!!(pass&&pass.available)&&!!(passWeb&&passWeb.available)&&!!(media&&media.mediaReady)&&!!(sign&&sign.ok)&&!!(backup&&backup.available);
   if(!media){
-    status.textContent='Chưa cài hoặc KanBan Tools chưa chạy. Bấm nút xanh bên dưới.';
+    status.textContent='Chưa cài hoặc KanBan Tools chưa chạy. Bấm Cài đặt / Cập nhật bên dưới.';
     status.classList.toggle('ready',false);
     return;
   }
@@ -158,7 +146,7 @@ async function refresh(){
       :'Đã là bản mới nhất '+ver.latestVersion+' trên máy.';
     status.classList.toggle('ready',ready&&!ver.updateAvailable);
   }else{
-    status.textContent=ready?'KanBan Tools đã sẵn sàng.':'Có thành phần cần kiểm tra. Bấm nút xanh bên dưới.';
+    status.textContent=ready?'KanBan Tools đã sẵn sàng.':'Có thành phần cần kiểm tra. Bấm Cài đặt / Cập nhật bên dưới.';
     status.classList.toggle('ready',ready);
   }
 }
