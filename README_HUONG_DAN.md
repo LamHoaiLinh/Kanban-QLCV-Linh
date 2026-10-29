@@ -31,6 +31,14 @@ Tài liệu này ưu tiên tra cứu theo chức năng. Phần lịch sử cập
 - Chuột phải CÔNG CỤ → **Cập nhật / sửa KanBan Tools**. Người dùng chỉ cần tải và mở `CAI_KANTOOL_1_LAN_BAM.bat` một lần; installer tự kiểm tra Python/runtime/thư viện và đăng ký Agent chạy cùng Windows.
 - Không cần cài riêng KanPass hoặc PyKeePass bằng tay.
 
+## KanRecorder – quay màn hình vùng chọn (Windows)
+- Vào **CÔNG CỤ → KanRecorder**, mặc định chọn **region, chuột ON, click ON, phím tắt ON, mic + âm thanh máy tính, 30 FPS**.
+- Lần đầu: chuột phải **CÔNG CỤ → Cập nhật / sửa KanBan Tools** để cài module Python recorder riêng. Nếu trình duyệt hỏi mở `kanbanrecorder://`, chọn cho phép.
+- Trong cửa sổ KanRecorder: **Chọn vùng và bắt đầu quay** → kéo vùng trên desktop; **Ctrl+Alt+F9** tạm dừng/tiếp tục; **Ctrl+Alt+F10** dừng/lưu.
+- Video lưu tại **Videos/KanRecorder** của tài khoản Windows, định dạng MP4. Video không tự tải lên KanBan hoặc GitHub.
+- Để bảo mật, chỉ phím tắt và phím điều hướng được hiển thị trong video, không phát lại văn bản/mật khẩu đang gõ.
+- Nếu mic/loopback không hoạt động: thử từng nguồn âm thanh hoặc xem hướng dẫn tại `kan-tools/recorder/README.md`. Không ảnh hưởng KanCapture/KanMedia.
+
 ## Sao lưu và khôi phục
 - **Xuất bản sao JSON** tạo một file chung gồm dự án/công việc/ghi chú, lịch nhắc, đồng hồ/preset, giao diện/quy tắc, Nội dung đã xóa, tùy chọn nhạc/CÔNG CỤ và KanPass nếu Agent đang sẵn sàng.
 - **Nhập dữ liệu** đọc file trước rồi cho chọn từng nhóm cần khôi phục. Nhóm không chọn được giữ nguyên trên máy.
