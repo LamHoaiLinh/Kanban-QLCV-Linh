@@ -60,7 +60,7 @@ class KanRecorderSmoke(unittest.TestCase):
         self.assertIn('self.state = "armed"', source)
         self.assertNotIn("def make_overlay(", source)
         self.assertNotIn("def draw_effects(", source)
-        self.assertIn("self.write_effect_subtitles(idx)", source)
+        self.assertIn("self.write_effect_subtitles(index)", source)
         self.assertIn('f"ass={subtitle.name}"', source)
 
     def test_f9_controls_state_machine(self):
