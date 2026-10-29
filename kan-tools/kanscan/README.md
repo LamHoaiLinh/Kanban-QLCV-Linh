@@ -34,3 +34,14 @@ KanScan là thành phần riêng, không cần xóa KanBan. Không xóa thư m�
 ## Hạn chế
 
 Repository đang lưu **bản vá nguồn v1.5 và bộ tích hợp**, không phải toàn bộ mã nguồn gốc v1.4. Để cài trên máy mới vẫn cần bản ZIP v1.4 đã ghim hash. Muốn phát hành hoàn toàn độc lập từ GitHub, cần xuất bản toàn bộ nguồn gốc và/hoặc gói cài Windows.
+
+
+## KanScan v1.5.1 – sửa khóa file Windows khi xoay trang
+
+Bản sửa **WinError 32** phát sinh khi Flask giữ handle cho `join_preview_03.jpeg` (hoặc ảnh xem trước từng trang) trong lúc người dùng xoay, cắt bốn góc hoặc chụp lại. API nay trả JPEG từ **BytesIO** và đóng nguồn ảnh trước `os.replace`. Không có thay đổi chất lượng, khung giấy A4/A5, trình chụp hệ thống hoặc định dạng lưu.
+
+- **Máy đã cài qua KanTool:** chạy **Cập nhật / sửa KanBan Tools** để nâng từ v1.4/v1.5 lên v1.5.1. Bản cài sao lưu file mã nguồn rồi lần lượt áp dụng `upgrade_rotate_v15.py` (nếu cần) và `fix_windows_preview_v151.py`, xác minh cú pháp; lỗi thì khôi phục source cũ và không ảnh hưởng dịch vụ khác.
+- **Máy cài mới qua KanTool:** vẫn dùng ZIP nền v1.4 đã ghim SHA-256. Không thay nguồn gốc, không thay gói cài Capture/KanMedia/KanPass/Backup. KanTool cài addon độc lập sau khi dịch vụ chính đã sẵn sàng.
+- **Máy chạy ZIP v1.5 riêng:** sử dụng ZIP v1.5.1 đã sửa và chạy `BUILD_ONEFILE.cmd` để chạy lại test và build EXE không hiện CMD. EXE onefile không thể cập nhật bằng cách thay Python trong GitHub; cần build lại.
+
+GitHub Actions kiểm tra cú pháp PowerShell/Python và tính an toàn của bản vá. Việc build EXE và các kiểm thử ảnh thực tế cần máy Windows với thư viện KanScan cài đầy đủ.
