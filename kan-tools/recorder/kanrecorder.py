@@ -97,12 +97,12 @@ def devices_for(mode: str) -> dict:
         loopback = sc.get_microphone(id=speaker.id, include_loopback=True)
         if loopback is None:
             raise RuntimeError("Không mở được WASAPI loopback của loa mặc định.")
-        result["system"] = loopback
+        result["system"] = loopback.id
     if mode in ("mic", "both"):
         microphone = sc.default_microphone()
         if microphone is None:
             raise RuntimeError("Không có microphone mặc định. Hãy cắm mic hoặc đổi chế độ âm thanh.")
-        result["mic"] = microphone
+        result["mic"] = microphone.id
     return result
 
 
@@ -118,9 +118,17 @@ class AudioWriter:
         self.thread.start()
 
     def run(self) -> None:
+        # WASAPI uses COM: initialize in worker, do not share COM device objects.
+        initialized = False
         try:
+            hr = ctypes.windll.ole32.CoInitializeEx(None, 0)
+            initialized = hr in (0, 1)
             import numpy as np
-            with self.device.recorder(samplerate=48000) as recorder:
+            import soundcard as sc
+            device = sc.get_microphone(id=self.device, include_loopback=self.label == "system")
+            if device is None:
+                raise RuntimeError("Thiết bị ghi âm không còn khả dụng.")
+            with device.recorder(samplerate=48000) as recorder:
                 with wave.open(str(self.target), "wb") as out:
                     out.setnchannels(2)
                     out.setsampwidth(2)
@@ -137,6 +145,9 @@ class AudioWriter:
                         out.writeframesraw(samples.tobytes())
         except Exception as exc:
             self.error = f"{self.label}: {exc}"
+        finally:
+            if initialized:
+                ctypes.windll.ole32.CoUninitialize()
 
     def stop(self) -> None:
         self.stop_event.set()
