@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "kanToolVersion": "2.9.0",
+  "kanToolVersion": "2.9.1",
   "installerVersion": "2.5.0",
   "pythonFallback": {
     "version": "3.13.16",
@@ -56,7 +56,7 @@
       "updater": "kan-tools/kanscan/upgrade_rotate_v15.py"
     },
     "recorder": {
-      "version": "1.0.1",
+      "version": "1.1.0",
       "source": "kan-tools/recorder/kanrecorder.py",
       "audioPackages": [
         "soundcard>=0.4,<0.5",
