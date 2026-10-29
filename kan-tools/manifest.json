@@ -1,14 +1,14 @@
 {
   "schema": 1,
-  "kanToolVersion": "2.8.9",
-  "installerVersion": "2.4.8",
+  "kanToolVersion": "2.9.0",
+  "installerVersion": "2.5.0",
   "pythonFallback": {
     "version": "3.13.16",
     "url": "https://www.python.org/ftp/python/3.13.16/python-3.13.16-amd64.exe"
   },
   "components": {
     "runtime": {
-      "version": "1.8.1",
+      "version": "1.8.2",
       "files": [
         "kan-tools/runtime/kanmedia-server.py",
         "kan-tools/runtime/kanmedia-worker.py"
@@ -64,5 +64,5 @@
       ]
     }
   },
-  "bootstrapVersion": "2.3.0"
+  "bootstrapVersion": "3.0.0"
 }
