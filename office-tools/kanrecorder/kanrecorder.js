@@ -7,7 +7,7 @@ export function renderKanRecorderTool(host,{setStatus}={}){
   const opt={...DEFAULT};
   host.innerHTML=`<section class="office-tool-panel active" aria-label="KanRecorder">
     <div class="office-tool-head"><div><h3>KanRecorder · Quay màn hình Windows</h3>
-    <p>Kéo chọn vùng quay, vòng sáng khi click, hiển thị phím tắt và lưu MP4 trên máy.</p></div></div>
+    <p>Kéo chọn vùng, nhấn F9 để bắt đầu, F9 để tạm dừng/tiếp tục và F10 để xuất MP4. Không phủ đen desktop.</p></div></div>
     <div class="office-card" style="max-width:820px;display:grid;gap:15px">
       <h4>Thiết lập trước khi mở KanRecorder</h4>
       <div class="office-warning">Chế độ quay: <strong>Region</strong> · Kéo chuột chọn vùng màn hình. Chỉ khởi động quay sau khi anh bấm bắt đầu trong cửa sổ Windows.</div>
@@ -30,8 +30,8 @@ export function renderKanRecorderTool(host,{setStatus}={}){
         </label>
       </div>
       <div class="office-toolbar"><button class="office-btn primary" type="button" data-rec-open>Mở KanRecorder trên Windows</button></div>
-      <p class="office-card-note" data-rec-message>Ctrl+Alt+F9: Tạm dừng/tiếp tục · Ctrl+Alt+F10: Dừng/lưu MP4. Video nằm tại Videos/KanRecorder.</p>
-      <p class="office-card-note">Bảo mật: chỉ hiển thị phím tắt, không hiển thị chữ đang gõ; video và âm thanh giữ trên máy. Nếu trình duyệt không mở được, chuột phải nút CÔNG CỤ → Cập nhật / sửa KanBan Tools.</p>
+      <p class="office-card-note" data-rec-message>Sau khi kéo chọn vùng: Ctrl+Alt+F9 để BẮT ĐẦU / tạm dừng / tiếp tục. Chỉ Ctrl+Alt+F10 mới kết thúc và xuất MP4. Video nằm tại Videos/KanRecorder.</p>
+      <p class="office-card-note">Bảo mật: chỉ hiển thị phím tắt, không hiển thị chữ đang gõ; vòng click và nhãn phím được chèn vào MP4 khi xuất (không dùng lớp phủ toàn màn hình). Video và âm thanh giữ trên máy. Nếu trình duyệt không mở được, chuột phải nút CÔNG CỤ → Cập nhật / sửa KanBan Tools.</p>
     </div>
   </section>`;
   host.querySelector('[data-rec-open]').addEventListener('click',()=>{
