@@ -490,11 +490,11 @@ class App:
                 self.stop_button.configure(state="disabled", text="Dừng và lưu MP4")
                 if job[0] == "done":
                     self.status.set(f"Đã lưu: {job[1]}")
-                    messagebox.showinfo(APP, f"Đã lưu MP4:\\n{job[1]}" +
-                                        (f"\\n\\nCảnh báo âm thanh: {job[2]}" if job[2] else ""))
+                    messagebox.showinfo(APP, f"Đã lưu MP4:\n{job[1]}" +
+                                        (f"\n\nCảnh báo âm thanh: {job[2]}" if job[2] else ""))
                 else:
                     self.status.set(f"Lỗi xuất video: {job[1]}")
-                    messagebox.showerror(APP, f"Không thể xuất MP4: {job[1]}\\nDữ liệu tạm giữ tại:\\n{job[2]}")
+                    messagebox.showerror(APP, f"Không thể xuất MP4: {job[1]}\nDữ liệu tạm giữ tại:\n{job[2]}")
         except queue.Empty:
             pass
 
@@ -574,20 +574,20 @@ class App:
             return None
         _, _, w, h = self.region
         header = (
-            "[Script Info]\\nScriptType: v4.00+\\n"
-            f"PlayResX: {w}\\nPlayResY: {h}\\n"
-            "WrapStyle: 2\\nScaledBorderAndShadow: yes\\n"
-            "\\n[V4+ Styles]\\n"
+            "[Script Info]\nScriptType: v4.00+\n"
+            f"PlayResX: {w}\nPlayResY: {h}\n"
+            "WrapStyle: 2\nScaledBorderAndShadow: yes\n"
+            "\n[V4+ Styles]\n"
             "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, "
             "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
             "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
-            "Alignment, MarginL, MarginR, MarginV, Encoding\\n"
+            "Alignment, MarginL, MarginR, MarginV, Encoding\n"
             "Style: Ring,Arial,26,&H00FFFFFF,&H00000000,&H00000000,&H00000000,"
-            "0,0,0,0,100,100,0,0,1,0,0,7,10,10,10,1\\n"
+            "0,0,0,0,100,100,0,0,1,0,0,7,10,10,10,1\n"
             "Style: Key,Segoe UI,23,&H00FFFFFF,&H00000000,&H00182332,&HAA182332,"
-            "-1,0,0,0,100,100,0,0,3,5,0,1,16,16,16,1\\n"
-            "\\n[Events]\\n"
-            "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\\n"
+            "-1,0,0,0,100,100,0,0,3,5,0,1,16,16,16,1\n"
+            "\n[Events]\n"
+            "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
         )
         lines = [header]
         ring = ("m 0 -20 b 11 -20 20 -11 20 0 b 20 11 11 20 0 20 "
@@ -600,15 +600,15 @@ class App:
                 # ASS colours are AABBGGRR: bright blue/cyan vs warm orange.
                 colour = ("&H00FAC828&" if event["button"] == "left" else "&H00429EFA&")
                 tags = (
-                    rf"{{\\an7\\pos({event['x']},{event['y']})\\p1\\1a&HFF&"
-                    rf"\\3c{colour}\\3a&H00&\\bord5\\blur2"
-                    rf"\\fad(30,260)\\t(0,650,\\fscx185\\fscy185)}}"
+                    rf"{{\an7\pos({event['x']},{event['y']})\p1\1a&HFF&"
+                    rf"\3c{colour}\3a&H00&\bord5\blur2"
+                    rf"\fad(30,260)\t(0,650,\fscx185\fscy185)}}"
                 )
-                lines.append(f"Dialogue: 0,{start},{end},Ring,,0,0,0,,{tags}{ring}\\n")
+                lines.append(f"Dialogue: 0,{start},{end},Ring,,0,0,0,,{tags}{ring}\n")
             else:
                 label = event["label"].replace("{", "").replace("}", "").replace("\\", "")
-                tags = rf"{{\\an1\\pos(16,{h-16})\\fad(40,300)}}"
-                lines.append(f"Dialogue: 1,{start},{end},Key,,0,0,0,,{tags}{label}\\n")
+                tags = rf"{{\an1\pos(16,{h-16})\fad(40,300)}}"
+                lines.append(f"Dialogue: 1,{start},{end},Key,,0,0,0,,{tags}{label}\n")
         path = self.session / f"effects_{index:03d}.ass"
         path.write_text("".join(lines), encoding="utf-8-sig")
         return path
