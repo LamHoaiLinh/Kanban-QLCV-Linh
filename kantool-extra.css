@@ -49,3 +49,27 @@
 [data-theme=dark] .kantool-smart-note{color:#aebeb6}
 [data-theme=dark] .kantool-advanced{border-color:#384a43}
 [data-theme=dark] .kantool-advanced summary{color:#b8c9c1}
+
+/* Compact software inventory: collapsed by default, click to see each diagnostic. */
+.kantool-tools{margin:12px 0 8px;border:1px solid #dce9e1;border-radius:12px;background:rgba(246,251,248,.78)}
+.kantool-tools>summary{display:flex;justify-content:space-between;gap:10px;align-items:center;cursor:pointer;padding:12px 13px;font-size:13px;font-weight:800;color:#315546}
+.kantool-tools>summary strong{color:#36805e;font-size:12px;text-align:right}
+.kantool-tools>summary strong.warn{color:#af6d1b}
+.kantool-tools .kantool-list{margin:0;padding:0 9px 10px;gap:5px}
+.kantool-software{border:1px solid #e1ebe5;border-radius:9px;background:rgba(255,255,255,.72);overflow:hidden}
+.kantool-software>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;padding:10px 12px;font-size:13px;list-style:none}
+.kantool-software>summary::-webkit-details-marker{display:none}
+.kantool-software>summary:before{content:'▸';font-size:11px;color:#7f9287;flex-shrink:0}
+.kantool-software[open]>summary:before{content:'▾'}
+.kantool-software .kantool-name{font-weight:750;flex:1}
+.kantool-software>summary strong{font-size:12px;color:#2a7854;white-space:nowrap}
+.kantool-software.is-outdated>summary strong,.kantool-software.is-outdated .kantool-name,.kantool-software.is-miss>summary strong,.kantool-software.is-miss .kantool-name{color:#b36c13}
+.kantool-software.is-unknown>summary strong{color:#758479}
+.kantool-software-detail{border-top:1px solid #e7ede8;padding:10px 12px 12px 25px;font-size:12px;line-height:1.55;color:#637a6f;word-break:break-word}
+a.kantool-smart-btn{display:flex;justify-content:center;align-items:center;text-decoration:none;text-align:center}
+a.kantool-smart-btn:focus-visible,.kantool-software>summary:focus-visible,.kantool-tools>summary:focus-visible{outline:2px solid #317654;outline-offset:2px}
+[data-theme=dark] .kantool-tools{background:#1b2822;border-color:#3c4f43}
+[data-theme=dark] .kantool-tools>summary{color:#cee1d5}
+[data-theme=dark] .kantool-software{background:#25382e;border-color:#3c5145}
+[data-theme=dark] .kantool-software-detail{color:#aebcb2;border-color:#3c5145}
+[data-theme=dark] .kantool-software.is-miss .kantool-name,[data-theme=dark] .kantool-software.is-outdated .kantool-name{color:#efac4f}
