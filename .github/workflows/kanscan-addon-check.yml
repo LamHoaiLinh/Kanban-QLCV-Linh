@@ -44,9 +44,12 @@ jobs:
         run: |
           $ErrorActionPreference='Stop'
           $script=Get-Content office-tools/kanscan-integration.js -Raw
-          if($script -notmatch 'kanbanscan://open'){throw 'Missing protocol launcher'}
-          if($script -notmatch 'ksOpen'){throw 'Missing fallback launcher'}
-          Write-Host 'PASS: browser launcher markers'
+          if($script -notmatch '/system/kanscan/launch'){throw 'Missing checked desktop launch endpoint'}
+          if($script -notmatch '/system/kanscan/status'){throw 'Missing KanScan status check'}
+          if($script -notmatch 'ksOpen'){throw 'Missing browser interface fallback'}
+          $server=Get-Content kan-tools/runtime/kanmedia-server.py -Raw
+          if($server -notmatch 'def launch_kanscan' -or $server -notmatch '/system/kanscan/launch'){throw 'Missing backend desktop launcher'}
+          Write-Host 'PASS: checked KanScan browser and Windows launcher'
 
       - name: Validate KanScan rotation patch and frontend JavaScript
         shell: pwsh
