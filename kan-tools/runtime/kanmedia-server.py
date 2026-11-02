@@ -14,6 +14,7 @@ import importlib.util
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import threading
@@ -39,6 +40,12 @@ FFMPEG = BIN / "ffmpeg.exe"
 FFPROBE = BIN / "ffprobe.exe"
 WORKER = RUNTIME / "kanmedia-worker.py"
 INSTALLER = ROOT / "KanTool.bat"
+KANSCAN_DIR = ROOT / "kanscan"
+KANSCAN_APP = KANSCAN_DIR / "app" / "KanScan.py"
+KANSCAN_PYTHONW = KANSCAN_DIR / ".venv" / "Scripts" / "pythonw.exe"
+KANSCAN_MARKER = KANSCAN_DIR / "installed.json"
+KANSCAN_LAUNCH_LOCK = threading.Lock()
+KANSCAN_LAST_LAUNCH = 0.0
 def windows_desktop() -> Path:
     fallback = Path(os.environ.get("USERPROFILE", str(Path.home()))) / "Desktop"
     if os.name != "nt":
@@ -389,8 +396,19 @@ def version_status() -> dict:
     tool_newer = bool(latest_v and (not current_v or version_tuple(current_v) < version_tuple(latest_v)))
     installer_newer = bool(latest_installer and (not current_installer or version_tuple(current_installer) < version_tuple(latest_installer)))
     update_available = tool_newer or installer_newer
+    current_components = installed.get("components") or {}
+    latest_components = latest.get("components") or {}
+    component_versions = {}
+    for key in sorted(set(current_components) | set(latest_components)):
+        old = str((current_components.get(key) or {}).get("version") or "")
+        new = str((latest_components.get(key) or {}).get("version") or "")
+        component_versions[key] = {
+            "currentVersion": old, "latestVersion": new,
+            "updateAvailable": bool(new and (not old or version_tuple(old) < version_tuple(new)))
+        }
     return {
         "ok": not bool(error),
+        "components": component_versions,
         "currentVersion": current_v,
         "latestVersion": latest_v,
         "currentInstallerVersion": current_installer,
@@ -398,6 +416,75 @@ def version_status() -> dict:
         "updateAvailable": update_available,
         "error": error,
     }
+
+def kanscan_web_ready() -> bool:
+    """Check if a local KanScan web listener is already up (no remote access)."""
+    for port in range(18765, 18769):
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.15):
+                return True
+        except OSError:
+            continue
+    return False
+
+
+def kanscan_status() -> dict:
+    version = ""
+    try:
+        if KANSCAN_MARKER.exists():
+            version = str(json_load(KANSCAN_MARKER).get("version") or "")
+    except Exception:
+        pass
+    installed = bool(KANSCAN_PYTHONW.is_file() and KANSCAN_APP.is_file()
+                     and KANSCAN_MARKER.is_file())
+    return {
+        "ok": True, "installed": installed, "version": version,
+        "webReady": kanscan_web_ready() if installed else False,
+        "message": ("KanScan PC đã cài." if installed else
+                    "KanScan chưa cài trên máy. Đây là công cụ tùy chọn: "
+                    "cần ZIP nền KanScan v1.4 đúng phiên bản trong Downloads, "
+                    "sau đó mở KanTool-Setup.exe và chọn Cập nhật hoặc Sửa lỗi.")
+    }
+
+
+def launch_kanscan() -> dict:
+    """Explicit user-triggered desktop launch. Never run at Windows startup."""
+    global KANSCAN_LAST_LAUNCH
+    if os.name != "nt":
+        return {"ok": False, "message": "KanScan PC chỉ chạy trên Windows."}
+    state = kanscan_status()
+    if not state["installed"]:
+        return {"ok": False, "message": state["message"]}
+    if state["webReady"]:
+        return {"ok": True, "alreadyRunning": True,
+                "message": "KanScan đang phục vụ tại máy PC. Chọn Mở giao diện PC hoặc Alt+Tab để xem cửa sổ."}
+    with KANSCAN_LAUNCH_LOCK:
+        now = time.monotonic()
+        if now - KANSCAN_LAST_LAUNCH < 8:
+            return {"ok": True, "starting": True,
+                    "message": "Đã gửi lệnh khởi động KanScan gần đây. Hãy kiểm tra cửa sổ Windows hoặc Alt+Tab."}
+        try:
+            proc = subprocess.Popen(
+                [str(KANSCAN_PYTHONW), str(KANSCAN_APP)],
+                cwd=str(KANSCAN_APP.parent),
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=CREATE_NO_WINDOW,
+            )
+            time.sleep(1.0)
+            exit_code = proc.poll()
+            if exit_code is not None:
+                raise RuntimeError(f"KanScan tự đóng ngay sau khi mở (mã {exit_code}).")
+            KANSCAN_LAST_LAUNCH = time.monotonic()
+            log(f"KANSCAN LAUNCH PID={proc.pid}")
+            return {"ok": True, "started": True, "pid": proc.pid,
+                    "message": "Đã khởi chạy KanScan trên Windows. Nếu cửa sổ nằm phía sau, nhấn Alt+Tab; sau đó dùng Mở giao diện PC."}
+        except Exception as exc:
+            log("KANSCAN LAUNCH ERROR " + repr(exc))
+            return {"ok": False,
+                    "message": "Không khởi chạy được KanScan: " + str(exc)
+                    + ". Mở KanTool-Setup.exe và chọn Sửa lỗi / Cài lại."}
+
 
 def fetch_latest_kantool() -> Path:
     """Download the native Windows GUI installer, never a .bat or cmd shell."""
@@ -1069,6 +1156,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/system/version":
                 self._json(version_status())
                 return
+            if path == "/system/kanscan/status":
+                self._json(kanscan_status())
+                return
             m = re.fullmatch(r"/jobs/([a-f0-9]{32})", path)
             if m:
                 p = job_path(m.group(1))
@@ -1138,6 +1228,11 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/system/diagnostics":
                 self._read_json()
                 self._json(diagnostics())
+                return
+            if path == "/system/kanscan/launch":
+                self._read_json()
+                result = launch_kanscan()
+                self._json(result, 200 if result["ok"] else 409)
                 return
             if path == "/system/repair":
                 self._read_json()
