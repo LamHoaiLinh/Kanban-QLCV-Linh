@@ -441,7 +441,7 @@ def kanscan_status() -> dict:
         "ok": True, "installed": installed, "version": version,
         "webReady": kanscan_web_ready() if installed else False,
         "message": ("KanScan PC đã cài." if installed else
-                    "KanScan chưa cài trên máy. Đây là công cụ tùy chọn: "
+                    "Chưa tìm thấy KanScan do KanTool quản lý. Nếu đang dùng bản EXE độc lập, hãy mở từ Windows. "
                     "cần ZIP nền KanScan v1.4 đúng phiên bản trong Downloads, "
                     "sau đó mở KanTool-Setup.exe và chọn Cập nhật hoặc Sửa lỗi.")
     }
