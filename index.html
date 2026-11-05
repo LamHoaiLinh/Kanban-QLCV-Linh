@@ -188,7 +188,7 @@
         <span>Đưa vào cột</span>
         <select id="quickCaptureColumnSelect" data-tooltip="Có thể chọn cột khác cho riêng lần nhập này"></select>
       </label>
-      <div class="quick-capture-shortcut">Phím tắt mở hộp này: <kbd>Ctrl</kbd> + <kbd>Enter</kbd> khi đang ở trang Kanban.</div>
+      <div class="quick-capture-shortcut">Phím tắt mở hộp này: <kbd>Ctrl</kbd> + <kbd>Enter</kbd> khi đang ở trang Kanban. Chèn ngày hôm nay: <kbd>Ctrl</kbd> + <kbd>;</kbd>.</div>
       <div class="modal-actions right-actions">
         <button class="secondary-btn" data-close="quickCaptureDialog" type="button">Hủy</button>
         <button class="primary-btn" type="submit">Thêm công việc</button>
@@ -230,7 +230,7 @@
         <aside class="card-form-side">
           <div class="field"><span>Nhãn phân loại</span><div id="labelOptions" class="label-options"></div></div>
           <label class="field"><span>Chuyển sang cột</span><select id="cardColumnSelect"></select></label>
-          <div class="editor-tip">Kéo biểu tượng ⠿ để đổi vị trí thẻ hoặc cột.</div>
+          <div class="editor-tip">Kéo biểu tượng ⠿ để đổi vị trí thẻ hoặc cột. Khi đang nhập, nhấn <kbd>Ctrl</kbd> + <kbd>;</kbd> để chèn ngày hôm nay (dd/mm/yyyy).</div>
         </aside>
       </div>
       <div class="modal-actions split-actions">
@@ -289,7 +289,7 @@
       <div class="guide-groups">
         <details open><summary>Bảng công việc & ghi chú</summary><div class="guide-group-body">
           <p><strong>Dự án / cột / thẻ:</strong> kéo biểu tượng ⠿ để sắp xếp. Ctrl+click chọn rời rạc, Shift+click chọn liên tục, Ctrl+A chọn toàn bộ thẻ trong cột; Delete chuyển thẻ đã chọn vào Nội dung đã xóa.</p>
-          <p><strong>Nhập nhanh:</strong> Ctrl+Enter khi trang KanBan đang focus. Ghi chú nhanh nằm dưới tên dự án; bấm ＋ để tạo thêm.</p>
+          <p><strong>Nhập nhanh:</strong> Ctrl+Enter khi trang KanBan đang focus. Trong ô tiêu đề, mô tả, checklist hoặc ghi chú, Ctrl+; chèn ngày hiện tại theo dạng dd/mm/yyyy tại con trỏ. Ghi chú nhanh nằm dưới tên dự án; bấm ＋ để tạo thêm.</p>
           <p><strong>Tự chuyển ngày mới:</strong> mở ⚙ Cài đặt để chọn cột nguồn và cột đích.</p>
         </div></details>
         <details><summary>Đồng hồ, báo thức & lịch nhắc</summary><div class="guide-group-body">
@@ -759,7 +759,7 @@
   <div id="globalTooltip" class="global-tooltip" role="tooltip" hidden></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="dragdrop.js?v=3.3"></script>
-  <script src="app.js?v=5.5"></script>
+  <script src="app.js?v=5.6"></script>
   <script src="music-player.js?v=3.7"></script>
   <script src="kalo-launcher.js?v=1.0.5"></script>
   <script src="capture-launcher.js?v=1.5.0"></script>
