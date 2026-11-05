@@ -148,6 +148,58 @@
       </label>`).join('');
   }
 
+  // Ctrl + ; chèn ngày dương lịch hiện tại vào vị trí con trỏ trong ô đang nhập.
+  // Chỉ áp dụng cho biểu mẫu Kanban; không chiếm phím tắt của công cụ Excel/Game bên ngoài.
+  function insertTodayShortcut(event) {
+    if (!event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || event.repeat || event.isComposing ||
+        !(event.key === ';' || event.code === 'Semicolon')) return false;
+    const field = event.target?.closest?.('input, textarea, [contenteditable="true"]');
+    if (!field || !field.closest('#cardDialog, #quickCaptureDialog, #noteDialog, #projectDialog, #columnDialog')) return false;
+    const isTextInput = field.matches('input') && ['text', 'search'].includes(field.type);
+    const isTextarea = field.matches('textarea');
+    const isRichEditor = !isTextInput && !isTextarea && field.isContentEditable;
+    if (!isTextInput && !isTextarea && !isRichEditor) return false;
+    if ((isTextInput || isTextarea) && (field.disabled || field.readOnly)) return false;
+
+    const today = new Date();
+    const dateText = [
+      String(today.getDate()).padStart(2, '0'),
+      String(today.getMonth() + 1).padStart(2, '0'),
+      String(today.getFullYear())
+    ].join('/');
+
+    if (isTextInput || isTextarea) {
+      const start = field.selectionStart ?? field.value.length;
+      const end = field.selectionEnd ?? start;
+      event.preventDefault();
+      if (field.maxLength >= 0 && field.value.length - (end - start) + dateText.length > field.maxLength) {
+        showToast('Ô nhập không đủ chỗ để chèn ngày.');
+        return true;
+      }
+      // insertText giữ được lịch sử Undo của ô nhập trong Chrome/Edge.
+      if (!document.execCommand('insertText', false, dateText)) {
+        field.setRangeText(dateText, start, end, 'end');
+        field.dispatchEvent(new Event('input', {bubbles:true}));
+      }
+    } else {
+      event.preventDefault();
+      const selection = window.getSelection();
+      if (!selection?.rangeCount || !field.contains(selection.anchorNode)) {
+        field.focus();
+        const range = document.createRange();
+        range.selectNodeContents(field);
+        range.collapse(false);
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+      }
+      if (!document.execCommand('insertText', false, dateText)) {
+        insertPlainTextAtSelection(dateText);
+        field.dispatchEvent(new Event('input', {bubbles:true}));
+      }
+    }
+    return true;
+  }
+
   function bindEvents() {
     refs.addProjectBtn.addEventListener('click', () => openProjectDialog());
     refs.emptyAddProjectBtn.addEventListener('click', () => openProjectDialog());
@@ -292,6 +344,7 @@
     });
 
     document.addEventListener('keydown', event => {
+      if (insertTodayShortcut(event)) return;
       const tag = document.activeElement?.tagName;
       const typing = ['INPUT','TEXTAREA','SELECT'].includes(tag) || Boolean(document.activeElement?.isContentEditable);
       const modifier = event.ctrlKey || event.metaKey;
