@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Cờ Vua Kanban: chơi cờ với máy hoặc bạn bè ngay trên Kanban." />
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; object-src 'none'; frame-ancestors 'self'; base-uri 'self'; form-action 'none'">
+  <title>Cờ Vua Kanban</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>♟️</text></svg>">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <div class="kanban-chess-head">
+      <div class="kanban-chess-brand"><span class="kanban-chess-logo" aria-hidden="true">♞</span><div><h1>Cờ Vua Kanban</h1><p>Đấu với máy hoặc chơi hai người trên cùng thiết bị</p></div></div>
+      <button id="exitGameBtn" class="kanban-chess-exit" type="button" title="Quay về danh sách Game">← Game Hub</button>
+    </div>
+    <header class="settings-bar">
+      <div class="setting">
+        <label for="difficultySelect">Độ khó</label>
+        <select id="difficultySelect" aria-label="Chọn độ khó của máy">
+          <option value="easy">Dễ</option>
+          <option value="medium" selected>Vừa</option>
+          <option value="hard">Khó</option>
+        </select>
+      </div>
+      <div class="controls">
+        <button id="resetBtn" type="button" title="Ván mới (N)">Ván mới</button>
+        <button id="undoBtn" type="button" title="Đi lại (U)">Đi lại</button>
+        <button id="botBtn" type="button" class="secondary" title="Bật hoặc tắt đấu với máy (B)">Đấu với máy</button>
+        <button id="flipBtn" type="button" title="Lật bàn cờ (F)">Lật bàn</button>
+        <button id="hintBtn" type="button" title="Gợi ý nước đi (H)">Gợi ý</button>
+        <button id="resignBtn" type="button" class="danger" title="Xin thua">Đầu hàng</button>
+      </div>
+      <div class="setting">
+        <label class="theme-toggle" for="themeToggle" title="Đổi giao diện sáng/tối (T)">
+          <span class="theme-label">Tối</span>
+          <input id="themeToggle" type="checkbox" checked aria-label="Bật giao diện tối" />
+          <span class="theme-switch" aria-hidden="true"></span>
+        </label>
+        <button id="soundBtn" type="button" class="sound-btn" title="Bật/tắt âm thanh (M)" aria-label="Bật/tắt âm thanh">🔊</button>
+      </div>
+    </header>
+
+    <div class="game-area">
+      <aside class="player-bar black-bar">
+        <div class="avatar" aria-hidden="true">♚</div>
+        <div class="player-info">
+          <span class="player-name">Quân Đen</span>
+          <span class="turn-badge" id="blackTurn" aria-live="polite">Đến lượt</span>
+        </div>
+        <div class="captured" id="blackCaptured" aria-label="Các quân Đen đã ăn"></div>
+      </aside>
+
+      <main>
+        <div id="board" class="board" role="grid" aria-label="Bàn cờ vua" tabindex="0"></div>
+      </main>
+
+      <aside class="player-bar white-bar">
+        <div class="avatar" aria-hidden="true">♔</div>
+        <div class="player-info">
+          <span class="player-name">Quân Trắng</span>
+          <span class="turn-badge" id="whiteTurn" aria-live="polite">Đến lượt</span>
+        </div>
+        <div class="captured" id="whiteCaptured" aria-label="Các quân Trắng đã ăn"></div>
+      </aside>
+    </div>
+
+    <section class="extras">
+      <div class="extra-panel move-history-panel">
+        <h3>Lịch sử nước đi</h3>
+        <div id="moveHistory" class="move-history" aria-live="polite"></div>
+      </div>
+      <div class="extra-panel fen-panel">
+        <h3>FEN</h3>
+        <div class="fen-row">
+          <input id="fenInput" type="text" readonly aria-label="Mã FEN hiện tại" spellcheck="false" />
+          <button id="copyFenBtn" type="button" title="Sao chép mã FEN">Sao chép</button>
+        </div>
+        <div class="fen-row">
+          <input id="loadFenInput" type="text" placeholder="Dán mã thế cờ FEN vào đây" aria-label="Mã FEN cần tải" spellcheck="false" />
+          <button id="loadFenBtn" type="button">Tải thế cờ</button>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <p class="status" id="status" aria-live="polite">Lượt quân Trắng</p>
+      <p class="credits">
+        Mã nguồn gốc: <a href="https://zrnge.com" target="_blank" rel="noopener noreferrer">zrnge</a> ·
+        <a href="https://github.com/zrnge/chess" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </p>
+    </footer>
+  </div>
+
+  <div id="gameOverModal" class="game-over-modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="modalSubtitle">
+    <div class="game-over-card">
+      <div class="trophy" id="modalIcon" aria-hidden="true">🏆</div>
+      <h2 id="modalTitle">Quân Trắng thắng!</h2>
+      <p id="modalSubtitle">Chiếu hết</p>
+      <button id="modalNewGame" type="button">Chơi ván mới</button>
+    </div>
+  </div>
+
+  <script src="chess.js" defer></script>
+</body>
+</html>
