@@ -1,6 +1,6 @@
 /* Kanban PWA: cache lõi nhỏ, game chỉ lưu sau khi người dùng mở. */
-const APP_CACHE = 'linh-kanban-app-v837-photo-v2';
-const GAME_CACHE = 'linh-kanban-games-v829';
+const APP_CACHE = 'linh-kanban-app-v838-chess-v1';
+const GAME_CACHE = 'linh-kanban-games-v830-chess';
 const CORE_ASSETS = [
   "./index.html",
   "./styles.css?v=6.46",
@@ -12,7 +12,7 @@ const CORE_ASSETS = [
   "./assets/backgrounds/Beautiful Background6.png"
 ];
 const gameRoots = [
-  '/dice-game/','/tarot-game/','/tetris-game/','/farm-game/',
+  '/dice-game/','/tarot-game/','/tetris-game/','/chess-kanban/','/farm-game/',
   '/thuong-lo-viet/','/doi-lap-nghiep/','/vuong-quoc-so-lieu/',
   '/bach-chieu-game/','/dai-luc-nghe-nghiep/','/tinh-nhanh-game/',
   '/drift1k-game/','/stock-sim-vn/','/aquarium-game/','/open-poker-game/'
