@@ -858,3 +858,12 @@ button,.theme-toggle,.square{-webkit-user-select:none;user-select:none;-webkit-t
  .controls button{padding:7px 8px;font-size:11px}
  .setting select{font-size:11px}
 }
+
+/* Đảm bảo chế độ sáng vẫn tương phản tốt với thanh tiêu đề Kanban */
+:root[data-theme="light"] body{background:radial-gradient(circle at 50% -180px,#e2f2e8 0%,#eff7f2 70%)}
+:root[data-theme="light"] .app{background:#fff}
+:root[data-theme="light"] .kanban-chess-brand h1{color:#214b36}
+:root[data-theme="light"] .kanban-chess-brand p{color:#5b7466}
+:root[data-theme="light"] .kanban-chess-head{border-bottom-color:rgba(32,94,60,.18)}
+:root[data-theme="light"] .kanban-chess-exit{background:#2c7456;color:#fff}
+:root[data-theme="light"] .settings-bar{background:#f4f8f5}
