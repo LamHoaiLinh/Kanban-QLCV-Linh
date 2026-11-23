@@ -61,3 +61,10 @@ Các tệp người dùng chọn không được gửi đến các địa chỉ 
 ## KanMedia runtime
 - `kanmedia-server.ps1` và `kanmedia-worker.ps1` là mã nguồn của chính dự án KanBan, chạy cục bộ trên `127.0.0.1`.
 - KanTool không tắt Windows Security, không thêm Defender exclusion và không nhúng executable dưới dạng Base64/obfuscation.
+
+
+## Cờ Vua Kanban (nguồn: zrnge/chess)
+- Nguồn gốc: https://github.com/zrnge/chess; tác giả công bố: zrnge.
+- Mã HTML, CSS, JavaScript được người dùng cung cấp qua chess-main.zip và Việt hóa trong thư mục `chess-kanban/`.
+- README của dự án gốc tuyên bố MIT nhưng hiện không có tệp LICENSE trong repository nguồn, và GitHub API không xác nhận giấy phép. Cần kiểm tra lại quyền tái phân phối với tác giả khi sử dụng ngoài phạm vi dự án này.
+- Ghi công trong màn hình trò chơi và tệp `chess-kanban/ATTRIBUTION.md`.
