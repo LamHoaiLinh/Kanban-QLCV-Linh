@@ -1,12 +1,12 @@
 /* Kanban PWA: cache lõi nhỏ, game chỉ lưu sau khi người dùng mở. */
-const APP_CACHE = 'linh-kanban-app-v838-chess-v1';
+const APP_CACHE = 'linh-kanban-app-v839-music-v38';
 const GAME_CACHE = 'linh-kanban-games-v830-chess';
 const CORE_ASSETS = [
   "./index.html",
   "./styles.css?v=6.46",
   "./dragdrop.js?v=3.3",
   "./app.js?v=5.6",
-  "./music-player.js?v=3.7",
+  "./music-player.js?v=3.8",
   "./manifest.webmanifest?v=3.2",
   "./assets/icon.svg",
   "./assets/backgrounds/Beautiful Background6.png"

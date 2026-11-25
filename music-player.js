@@ -46,6 +46,8 @@
     if (playbackDiagnostics.length>30) playbackDiagnostics.shift();
     if (['error','unexpected-pause','skip'].includes(type)) console.warn('[Kanban music]',type,detail);
   }
+  let directoryLoadGeneration = 0;
+  let directFallbackNeeded = false;
   let requiresReconnect = false;
   let rememberedHandleMissing = false;
   const recentHandleCache = new Map();
@@ -70,13 +72,14 @@
       'musicRepeatBtn','musicProgress','musicCurrentTime','musicDuration','musicVolume','musicPlaylistBtn','musicStatus',
       'musicPlaylistDialog','musicPlaylistList','musicPlaylistCount','musicPlaylistFolder','musicSortSelect','musicRecentSelect',
       'musicOpenRecentBtn','musicPlaylistBrowseBtn','musicPlaylistEmpty','musicPlaylistSearch','musicPlaylistSearchClear',
-      'musicChangeFolderBtn'
+      'musicChangeFolderBtn','musicDirectFolderBtn'
     ].forEach(id => refs[id] = document.getElementById(id));
   }
 
   function bindEvents() {
     refs.musicBrowseBtn.addEventListener('click', () => requiresReconnect ? reopenMostRecentFolder() : browseMusicDirectory());
     refs.musicChangeFolderBtn.addEventListener('click', browseMusicDirectory);
+    refs.musicDirectFolderBtn.addEventListener('click', () => refs.musicFolderInput.click());
     refs.musicFolderInput.addEventListener('change', loadFilesFromInput);
     refs.musicRecentBtn.addEventListener('click', reopenMostRecentFolder);
     refs.musicPlaylistBtn.addEventListener('click', openPlaylistDialog);
@@ -127,75 +130,97 @@
   }
 
   // ===== Chọn và đọc thư mục nhạc =====
+  // IndexedDB chỉ dùng để ghi nhớ, không được chặn việc nhập và phát nhạc.
+  function withMusicTimeout(promise, ms = 3000) {
+    let timer;
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Music storage timeout')), ms); })
+    ]).finally(() => clearTimeout(timer));
+  }
+
+  function offerDirectFolder(message) {
+    directFallbackNeeded = true;
+    refs.musicStatus.textContent = message;
+    renderRecentFolders();
+  }
+
   async function browseMusicDirectory() {
+    const generation = ++directoryLoadGeneration;
     try {
       if ('showDirectoryPicker' in window && window.isSecureContext) {
         const handle = await window.showDirectoryPicker({ mode: 'read' });
-        await rememberAndLoadDirectory(handle);
+        if (generation !== directoryLoadGeneration) return;
+        await rememberAndLoadDirectory(handle, generation);
       } else {
         refs.musicFolderInput.click();
       }
     } catch (error) {
+      if (generation !== directoryLoadGeneration) return;
       if (error?.name !== 'AbortError') {
         console.error('Không thể chọn thư mục nhạc:', error);
-        showMusicToast('Không thể mở thư mục nhạc.');
+        offerDirectFolder('Không mở được thư mục. Hãy bấm Chọn trực tiếp.');
       }
     }
   }
 
-  async function rememberAndLoadDirectory(handle) {
-    // Tên thư mục không duy nhất: dùng isSameEntry để nhận biết đúng đường dẫn.
-    let id = null;
-    for (const folder of settings.recentFolders) {
+  async function rememberAndLoadDirectory(handle, generation = ++directoryLoadGeneration) {
+    // Chỉ so sánh các handle đã có trong RAM, tuyệt đối không đọc IndexedDB trước khi tải nhạc.
+    const candidates = settings.recentFolders.filter(folder => folder.name === handle.name && recentHandleCache.has(folder.id));
+    const matched = await Promise.all(candidates.map(async folder => {
       try {
-        const oldHandle = await getDirectoryHandle(folder.id);
-        if (oldHandle?.isSameEntry && await oldHandle.isSameEntry(handle)) {
-          id = folder.id;
-          break;
-        }
-      } catch (error) { console.debug('Không so được thư mục gần đây:',error); }
-    }
-    id ||= makeDirectoryId(handle.name);
-    let persisted = false;
+        const old = recentHandleCache.get(folder.id);
+        return old?.isSameEntry && await withMusicTimeout(old.isSameEntry(handle), 300) ? folder.id : null;
+      } catch (_) { return null; }
+    }));
+    if (generation !== directoryLoadGeneration) return;
+    const id = matched.find(Boolean) || makeDirectoryId(handle.name);
+    const loaded = await loadTracksFromDirectoryHandle(handle, id, generation, false);
+    if (!loaded || generation !== directoryLoadGeneration) return;
+
+    // Danh sách và nút Play đã sẵn sàng. Lưu handle độc lập với trình phát.
+    recentHandleCache.set(id, handle);
     try {
-      await putDirectoryHandle(id, handle);
-      recentHandleCache.set(id, handle);
+      await withMusicTimeout(putDirectoryHandle(id, handle));
+      if (generation !== directoryLoadGeneration || currentDirectoryId !== id) return;
       rememberRecentFolder({ id, name: handle.name, lastUsed: Date.now() });
-      persisted = true;
+      renderRecentFolders();
     } catch (error) {
       console.warn('Không thể lưu quyền thư mục gần đây:', error);
-      showMusicToast('Thư mục chỉ mở được trong phiên này. Trình duyệt không lưu được quyền truy cập.');
+      if (generation === directoryLoadGeneration && currentDirectoryId === id) {
+        showMusicToast('Đã tải nhạc. Không lưu được quyền thư mục; lần sau có thể cần chọn lại.');
+      }
     }
-    await loadTracksFromDirectoryHandle(handle, persisted ? id : null);
-    if (!persisted && tracks.length) refs.musicStatus.textContent = 'Chưa lưu được quyền thư mục. Lần sau cần chọn lại thư mục nhạc.';
   }
 
-  async function loadTracksFromDirectoryHandle(handle, directoryId = null) {
+  async function loadTracksFromDirectoryHandle(handle, directoryId = null, generation = ++directoryLoadGeneration, rememberDirectory = true) {
+    if (generation !== directoryLoadGeneration) return false;
     setLoadingState(`Đang đọc thư mục “${handle.name}”…`);
     try {
       const permission = await ensureReadPermission(handle);
+      if (generation !== directoryLoadGeneration) return false;
       if (!permission) {
-        requiresReconnect = Boolean(directoryId);
-        refs.musicStatus.textContent = 'Chưa mở được nhạc. Nhấn Khôi phục để thử lại.';
-        showMusicToast('Chrome chưa cấp quyền đọc thư mục nhạc.');
-        renderRecentFolders();
-        return;
+        requiresReconnect = Boolean(directoryId && rememberDirectory);
+        offerDirectFolder('Chrome chưa cấp quyền đọc. Hãy bấm Chọn trực tiếp.');
+        return false;
       }
-      requiresReconnect = false;
-      rememberedHandleMissing = false;
-
       const found = [];
       await collectTracksFromDirectory(handle, '', found);
+      if (generation !== directoryLoadGeneration) return false;
+      requiresReconnect = false;
+      rememberedHandleMissing = false;
+      directFallbackNeeded = false;
+      setTrackCollection(found, handle.name, directoryId, rememberDirectory);
       if (!found.length) {
-        setTrackCollection([], handle.name, directoryId);
-        showMusicToast('Không tìm thấy tệp nhạc được hỗ trợ trong thư mục.');
-        return;
+        offerDirectFolder('Không tìm thấy tệp nhạc hỗ trợ trong thư mục.');
+        return false;
       }
-      setTrackCollection(found, handle.name, directoryId);
+      return true;
     } catch (error) {
+      if (generation !== directoryLoadGeneration) return false;
       console.error('Lỗi đọc thư mục nhạc:', error);
-      setLoadingState('Không thể đọc thư mục nhạc.');
-      showMusicToast('Không thể đọc thư mục nhạc.');
+      offerDirectFolder('Không thể đọc thư mục nhạc. Hãy bấm Chọn trực tiếp.');
+      return false;
     }
   }
 
@@ -217,6 +242,8 @@
   }
 
   async function loadFilesFromInput(event) {
+    ++directoryLoadGeneration;
+    directFallbackNeeded = false;
     const files = [...(event.target.files || [])].filter(file => isSupportedAudioName(file.name));
     event.target.value = '';
     const folderName = files[0]?.webkitRelativePath?.split('/')[0] || 'Thư mục đã chọn';
@@ -246,7 +273,7 @@
     };
   }
 
-  function setTrackCollection(nextTracks, folderName, directoryId) {
+  function setTrackCollection(nextTracks, folderName, directoryId, rememberDirectory = true) {
     const rememberedTrackId = directoryId && settings.lastDirectoryId === directoryId ? settings.lastTrackId : null;
     stopPlaybackAndReleaseUrl();
     metadataGeneration += 1;
@@ -259,8 +286,12 @@
     currentDirectoryName = folderName || '';
     sortTracks(false);
 
-    if (directoryId) {
-      settings.lastDirectoryId = directoryId;
+    if (!rememberedTrackId || !tracks.some(track => track.id === rememberedTrackId)) {
+      settings.lastTrackId = null;
+      settings.lastTrackTime = 0;
+    }
+    settings.lastDirectoryId = directoryId;
+    if (directoryId && rememberDirectory) {
       rememberRecentFolder({ id: directoryId, name: currentDirectoryName, lastUsed: Date.now() });
     }
     settings.lastFolderName = currentDirectoryName;
@@ -820,11 +851,13 @@
   }
 
   async function restoreMostRecentFolder() {
+    const generation = ++directoryLoadGeneration;
     const recent = settings.recentFolders[0];
     if (!recent) return renderRecentFolders();
     refs.musicRecentName.textContent = recent.name;
     try {
-      const handle = await getDirectoryHandle(recent.id);
+      const handle = await withMusicTimeout(getDirectoryHandle(recent.id));
+      if (generation !== directoryLoadGeneration) return;
       if (!handle) {
         rememberedHandleMissing = true;
         refs.musicStatus.textContent = 'Tên thư mục còn lưu nhưng quyền truy cập đã mất. Hãy chọn lại thư mục một lần.';
@@ -832,9 +865,10 @@
         return;
       }
       recentHandleCache.set(recent.id,handle);
-      const permission = await queryReadPermission(handle);
+      const permission = await withMusicTimeout(queryReadPermission(handle));
+      if (generation !== directoryLoadGeneration) return;
       if (permission === 'granted') {
-        await loadTracksFromDirectoryHandle(handle,recent.id);
+        await loadTracksFromDirectoryHandle(handle,recent.id,generation);
       } else {
         requiresReconnect = true;
         refs.musicStatus.textContent = 'Nhấn Khôi phục thư mục nhạc để tiếp tục.';
@@ -842,6 +876,7 @@
         renderRecentFolders();
       }
     } catch (error) {
+      if (generation !== directoryLoadGeneration) return;
       console.warn('Không thể khôi phục quyền thư mục gần đây:',error);
       rememberedHandleMissing = true;
       refs.musicStatus.textContent = 'Không đọc được quyền thư mục đã lưu. Hãy chọn lại thư mục.';
@@ -863,8 +898,10 @@
 
   // Khi handle đã nằm trong RAM, requestPermission bắt đầu ngay từ thao tác bấm.
   async function openRecentFolderById(id) {
+    const generation = ++directoryLoadGeneration;
     try {
-      const handle = recentHandleCache.get(id) || await getDirectoryHandle(id);
+      const handle = recentHandleCache.get(id) || await withMusicTimeout(getDirectoryHandle(id));
+      if (generation !== directoryLoadGeneration) return;
       if (!handle) {
         rememberedHandleMissing = true;
         requiresReconnect = false;
@@ -878,6 +915,7 @@
         : Promise.resolve(await queryReadPermission(handle));
       refs.musicStatus.textContent = 'Đang khôi phục nhạc…';
       const permission = await permissionRequest;
+      if (generation !== directoryLoadGeneration) return;
       if (permission !== 'granted') {
         requiresReconnect = true;
         refs.musicStatus.textContent = 'Chưa mở được nhạc. Nhấn Khôi phục để thử lại.';
@@ -885,8 +923,9 @@
         return;
       }
       requiresReconnect = false;
-      await loadTracksFromDirectoryHandle(handle,id);
+      await loadTracksFromDirectoryHandle(handle,id,generation);
     } catch (error) {
+      if (generation !== directoryLoadGeneration) return;
       console.error('Không thể mở thư mục gần đây:',error);
       requiresReconnect = true;
       refs.musicStatus.textContent = 'Chưa mở được nhạc. Nhấn Khôi phục để thử lại.';
@@ -913,6 +952,7 @@
       ? 'Mở lại thư mục đã lưu, không cần Browse từ đầu'
       : 'Chọn thư mục nhạc trên máy tính';
     refs.musicChangeFolderBtn.hidden = !reconnect;
+    refs.musicDirectFolderBtn.hidden = Boolean(tracks.length) && !directFallbackNeeded;
   }
 
   function rememberRecentFolder(folder) {
@@ -931,13 +971,16 @@
     refs.musicPlayer.classList.remove('drag-over');
     const items = [...(event.dataTransfer?.items || [])];
     if (!items.length) return;
+    const generation = ++directoryLoadGeneration;
+    directFallbackNeeded = false;
 
     try {
       if (items[0].getAsFileSystemHandle) {
         const handles = (await Promise.all(items.map(item => item.getAsFileSystemHandle()))).filter(Boolean);
+        if (generation !== directoryLoadGeneration) return;
         const directory = handles.find(handle => handle.kind === 'directory');
         if (directory) {
-          await rememberAndLoadDirectory(directory);
+          await rememberAndLoadDirectory(directory,generation);
           return;
         }
         const files = [];
@@ -953,6 +996,7 @@
       if (entries.length) {
         const records = [];
         for (const entry of entries) await collectTracksFromLegacyEntry(entry, '', records);
+        if (generation !== directoryLoadGeneration) return;
         const folderName = entries.find(entry => entry.isDirectory)?.name || 'Tệp đã thả';
         setTrackCollection(records, folderName, null);
         return;
@@ -1158,6 +1202,9 @@
   }
 
   async function clearAllMusicData() {
+    ++directoryLoadGeneration;
+    directFallbackNeeded = false;
+    recentHandleCache.clear();
     stopPlaybackAndReleaseUrl();
     localStorage.removeItem(MUSIC_STORAGE_KEY);
     try {
@@ -1197,7 +1244,9 @@
         const db = request.result;
         if (!db.objectStoreNames.contains(MUSIC_HANDLE_STORE)) db.createObjectStore(MUSIC_HANDLE_STORE, { keyPath: 'id' });
       };
-      request.onsuccess = () => resolve(request.result);
+      let abandoned = false;
+      request.onblocked = () => { abandoned = true; reject(new Error('Music IndexedDB blocked')); };
+      request.onsuccess = () => { if (abandoned) request.result.close(); else resolve(request.result); };
       request.onerror = () => reject(request.error);
     });
   }
