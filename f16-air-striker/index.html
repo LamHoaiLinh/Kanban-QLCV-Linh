@@ -1,0 +1,8 @@
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"><title>F-16 Air Striker</title><style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;overscroll-behavior:none;position:fixed;inset:0}
+body{background:#0a0612;display:flex;justify-content:center;align-items:center;font-family:'Share Tech Mono',Consolas,Monaco,'Courier New',monospace}
+#game-container{position:relative}#pixi-play{position:absolute;z-index:1;pointer-events:none}#game{position:relative;z-index:2;display:block}
+#f16-exit{position:fixed;top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));z-index:5;background:#0a0612;color:#00e5ff;border:1px solid #00e5ff;border-radius:5px;font:14px monospace;padding:10px;cursor:pointer}#f16-exit[hidden]{display:none}
+</style></head><body><div id="game-container"><canvas id="game"></canvas></div><button id="f16-exit" type="button">‹ Kanban</button><script src="vendor/pixi.min.js"></script><script src="vendor/pixi-filters.min.js"></script><script src="vendor/three.min.js"></script><script src="game.js"></script></body></html>
