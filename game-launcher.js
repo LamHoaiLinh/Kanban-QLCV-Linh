@@ -15,6 +15,7 @@ const games=[
  {id:'tinhnhanh',title:'Tính Nhanh',sub:'72 kỹ năng · cá nhân hóa · cửu chương · Nhìn Che Tính',icon:'🧮',url:'tinh-nhanh-game/index.html?v=3.3.0',close:'tinh-nhanh-game-close'},
  {id:'drift1k',title:'DRIFT CAR',sub:'Drift 1 nút · 1–4 người · tranh pin nhiên liệu',icon:'🏎️',url:'drift1k-game/index.html?v=1.0.1',close:'drift1k-game-close'},
  {id:'openpoker',title:'Open Poker',sub:'Poker roguelike · Meta chuẩn Balatro · Seeded Practice · Collection 8 tab',icon:'♠',url:'open-poker-game/index.html?v=1.8.2',close:'open-poker-close'},
+ {id:'f16airstriker',title:'F-16 Air Striker',sub:'Bắn máy bay · 10 chương · 10 vũ khí · cảm ứng',icon:'✈',url:'f16-air-striker/index.html?v=1.0.0',close:'f16-air-striker-close'},
  {id:'stocksim',title:'StockSim VN',sub:'Mô phỏng thị trường sống · IPO/BCTC/phá sản · Long/Short · SL/TP',icon:'📈',url:'stock-sim-vn/index.html?v=2.1.3',close:'stocksim-close'}
 ];
 if(btn){btn.addEventListener('click',openHub);window.addEventListener('message',e=>{if(games.some(g=>g.close===e.data?.type))closeGame()});window.addEventListener('keydown',e=>{if(e.key==='Escape'&&hub&&!hub.hidden){hub.hidden=true}else if(e.key==='Escape'&&overlay&&!overlay.hidden)closeGame()})}
