@@ -442,7 +442,7 @@ def kanscan_status() -> dict:
         "webReady": kanscan_web_ready() if installed else False,
         "message": ("KanScan PC đã cài." if installed else
                     "Chưa tìm thấy KanScan do KanTool quản lý. Nếu đang dùng bản EXE độc lập, hãy mở từ Windows. "
-                    "cần ZIP nền KanScan v1.4 đúng phiên bản trong Downloads, "
+                    "có thể tự tải gói nguồn từ GitHub; nếu thất bại dùng ZIP gốc v1.4 trong Downloads, "
                     "sau đó mở KanTool-Setup.exe và chọn Cập nhật hoặc Sửa lỗi.")
     }
 
@@ -825,7 +825,7 @@ def health() -> dict:
     ready = bool(yt_ok and node_ok and ff_ok and worker_ok)
     return {
         "ok": True,
-        "version": "KanMedia Agent 1.8.4",
+        "version": "KanMedia Agent 1.8.5",
         "mediaReady": ready,
         "ytDlp": "installed" if yt_ok else "",
         "ffmpeg": str(FFMPEG) if ff_ok else "",

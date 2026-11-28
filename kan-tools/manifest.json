@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "kanToolVersion": "2.9.5",
+  "kanToolVersion": "2.9.6",
   "installerVersion": "2.5.1",
   "pythonFallback": {
     "version": "3.13.16",
@@ -8,7 +8,7 @@
   },
   "components": {
     "runtime": {
-      "version": "1.8.4",
+      "version": "1.8.5",
       "files": [
         "kan-tools/runtime/kanmedia-server.py",
         "kan-tools/runtime/kanmedia-worker.py"
@@ -52,7 +52,7 @@
       "version": "1.5.1",
       "installer": "kan-tools/kanscan/install-kanscan.ps1",
       "archiveSha256": "911faf44a23833210ebec0130ff4a7e5b20076cf894331a5699ac0bf7a2b78ae",
-      "installMode": "optional-v14-zip-plus-v151-github-patches",
+      "installMode": "github-v14-archive-plus-v151-patches-with-local-fallback",
       "updater": "kan-tools/kanscan/upgrade_rotate_v15.py",
       "winFix": "kan-tools/kanscan/fix_windows_preview_v151.py"
     },

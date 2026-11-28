@@ -83,7 +83,7 @@ function ensurePanel(){
         '<button type="button" data-copy-diag>Sao chép chẩn đoán</button>'+
       '</div><div class="kantool-diagnostics" data-diagnostics hidden></div>'+
     '</details>'+
-    '<div class="capture-security-note">KanPass lưu KDBX mã hóa trên máy; KanBackup dùng Kopia mã hóa và lịch Windows. KanScan là tiện ích cài riêng, cần ZIP gốc v1.4 hợp lệ nếu cài lần đầu.</div></section>';
+    '<div class="capture-security-note">KanPass lưu KDBX mã hóa trên máy; KanBackup dùng Kopia mã hóa và lịch Windows. KanScan cài riêng từ GitHub; ZIP gốc v1.4 hợp lệ chỉ dùng dự phòng.</div></section>';
   document.body.appendChild(panel);
   panel.addEventListener('click',function(e){if(e.target===panel||e.target.closest('.capture-setup-close'))panel.hidden=true;});
   panel.querySelector('[data-download]').addEventListener('click',function(){
@@ -124,7 +124,7 @@ async function refresh(){
     makeSoftware('KanMedia',!!(media&&media.mediaReady),['runtime','ytDlp','node','ffmpeg'],ver,'Tải, xử lý và chuyển đổi video/âm thanh.'),
     makeSoftware('Ký số PDF',!!(sign&&sign.ok),['signing'],ver,'Dịch vụ ký PDF bằng chứng thư số trên PC.'),
     makeSoftware('KanBackup · Kopia',!!(backup&&backup.available),['backup','kopia'],ver,'Sao lưu dữ liệu trên máy Windows.'),
-    makeSoftware('KanScan',!!(scan&&scan.installed),['kanscan'],ver,scan?scan.message:'Cần cập nhật KanTool để kiểm tra KanScan; ứng dụng chỉ được cài nếu có ZIP nền v1.4 hợp lệ.',scan&&scan.version)
+    makeSoftware('KanScan',!!(scan&&scan.installed),['kanscan'],ver,scan?scan.message:'Cần cập nhật KanTool để kiểm tra và tự cài KanScan từ GitHub.',scan&&scan.version)
   ];
   // Older KanTool versions do not have KanScan status; do not mislabel an unknown installation as absent.
   if(!scan&&media){s[6].state='unknown';s[6].stateText='Chưa xác minh';}

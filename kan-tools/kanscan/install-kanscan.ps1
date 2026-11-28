@@ -124,7 +124,27 @@ try {
   }
 } catch {}
 $zip = $null
+$downloadedZip = $null
+# Fetch the exact original archive; verify integrity before extracting.
+if(Test-Path -LiteralPath $MainPython -PathType Leaf) {
+  $candidate = Join-Path $addon ('source-download-' + [guid]::NewGuid().ToString('N') + '.zip')
+  $sourceUrl = 'https://raw.githubusercontent.com/LamHoaiLinh/Kanban-QLCV-Linh/main/kan-tools/kanscan/KanScan_v1.4_Chinh_Rieng_Tung_Anh.zip'
+  try {
+    Write-Host '  KanScan: tai goi nguon tu GitHub...' -ForegroundColor Cyan
+    Invoke-WebRequest -UseBasicParsing -Uri $sourceUrl -OutFile $candidate -TimeoutSec 60
+    $digest = (Get-FileHash -LiteralPath $candidate -Algorithm SHA256).Hash.ToLowerInvariant()
+    if($digest -ne $ArchiveSha256.ToLowerInvariant()){ throw 'SHA-256 KanScan khong khop.' }
+    $zip = $candidate
+    $downloadedZip = $candidate
+    Write-Host '  KanScan: goi nguon GitHub da qua kiem tra SHA-256.' -ForegroundColor Green
+  } catch {
+    Remove-Item -LiteralPath $candidate -Force -ErrorAction SilentlyContinue
+    Write-Host ('  KanScan: tai GitHub chua thanh cong, thu goi ZIP cuc bo: ' + $_.Exception.Message) -ForegroundColor Yellow
+  }
+}
+# Offline/manual source fallback.
 foreach($folder in ($locations | Select-Object -Unique)) {
+  if($zip){break}
   if(-not (Test-Path -LiteralPath $folder)){continue}
   foreach($item in (Get-ChildItem -LiteralPath $folder -File -Filter 'KanScan_v1.4_Chinh_Rieng_Tung_Anh*.zip' -ErrorAction SilentlyContinue)) {
     try {
@@ -135,8 +155,8 @@ foreach($folder in ($locations | Select-Object -Unique)) {
   if($zip){break}
 }
 if(-not $zip){
-  Write-Host '  KanScan v1.4: khong thay ZIP chinh xac trong Downloads/Desktop/Documents - bo qua.' -ForegroundColor Yellow
-  Write-Host '  Luu KanScan_v1.4_Chinh_Rieng_Tung_Anh.zip vao Downloads, sau do chay Cap nhat/Sua KanBan Tools.' -ForegroundColor Yellow
+  Write-Host '  KanScan: chua tai duoc goi nguon GitHub va khong thay ZIP cuc bo hop le - bo qua.' -ForegroundColor Yellow
+  Write-Host '  Thu lai Cap nhat/Sua KanBan Tools khi co mang; ZIP goc v1.4 van la phuong an du phong.' -ForegroundColor Yellow
   return
 }
 
@@ -187,4 +207,5 @@ try {
   throw
 } finally {
   Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue
+  if($downloadedZip){Remove-Item -LiteralPath $downloadedZip -Force -ErrorAction SilentlyContinue}
 }

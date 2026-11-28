@@ -517,7 +517,7 @@ Report-InstallerProgress 93 "Đã kiểm tra dịch vụ lõi KanTool"
 try {
   $scanSpec=$Manifest.components.PSObject.Properties['kanscan']
   if($scanSpec -and $scanSpec.Value){
-    Write-Step 'KanScan v1.4 (tuy chon, cai rieng, khong anh huong KanBan Tools)'
+    Write-Step 'KanScan v1.5.1 (tu tai goi nguon GitHub, cai rieng)'
     $scanInstaller=Join-Path $TempDir 'install-kanscan.ps1'
     Download-File ([string]$scanSpec.Value.installer) $scanInstaller
     if((Get-Item -LiteralPath $scanInstaller).Length -lt 3500){ throw 'KanScan addon script qua ngan.' }
@@ -598,7 +598,7 @@ Write-Host "  - Alt+C / Alt+X: chup man hinh; Alt+A / Alt+P: KanPass; Web Bridge
 Write-Host "  - KanMedia: Tai / Chuyen doi / Edit Media"
 Write-Host "  - Ho tro ky PDF bang USB Token"
 Write-Host "  - KanBackup + Kopia: backup tang dan / dedup, lich Windows, restore rieng"
-Write-Host "  - KanScan: tuy chon, cai rieng neu da tai ZIP v1.4 ve Downloads"
+Write-Host "  - KanScan: cai rieng tu GitHub, ZIP cuc bo la phuong an du phong"
 Write-Host "  - KanRecorder: quay vung man hinh, click, phim tat, mic + am thanh he thong"
 Write-Host "  - Cap nhat theo tung thanh phan, khong tai lai neu khong can"
 Write-Host ""
