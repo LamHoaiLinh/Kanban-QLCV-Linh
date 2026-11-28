@@ -102,10 +102,32 @@ def allowed_origin(origin: str | None) -> bool:
         return True
     return origin in ALLOWED_ORIGINS or bool(LOCAL_ORIGIN_RE.match(origin))
 
+def is_file_lock(exc: OSError) -> bool:
+    # Windows sharing/lock violations, including access denied during replace.
+    return getattr(exc, "winerror", None) in (5, 32, 33)
+
+def atomic_write_json(path: Path, obj: object, attempts: int = 10) -> None:
+    # Each writer owns its temp file; concurrent worker/server writes cannot
+    # replace or truncate one another's temp files.
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
+    try:
+        tmp.write_text(json.dumps(obj, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+        for attempt in range(attempts):
+            try:
+                tmp.replace(path)
+                return
+            except OSError as exc:
+                if not is_file_lock(exc) or attempt + 1 >= attempts:
+                    raise
+                time.sleep(min(0.05 * (2 ** attempt), 0.4))
+    finally:
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
+
 def json_dump(path: Path, obj: object) -> None:
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(obj, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-    tmp.replace(path)
+    atomic_write_json(path, obj)
 
 def json_load(path: Path):
     return json.loads(path.read_text(encoding="utf-8-sig"))
@@ -825,7 +847,7 @@ def health() -> dict:
     ready = bool(yt_ok and node_ok and ff_ok and worker_ok)
     return {
         "ok": True,
-        "version": "KanMedia Agent 1.8.5",
+        "version": "KanMedia Agent 1.8.6",
         "mediaReady": ready,
         "ytDlp": "installed" if yt_ok else "",
         "ffmpeg": str(FFMPEG) if ff_ok else "",
@@ -880,13 +902,8 @@ def start_job(mode: str, payload: dict) -> dict:
         encoding="utf-8",
         errors="replace",
     )
-    try:
-        queued = json_load(job_path(job_id))
-        queued["workerPid"] = proc.pid
-        queued["updatedAt"] = time.time()
-        json_dump(job_path(job_id), queued)
-    except Exception:
-        pass
+    # The worker owns running status after launch. Do not write the queued
+    # snapshot back over a newer progress update.
     def watch():
         code = proc.wait()
         try:

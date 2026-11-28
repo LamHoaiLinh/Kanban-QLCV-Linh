@@ -39,6 +39,10 @@ jobs:
         shell: pwsh
         run: python -m py_compile kan-tools/runtime/kanmedia-server.py kan-tools/runtime/kanmedia-worker.py kan-tools/runtime/kanbackup-server.py kan-tools/recorder/kanrecorder.py capture-agent/capture_agent.py capture-agent/kanpass.py capture-agent/kanpass_webbridge.py office-tools/signing-agent/package/kanban_signing_agent.py
 
+      - name: Check KanMedia status file lock regression
+        shell: pwsh
+        run: python -m unittest discover -s kan-tools/runtime/tests -p test_status_write.py -v
+
       - name: Smoke test KanRecorder defaults and security contract
         shell: pwsh
         run: python -m unittest discover -s tests -p test_kanrecorder_smoke.py -v

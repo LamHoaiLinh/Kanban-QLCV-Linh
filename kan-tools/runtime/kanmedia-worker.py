@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import time
+import uuid
 from pathlib import Path
 
 if len(sys.argv) < 2:
@@ -41,15 +42,37 @@ def log(msg: str) -> None:
 def load_json(path: Path):
     return json.loads(path.read_text(encoding="utf-8-sig"))
 
+def is_file_lock(exc: OSError) -> bool:
+    # Windows sharing/lock violations, including access denied during replace.
+    return getattr(exc, "winerror", None) in (5, 32, 33)
+
+def atomic_write_json(path: Path, obj: object, attempts: int = 10) -> None:
+    # Each writer owns its temp file; concurrent worker/server writes cannot
+    # replace or truncate one another's temp files.
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
+    try:
+        tmp.write_text(json.dumps(obj, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+        for attempt in range(attempts):
+            try:
+                tmp.replace(path)
+                return
+            except OSError as exc:
+                if not is_file_lock(exc) or attempt + 1 >= attempts:
+                    raise
+                time.sleep(min(0.05 * (2 ** attempt), 0.4))
+    finally:
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
+
 def save_json(path: Path, data: dict) -> None:
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-    tmp.replace(path)
+    atomic_write_json(path, data, attempts=25 if data.get("state") in {"done", "error", "cancelled"} else 10)
 
 def status(state: str, percent: float, message: str, current: str = "", index: int = 0,
            total: int = 0, output: str = "", error: str = "", child_pid: int = 0,
            speed: str = "", eta: str = "", stage: str = "") -> None:
-    save_json(STATUS, {
+    data = {
         "ok": state != "error",
         "state": state,
         "percent": max(0, min(100, round(float(percent), 1))),
@@ -63,10 +86,19 @@ def status(state: str, percent: float, message: str, current: str = "", index: i
         "eta": eta,
         "stage": stage,
         "updatedAt": time.time(),
-        "workerVersion": "1.8.4",
+        "workerVersion": "1.8.6",
         "workerPid": os.getpid(),
         "childPid": child_pid,
-    })
+    }
+    try:
+        save_json(STATUS, data)
+    except OSError as exc:
+        # A locked progress file must not interrupt FFmpeg or yt-dlp.
+        # Terminal states are never silently dropped.
+        if state == "running" and is_file_lock(exc):
+            log("Progress update temporarily blocked: " + repr(exc))
+            return
+        raise
 
 def check_cancel() -> None:
     if CANCEL.exists():
@@ -721,7 +753,9 @@ def main():
     global DOWNLOADS
     DOWNLOADS = Path(str(p.get("downloadDir") or DOWNLOADS))
     DOWNLOADS.mkdir(parents=True, exist_ok=True)
+    check_cancel()
     status("running", 1, "Worker đã khởi động…", stage="startup")
+    check_cancel()
 
     if mode == "download":
         urls = list(p.get("urls") or [])
