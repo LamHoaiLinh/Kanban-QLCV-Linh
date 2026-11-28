@@ -825,7 +825,7 @@ def health() -> dict:
     ready = bool(yt_ok and node_ok and ff_ok and worker_ok)
     return {
         "ok": True,
-        "version": "KanMedia Agent 1.8.1",
+        "version": "KanMedia Agent 1.8.4",
         "mediaReady": ready,
         "ytDlp": "installed" if yt_ok else "",
         "ffmpeg": str(FFMPEG) if ff_ok else "",
@@ -1021,7 +1021,13 @@ def probe(payload: dict) -> dict:
                 code, out, err = run_text(args, 90)
         if code != 0 or not out:
             raise RuntimeError(err or out or "Không đọc được thông tin nguồn.")
-        info = json.loads(out)
+        try:
+            info = json.loads(out.lstrip("\ufeff").strip())
+        except json.JSONDecodeError as exc:
+            detail = (err or out or "yt-dlp không trả dữ liệu").strip().splitlines()[-1:]
+            raise RuntimeError("Không đọc được dữ liệu video từ yt-dlp. " + (detail[0][:600] if detail else "Phản hồi rỗng.")) from exc
+        if not isinstance(info, dict):
+            raise RuntimeError("yt-dlp trả về dữ liệu video không hợp lệ.")
         if all_playlist and (info.get("_type") == "playlist" or info.get("entries")):
             entries = [x for x in (info.get("entries") or []) if x]
             count = len(entries)

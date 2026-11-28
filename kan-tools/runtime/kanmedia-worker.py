@@ -63,7 +63,7 @@ def status(state: str, percent: float, message: str, current: str = "", index: i
         "eta": eta,
         "stage": stage,
         "updatedAt": time.time(),
-        "workerVersion": "1.8.1",
+        "workerVersion": "1.8.4",
         "workerPid": os.getpid(),
         "childPid": child_pid,
     })
@@ -265,18 +265,41 @@ def auto_update_ytdlp(reason: str) -> bool:
         log("yt-dlp self-heal exception: " + repr(exc))
         return False
 
+def run_info_capture(args: list[str], timeout: int = 90) -> tuple[int, str, str]:
+    check_cancel()
+    cp = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                        text=True, encoding="utf-8", errors="replace", timeout=timeout,
+                        env=env(), creationflags=CREATE_NO_WINDOW if os.name == "nt" else 0)
+    log("$ " + " ".join(args))
+    if cp.stderr:
+        log(cp.stderr)
+    check_cancel()
+    return cp.returncode, cp.stdout, cp.stderr
+
+def parse_yt_info(out: str, err: str) -> dict:
+    try:
+        info = json.loads(out.lstrip("\ufeff").strip())
+    except json.JSONDecodeError as exc:
+        detail = (err or out or "yt-dlp không trả dữ liệu").strip().splitlines()[-1:]
+        raise RuntimeError("Không đọc được dữ liệu video từ yt-dlp. " + (detail[0][:600] if detail else "Phản hồi rỗng.")) from exc
+    if not isinstance(info, dict):
+        raise RuntimeError("yt-dlp trả về dữ liệu video không hợp lệ.")
+    return info
+
 def yt_info(url: str) -> dict:
     args = [
         sys.executable, "-m", "yt_dlp",
         "--no-playlist", "--skip-download", "--js-runtimes", "node", "-J", url
     ]
-    code, out = run_capture(args, 90)
-    if code != 0 and is_youtube_url(url) and looks_like_ytdlp_breakage(out):
-        if auto_update_ytdlp(out):
-            code, out = run_capture(args, 90)
+    code, out, err = run_info_capture(args, 90)
+    combined = (out or "") + "\n" + (err or "")
+    if code != 0 and is_youtube_url(url) and looks_like_ytdlp_breakage(combined):
+        if auto_update_ytdlp(combined):
+            code, out, err = run_info_capture(args, 90)
     if code != 0:
-        raise RuntimeError("Không đọc được thông tin video. " + (out.strip().splitlines()[-1] if out.strip() else ""))
-    return json.loads(out)
+        detail = (err or out or "yt-dlp không trả dữ liệu").strip().splitlines()[-1:]
+        raise RuntimeError("Không đọc được thông tin video. " + (detail[0][:600] if detail else ""))
+    return parse_yt_info(out, err)
 
 def resolve_height(formats: list[dict], quality: str) -> int:
     hs = sorted({int(f["height"]) for f in formats if f.get("height")})
