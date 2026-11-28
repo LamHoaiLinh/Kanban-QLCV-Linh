@@ -4288,9 +4288,9 @@ const Touch = {
         this.canvas = c;
         this.ctx = c.getContext('2d');
 
-        window.addEventListener('pointerdown', e => this._down(e));
+        window.addEventListener('pointerdown', e => {if(e.target.id!=='f16-exit')this._down(e);});
         window.addEventListener('pointermove', e => this._moveTo(e));
-        window.addEventListener('pointerup', e => this._up(e, true));
+        window.addEventListener('pointerup', e => {if(e.target.id!=='f16-exit')this._up(e,true);});
         window.addEventListener('pointercancel', e => this._up(e, false));
         window.addEventListener('blur', () => this.reset());
         document.addEventListener('visibilitychange', () => {
@@ -4573,7 +4573,7 @@ const Touch = {
                 g.globalAlpha = on ? 1 : 0.8;
                 g.fillStyle = on ? '#ffffff' : '#c8d2e6';
                 g.font = 'bold ' + Math.round(0.38 * u) + "px 'Share Tech Mono', monospace";
-                g.fillText('◀ ' + b.label, b.x, b.y);
+                g.fillText('◀ ' + f16vi(b.label), b.x, b.y);
                 g.globalAlpha = 1;
             }
             return;
@@ -4615,7 +4615,7 @@ const Touch = {
             g.globalAlpha = 0.35;
             g.fillStyle = '#00e5ff';
             g.font = Math.round(0.36 * u) + "px 'Share Tech Mono', monospace";
-            g.fillText('MOVE', bx, by);
+            g.fillText('DI CHUYỂN', bx, by);
         }
         this._drawButtons(g, u);
     },
@@ -4627,7 +4627,7 @@ const Touch = {
             g.globalAlpha = on ? 1 : 0.7;
             g.fillStyle = on ? '#ffffff' : b.color;
             g.font = 'bold ' + Math.round(Math.min(0.42 * u, b.r * (b.label.length > 2 ? 0.42 : 0.8))) + "px 'Share Tech Mono', monospace";
-            g.fillText(b.label, b.x, b.y);
+            g.fillText(f16vi(b.label), b.x, b.y);
         }
         g.globalAlpha = 1;
     },
@@ -10500,8 +10500,7 @@ seeker: {name:'Tên lửa kép',color:'#44ffcc',desc:'Tên lửa tự tìm mục
     begin() {
         this.active = true;
         this.practice = null;
-        this.order = [0, 1, 2, 3, 4];
-        if (Campaign.secretUnlocked) this.order.push(5);
+        this.order = [0, 1, 2, 3, 4, 5];
         this.stage = 0;
         this.time = 0;
         this.stageTime = 0;
@@ -10525,7 +10524,7 @@ seeker: {name:'Tên lửa kép',color:'#44ffcc',desc:'Tên lửa tự tìm mục
 
     // Levels whose boss can be practised, in campaign order
     practiceLevels() {
-        return ALL_LEVELS.map((L, i) => i).filter(i => Campaign.bossesDefeated.includes(ALL_LEVELS[i].bossType));
+        return ALL_LEVELS.slice(0,6).map((L, i) => i).filter(i => Campaign.bossesDefeated.includes(ALL_LEVELS[i].bossType));
     },
 
     level() { return ALL_LEVELS[this.order[this.stage]]; },
@@ -14850,9 +14849,9 @@ const Menu = {
         // Portrait: the long lines wrap, pushing what follows down (`extra`)
         const pw = UI.w(920), tw = pw - 60;
         UI.panel(ctx, cx - pw / 2, 150, pw, Layout.portrait ? 720 : 660, color);
-        Neon.text(ctx, isSecret ? 'SIGNAL TERMINATED' : 'CAMPAIGN COMPLETE', cx, 250, color, 60, { core: 0.5, halo: 0.6 });
+        Neon.text(ctx, isSecret ? 'CHIẾN DỊCH THẮNG LỢI' : 'CAMPAIGN COMPLETE', cx, 250, color, 60, { core: 0.5, halo: 0.6 });
         const sub = isSecret
-            ? ['You silenced the relay. The void is quiet...', 'For now.']
+            ? ['Đã tiêu diệt lực lượng cuối cùng.', 'Chiến dịch hoàn thành.']
             : ['The threat has been neutralized.', 'Outstanding work, pilot.'];
         sub.forEach((line, i) => UI.label(ctx, line, cx, 305 + i * 30, UI.TEXT, 20));
         UI.label(ctx, 'DIFFICULTY: ' + GameConfig.difficulty.toUpperCase(), cx, 400, UI.DIM, 16);
@@ -14864,7 +14863,7 @@ const Menu = {
         } else if (!isSecret && Campaign.secretUnlocked) {
             Neon.text(ctx, 'SECRET LEVEL UNLOCKED: SIGNAL LOST', cx, 545, '#ff2bd6', 19, { halo: 0.4 });
         }
-        extra += UI.para(ctx, 'Thank you for playing Neon Storm \u03b3 \u2014 more to come!', cx, 600 + extra, tw, UI.DIM, 16, 28) - 628 - extra;
+        extra += UI.para(ctx, 'Cảm ơn đã chơi F-16 Air Striker!', cx, 600 + extra, tw, UI.DIM, 16, 28) - 628 - extra;
         const items = ['PLAY AGAIN', 'MAIN MENU'];
         const st = Layout.portrait ? 80 : 54;
         items.forEach((label, i) => UI.item(ctx, label, cx, 680 + extra + i * st, i === Menu.selectedIndex,
@@ -16669,12 +16668,14 @@ function gameLoop(timestamp) {
 
 /* F-16 Air Striker — localization, mobile isolation and return to Kanban. */
 const F16_VI={"NEW GAME":"CHIẾN DỊCH","ENDLESS MODE":"SINH TỒN","BOSS MODES":"CHẾ ĐỘ BOSS","BOSS RUSH":"ĐẤU TRÙM","BOSS PRACTICE":"LUYỆN ĐẤU TRÙM","HANGAR":"NHÀ CHỨA MÁY BAY","HIGH SCORES":"KỶ LỤC","ACHIEVEMENTS":"THÀNH TỰU","SETTINGS":"CÀI ĐẶT","HOW TO PLAY":"HƯỚNG DẪN","SELECT DIFFICULTY":"CHỌN ĐỘ KHÓ","CASUAL":"DỄ","NORMAL":"THƯỜNG","HARDCORE":"KHÓ","CUSTOM":"TÙY CHỈNH","BACK":"QUAY LẠI","SELECT LEVEL":"CHỌN CHƯƠNG","DIFFICULTY":"ĐỘ KHÓ","LOCKED":"KHÓA","NO RECORD":"CHƯA CÓ KỶ LỤC","BULLET HELL SHOOTER":"KHÔNG CHIẾN NEON","BRIEFING":"NHIỆM VỤ","CAMPAIGN COMPLETE":"HOÀN THÀNH CHIẾN DỊCH","SIGNAL TERMINATED":"CHIẾN DỊCH THẮNG LỢI","CAMPAIGN":"CHIẾN DỊCH","MISSION COMPLETE":"HOÀN THÀNH NHIỆM VỤ","GAME OVER":"THẤT BẠI","PAUSED":"TẠM DỪNG","PAUSE":"TẠM DỪNG","RESUME":"TIẾP TỤC","RETRY":"THỬ LẠI","RESTART":"CHƠI LẠI","NEXT LEVEL":"CHƯƠNG TIẾP","MAIN MENU":"TRANG CHỦ","PLAY AGAIN":"CHƠI LẠI","QUIT":"THOÁT","TOTAL SCORE":"TỔNG ĐIỂM","HIGH SCORE":"KỶ LỤC","SCORE":"ĐIỂM","TOTAL":"TỔNG","NEON CREDITS":"XU NEON","CREDITS":"XU","LIVES":"MẠNG","LIFE":"MẠNG","BOMBS":"BOM","BOMB":"BOM","DRONES":"UAV","DRONE":"UAV","WEAPON":"VŨ KHÍ","BASE SHOT":"ĐẠN CƠ BẢN","SPREAD SHOT":"ĐẠN TỎA","SPREAD":"ĐẠN TỎA","HOMING MISSILES":"TÊN LỬA DẪN ĐƯỜNG","HOMING":"TỰ TÌM","LASER BEAM":"TIA LASER","LASER":"LASER","CHAIN":"LIÊN KÍCH","GRAZE":"NÉ SÁT","SHIELD":"KHIÊN","DASH":"LƯỚT","SURGE":"BÙNG NỔ","FOCUS":"NGẮM","MOVE":"DI CHUYỂN","FIRE":"BẮN","LEVEL":"CHƯƠNG","PHASE":"GIAI ĐOẠN","TIME":"THỜI GIAN","WAVE":"ĐỢT","RANK":"HẠNG","BOSS":"TRÙM","BOSSES":"CÁC TRÙM","LOADOUT":"TRANG BỊ","CHOOSE YOUR WEAPON":"CHỌN VŨ KHÍ","CHOOSE AN UPGRADE":"CHỌN NÂNG CẤP","NO WEAPON YET":"CHƯA CÓ VŨ KHÍ","NONE":"KHÔNG","ON":"BẬT","OFF":"TẮT","LOW":"THẤP","MEDIUM":"VỪA","HIGH":"CAO","AUTO":"TỰ ĐỘNG","MANUAL":"THỦ CÔNG","DRAG":"VUỐT","STICK":"CẦN ẢO","SFX VOLUME":"ÂM HIỆU","MUSIC VOLUME":"NHẠC NỀN","SCREEN SHAKE":"RUNG MÀN HÌNH","GRAPHICS QUALITY":"CHẤT LƯỢNG HÌNH","3D BACKDROPS":"NỀN 3D","PARTICLES":"HIỆU ỨNG HẠT","SHOW HITBOX":"HIỆN VÙNG TRÚNG","SHOW FPS":"HIỆN FPS","FLASH REDUCTION":"GIẢM NHẤP NHÁY","COLORBLIND MODE":"CHẾ ĐỘ MÙ MÀU","FIRE MODE":"CHẾ ĐỘ BẮN","TOUCH CONTROLS":"ĐIỀU KHIỂN CẢM ỨNG","TOUCH MOVE":"DI CHUYỂN CẢM ỨNG","FULLSCREEN":"TOÀN MÀN HÌNH","CONTROLS":"ĐIỀU KHIỂN","RESET TO DEFAULTS":"KHÔI PHỤC MẶC ĐỊNH","START LEVEL":"CHƯƠNG BẮT ĐẦU","START":"BẮT ĐẦU","CONFIRM":"XÁC NHẬN","CANCEL":"HỦY","UNLOCKED":"ĐÃ MỞ","BUY":"MUA","EQUIP":"TRANG BỊ","EQUIPPED":"ĐANG DÙNG","SKIN":"MÀU MÁY BAY","TRAIL":"VỆT ĐUÔI","BULLET":"ĐẠN","PERFECT":"HOÀN HẢO","NEW LEVEL RECORD":"KỶ LỤC CHƯƠNG MỚI","TIME BONUS":"THƯỞNG THỜI GIAN","LIVES BONUS":"THƯỞNG MẠNG","NO DEATH BONUS":"THƯỞNG KHÔNG MẤT MẠNG","CHAIN BONUS":"THƯỞNG LIÊN KÍCH","GRAZE BONUS":"THƯỞNG NÉ SÁT","DEATH BOMB":"BOM CỨU MẠNG","TAP TO LAUNCH":"CHẠM ĐỂ XUẤT KÍCH","PRESS ENTER OR FIRE TO LAUNCH":"ENTER ĐỂ XUẤT KÍCH","ESC BACK":"ESC QUAY LẠI","ESC TO GO BACK":"ESC QUAY LẠI","ARROW KEYS / D-PAD TO SELECT":"PHÍM MŨI TÊN ĐỂ CHỌN","ENTER TO CONFIRM":"ENTER XÁC NHẬN","DEFEAT A BOSS TO UNLOCK BOSS PRACTICE":"HẠ TRÙM ĐỂ MỞ LUYỆN TẬP","CLEAR THE CAMPAIGN TO UNLOCK":"HOÀN THÀNH CHIẾN DỊCH ĐỂ MỞ","The threat has been neutralized.":"Mối đe dọa đã bị loại bỏ.","Outstanding work, pilot.":"Nhiệm vụ hoàn thành, phi công!","You silenced the relay. The void is quiet...":"Đã vô hiệu hóa trạm chuyển tiếp.","For now.":"Bầu trời đã an toàn.","Thank you for playing Neon Storm γ — more to come!":"Cảm ơn đã chơi F-16 Air Striker!","0.5x SCORE  •  5 LIVES  •  ALL ASSISTS ON":"0,5x ĐIỂM • 5 MẠNG • CÓ HỖ TRỢ","1.0x SCORE  •  3 LIVES  •  STANDARD EXPERIENCE":"1x ĐIỂM • 3 MẠNG • TIÊU CHUẨN","2.0x SCORE  •  1 LIFE  •  NO BOMBS OR FOCUS":"2x ĐIỂM • 1 MẠNG • KHÔNG BOM","MIX AND MATCH  •  NO LEADERBOARD":"TỰ CHỈNH • KHÔNG XẾP HẠNG"};
+Object.assign(F16_VI,{"ARMAMENT":"VŨ KHÍ","UPGRADE":"NÂNG CẤP","SWITCH TO":"ĐỔI SANG","A WIDE FAN OF SHOTS":"Đạn tỏa hình quạt","MISSILES THAT SEEK THEIR TARGET":"Tên lửa tự tìm mục tiêu","A PIERCING BEAM, HIGH DAMAGE":"Tia xuyên giáp sát thương cao","WEAPON POWER +1":"Tăng một cấp vũ khí","MORE DRONE FIREPOWER":"Tăng hỏa lực UAV","AN EXTRA SHIP":"Thêm một mạng","CLEAR THE SCREEN WHEN IT GETS BAD":"Xóa đạn địch khi nguy cấp","FIRST BLOOD":"CHIẾN CÔNG ĐẦU","BOSS SLAYER":"HẠ TRÙM","BOSS MASTER":"BẬC THẦY ĐẤU TRÙM","EXTERMINATOR":"TIÊU DIỆT ĐỊCH","CHAIN STARTER":"LIÊN KÍCH KHỞI ĐẦU","CHAIN EXPERT":"CHUYÊN GIA LIÊN KÍCH","CHAIN MASTER":"BẬC THẦY LIÊN KÍCH","SCORE LEGEND":"HUYỀN THOẠI ĐIỂM SỐ","UNTOUCHABLE":"BẤT BẠI","FULLY ARMED":"VŨ TRANG TỐI ĐA","DRONE COMMANDER":"CHỈ HUY UAV","THE ARCHITECT":"KIẾN TRÚC SƯ","THE FURNACE":"LÒ LUYỆN","THE LEVIATHAN":"THỦY QUÁI","THE NEXUS":"LÕI ĐIỀU KHIỂN","THE ECHO":"TIẾNG VỌNG","TAP":"CHẠM","LV":"CẤP","SHOOT":"BẮN","PLAYER":"PHI CÔNG","PILOT":"PHI CÔNG","COMBO":"LIÊN KÍCH","BEST":"KỶ LỤC","NEW RECORD":"KỶ LỤC MỚI","CLOSE":"ĐÓNG","EXIT":"THOÁT","SELECT":"CHỌN","RETURN TO TITLE":"VỀ TRANG CHỦ","QUIT TO TITLE":"VỀ TRANG CHỦ","SHOP":"CỬA HÀNG","PURCHASE":"MUA","COST":"GIÁ","OWNED":"ĐÃ SỞ HỮU","UNLOCK":"MỞ KHÓA","CUSTOMIZE":"TÙY CHỈNH","WARNING":"CẢNH BÁO","INCOMING":"ĐANG ĐẾN","VICTORY":"CHIẾN THẮNG","MISSION":"NHIỆM VỤ","FIREPOWER":"HỎA LỰC","GRAZES":"NÉ SÁT","KILLS":"TIÊU DIỆT"});
 const F16_KEYS=Object.keys(F16_VI).sort((a,b)=>b.length-a.length);
+const F16_PATTERN=new RegExp('(^|[^A-Za-zÀ-ỹ])('+F16_KEYS.filter(k=>/^[A-Z][A-Z ]+$/.test(k)).join('|')+')(?![A-Za-zÀ-ỹ])','g');
 function f16vi(value){
  if(typeof value!=='string')return value;
  if(Object.prototype.hasOwnProperty.call(F16_VI,value))return F16_VI[value];
  // Only translate words in UI output, never the identifiers used by gameplay.
- return value.replace(new RegExp('(?<![A-Za-zÀ-ỹ])(?:'+F16_KEYS.filter(k=>/^[A-Z][A-Z ]+$/.test(k)).join('|')+')(?![A-Za-zÀ-ỹ])','g'),m=>F16_VI[m]||m);
+ return value.replace(F16_PATTERN,(m,p,k)=>p+(F16_VI[k]||k));
 }
 const f16Text=Neon.text;
 Neon.text=function(c,str,x,y,color,size,opts){return f16Text.call(this,c,f16vi(str),x,y,color,size,opts);};
