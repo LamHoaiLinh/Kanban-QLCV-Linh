@@ -3928,7 +3928,7 @@ const DIFFICULTY_PRESETS = {
         focus: { enabled: true, speedMultiplier: 0.4 },
         dash: { enabled: true, cooldown: 2.0 },
         graze: { enabled: true, zoneMultiplier: 1.0, rewardMultiplier: 1.0 },
-        autofire: false,
+        autofire: true,
         lives: 3,
         shieldHp: 0,
         deathPenalty: 'moderate',
@@ -3942,7 +3942,7 @@ const DIFFICULTY_PRESETS = {
         focus: { enabled: true, speedMultiplier: 0.4 }, // focus is a precision tool, not an assist
         dash: { enabled: true, cooldown: 3.0 },
         graze: { enabled: true, zoneMultiplier: 0.7, rewardMultiplier: 1.5 },
-        autofire: false,
+        autofire: true,
         lives: 1,
         shieldHp: 0,
         deathPenalty: 'full',
@@ -3955,7 +3955,7 @@ const DIFFICULTY_PRESETS = {
 
 let GameConfig = JSON.parse(JSON.stringify(DIFFICULTY_PRESETS.normal));
 GameConfig.difficulty = 'normal';
-GameConfig.fireMode = 'manual'; // 'auto' or 'manual'
+GameConfig.fireMode = 'auto'; // Always automatic in F-16
 
 
 // === input.js ===
@@ -3977,7 +3977,6 @@ const Input = {
         down: ['ArrowDown', 'KeyS'],
         left: ['ArrowLeft', 'KeyA'],
         right: ['ArrowRight', 'KeyD'],
-        fire: ['Space', 'KeyZ'],
         focus: ['ShiftLeft', 'ShiftRight', 'KeyX'],
         dash: ['KeyC', 'KeyV'],
         bomb: ['KeyB', 'KeyN'],
@@ -3989,7 +3988,6 @@ const Input = {
 
     // Default gamepad bindings
     defaultGpBindings: {
-        fire: [0, 2],       // A, X
         focus: [6],          // Left trigger
         dash: [5],           // Right bumper
         bomb: [4],           // Left bumper
@@ -4004,7 +4002,7 @@ const Input = {
     gpBindings: {},
 
     // Actions that can be rebound by the player (excludes menu-only actions)
-    rebindableActions: ['up', 'down', 'left', 'right', 'fire', 'focus', 'dash', 'bomb', 'surge', 'pause'],
+    rebindableActions: ['up', 'down', 'left', 'right', 'focus', 'dash', 'bomb', 'surge', 'pause'],
 
     // Human-readable names for key codes
     keyDisplayNames: {
@@ -4265,6 +4263,7 @@ const Touch = {
     move: { x: 0, y: 0 },
     drag: null,          // { id, x, y } — the dragging finger, CSS px
     pending: { x: 0, y: 0 },
+    mouseTarget: null,   // absolute target in play-area coordinates, not screen pixels
     heading: null,       // direction of the latest drag travel, for dash
     _headingAge: 0,      // frames since the drag last moved
     owners: {},          // pointerId -> action of the button that touch started on
@@ -4290,6 +4289,7 @@ const Touch = {
 
         window.addEventListener('pointerdown', e => {if(e.target.id!=='f16-exit')this._down(e);});
         window.addEventListener('pointermove', e => this._moveTo(e));
+        canvas.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse') this.mouseTarget = null; });
         window.addEventListener('pointerup', e => {if(e.target.id!=='f16-exit')this._up(e,true);});
         window.addEventListener('pointercancel', e => this._up(e, false));
         window.addEventListener('blur', () => this.reset());
@@ -4314,6 +4314,7 @@ const Touch = {
         this.stick = null;
         this.drag = null;
         this.menuTouch = null;
+        this.mouseTarget = null;
         this.pending = { x: 0, y: 0 };
         this.owners = {};
         this.held = {};
@@ -4388,7 +4389,13 @@ const Touch = {
     },
 
     _down(e) {
+        if (e.pointerType === 'mouse') {
+            if (e.button !== 0) return;
+            if (this._mode() === 'menu') return this._menuDown(e, e.clientX, e.clientY);
+            return this._setMouseTarget(e);
+        }
         if (e.pointerType !== 'touch' || !this.enabled()) return;
+        this.mouseTarget = null;
         Input.lastDevice = 'touch';
         const x = e.clientX, y = e.clientY;
         if (this._mode() === 'menu') return this._menuDown(e, x, y);
@@ -4416,7 +4423,7 @@ const Touch = {
     _menuDown(e, x, y) {
         const back = this._backButton();
         const pad = 0.25 * this._unit();
-        if (back && Math.abs(x - back.x) < back.w / 2 + pad && Math.abs(y - back.y) < back.h / 2 + pad) {
+        if (e.pointerType === 'touch' && back && Math.abs(x - back.x) < back.w / 2 + pad && Math.abs(y - back.y) < back.h / 2 + pad) {
             return this._press(e.pointerId, 'back');
         }
         if (this.menuTouch) return; // one finger at a time on menus
@@ -4438,6 +4445,7 @@ const Touch = {
             }
             return;
         }
+        if (e.pointerType === 'mouse') { this._setMouseTarget(e); return; }
         const f = this.drag;
         if (f && e.pointerId === f.id) {
             // Screen travel -> play-area px (the overlay canvas spans SCREEN_W)
@@ -4462,6 +4470,24 @@ const Touch = {
             s.bx += dx / d * (d - R);
             s.by += dy / d * (d - R);
         }
+    },
+
+    _setMouseTarget(e) {
+        if (this._mode() !== 'play' || e.target !== canvas) { this.mouseTarget = null; return; }
+        const p = this._logical(e.clientX, e.clientY);
+        const x = p.x - PLAY_X, y = p.y - PLAY_Y;
+        if (x < 0 || x > PLAY_W || y < 0 || y > PLAY_H) { this.mouseTarget = null; return; }
+        Input.lastDevice = 'mouse';
+        this.mouseTarget = { x, y };
+    },
+
+    mouseStep(x, y, radius, maxStep) {
+        if (!this.mouseTarget || !['mouse','keyboard','pad'].includes(Input.lastDevice)) return null;
+        const tx = Math.max(radius, Math.min(PLAY_W - radius, this.mouseTarget.x));
+        const ty = Math.max(radius, Math.min(PLAY_H - radius, this.mouseTarget.y));
+        const dx = tx - x, dy = ty - y, d = Math.hypot(dx, dy);
+        const k = d > 0 ? Math.min(1, maxStep / d) : 0;
+        return { x: dx * k, y: dy * k };
     },
 
     _fullscreen() {
@@ -4510,8 +4536,7 @@ const Touch = {
 
         this.held = {};
         for (const id in this.owners) this.held[this.owners[id]] = true;
-        if (this._mode() === 'play' && (s || this.drag || this.held.focus)) this.held.fire = true;
-        if (this._mode() !== 'play') this.pending = { x: 0, y: 0 };
+        if (this._mode() !== 'play') { this.pending = { x: 0, y: 0 }; this.mouseTarget = null; }
         if (++this._headingAge > 8) this.heading = null; // dash only follows a drag still moving
     },
 
@@ -5374,7 +5399,7 @@ const Settings = {
         showHitbox: false,
         showFps: false,
         flashReduction: false,
-        fireMode: 'manual',     // 'auto', 'manual'
+        fireMode: 'auto',       // Always automatic
         colorblind: false,
         graphicsQuality: 'auto',  // 'auto', 'high', 'medium', 'low'
         backdrop3d: true,         // three.js level backdrops (backdrop3d.js); off = shader backdrops
@@ -5395,7 +5420,6 @@ const Settings = {
         { key: 'showFps', label: 'SHOW FPS', type: 'toggle' },
         { key: 'flashReduction', label: 'FLASH REDUCTION', type: 'toggle' },
         { key: 'colorblind', label: 'COLORBLIND MODE', type: 'toggle' },
-        { key: 'fireMode', label: 'FIRE MODE', type: 'cycle', options: ['manual', 'auto'] },
         { key: 'touchControls', label: 'TOUCH CONTROLS', type: 'cycle', options: ['auto', 'on', 'off'] },
         { key: 'touchMove', label: 'TOUCH MOVE', type: 'cycle', options: ['drag', 'stick'] },
         { key: 'fullscreen', label: 'FULLSCREEN', type: 'cycle', options: ['auto', 'off'] },
@@ -5420,7 +5444,8 @@ const Settings = {
         }
         Audio.sfxVolume = this.values.sfxVolume / 100;
         Audio.musicVolume = this.values.musicVolume / 100;
-        GameConfig.fireMode = this.values.fireMode;
+        this.values.fireMode = 'auto';
+        GameConfig.fireMode = 'auto';
         // FULLSCREEN OFF leaves fullscreen straight away
         if (this.values.fullscreen === 'off' && document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
     },
@@ -5946,7 +5971,6 @@ const CustomDifficulty = {
         { key: 'dash_cooldown', label: 'DASH COOLDOWN', type: 'cycle', options: [1.0, 1.5, 2.0, 3.0, 5.0], configPath: ['dash', 'cooldown'], suffix: 's' },
         { key: 'graze_enabled', label: 'GRAZE SYSTEM', type: 'toggle', configPath: ['graze', 'enabled'] },
         { key: 'graze_zone', label: 'GRAZE ZONE', type: 'cycle', options: [1.4, 1.0, 0.7], labels: ['GENEROUS', 'STANDARD', 'TIGHT'], configPath: ['graze', 'zoneMultiplier'] },
-        { key: 'autofire', label: 'AUTO-FIRE', type: 'toggle', configPath: ['autofire'] },
         { key: 'lives', label: 'LIVES', type: 'cycle', options: [1, 2, 3, 5], configPath: ['lives'] },
         { key: 'shieldHp', label: 'SHIELD HP', type: 'cycle', options: [0, 1, 2, 3, 5], labels: ['OFF', '1 HIT', '2 HITS', '3 HITS', '5 HITS'], configPath: ['shieldHp'] },
         { key: 'deathPenalty', label: 'DEATH PENALTY', type: 'cycle', options: ['none', 'moderate', 'full'], configPath: ['deathPenalty'] },
@@ -6399,8 +6423,8 @@ const Hangar = {
 const Tutorial = {
     pageIndex: 0,
     pages: [
-        { title: 'MOVEMENT', lines: ['Use ARROW KEYS or WASD to move your ship.', 'Your ship can move in all 8 directions.', '', 'Hold SHIFT or X for FOCUS MODE — slower', 'movement and a tighter shot pattern.', 'Your hitbox is the tiny dot at the center!', '', 'Gamepad: Left Stick to move.', 'Left Trigger to focus.'] },
-        { title: 'SHOOTING', lines: ['Press SPACE or Z to fire.', 'Toggle AUTO-FIRE in Settings menu.', '', 'Collect weapon power-ups to upgrade:', '  S = SPREAD SHOT (orange)', '  H = HOMING MISSILES (green)', '  L = LASER BEAM (blue)', '  D = DRONES (purple, passive slot)', '', 'Same pickup = level up (max Lv5).', 'Different pickup = switch weapon to Lv1.', '', 'Hold FOCUS to tighten your spread.'] },
+        { title: 'MOVEMENT', lines: ['PC: Di chuyển chuột, không cần giữ nút.', 'Điện thoại: Vuốt để di chuyển máy bay.', '', 'Hold SHIFT or X for FOCUS MODE — slower', 'movement and a tighter shot pattern.', 'Your hitbox is the tiny dot at the center!', '', 'Gamepad: Left Stick to move.', 'Left Trigger to focus.'] },
+        { title: 'SHOOTING', lines: ['Máy bay tự động bắn liên tục.', 'Không cần nhấn hay giữ nút bắn.', '', 'Collect weapon power-ups to upgrade:', '  S = SPREAD SHOT (orange)', '  H = HOMING MISSILES (green)', '  L = LASER BEAM (blue)', '  D = DRONES (purple, passive slot)', '', 'Same pickup = level up (max Lv5).', 'Different pickup = switch weapon to Lv1.', '', 'Hold FOCUS to tighten your spread.'] },
         { title: 'ABILITIES', lines: ['DASH (C or V) — Quick invincible burst', 'in your movement direction. Has a cooldown.', '', 'BOMB (B or N) — Clears all enemy bullets', 'and damages all enemies. Limited stock.', '', 'Gamepad: Right Bumper = Dash', '         Left Bumper = Bomb'] },
         { title: 'SCORING', lines: ['CHAIN COMBO — Kill enemies quickly to', 'build a score multiplier:', '  10 hits=2x  20=3x  35=5x  60+=8x', '', 'GRAZE — Fly close to enemy bullets to', 'fill the SURGE meter.', '', 'NEON SURGE — When meter is full, press', 'SURGE (F / M) to activate: 2x fire rate,', '3x score, and your shots cancel bullets!', '', 'Destroying tough enemies converts their', 'bullets into bonus score pickups.'] },
         { title: 'TIPS', lines: ['Dying drops your weapon 1 level and', 'breaks your chain combo.', '', 'Use FOCUS MODE during dense boss patterns.', 'Your tiny hitbox is your best friend!', '', 'DASH can save you from impossible spots.', '', 'Pre-boss section has extra power-up drops.', 'Stock up before the big fight!', '', 'Earn NEON CREDITS from your score to', 'unlock cosmetics in the HANGAR.', '', 'GOOD LUCK, PILOT!'] }
@@ -12070,13 +12094,19 @@ const Player = {
             // Normal movement
             const move = Input.getMovement();
             const spd = this.speed * (this.isFocusing() ? GameConfig.focus.speedMultiplier : 1);
-            this.x += move.x * spd * dt;
-            this.y += move.y * spd * dt;
-            // Touch drag: follow the finger's travel, no faster than top speed
             const r = this.radius;
-            const step = Touch.takeDrag(this.speed * dt, this.speed,
-                { left: r - this.x, right: PLAY_W - r - this.x, top: r - this.y, bottom: PLAY_H - r - this.y });
-            if (step) { this.x += step.x; this.y += step.y; }
+            // Mouse follows the cursor without clicking, with original speed and collision rules.
+            // Keyboard/controller movement overrides the mouse until the next mouse movement.
+            if (move.x || move.y) Touch.mouseTarget = null;
+            const mouse = Touch.mouseStep(this.x, this.y, r, spd * dt);
+            if (mouse) { this.x += mouse.x; this.y += mouse.y; }
+            else {
+                this.x += move.x * spd * dt;
+                this.y += move.y * spd * dt;
+                const step = Touch.takeDrag(this.speed * dt, this.speed,
+                    { left: r - this.x, right: PLAY_W - r - this.x, top: r - this.y, bottom: PLAY_H - r - this.y });
+                if (step) { this.x += step.x; this.y += step.y; }
+            }
         }
 
         // Clamp to play area
@@ -12088,7 +12118,7 @@ const Player = {
         if (this.trailPositions.length > 10) this.trailPositions.pop();
 
         // Firing — auto-fire keeps shooting while focusing (focus tightens the pattern instead)
-        const shouldFire = (GameConfig.fireMode === 'auto' || Touch.visible() || Input.isHeld('fire')) && !this.dashing && this.deathPending <= 0;
+        const shouldFire = !this.dashing && this.deathPending <= 0;
         const rateMult = Scoring.surgeActive ? 0.5 : 1; // Neon Surge: double fire rate
         this.fireTimer -= dt;
         this.weaponTimer -= dt;
@@ -12444,6 +12474,10 @@ seeker: isDefaultBullet ? '#44ffcc' : bColor,
 
     _startDash() {
         let move = Input.getMovement();
+        if (move.x === 0 && move.y === 0 && Touch.mouseTarget) {
+            const dx = Touch.mouseTarget.x - this.x, dy = Touch.mouseTarget.y - this.y, d = Math.hypot(dx,dy);
+            if (d > 1) move = {x: dx/d, y: dy/d};
+        }
         if (move.x === 0 && move.y === 0 && Touch.heading) move = Touch.heading; // dragging
         if (move.x === 0 && move.y === 0) {
             this.dashDir = { x: 0, y: -1 }; // Default: dash up
@@ -14200,8 +14234,8 @@ const HUD = {
 
         // Controls reference (actual bindings)
         const controls = [
-            ['MOVE', Input.getKeyBindDisplay('up').split(' / ')[0] + '/' + Input.getKeyBindDisplay('down').split(' / ')[0]],
-            ['FIRE', Input.getKeyBindDisplay('fire')],
+            ['MOVE', 'CHUỘT / VUỐT'],
+            ['HỎA LỰC', 'TỰ ĐỘNG'],
             ['FOCUS', Input.getKeyBindDisplay('focus')],
             ['DASH', Input.getKeyBindDisplay('dash')],
             ['BOMB', Input.getKeyBindDisplay('bomb')],
@@ -14717,7 +14751,7 @@ const Menu = {
 
         // Start prompt with an auto-start countdown
         ctx.globalAlpha = inK * (Renderer.calm() ? 1 : 0.7 + Math.sin(t * 5) * 0.3);
-        Neon.text(ctx, UI.keys('PRESS ENTER OR FIRE TO LAUNCH'), cx, 850, '#ffffff', 22, { halo: 0.3 });
+        Neon.text(ctx, UI.keys('PRESS ENTER TO LAUNCH'), cx, 850, '#ffffff', 22, { halo: 0.3 });
         ctx.globalAlpha = inK;
         Neon.bar(ctx, cx - 180, 880, 360, 4, Math.min(1, t / 8), UI.CYAN, 0);
         ctx.globalAlpha = 1;
@@ -14749,7 +14783,7 @@ const Menu = {
         this._drawThreat(ctx, lvl.bossType, t, { cx, top: ty, w: 440, h: Math.min(380, PLAY_Y + PLAY_H - 130 - ty), scale: 1.2 });
 
         ctx.globalAlpha = inK * (Renderer.calm() ? 1 : 0.7 + Math.sin(t * 5) * 0.3);
-        Neon.text(ctx, UI.keys('PRESS ENTER OR FIRE TO LAUNCH'), cx, PLAY_Y + PLAY_H - 70, '#ffffff', 22, { halo: 0.3 });
+        Neon.text(ctx, UI.keys('PRESS ENTER TO LAUNCH'), cx, PLAY_Y + PLAY_H - 70, '#ffffff', 22, { halo: 0.3 });
         ctx.globalAlpha = inK;
         Neon.bar(ctx, cx - 180, PLAY_Y + PLAY_H - 44, 360, 4, Math.min(1, t / 8), UI.CYAN, 0);
         ctx.globalAlpha = 1;
@@ -15031,7 +15065,8 @@ const Game = {
         } else {
             GameConfig = CustomDifficulty.getConfig();
         }
-        GameConfig.fireMode = GameConfig.autofire ? 'auto' : Settings.values.fireMode;
+        GameConfig.fireMode = 'auto';
+        GameConfig.autofire = true;
 
         const levelData = ALL_LEVELS[levelIndex];
         this.currentLevelIndex = levelIndex;
@@ -15131,7 +15166,8 @@ const Game = {
     startEndless(difficulty) {
         GameConfig = JSON.parse(JSON.stringify(DIFFICULTY_PRESETS[difficulty]));
         GameConfig.difficulty = difficulty;
-        GameConfig.fireMode = GameConfig.autofire ? 'auto' : Settings.values.fireMode;
+        GameConfig.fireMode = 'auto';
+        GameConfig.autofire = true;
         GameConfig._baseDensity = GameConfig.bulletDensity;
         this.applyLevelScaling(1, GameConfig._baseDensity);
         this.currentLevelIndex = -1; // Flag for endless mode
@@ -15171,7 +15207,8 @@ const Game = {
         } else {
             GameConfig = CustomDifficulty.getConfig();
         }
-        GameConfig.fireMode = GameConfig.autofire ? 'auto' : Settings.values.fireMode;
+        GameConfig.fireMode = 'auto';
+        GameConfig.autofire = true;
         GameConfig._baseDensity = GameConfig.bulletDensity || 1.0;
         this._rushDifficulty = difficulty;
         this._retryLoadout = null;
@@ -15188,7 +15225,8 @@ const Game = {
         SaveData.migrated = null;
         GameConfig = JSON.parse(JSON.stringify(DIFFICULTY_PRESETS[setup.difficulty]));
         GameConfig.difficulty = setup.difficulty;
-        GameConfig.fireMode = GameConfig.autofire ? 'auto' : Settings.values.fireMode;
+        GameConfig.fireMode = 'auto';
+        GameConfig.autofire = true;
         GameConfig._baseDensity = GameConfig.bulletDensity || 1.0;
         this._retryLoadout = null;
         EndlessMode.active = false;
@@ -15505,7 +15543,8 @@ const Game = {
                     Transition.start(() => { this.startBossRush('custom'); });
                 } else if (cdResult === 'start') {
                     GameConfig = CustomDifficulty.getConfig();
-                    GameConfig.fireMode = Settings.values.fireMode;
+                    GameConfig.fireMode = 'auto';
+                    GameConfig.autofire = true;
                     this.currentLevelIndex = CustomDifficulty.startLevel || 0;
                     this.showBriefing(this.currentLevelIndex);
                 } else if (cdResult === 'back') {
@@ -15608,7 +15647,7 @@ const Game = {
             case 'briefing':
                 this.briefingTimer += dt;
                 Background.update(dt);   // keep the briefing backdrop moving
-                if (Input.isPressed('confirm') || Input.isPressed('fire') || this.briefingTimer > 8) {
+                if (Input.isPressed('confirm') || this.briefingTimer > 8) {
                     Audio.playMenuSelect();
                     const lvlIdx = this.currentLevelIndex;
                     const diff = GameConfig.difficulty;
@@ -16669,6 +16708,7 @@ function gameLoop(timestamp) {
 /* F-16 Air Striker — localization, mobile isolation and return to Kanban. */
 const F16_VI={"NEW GAME":"CHIẾN DỊCH","ENDLESS MODE":"SINH TỒN","BOSS MODES":"CHẾ ĐỘ BOSS","BOSS RUSH":"ĐẤU TRÙM","BOSS PRACTICE":"LUYỆN ĐẤU TRÙM","HANGAR":"NHÀ CHỨA MÁY BAY","HIGH SCORES":"KỶ LỤC","ACHIEVEMENTS":"THÀNH TỰU","SETTINGS":"CÀI ĐẶT","HOW TO PLAY":"HƯỚNG DẪN","SELECT DIFFICULTY":"CHỌN ĐỘ KHÓ","CASUAL":"DỄ","NORMAL":"THƯỜNG","HARDCORE":"KHÓ","CUSTOM":"TÙY CHỈNH","BACK":"QUAY LẠI","SELECT LEVEL":"CHỌN CHƯƠNG","DIFFICULTY":"ĐỘ KHÓ","LOCKED":"KHÓA","NO RECORD":"CHƯA CÓ KỶ LỤC","BULLET HELL SHOOTER":"KHÔNG CHIẾN NEON","BRIEFING":"NHIỆM VỤ","CAMPAIGN COMPLETE":"HOÀN THÀNH CHIẾN DỊCH","SIGNAL TERMINATED":"CHIẾN DỊCH THẮNG LỢI","CAMPAIGN":"CHIẾN DỊCH","MISSION COMPLETE":"HOÀN THÀNH NHIỆM VỤ","GAME OVER":"THẤT BẠI","PAUSED":"TẠM DỪNG","PAUSE":"TẠM DỪNG","RESUME":"TIẾP TỤC","RETRY":"THỬ LẠI","RESTART":"CHƠI LẠI","NEXT LEVEL":"CHƯƠNG TIẾP","MAIN MENU":"TRANG CHỦ","PLAY AGAIN":"CHƠI LẠI","QUIT":"THOÁT","TOTAL SCORE":"TỔNG ĐIỂM","HIGH SCORE":"KỶ LỤC","SCORE":"ĐIỂM","TOTAL":"TỔNG","NEON CREDITS":"XU NEON","CREDITS":"XU","LIVES":"MẠNG","LIFE":"MẠNG","BOMBS":"BOM","BOMB":"BOM","DRONES":"UAV","DRONE":"UAV","WEAPON":"VŨ KHÍ","BASE SHOT":"ĐẠN CƠ BẢN","SPREAD SHOT":"ĐẠN TỎA","SPREAD":"ĐẠN TỎA","HOMING MISSILES":"TÊN LỬA DẪN ĐƯỜNG","HOMING":"TỰ TÌM","LASER BEAM":"TIA LASER","LASER":"LASER","CHAIN":"LIÊN KÍCH","GRAZE":"NÉ SÁT","SHIELD":"KHIÊN","DASH":"LƯỚT","SURGE":"BÙNG NỔ","FOCUS":"NGẮM","MOVE":"DI CHUYỂN","FIRE":"BẮN","LEVEL":"CHƯƠNG","PHASE":"GIAI ĐOẠN","TIME":"THỜI GIAN","WAVE":"ĐỢT","RANK":"HẠNG","BOSS":"TRÙM","BOSSES":"CÁC TRÙM","LOADOUT":"TRANG BỊ","CHOOSE YOUR WEAPON":"CHỌN VŨ KHÍ","CHOOSE AN UPGRADE":"CHỌN NÂNG CẤP","NO WEAPON YET":"CHƯA CÓ VŨ KHÍ","NONE":"KHÔNG","ON":"BẬT","OFF":"TẮT","LOW":"THẤP","MEDIUM":"VỪA","HIGH":"CAO","AUTO":"TỰ ĐỘNG","MANUAL":"THỦ CÔNG","DRAG":"VUỐT","STICK":"CẦN ẢO","SFX VOLUME":"ÂM HIỆU","MUSIC VOLUME":"NHẠC NỀN","SCREEN SHAKE":"RUNG MÀN HÌNH","GRAPHICS QUALITY":"CHẤT LƯỢNG HÌNH","3D BACKDROPS":"NỀN 3D","PARTICLES":"HIỆU ỨNG HẠT","SHOW HITBOX":"HIỆN VÙNG TRÚNG","SHOW FPS":"HIỆN FPS","FLASH REDUCTION":"GIẢM NHẤP NHÁY","COLORBLIND MODE":"CHẾ ĐỘ MÙ MÀU","FIRE MODE":"CHẾ ĐỘ BẮN","TOUCH CONTROLS":"ĐIỀU KHIỂN CẢM ỨNG","TOUCH MOVE":"DI CHUYỂN CẢM ỨNG","FULLSCREEN":"TOÀN MÀN HÌNH","CONTROLS":"ĐIỀU KHIỂN","RESET TO DEFAULTS":"KHÔI PHỤC MẶC ĐỊNH","START LEVEL":"CHƯƠNG BẮT ĐẦU","START":"BẮT ĐẦU","CONFIRM":"XÁC NHẬN","CANCEL":"HỦY","UNLOCKED":"ĐÃ MỞ","BUY":"MUA","EQUIP":"TRANG BỊ","EQUIPPED":"ĐANG DÙNG","SKIN":"MÀU MÁY BAY","TRAIL":"VỆT ĐUÔI","BULLET":"ĐẠN","PERFECT":"HOÀN HẢO","NEW LEVEL RECORD":"KỶ LỤC CHƯƠNG MỚI","TIME BONUS":"THƯỞNG THỜI GIAN","LIVES BONUS":"THƯỞNG MẠNG","NO DEATH BONUS":"THƯỞNG KHÔNG MẤT MẠNG","CHAIN BONUS":"THƯỞNG LIÊN KÍCH","GRAZE BONUS":"THƯỞNG NÉ SÁT","DEATH BOMB":"BOM CỨU MẠNG","TAP TO LAUNCH":"CHẠM ĐỂ XUẤT KÍCH","PRESS ENTER OR FIRE TO LAUNCH":"ENTER ĐỂ XUẤT KÍCH","ESC BACK":"ESC QUAY LẠI","ESC TO GO BACK":"ESC QUAY LẠI","ARROW KEYS / D-PAD TO SELECT":"PHÍM MŨI TÊN ĐỂ CHỌN","ENTER TO CONFIRM":"ENTER XÁC NHẬN","DEFEAT A BOSS TO UNLOCK BOSS PRACTICE":"HẠ TRÙM ĐỂ MỞ LUYỆN TẬP","CLEAR THE CAMPAIGN TO UNLOCK":"HOÀN THÀNH CHIẾN DỊCH ĐỂ MỞ","The threat has been neutralized.":"Mối đe dọa đã bị loại bỏ.","Outstanding work, pilot.":"Nhiệm vụ hoàn thành, phi công!","You silenced the relay. The void is quiet...":"Đã vô hiệu hóa trạm chuyển tiếp.","For now.":"Bầu trời đã an toàn.","Thank you for playing Neon Storm γ — more to come!":"Cảm ơn đã chơi F-16 Air Striker!","0.5x SCORE  •  5 LIVES  •  ALL ASSISTS ON":"0,5x ĐIỂM • 5 MẠNG • CÓ HỖ TRỢ","1.0x SCORE  •  3 LIVES  •  STANDARD EXPERIENCE":"1x ĐIỂM • 3 MẠNG • TIÊU CHUẨN","2.0x SCORE  •  1 LIFE  •  NO BOMBS OR FOCUS":"2x ĐIỂM • 1 MẠNG • KHÔNG BOM","MIX AND MATCH  •  NO LEADERBOARD":"TỰ CHỈNH • KHÔNG XẾP HẠNG"};
 Object.assign(F16_VI,{"ARMAMENT":"VŨ KHÍ","UPGRADE":"NÂNG CẤP","SWITCH TO":"ĐỔI SANG","A WIDE FAN OF SHOTS":"Đạn tỏa hình quạt","MISSILES THAT SEEK THEIR TARGET":"Tên lửa tự tìm mục tiêu","A PIERCING BEAM, HIGH DAMAGE":"Tia xuyên giáp sát thương cao","WEAPON POWER +1":"Tăng một cấp vũ khí","MORE DRONE FIREPOWER":"Tăng hỏa lực UAV","AN EXTRA SHIP":"Thêm một mạng","CLEAR THE SCREEN WHEN IT GETS BAD":"Xóa đạn địch khi nguy cấp","FIRST BLOOD":"CHIẾN CÔNG ĐẦU","BOSS SLAYER":"HẠ TRÙM","BOSS MASTER":"BẬC THẦY ĐẤU TRÙM","EXTERMINATOR":"TIÊU DIỆT ĐỊCH","CHAIN STARTER":"LIÊN KÍCH KHỞI ĐẦU","CHAIN EXPERT":"CHUYÊN GIA LIÊN KÍCH","CHAIN MASTER":"BẬC THẦY LIÊN KÍCH","SCORE LEGEND":"HUYỀN THOẠI ĐIỂM SỐ","UNTOUCHABLE":"BẤT BẠI","FULLY ARMED":"VŨ TRANG TỐI ĐA","DRONE COMMANDER":"CHỈ HUY UAV","THE ARCHITECT":"KIẾN TRÚC SƯ","THE FURNACE":"LÒ LUYỆN","THE LEVIATHAN":"THỦY QUÁI","THE NEXUS":"LÕI ĐIỀU KHIỂN","THE ECHO":"TIẾNG VỌNG","TAP":"CHẠM","LV":"CẤP","SHOOT":"BẮN","PLAYER":"PHI CÔNG","PILOT":"PHI CÔNG","COMBO":"LIÊN KÍCH","BEST":"KỶ LỤC","NEW RECORD":"KỶ LỤC MỚI","CLOSE":"ĐÓNG","EXIT":"THOÁT","SELECT":"CHỌN","RETURN TO TITLE":"VỀ TRANG CHỦ","QUIT TO TITLE":"VỀ TRANG CHỦ","SHOP":"CỬA HÀNG","PURCHASE":"MUA","COST":"GIÁ","OWNED":"ĐÃ SỞ HỮU","UNLOCK":"MỞ KHÓA","CUSTOMIZE":"TÙY CHỈNH","WARNING":"CẢNH BÁO","INCOMING":"ĐANG ĐẾN","VICTORY":"CHIẾN THẮNG","MISSION":"NHIỆM VỤ","FIREPOWER":"HỎA LỰC","GRAZES":"NÉ SÁT","KILLS":"TIÊU DIỆT"});
+Object.assign(F16_VI,{'PRESS ENTER TO LAUNCH':'ENTER ĐỂ XUẤT KÍCH','MOVEMENT':'DI CHUYỂN','SHOOTING':'TỰ ĐỘNG BẮN'});
 const F16_KEYS=Object.keys(F16_VI).sort((a,b)=>b.length-a.length);
 const F16_PATTERN=new RegExp('(^|[^A-Za-zÀ-ỹ])('+F16_KEYS.filter(k=>/^[A-Z][A-Z ]+$/.test(k)).join('|')+')(?![A-Za-zÀ-ỹ])','g');
 function f16vi(value){
